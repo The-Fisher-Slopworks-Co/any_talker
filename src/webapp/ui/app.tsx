@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { api } from "./api-client";
-import type { Settings } from "../../shared/types";
+import type { Settings, WhitelistEntry } from "../../shared/types";
 
 type Tab = "prompt" | "model" | "ratelimit" | "whitelist";
 
@@ -173,6 +173,95 @@ function RateLimitTab({
   );
 }
 
+function WhitelistList({
+  kind,
+  entries,
+  onAdd,
+  onRemove,
+}: {
+  kind: "users" | "chats";
+  entries: WhitelistEntry[];
+  onAdd: (e: WhitelistEntry) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const [id, setId] = useState("");
+  const [label, setLabel] = useState("");
+  const submit = async () => {
+    if (!id.trim()) return;
+    await onAdd({ id: id.trim(), label: label.trim() || undefined });
+    setId("");
+    setLabel("");
+  };
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold capitalize">{kind}</h3>
+      <ul className="space-y-1">
+        {entries.length === 0 && <li className="text-gray-400 text-sm">empty</li>}
+        {entries.map((e) => (
+          <li key={e.id} className="flex justify-between border-b py-1">
+            <span>
+              <code>{e.id}</code>
+              {e.label && <span className="ml-2 text-gray-500">{e.label}</span>}
+            </span>
+            <button
+              className="text-red-500 text-sm"
+              onClick={() => onRemove(e.id)}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex gap-2">
+        <input
+          className="border rounded p-2 flex-1"
+          placeholder="ID"
+          value={id}
+          onChange={(e) => setId(e.target.value)}
+        />
+        <input
+          className="border rounded p-2 flex-1"
+          placeholder="label (optional)"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+        <button className="px-3 py-2 bg-blue-500 text-white rounded" onClick={submit}>
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WhitelistTab() {
+  const [users, setUsers] = useState<WhitelistEntry[]>([]);
+  const [chats, setChats] = useState<WhitelistEntry[]>([]);
+
+  useEffect(() => {
+    api.getWhitelist().then((d) => {
+      setUsers(d.users);
+      setChats(d.chats);
+    });
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <WhitelistList
+        kind="users"
+        entries={users}
+        onAdd={async (e) => setUsers(await api.addWhitelist("users", e))}
+        onRemove={async (id) => setUsers(await api.removeWhitelist("users", id))}
+      />
+      <WhitelistList
+        kind="chats"
+        entries={chats}
+        onAdd={async (e) => setChats(await api.addWhitelist("chats", e))}
+        onRemove={async (id) => setChats(await api.removeWhitelist("chats", id))}
+      />
+    </div>
+  );
+}
+
 function App() {
   const [tab, setTab] = useState<Tab>("prompt");
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -210,7 +299,7 @@ function App() {
         {tab === "prompt" && <PromptTab settings={settings} onSaved={setSettings} />}
         {tab === "model" && <ModelTab settings={settings} onSaved={setSettings} />}
         {tab === "ratelimit" && <RateLimitTab settings={settings} onSaved={setSettings} />}
-        {tab === "whitelist" && <div>Whitelist editor coming up.</div>}
+        {tab === "whitelist" && <WhitelistTab />}
       </section>
     </div>
   );
