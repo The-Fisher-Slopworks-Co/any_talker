@@ -1,0 +1,52 @@
+import { loadConfig } from "./config";
+import { KeyDBStorage } from "./storage/keydb";
+import { TokenBucketLimiter } from "./ratelimit/token-bucket";
+import { OpenRouterAIClient } from "./ai/openrouter";
+import { registerTool } from "./ai/tools/registry";
+import { randomNumberTool } from "./ai/tools/random-number";
+import { createBot } from "./bot";
+import { startServer } from "./webapp/server";
+
+async function main() {
+  const config = loadConfig();
+
+  const storage = await KeyDBStorage.connect(config.keydbUrl);
+  const rateLimiter = new TokenBucketLimiter(storage);
+  const ai = new OpenRouterAIClient(config.openrouterApiKey);
+
+  registerTool(randomNumberTool);
+
+  const bot = createBot({
+    botToken: config.botToken,
+    ownerId: config.botOwnerId,
+    webappUrl: config.webappUrl,
+    storage,
+    rateLimiter,
+    ai,
+  });
+
+  if (config.webhookUrl) {
+    await bot.api.setWebhook(`${config.webhookUrl}/telegram-webhook`);
+    console.log("Webhook set:", config.webhookUrl);
+  } else {
+    await bot.api.deleteWebhook();
+    bot.start({ drop_pending_updates: true });
+    console.log("Bot started in long-polling mode");
+  }
+
+  const server = startServer({
+    port: config.port,
+    bot,
+    botToken: config.botToken,
+    ownerId: config.botOwnerId,
+    webhookUrl: config.webhookUrl,
+    storage,
+    rateLimiter,
+  });
+  console.log(`HTTP server listening on :${server.port}`);
+}
+
+main().catch((err) => {
+  console.error("Fatal:", err);
+  process.exit(1);
+});
