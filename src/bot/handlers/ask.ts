@@ -1,0 +1,103 @@
+import type { Storage } from "../../storage/types";
+import type { RateLimiter } from "../../ratelimit/types";
+import type { AIClient } from "../../ai/types";
+import { isAllowed } from "../access";
+import { buildContext, type ReplyTarget } from "../context-builder";
+import { getOrInitSettings } from "../../settings";
+import { getAllTools } from "../../ai/tools/registry";
+
+export type AskInput = {
+  storage: Storage;
+  rateLimiter: RateLimiter;
+  ai: AIClient;
+  ownerId: string;
+  now: number;
+  chatId: string;
+  userId: string;
+  userText: string;
+  replyTarget: ReplyTarget | null;
+};
+
+export type AskOutcome =
+  | { kind: "denied" }
+  | { kind: "usage" }
+  | { kind: "rateLimited"; minutesUntilNextRefill: number }
+  | {
+      kind: "answered";
+      text: string;
+      persistConversation: (botMsgId: number) => Promise<void>;
+    }
+  | { kind: "error"; message: string };
+
+export async function askHandler(input: AskInput): Promise<AskOutcome> {
+  const allowed = await isAllowed({
+    storage: input.storage,
+    ownerId: input.ownerId,
+    userId: input.userId,
+    chatId: input.chatId,
+  });
+  if (!allowed) return { kind: "denied" };
+
+  if (input.userText.trim() === "" && input.replyTarget === null) {
+    return { kind: "usage" };
+  }
+
+  const settings = await getOrInitSettings(input.storage);
+
+  const isOwner = input.userId === input.ownerId;
+  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
+  if (!skipRateLimit) {
+    const r = await input.rateLimiter.check(input.userId, settings.rateLimit, input.now);
+    if (!r.allowed) {
+      return {
+        kind: "rateLimited",
+        minutesUntilNextRefill: Math.ceil(r.msUntilNextRefill / 60_000),
+      };
+    }
+  }
+
+  const messages = await buildContext({
+    storage: input.storage,
+    chatId: input.chatId,
+    systemPrompt: settings.systemPrompt,
+    userText: input.userText,
+    replyTarget: input.replyTarget,
+  });
+
+  let result;
+  try {
+    result = await input.ai.ask({
+      model: settings.model,
+      messages,
+      tools: getAllTools(),
+    });
+  } catch (err) {
+    return { kind: "error", message: err instanceof Error ? err.message : String(err) };
+  }
+
+  if (!skipRateLimit) {
+    await input.rateLimiter.deduct(input.userId, result.totalTokens);
+  }
+
+  let parentBotMsgId: number | null = null;
+  if (input.replyTarget) {
+    const existing = await input.storage.getConversation(
+      input.chatId,
+      input.replyTarget.messageId,
+    );
+    if (existing) parentBotMsgId = input.replyTarget.messageId;
+  }
+
+  return {
+    kind: "answered",
+    text: result.text,
+    persistConversation: async (botMsgId) => {
+      await input.storage.saveConversation(input.chatId, botMsgId, {
+        userQuestion: input.userText,
+        botAnswer: result.text,
+        parentBotMsgId,
+        ts: input.now,
+      });
+    },
+  };
+}
