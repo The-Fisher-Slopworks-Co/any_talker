@@ -1,12 +1,30 @@
 {
   "name": "any_talker",
-  "module": "index.ts",
+  "module": "src/main.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --hot ./src/main.ts",
+    "start": "bun ./src/main.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "bun-plugin-tailwind": "latest",
+    "tailwindcss": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "grammy": "latest",
+    "ai": "latest",
+    "@openrouter/ai-sdk-provider": "latest",
+    "zod": "latest",
+    "react": "latest",
+    "react-dom": "latest"
   }
 }
