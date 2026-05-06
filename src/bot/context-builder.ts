@@ -40,7 +40,9 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
     }
   }
 
-  messages.push({ role: "user", content: userText });
+  if (userText.trim() !== "") {
+    messages.push({ role: "user", content: userText });
+  }
   return messages;
 }
 

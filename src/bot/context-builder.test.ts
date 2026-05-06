@@ -149,4 +149,41 @@ describe("buildContext", () => {
       content: "Context (replied message from Alice): <media>",
     });
   });
+
+  test("empty userText with non-bot reply: synthetic context becomes the prompt", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      systemPrompt: "SYS",
+      userText: "",
+      replyTarget: { messageId: 999, text: "what is 2+2?", authorFirstName: "Alice" },
+    });
+    expect(msgs).toEqual([
+      { role: "system", content: "SYS" },
+      { role: "user", content: "Context (replied message from Alice): what is 2+2?" },
+    ]);
+  });
+
+  test("empty userText with bot-msg reply: chain becomes the prompt (no trailing empty user)", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+    });
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      systemPrompt: "SYS",
+      userText: "",
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
+    });
+    expect(msgs).toEqual([
+      { role: "system", content: "SYS" },
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+    ]);
+  });
 });
