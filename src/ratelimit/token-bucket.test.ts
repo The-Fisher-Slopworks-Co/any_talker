@@ -91,4 +91,13 @@ describe("TokenBucketLimiter", () => {
     await lim.deduct("u1", 1000);
     expect((await storage.getBucket("u1"))?.tokens).toBe(-900);
   });
+
+  test("deduct seeds a deficit bucket if storage was empty", async () => {
+    const storage = new MemoryStorage();
+    const lim = new TokenBucketLimiter(storage);
+    await lim.deduct("u1", 100);
+    const b = await storage.getBucket("u1");
+    expect(b).not.toBeNull();
+    expect(b?.tokens).toBe(-100);
+  });
 });
