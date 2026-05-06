@@ -48,7 +48,13 @@ export class TokenBucketLimiter implements RateLimiter {
 
   async deduct(userId: string, tokens: number): Promise<void> {
     const current = await this.storage.getBucket(userId);
-    if (!current) return;
+    if (!current) {
+      await this.storage.saveBucket(userId, {
+        tokens: -tokens,
+        lastRefillTs: Date.now(),
+      });
+      return;
+    }
     await this.storage.saveBucket(userId, {
       tokens: current.tokens - tokens,
       lastRefillTs: current.lastRefillTs,
