@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 :root {
   --tg-bg: var(--tg-theme-bg-color, #ffffff);
   --tg-secondary: var(--tg-theme-secondary-bg-color, #efeff4);
