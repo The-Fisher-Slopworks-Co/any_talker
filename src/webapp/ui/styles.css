@@ -146,7 +146,8 @@ input[type="number"]::-webkit-outer-spin-button {
   position: relative;
 }
 
-.tg-row + .tg-row::before {
+.tg-row + .tg-row::before,
+.tg-row + .tg-button-row::before {
   content: "";
   position: absolute;
   top: 0;
@@ -226,19 +227,26 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .tg-button-row {
+  position: relative;
   display: block;
   background: var(--tg-section);
   color: var(--tg-link);
   border: none;
   width: 100%;
-  text-align: left;
+  text-align: center;
   padding: 13px 16px;
   font-size: 16px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.tg-button-row:active {
+.tg-button-row:active:not(:disabled) {
   background: var(--tg-separator);
+}
+
+.tg-button-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tg-button-destructive {
