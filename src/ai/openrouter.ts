@@ -12,6 +12,7 @@ export class OpenRouterAIClient implements AIClient {
 
   async ask(opts: {
     model: string;
+    system: string;
     messages: AIMessage[];
     tools: Tool[];
   }): Promise<AskResult> {
@@ -26,6 +27,7 @@ export class OpenRouterAIClient implements AIClient {
 
     const result = await generateText({
       model: this.provider(opts.model),
+      system: opts.system,
       messages: opts.messages,
       tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
       stopWhen: stepCountIs(5),

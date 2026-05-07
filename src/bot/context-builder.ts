@@ -11,16 +11,15 @@ export type ReplyTarget = {
 export type BuildContextArgs = {
   storage: Storage;
   chatId: string;
-  systemPrompt: string;
   userText: string;
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
 };
 
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, systemPrompt, userText, replyTarget } = args;
+  const { storage, chatId, userText, replyTarget } = args;
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
-  const messages: AIMessage[] = [{ role: "system", content: systemPrompt }];
+  const messages: AIMessage[] = [];
 
   if (replyTarget !== null) {
     const node = await storage.getConversation(chatId, replyTarget.messageId);
