@@ -56,7 +56,7 @@ function PromptTab({
       <Card>
         <div className="tg-row">
           <input
-            className="tg-input left tg-mono"
+            className="tg-input left"
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="Model ID"
@@ -262,7 +262,7 @@ function WhitelistList({
       <Card>
         <div className="tg-row">
           <input
-            className="tg-input left tg-mono"
+            className="tg-input left"
             placeholder={kind === "users" ? "User ID" : "Chat ID"}
             value={id}
             onChange={(e) => setId(e.target.value)}
