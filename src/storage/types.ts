@@ -17,6 +17,9 @@ export interface Storage {
   getBucket(userId: string): Promise<BucketState | null>;
   saveBucket(userId: string, state: BucketState): Promise<void>;
 
+  getUserName(userId: string): Promise<string | null>;
+  setUserName(userId: string, name: string | null): Promise<void>;
+
   getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null>;
   saveConversation(
     chatId: string,

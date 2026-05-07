@@ -12,6 +12,7 @@ export type ReplyTarget = {
 export type Sender = {
   firstName: string | null;
   lastName: string | null;
+  nameOverride: string | null;
 };
 
 export type BuildContextArgs = {
@@ -30,10 +31,14 @@ export function buildUserEnvelope(args: {
   quote: string | null;
   text: string;
 }): string {
-  const author = [args.sender.firstName, args.sender.lastName]
-    .map((s) => (s ?? "").trim())
-    .filter((s) => s.length > 0)
-    .join(" ");
+  const override = args.sender.nameOverride?.trim() ?? "";
+  const author =
+    override.length > 0
+      ? override
+      : [args.sender.firstName, args.sender.lastName]
+          .map((s) => (s ?? "").trim())
+          .filter((s) => s.length > 0)
+          .join(" ");
 
   const obj: Record<string, string> = { author };
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;

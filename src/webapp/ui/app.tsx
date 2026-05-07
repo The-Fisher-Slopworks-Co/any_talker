@@ -2,10 +2,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { api } from "./api-client";
+import { api, type MeResponse } from "./api-client";
 import type { Settings, WhitelistEntry, BucketState } from "../../shared/types";
 
 type Tab = "prompt" | "ratelimit" | "whitelist";
+type View = "main" | "admin";
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return <div className="tg-section-header">{children}</div>;
@@ -27,6 +28,75 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       onClick={() => onChange(!value)}
       aria-pressed={value}
     />
+  );
+}
+
+function MainView({
+  me,
+  onMe,
+  onOpenAdmin,
+}: {
+  me: MeResponse;
+  onMe: (m: MeResponse) => void;
+  onOpenAdmin: () => void;
+}) {
+  const [name, setName] = useState(me.displayName ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const tg = window.Telegram?.WebApp;
+  const tgUser = tg?.initDataUnsafe?.user;
+  const tgName = tgUser
+    ? [tgUser.first_name, tgUser.last_name]
+        .filter((s): s is string => Boolean(s && s.trim().length > 0))
+        .join(" ")
+    : "";
+
+  const dirty = name.trim() !== (me.displayName ?? "");
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const next = await api.putMe(name.trim() || null);
+      onMe(next);
+      setName(next.displayName ?? "");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="tg-stack">
+      <SectionHeader>Display Name</SectionHeader>
+      <Card>
+        <label className="tg-row">
+          <span className="tg-row-label">Name</span>
+          <input
+            className="tg-input"
+            placeholder={tgName || "Your name"}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+      </Card>
+      <SectionFooter>Name shown to the AI.</SectionFooter>
+
+      <div className="tg-action">
+        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
+          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+        </button>
+      </div>
+
+      {me.isOwner && (
+        <>
+          <SectionHeader>Bot Configuration</SectionHeader>
+          <Card>
+            <button className="tg-button-row" onClick={onOpenAdmin}>
+              Admin panel
+            </button>
+          </Card>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -76,7 +146,7 @@ function PromptTab({
       </Card>
       <SectionFooter>Sent as the system message on every /ask request.</SectionFooter>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="tg-action">
         <button className="tg-button" disabled={saving || !dirty} onClick={save}>
           {saving ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
@@ -175,7 +245,7 @@ function RateLimitTab({
         the interval.
       </SectionFooter>
 
-      <div style={{ marginTop: 16 }}>
+      <div className="tg-action">
         <button className="tg-button" disabled={saving || !dirty} onClick={save}>
           {saving ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
@@ -324,16 +394,24 @@ function WhitelistTab() {
   );
 }
 
-function App() {
+function AdminView({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<Tab>("prompt");
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    tg?.ready();
-    tg?.expand();
     api.getSettings().then(setSettings);
   }, []);
+
+  useEffect(() => {
+    const back = window.Telegram?.WebApp?.BackButton;
+    if (!back) return;
+    back.show();
+    back.onClick(onBack);
+    return () => {
+      back.offClick(onBack);
+      back.hide();
+    };
+  }, [onBack]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "prompt", label: "Prompt" },
@@ -342,8 +420,7 @@ function App() {
   ];
 
   return (
-    <div className="tg-page">
-      <div className="tg-title">Bot Admin</div>
+    <>
       <div className="tg-tabs" role="tablist">
         <div
           className="tg-tab-indicator"
@@ -373,6 +450,31 @@ function App() {
         <RateLimitTab settings={settings} onSaved={setSettings} />
       ) : (
         <WhitelistTab />
+      )}
+    </>
+  );
+}
+
+function App() {
+  const [view, setView] = useState<View>("main");
+  const [me, setMe] = useState<MeResponse | null>(null);
+
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
+    api.getMe().then(setMe);
+  }, []);
+
+  return (
+    <div className="tg-page">
+      <div className="tg-title">{view === "admin" ? "Bot Admin" : "Settings"}</div>
+      {!me ? (
+        <div className="tg-loading">Loading…</div>
+      ) : view === "main" ? (
+        <MainView me={me} onMe={setMe} onOpenAdmin={() => setView("admin")} />
+      ) : (
+        <AdminView onBack={() => setView("main")} />
       )}
     </div>
   );

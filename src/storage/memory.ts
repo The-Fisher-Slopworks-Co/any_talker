@@ -14,6 +14,7 @@ export class MemoryStorage implements Storage {
   };
   private buckets = new Map<string, BucketState>();
   private conversations = new Map<string, ConversationNode>();
+  private userNames = new Map<string, string>();
 
   private convKey(chatId: string, botMsgId: number): string {
     return `${chatId}:${botMsgId}`;
@@ -50,6 +51,15 @@ export class MemoryStorage implements Storage {
 
   async saveBucket(userId: string, state: BucketState): Promise<void> {
     this.buckets.set(userId, { ...state });
+  }
+
+  async getUserName(userId: string): Promise<string | null> {
+    return this.userNames.get(userId) ?? null;
+  }
+
+  async setUserName(userId: string, name: string | null): Promise<void> {
+    if (name === null) this.userNames.delete(userId);
+    else this.userNames.set(userId, name);
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {

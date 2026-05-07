@@ -59,6 +59,16 @@ export class KeyDBStorage implements Storage {
     await this.client.set(`${PREFIX}bucket:${userId}`, JSON.stringify(state));
   }
 
+  async getUserName(userId: string): Promise<string | null> {
+    return await this.client.get(`${PREFIX}user_name:${userId}`);
+  }
+
+  async setUserName(userId: string, name: string | null): Promise<void> {
+    const key = `${PREFIX}user_name:${userId}`;
+    if (name === null) await this.client.del(key);
+    else await this.client.set(key, name);
+  }
+
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {
     const raw = await this.client.get(`${PREFIX}msg:${chatId}:${botMsgId}`);
     return raw ? (JSON.parse(raw) as ConversationNode) : null;

@@ -50,9 +50,8 @@ export function startServer(deps: ServerDeps) {
         if (!verify.ok) {
           return Response.json({ error: verify.reason }, { status: 401 });
         }
-        if (String(verify.user.id) !== deps.ownerId) {
-          return Response.json({ error: "forbidden" }, { status: 403 });
-        }
+        const userId = String(verify.user.id);
+        const actor = { userId, isOwner: userId === deps.ownerId };
 
         let body: unknown = null;
         if (req.method !== "GET" && req.method !== "DELETE") {
@@ -67,7 +66,7 @@ export function startServer(deps: ServerDeps) {
           path: url.pathname,
           body,
         };
-        const res = await handleApi(apiReq, apiDeps);
+        const res = await handleApi(apiReq, apiDeps, actor);
         return Response.json(res.body, { status: res.status });
       }
 
