@@ -3,6 +3,7 @@ import type {
   WhitelistEntry,
   BucketState,
   ConversationNode,
+  User,
 } from "../shared/types";
 
 export interface Storage {
@@ -19,6 +20,10 @@ export interface Storage {
 
   getUserName(userId: string): Promise<string | null>;
   setUserName(userId: string, name: string | null): Promise<void>;
+
+  listUsers(): Promise<User[]>;
+  upsertUser(user: User): Promise<void>;
+  getUser(id: string): Promise<User | null>;
 
   getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null>;
   saveConversation(

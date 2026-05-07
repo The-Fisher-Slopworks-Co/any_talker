@@ -24,6 +24,12 @@ export type ApiDeps = {
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
 
+function normalizeDisplayName(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function handleApi(
   req: ApiRequest,
   deps: ApiDeps,
@@ -39,9 +45,7 @@ export async function handleApi(
     }
     if (req.method === "PUT") {
       const body = (req.body ?? {}) as { displayName?: string | null };
-      const trimmed =
-        typeof body.displayName === "string" ? body.displayName.trim() : null;
-      const next = trimmed && trimmed.length > 0 ? trimmed : null;
+      const next = normalizeDisplayName(body.displayName);
       await deps.storage.setUserName(actor.userId, next);
       return {
         status: 200,
@@ -92,6 +96,32 @@ export async function handleApi(
       await deps.storage.removeWhitelist(kind, m[1]!);
       const list = await deps.storage.listWhitelist(kind);
       return { status: 200, body: list };
+    }
+  }
+
+  if (req.path === "/api/admin/users" && req.method === "GET") {
+    const users = await deps.storage.listUsers();
+    return { status: 200, body: { users } };
+  }
+
+  const userMatch = req.path.match(/^\/api\/admin\/users\/(.+)$/);
+  if (userMatch) {
+    const id = userMatch[1]!;
+    if (req.method === "GET") {
+      const [user, displayName] = await Promise.all([
+        deps.storage.getUser(id),
+        deps.storage.getUserName(id),
+      ]);
+      if (!user) return { status: 404, body: { error: "user not found" } };
+      return { status: 200, body: { user, displayName } };
+    }
+    if (req.method === "PUT") {
+      const user = await deps.storage.getUser(id);
+      if (!user) return { status: 404, body: { error: "user not found" } };
+      const body = (req.body ?? {}) as { displayName?: string | null };
+      const displayName = normalizeDisplayName(body.displayName);
+      await deps.storage.setUserName(id, displayName);
+      return { status: 200, body: { user, displayName } };
     }
   }
 

@@ -22,6 +22,22 @@ const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
 export function createBot(deps: BotDeps): Bot {
   const bot = new Bot(deps.botToken);
 
+  bot.use(async (ctx, next) => {
+    const from = ctx.from;
+    if (from && !from.is_bot) {
+      void deps.storage
+        .upsertUser({
+          id: String(from.id),
+          firstName: from.first_name ?? null,
+          lastName: from.last_name ?? null,
+          username: from.username ?? null,
+          lastSeenAt: Date.now(),
+        })
+        .catch((err) => console.error("upsertUser failed:", err));
+    }
+    await next();
+  });
+
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
   const dispatchAsk = async (ctx: Context, userText: string) => {

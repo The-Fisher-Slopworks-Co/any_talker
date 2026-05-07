@@ -26,6 +26,14 @@ export type BucketState = {
   lastRefillTs: number;
 };
 
+export type User = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
+  lastSeenAt: number;
+};
+
 export type ConversationNode = {
   userQuestion: string;
   botAnswer: string;
@@ -46,3 +54,13 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const MAX_REPLY_CHAIN_DEPTH = 20;
 export const CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+export function composeFullName(
+  firstName: string | null | undefined,
+  lastName: string | null | undefined,
+): string {
+  return [firstName, lastName]
+    .map((s) => (s ?? "").trim())
+    .filter((s) => s.length > 0)
+    .join(" ");
+}
