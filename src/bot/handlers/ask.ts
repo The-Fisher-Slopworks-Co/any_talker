@@ -59,7 +59,6 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   const messages = await buildContext({
     storage: input.storage,
     chatId: input.chatId,
-    systemPrompt: settings.systemPrompt,
     userText: input.userText,
     replyTarget: input.replyTarget,
   });
@@ -68,6 +67,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   try {
     result = await input.ai.ask({
       model: settings.model,
+      system: settings.systemPrompt,
       messages,
       tools: getAllTools(),
     });
