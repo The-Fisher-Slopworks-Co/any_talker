@@ -6,6 +6,7 @@ export type ReplyTarget = {
   messageId: number;
   text: string | null;
   authorFirstName: string | null;
+  image: Uint8Array | null;
 };
 
 export type Sender = {
@@ -19,6 +20,7 @@ export type BuildContextArgs = {
   sender: Sender;
   userText: string;
   quote: string | null;
+  image: Uint8Array | null;
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
 };
@@ -40,7 +42,7 @@ export function buildUserEnvelope(args: {
 }
 
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, sender, userText, quote, replyTarget } = args;
+  const { storage, chatId, sender, userText, quote, image, replyTarget } = args;
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   const messages: AIMessage[] = [];
 
@@ -55,19 +57,35 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
     } else {
       const author = replyTarget.authorFirstName ?? "unknown";
       const text = replyTarget.text ?? "<media>";
-      messages.push({
-        role: "user",
-        content: `Context (replied message from ${author}): ${text}`,
-      });
+      const header = `Context (replied message from ${author}): ${text}`;
+      if (replyTarget.image !== null) {
+        messages.push({
+          role: "user",
+          content: [
+            { type: "text", text: header },
+            { type: "image", image: replyTarget.image, mediaType: "image/jpeg" },
+          ],
+        });
+      } else {
+        messages.push({ role: "user", content: header });
+      }
     }
   }
 
   const hasQuote = quote !== null && quote.trim() !== "";
-  if (userText.trim() !== "" || hasQuote) {
-    messages.push({
-      role: "user",
-      content: buildUserEnvelope({ sender, quote, text: userText }),
-    });
+  if (userText.trim() !== "" || hasQuote || image !== null) {
+    const envelope = buildUserEnvelope({ sender, quote, text: userText });
+    if (image !== null) {
+      messages.push({
+        role: "user",
+        content: [
+          { type: "text", text: envelope },
+          { type: "image", image, mediaType: "image/jpeg" },
+        ],
+      });
+    } else {
+      messages.push({ role: "user", content: envelope });
+    }
   }
   return messages;
 }

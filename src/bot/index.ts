@@ -5,6 +5,7 @@ import type { AIClient } from "../ai/types";
 import { askHandler } from "./handlers/ask";
 import { makeStartHandler } from "./handlers/start";
 import type { ReplyTarget } from "./context-builder";
+import { pickPhotoSize, downloadTelegramFile } from "./photo";
 
 export type BotDeps = {
   botToken: string;
@@ -15,22 +16,53 @@ export type BotDeps = {
   ai: AIClient;
 };
 
+const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+
 export function createBot(deps: BotDeps): Bot {
   const bot = new Bot(deps.botToken);
 
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
-  bot.command("ask", async (ctx) => {
+  const dispatchAsk = async (ctx: Context, userText: string) => {
     const userId = String(ctx.from?.id ?? "");
     const chatId = ctx.chat?.id;
     if (!userId || chatId === undefined) return;
-    const userText = (ctx.match ?? "").toString().trim();
+
     const replyTarget = extractReplyTarget(ctx);
     const sender = {
       firstName: ctx.from?.first_name ?? null,
       lastName: ctx.from?.last_name ?? null,
     };
     const quote = ctx.message?.quote?.text ?? null;
+
+    let image: Uint8Array | null = null;
+    const photo = ctx.message?.photo;
+    if (photo && photo.length > 0) {
+      const picked = pickPhotoSize(photo);
+      if (picked) {
+        try {
+          image = await downloadTelegramFile(deps.botToken, picked.file_id);
+        } catch (err) {
+          console.error("photo download failed:", err);
+          await ctx.reply("⚠️ Couldn't fetch the attached photo.");
+          return;
+        }
+      }
+    }
+
+    if (replyTarget) {
+      const replyPhoto = ctx.message?.reply_to_message?.photo;
+      if (replyPhoto && replyPhoto.length > 0) {
+        const picked = pickPhotoSize(replyPhoto);
+        if (picked) {
+          try {
+            replyTarget.image = await downloadTelegramFile(deps.botToken, picked.file_id);
+          } catch (err) {
+            console.error("reply photo download failed:", err);
+          }
+        }
+      }
+    }
 
     const outcome = await askHandler({
       storage: deps.storage,
@@ -43,12 +75,13 @@ export function createBot(deps: BotDeps): Bot {
       sender,
       userText,
       quote,
+      image,
       replyTarget,
     });
 
     switch (outcome.kind) {
       case "denied":
-        return; // silent
+        return;
       case "usage":
         await ctx.reply("Usage: /ask <text> or reply to a message with /ask");
         return;
@@ -69,6 +102,17 @@ export function createBot(deps: BotDeps): Bot {
         return;
       }
     }
+  };
+
+  bot.command("ask", async (ctx) => {
+    await dispatchAsk(ctx, (ctx.match ?? "").toString().trim());
+  });
+
+  bot.on("message:photo", async (ctx) => {
+    const caption = ctx.message.caption ?? "";
+    const m = caption.match(ASK_CAPTION_RE);
+    if (!m) return;
+    await dispatchAsk(ctx, (m[1] ?? "").trim());
   });
 
   bot.catch((err) => {
@@ -86,5 +130,6 @@ function extractReplyTarget(ctx: Context): ReplyTarget | null {
     messageId: reply.message_id,
     text,
     authorFirstName: reply.from?.first_name ?? null,
+    image: null,
   };
 }

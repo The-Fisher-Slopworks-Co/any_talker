@@ -20,6 +20,7 @@ describe("buildContext", () => {
       userText: "hello",
       quote: null,
       replyTarget: null,
+      image: null,
     });
     expect(msgs).toEqual([{ role: "user", content: envelope({ text: "hello" }) }]);
   });
@@ -33,6 +34,7 @@ describe("buildContext", () => {
       userText: "what does this mean",
       quote: "to be or not to be",
       replyTarget: null,
+      image: null,
     });
     expect(msgs[0]!.content).toBe(
       JSON.stringify({ author: "John Doe", quote: "to be or not to be", text: "what does this mean" }),
@@ -54,6 +56,7 @@ describe("buildContext", () => {
       userText: "hi",
       quote: null,
       replyTarget: null,
+      image: null,
     });
     expect(JSON.parse(msgs[0]!.content as string).author).toBe("Alice");
   });
@@ -67,6 +70,7 @@ describe("buildContext", () => {
       userText: "hi",
       quote: null,
       replyTarget: null,
+      image: null,
     });
     const parsed = JSON.parse(msgs[0]!.content as string);
     expect("quote" in parsed).toBe(false);
@@ -80,7 +84,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "what does that mean",
       quote: null,
-      replyTarget: { messageId: 999, text: "to be or not to be", authorFirstName: "Alice" },
+      replyTarget: { messageId: 999, text: "to be or not to be", authorFirstName: "Alice", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       {
@@ -105,7 +110,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "follow-up",
       quote: null,
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
@@ -134,7 +140,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "Q3",
       quote: null,
-      replyTarget: { messageId: 200, text: "A2", authorFirstName: "Bot" },
+      replyTarget: { messageId: 200, text: "A2", authorFirstName: "Bot", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
@@ -153,7 +160,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "hi",
       quote: null,
-      replyTarget: { messageId: 500, text: "old bot reply", authorFirstName: "Bot" },
+      replyTarget: { messageId: 500, text: "old bot reply", authorFirstName: "Bot", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       { role: "user", content: "Context (replied message from Bot): old bot reply" },
@@ -180,7 +188,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "next",
       quote: null,
-      replyTarget: { messageId: depth, text: `A${depth}`, authorFirstName: "Bot" },
+      replyTarget: { messageId: depth, text: `A${depth}`, authorFirstName: "Bot", image: null },
+      image: null,
       maxDepth: 5,
     });
     // (5 user + 5 assistant) + 1 current user = 11
@@ -196,7 +205,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "what is this",
       quote: null,
-      replyTarget: { messageId: 12, text: null, authorFirstName: "Alice" },
+      replyTarget: { messageId: 12, text: null, authorFirstName: "Alice", image: null },
+      image: null,
     });
     expect(msgs[0]).toEqual({
       role: "user",
@@ -212,7 +222,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "",
       quote: null,
-      replyTarget: { messageId: 999, text: "what is 2+2?", authorFirstName: "Alice" },
+      replyTarget: { messageId: 999, text: "what is 2+2?", authorFirstName: "Alice", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       { role: "user", content: "Context (replied message from Alice): what is 2+2?" },
@@ -233,12 +244,81 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "",
       quote: null,
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
     ]);
+  });
+
+  test("reply photo is attached to the synthetic context message when reply isn't in the chain", async () => {
+    const storage = new MemoryStorage();
+    const replyBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe1]);
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what's on this picture?",
+      quote: null,
+      image: null,
+      replyTarget: {
+        messageId: 999,
+        text: null,
+        authorFirstName: "Alice",
+        image: replyBytes,
+      },
+    });
+    expect(msgs).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Context (replied message from Alice): <media>" },
+          { type: "image", image: replyBytes, mediaType: "image/jpeg" },
+        ],
+      },
+      { role: "user", content: envelope({ text: "what's on this picture?" }) },
+    ]);
+  });
+
+  test("image is attached as a content part alongside the envelope", async () => {
+    const storage = new MemoryStorage();
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what is on this picture?",
+      quote: null,
+      replyTarget: null,
+      image: bytes,
+    });
+    expect(msgs).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: envelope({ text: "what is on this picture?" }) },
+          { type: "image", image: bytes, mediaType: "image/jpeg" },
+        ],
+      },
+    ]);
+  });
+
+  test("image-only message (no text, no quote) still produces multi-part envelope", async () => {
+    const storage = new MemoryStorage();
+    const bytes = new Uint8Array([1, 2, 3]);
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "",
+      quote: null,
+      replyTarget: null,
+      image: bytes,
+    });
+    expect(msgs).toHaveLength(1);
+    expect(Array.isArray(msgs[0]!.content)).toBe(true);
   });
 
   test("quote-only message (empty text) still produces envelope when reply is to bot msg", async () => {
@@ -255,7 +335,8 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "",
       quote: "explain this part",
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", image: null },
+      image: null,
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
