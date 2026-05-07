@@ -378,6 +378,13 @@ function App() {
     <div className="tg-page">
       <div className="tg-title">Bot Admin</div>
       <div className="tg-tabs" role="tablist">
+        <div
+          className="tg-tab-indicator"
+          style={{
+            width: `calc((100% - 6px) / ${tabs.length})`,
+            transform: `translateX(${tabs.findIndex((t) => t.id === tab) * 100}%)`,
+          }}
+        />
         {tabs.map((t) => (
           <button
             key={t.id}

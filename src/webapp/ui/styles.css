@@ -57,17 +57,31 @@ textarea {
 }
 
 .tg-tabs {
+  position: relative;
   display: flex;
   background: var(--tg-section);
   border-radius: 10px;
   padding: 3px;
-  gap: 2px;
   margin-bottom: 20px;
   box-shadow: 0 0 0 1px var(--tg-separator);
 }
 
+.tg-tab-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  background: var(--tg-button);
+  border-radius: 8px;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+  pointer-events: none;
+}
+
 .tg-tab {
   flex: 1;
+  position: relative;
+  z-index: 1;
   border: none;
   background: transparent;
   padding: 8px 6px;
@@ -76,11 +90,10 @@ textarea {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.2s;
 }
 
 .tg-tab.active {
-  background: var(--tg-button);
   color: var(--tg-button-text);
 }
 
