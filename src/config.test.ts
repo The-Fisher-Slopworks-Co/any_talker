@@ -13,7 +13,7 @@ test("loadConfig returns required fields when all env vars present", () => {
   expect(cfg.botOwnerId).toBe("12345");
   expect(cfg.webappUrl).toBe("https://example.com/app");
   expect(cfg.keydbUrl).toBe("redis://localhost:6379");
-  expect(cfg.port).toBe(3000);
+  expect(cfg.port).toBe(8080);
   expect(cfg.webhookUrl).toBeUndefined();
 });
 

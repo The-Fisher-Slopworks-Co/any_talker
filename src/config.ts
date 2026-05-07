@@ -15,7 +15,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     return v;
   };
 
-  const port = env.PORT ? Number(env.PORT) : 3000;
+  const port = env.PORT ? Number(env.PORT) : 8080;
   if (Number.isNaN(port)) throw new Error(`PORT must be a number, got: ${env.PORT}`);
 
   return {
