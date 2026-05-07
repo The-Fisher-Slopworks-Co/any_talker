@@ -22,7 +22,9 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   now: 1_000,
   chatId: "c1",
   userId: "42",
+  sender: { firstName: "John", lastName: "Doe" },
   userText: "hello",
+  quote: null,
   replyTarget: null,
   ...overrides,
 });
@@ -90,7 +92,7 @@ describe("askHandler", () => {
       await out.persistConversation(999);
       const node = await storage.getConversation("c1", 999);
       expect(node).toEqual({
-        userQuestion: "hello",
+        userQuestion: JSON.stringify({ author: "John Doe", text: "hello" }),
         botAnswer: "hi back",
         parentBotMsgId: null,
         ts: 1000,
