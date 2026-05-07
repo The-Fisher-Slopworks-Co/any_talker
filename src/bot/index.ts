@@ -6,6 +6,7 @@ import { askHandler } from "./handlers/ask";
 import { makeStartHandler } from "./handlers/start";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, downloadTelegramFile } from "./photo";
+import { resolveReplyAuthor } from "./reply";
 
 export type BotDeps = {
   botToken: string;
@@ -24,6 +25,8 @@ export function createBot(deps: BotDeps): Bot {
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
   const dispatchAsk = async (ctx: Context, userText: string) => {
+    if (ctx.message?.forward_origin) return;
+
     const userId = String(ctx.from?.id ?? "");
     const chatId = ctx.chat?.id;
     if (!userId || chatId === undefined) return;
@@ -149,7 +152,7 @@ function extractReplyTarget(ctx: Context): ReplyTarget | null {
   return {
     messageId: reply.message_id,
     text,
-    authorFirstName: reply.from?.first_name ?? null,
+    authorFirstName: resolveReplyAuthor(reply),
     image: null,
   };
 }
