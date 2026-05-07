@@ -1,68 +1,119 @@
 /// <reference lib="dom" />
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { api } from "./api-client";
-import type { Settings, WhitelistEntry } from "../../shared/types";
+import type { Settings, WhitelistEntry, BucketState } from "../../shared/types";
 
 type Tab = "prompt" | "model" | "ratelimit" | "whitelist";
 
-function PromptTab({ settings, onSaved }: { settings: Settings; onSaved: (s: Settings) => void }) {
+function SectionHeader({ children }: { children: ReactNode }) {
+  return <div className="tg-section-header">{children}</div>;
+}
+
+function SectionFooter({ children }: { children: ReactNode }) {
+  return <div className="tg-section-footer">{children}</div>;
+}
+
+function Card({ children }: { children: ReactNode }) {
+  return <div className="tg-card">{children}</div>;
+}
+
+function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      className={`tg-toggle ${value ? "on" : ""}`}
+      onClick={() => onChange(!value)}
+      aria-pressed={value}
+    />
+  );
+}
+
+function PromptTab({
+  settings,
+  onSaved,
+}: {
+  settings: Settings;
+  onSaved: (s: Settings) => void;
+}) {
   const [value, setValue] = useState(settings.systemPrompt);
   const [saving, setSaving] = useState(false);
+
+  const dirty = value !== settings.systemPrompt;
+
   const save = async () => {
     setSaving(true);
     const next = await api.putSettings({ systemPrompt: value });
     onSaved(next);
     setSaving(false);
   };
+
   return (
-    <div className="space-y-3">
-      <label className="block font-semibold">System Prompt</label>
-      <textarea
-        className="w-full h-48 border rounded p-2 font-mono text-sm"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
-      <button
-        className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-        disabled={saving}
-        onClick={save}
-      >
-        {saving ? "Saving..." : "Save"}
-      </button>
+    <div className="tg-stack">
+      <SectionHeader>System Prompt</SectionHeader>
+      <Card>
+        <textarea
+          className="tg-textarea"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="You are a helpful assistant…"
+        />
+      </Card>
+      <SectionFooter>
+        Sent as the system message on every /ask request.
+      </SectionFooter>
+      <div style={{ marginTop: 16 }}>
+        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
+          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+        </button>
+      </div>
     </div>
   );
 }
 
-function ModelTab({ settings, onSaved }: { settings: Settings; onSaved: (s: Settings) => void }) {
+function ModelTab({
+  settings,
+  onSaved,
+}: {
+  settings: Settings;
+  onSaved: (s: Settings) => void;
+}) {
   const [value, setValue] = useState(settings.model);
   const [saving, setSaving] = useState(false);
+
+  const dirty = value !== settings.model;
+
   const save = async () => {
     setSaving(true);
     const next = await api.putSettings({ model: value });
     onSaved(next);
     setSaving(false);
   };
+
   return (
-    <div className="space-y-3">
-      <label className="block font-semibold">Model (OpenRouter ID)</label>
-      <input
-        className="w-full border rounded p-2 font-mono text-sm"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="anthropic/claude-sonnet-4-5"
-      />
-      <p className="text-sm text-gray-500">
-        Examples: anthropic/claude-sonnet-4-5, openai/gpt-4o-mini, google/gemini-pro-1.5
-      </p>
-      <button
-        className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-        disabled={saving}
-        onClick={save}
-      >
-        {saving ? "Saving..." : "Save"}
-      </button>
+    <div className="tg-stack">
+      <SectionHeader>Model</SectionHeader>
+      <Card>
+        <div className="tg-row">
+          <input
+            className="tg-input left tg-mono"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="anthropic/claude-sonnet-4-5"
+          />
+        </div>
+      </Card>
+      <SectionFooter>
+        OpenRouter model ID. Examples: <span className="tg-mono">anthropic/claude-sonnet-4-5</span>,{" "}
+        <span className="tg-mono">openai/gpt-4o-mini</span>,{" "}
+        <span className="tg-mono">google/gemini-pro-1.5</span>.
+      </SectionFooter>
+      <div style={{ marginTop: 16 }}>
+        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
+          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -80,12 +131,18 @@ function RateLimitTab({
     Math.round(settings.rateLimit.refillIntervalMs / 60000),
   );
   const [ownerExempt, setOwnerExempt] = useState(settings.rateLimit.ownerExempt);
-  const [bucket, setBucket] = useState<{ tokens: number; lastRefillTs: number } | null>(null);
+  const [bucket, setBucket] = useState<BucketState | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.getMyBucket().then((r) => setBucket(r.bucket));
   }, []);
+
+  const dirty =
+    capacity !== settings.rateLimit.capacity ||
+    refillAmount !== settings.rateLimit.refillAmount ||
+    refillIntervalMin !== Math.round(settings.rateLimit.refillIntervalMs / 60000) ||
+    ownerExempt !== settings.rateLimit.ownerExempt;
 
   const save = async () => {
     setSaving(true);
@@ -107,68 +164,80 @@ function RateLimitTab({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block">
-          <span className="font-semibold">Capacity</span>
+    <div className="tg-stack">
+      <SectionHeader>Limits</SectionHeader>
+      <Card>
+        <label className="tg-row">
+          <span className="tg-row-label">Capacity</span>
           <input
             type="number"
-            className="w-full border rounded p-2"
+            className="tg-input"
             value={capacity}
             onChange={(e) => setCapacity(Number(e.target.value))}
           />
         </label>
-        <label className="block">
-          <span className="font-semibold">Refill amount</span>
+        <label className="tg-row">
+          <span className="tg-row-label">Refill amount</span>
           <input
             type="number"
-            className="w-full border rounded p-2"
+            className="tg-input"
             value={refillAmount}
             onChange={(e) => setRefillAmount(Number(e.target.value))}
           />
         </label>
-        <label className="block col-span-2">
-          <span className="font-semibold">Refill interval (minutes)</span>
+        <label className="tg-row">
+          <span className="tg-row-label">Refill every</span>
           <input
             type="number"
-            className="w-full border rounded p-2"
+            className="tg-input"
             value={refillIntervalMin}
             onChange={(e) => setRefillIntervalMin(Number(e.target.value))}
           />
+          <span className="tg-row-value" style={{ flex: "0 0 auto" }}>
+            min
+          </span>
         </label>
-        <label className="flex items-center gap-2 col-span-2">
-          <input
-            type="checkbox"
-            checked={ownerExempt}
-            onChange={(e) => setOwnerExempt(e.target.checked)}
-          />
-          <span>Owner exempt from rate limit</span>
-        </label>
-      </div>
-      <button
-        className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-        disabled={saving}
-        onClick={save}
-      >
-        {saving ? "Saving..." : "Save"}
-      </button>
+        <div className="tg-row">
+          <span className="tg-row-label">Owner exempt</span>
+          <span className="tg-row-value" style={{ flex: 1 }} />
+          <Toggle value={ownerExempt} onChange={setOwnerExempt} />
+        </div>
+      </Card>
+      <SectionFooter>
+        Tokens are deducted from each user's bucket per /ask. The bucket lazily refills based on
+        the interval.
+      </SectionFooter>
 
-      <hr />
-      <h2 className="font-semibold">My bucket</h2>
-      {bucket ? (
-        <p>
-          Tokens: <b>{bucket.tokens}</b> / {capacity} — last refill{" "}
-          {new Date(bucket.lastRefillTs).toLocaleString()}
-        </p>
-      ) : (
-        <p className="text-gray-500">No bucket yet (will be seeded on first /ask).</p>
-      )}
-      <button
-        className="px-4 py-2 bg-gray-200 rounded"
-        onClick={reset}
-      >
-        Reset to capacity
-      </button>
+      <div style={{ marginTop: 16 }}>
+        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
+          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+        </button>
+      </div>
+
+      <SectionHeader>My Bucket</SectionHeader>
+      <Card>
+        {bucket ? (
+          <>
+            <div className="tg-row">
+              <span className="tg-row-label">Tokens</span>
+              <span className="tg-row-value">
+                {bucket.tokens.toLocaleString()} / {capacity.toLocaleString()}
+              </span>
+            </div>
+            <div className="tg-row">
+              <span className="tg-row-label">Last refill</span>
+              <span className="tg-row-value">
+                {new Date(bucket.lastRefillTs).toLocaleString()}
+              </span>
+            </div>
+            <button className="tg-button-row" onClick={reset}>
+              Reset to capacity
+            </button>
+          </>
+        ) : (
+          <div className="tg-empty">No bucket yet — will be seeded on first /ask.</div>
+        )}
+      </Card>
     </div>
   );
 }
@@ -186,66 +255,91 @@ function WhitelistList({
 }) {
   const [id, setId] = useState("");
   const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+
   const submit = async () => {
-    if (!id.trim()) return;
-    await onAdd({ id: id.trim(), label: label.trim() || undefined });
-    setId("");
-    setLabel("");
+    if (!id.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onAdd({ id: id.trim(), label: label.trim() || undefined });
+      setId("");
+      setLabel("");
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
-    <div className="space-y-2">
-      <h3 className="font-semibold capitalize">{kind}</h3>
-      <ul className="space-y-1">
-        {entries.length === 0 && <li className="text-gray-400 text-sm">empty</li>}
-        {entries.map((e) => (
-          <li key={e.id} className="flex justify-between border-b py-1">
-            <span>
-              <code>{e.id}</code>
-              {e.label && <span className="ml-2 text-gray-500">{e.label}</span>}
-            </span>
-            <button
-              className="text-red-500 text-sm"
-              onClick={() => onRemove(e.id)}
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="flex gap-2">
-        <input
-          className="border rounded p-2 flex-1"
-          placeholder="ID"
-          value={id}
-          onChange={(e) => setId(e.target.value)}
-        />
-        <input
-          className="border rounded p-2 flex-1"
-          placeholder="label (optional)"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        />
-        <button className="px-3 py-2 bg-blue-500 text-white rounded" onClick={submit}>
-          Add
+    <>
+      <SectionHeader>{kind === "users" ? "Allowed Users" : "Allowed Chats"}</SectionHeader>
+      <Card>
+        {entries.length === 0 ? (
+          <div className="tg-empty">No entries</div>
+        ) : (
+          entries.map((e) => (
+            <div key={e.id} className="tg-row">
+              <span className="tg-row-label tg-mono">{e.id}</span>
+              <span className="tg-row-value">{e.label ?? ""}</span>
+              <button
+                className="tg-button-destructive"
+                onClick={() => onRemove(e.id)}
+              >
+                Remove
+              </button>
+            </div>
+          ))
+        )}
+      </Card>
+
+      <SectionHeader>Add {kind === "users" ? "User" : "Chat"}</SectionHeader>
+      <Card>
+        <div className="tg-row">
+          <input
+            className="tg-input left tg-mono"
+            placeholder={kind === "users" ? "User ID" : "Chat ID (e.g. -100…)"}
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            inputMode="numeric"
+          />
+        </div>
+        <div className="tg-row">
+          <input
+            className="tg-input left"
+            placeholder="Label (optional)"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </div>
+        <button
+          className="tg-button-row"
+          onClick={submit}
+          disabled={!id.trim() || busy}
+          style={!id.trim() || busy ? { opacity: 0.5 } : undefined}
+        >
+          {busy ? "Adding…" : "Add"}
         </button>
-      </div>
-    </div>
+      </Card>
+    </>
   );
 }
 
 function WhitelistTab() {
   const [users, setUsers] = useState<WhitelistEntry[]>([]);
   const [chats, setChats] = useState<WhitelistEntry[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     api.getWhitelist().then((d) => {
       setUsers(d.users);
       setChats(d.chats);
+      setLoaded(true);
     });
   }, []);
 
+  if (!loaded) return <div className="tg-loading">Loading…</div>;
+
   return (
-    <div className="space-y-6">
+    <div className="tg-stack">
       <WhitelistList
         kind="users"
         entries={users}
@@ -267,40 +361,47 @@ function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
-    window.Telegram?.WebApp?.ready();
-    window.Telegram?.WebApp?.expand();
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
     api.getSettings().then(setSettings);
   }, []);
-
-  if (!settings) return <div className="p-4">Loading...</div>;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "prompt", label: "Prompt" },
     { id: "model", label: "Model" },
-    { id: "ratelimit", label: "Rate Limit" },
+    { id: "ratelimit", label: "Limits" },
     { id: "whitelist", label: "Whitelist" },
   ];
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Bot Admin</h1>
-      <nav className="flex gap-2 mb-4 border-b">
+    <div className="tg-page">
+      <div className="tg-title">Bot Admin</div>
+      <div className="tg-tabs" role="tablist">
         {tabs.map((t) => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`px-3 py-2 ${tab === t.id ? "border-b-2 border-blue-500 font-semibold" : ""}`}
+            className={`tg-tab ${tab === t.id ? "active" : ""}`}
           >
             {t.label}
           </button>
         ))}
-      </nav>
-      <section>
-        {tab === "prompt" && <PromptTab settings={settings} onSaved={setSettings} />}
-        {tab === "model" && <ModelTab settings={settings} onSaved={setSettings} />}
-        {tab === "ratelimit" && <RateLimitTab settings={settings} onSaved={setSettings} />}
-        {tab === "whitelist" && <WhitelistTab />}
-      </section>
+      </div>
+
+      {!settings ? (
+        <div className="tg-loading">Loading…</div>
+      ) : tab === "prompt" ? (
+        <PromptTab settings={settings} onSaved={setSettings} />
+      ) : tab === "model" ? (
+        <ModelTab settings={settings} onSaved={setSettings} />
+      ) : tab === "ratelimit" ? (
+        <RateLimitTab settings={settings} onSaved={setSettings} />
+      ) : (
+        <WhitelistTab />
+      )}
     </div>
   );
 }
