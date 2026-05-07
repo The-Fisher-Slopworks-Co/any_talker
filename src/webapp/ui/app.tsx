@@ -5,7 +5,7 @@ import "./styles.css";
 import { api } from "./api-client";
 import type { Settings, WhitelistEntry, BucketState } from "../../shared/types";
 
-type Tab = "prompt" | "model" | "ratelimit" | "whitelist";
+type Tab = "prompt" | "ratelimit" | "whitelist";
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return <div className="tg-section-header">{children}</div>;
@@ -37,56 +37,15 @@ function PromptTab({
   settings: Settings;
   onSaved: (s: Settings) => void;
 }) {
-  const [value, setValue] = useState(settings.systemPrompt);
+  const [model, setModel] = useState(settings.model);
+  const [prompt, setPrompt] = useState(settings.systemPrompt);
   const [saving, setSaving] = useState(false);
 
-  const dirty = value !== settings.systemPrompt;
+  const dirty = model !== settings.model || prompt !== settings.systemPrompt;
 
   const save = async () => {
     setSaving(true);
-    const next = await api.putSettings({ systemPrompt: value });
-    onSaved(next);
-    setSaving(false);
-  };
-
-  return (
-    <div className="tg-stack">
-      <SectionHeader>System Prompt</SectionHeader>
-      <Card>
-        <textarea
-          className="tg-textarea"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="You are a helpful assistant…"
-        />
-      </Card>
-      <SectionFooter>
-        Sent as the system message on every /ask request.
-      </SectionFooter>
-      <div style={{ marginTop: 16 }}>
-        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
-          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ModelTab({
-  settings,
-  onSaved,
-}: {
-  settings: Settings;
-  onSaved: (s: Settings) => void;
-}) {
-  const [value, setValue] = useState(settings.model);
-  const [saving, setSaving] = useState(false);
-
-  const dirty = value !== settings.model;
-
-  const save = async () => {
-    setSaving(true);
-    const next = await api.putSettings({ model: value });
+    const next = await api.putSettings({ model, systemPrompt: prompt });
     onSaved(next);
     setSaving(false);
   };
@@ -98,17 +57,25 @@ function ModelTab({
         <div className="tg-row">
           <input
             className="tg-input left tg-mono"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
             placeholder="anthropic/claude-sonnet-4-5"
           />
         </div>
       </Card>
-      <SectionFooter>
-        OpenRouter model ID. Examples: <span className="tg-mono">anthropic/claude-sonnet-4-5</span>,{" "}
-        <span className="tg-mono">openai/gpt-4o-mini</span>,{" "}
-        <span className="tg-mono">google/gemini-pro-1.5</span>.
-      </SectionFooter>
+      <SectionFooter>OpenRouter model ID.</SectionFooter>
+
+      <SectionHeader>System Prompt</SectionHeader>
+      <Card>
+        <textarea
+          className="tg-textarea"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="You are a helpful assistant…"
+        />
+      </Card>
+      <SectionFooter>Sent as the system message on every /ask request.</SectionFooter>
+
       <div style={{ marginTop: 16 }}>
         <button className="tg-button" disabled={saving || !dirty} onClick={save}>
           {saving ? "Saving…" : dirty ? "Save" : "Saved"}
@@ -369,7 +336,6 @@ function App() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "prompt", label: "Prompt" },
-    { id: "model", label: "Model" },
     { id: "ratelimit", label: "Limits" },
     { id: "whitelist", label: "Whitelist" },
   ];
@@ -402,8 +368,6 @@ function App() {
         <div className="tg-loading">Loading…</div>
       ) : tab === "prompt" ? (
         <PromptTab settings={settings} onSaved={setSettings} />
-      ) : tab === "model" ? (
-        <ModelTab settings={settings} onSaved={setSettings} />
       ) : tab === "ratelimit" ? (
         <RateLimitTab settings={settings} onSaved={setSettings} />
       ) : (
