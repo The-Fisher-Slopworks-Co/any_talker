@@ -18,11 +18,13 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "grammy": "latest",
-    "ai": "latest",
     "@openrouter/ai-sdk-provider": "latest",
-    "zod": "latest",
+    "ai": "latest",
+    "bun-plugin-tailwind": "^0.1.2",
+    "grammy": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "tailwindcss": "^4.2.4",
+    "zod": "latest"
   }
 }

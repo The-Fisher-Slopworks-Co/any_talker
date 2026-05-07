@@ -9,25 +9,87 @@ type Tab = "prompt" | "ratelimit" | "whitelist";
 type View = "main" | "admin";
 
 function SectionHeader({ children }: { children: ReactNode }) {
-  return <div className="tg-section-header">{children}</div>;
+  return (
+    <div className="section-header px-4 pb-1.5 text-[14px] font-medium text-tg-section-header">
+      {children}
+    </div>
+  );
 }
 
 function SectionFooter({ children }: { children: ReactNode }) {
-  return <div className="tg-section-footer">{children}</div>;
+  return (
+    <div className="px-4 pt-1.5 text-[13px] leading-[1.35] text-tg-hint">
+      {children}
+    </div>
+  );
 }
 
 function Card({ children }: { children: ReactNode }) {
-  return <div className="tg-card">{children}</div>;
+  return <div className="card bg-tg-section rounded-xl overflow-hidden">{children}</div>;
 }
+
+function Stack({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-2">{children}</div>;
+}
+
+const ROW_CLS = "row relative flex items-center gap-3 px-4 py-[11px]";
+const ROW_LABEL_CLS = "shrink-0 text-base";
+const ROW_VALUE_CLS = "flex-1 text-right text-tg-hint text-[15px]";
+const INPUT_BASE_CLS =
+  "flex-1 min-w-0 bg-transparent border-0 p-0 text-base text-tg-text";
+const INPUT_CLS = `${INPUT_BASE_CLS} text-right`;
+const INPUT_LEFT_CLS = `${INPUT_BASE_CLS} text-left`;
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       type="button"
-      className={`tg-toggle ${value ? "on" : ""}`}
+      className={`toggle ${value ? "on" : ""}`}
       onClick={() => onChange(!value)}
       aria-pressed={value}
     />
+  );
+}
+
+function PrimaryButton({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="action mt-4">
+      <button
+        className="w-full bg-tg-button text-tg-button-text rounded-xl py-[14px] text-base font-semibold cursor-pointer transition-opacity active:not-disabled:opacity-75 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={disabled}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    </div>
+  );
+}
+
+function RowButton({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className="action-row relative block w-full bg-tg-section text-tg-link border-0 text-center px-4 py-[13px] text-base font-medium cursor-pointer active:not-disabled:bg-[var(--tg-separator)] disabled:opacity-50 disabled:cursor-not-allowed"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -65,13 +127,13 @@ function MainView({
   };
 
   return (
-    <div className="tg-stack">
+    <Stack>
       <SectionHeader>Display Name</SectionHeader>
       <Card>
-        <label className="tg-row">
-          <span className="tg-row-label">Name</span>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Name</span>
           <input
-            className="tg-input"
+            className={INPUT_CLS}
             placeholder={tgName || "Your name"}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -80,23 +142,19 @@ function MainView({
       </Card>
       <SectionFooter>Name shown to the AI.</SectionFooter>
 
-      <div className="tg-action">
-        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
-          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-        </button>
-      </div>
+      <PrimaryButton disabled={saving || !dirty} onClick={save}>
+        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+      </PrimaryButton>
 
       {me.isOwner && (
         <>
           <SectionHeader>Bot Configuration</SectionHeader>
           <Card>
-            <button className="tg-button-row" onClick={onOpenAdmin}>
-              Admin panel
-            </button>
+            <RowButton onClick={onOpenAdmin}>Admin panel</RowButton>
           </Card>
         </>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -121,12 +179,12 @@ function PromptTab({
   };
 
   return (
-    <div className="tg-stack">
+    <Stack>
       <SectionHeader>Model</SectionHeader>
       <Card>
-        <div className="tg-row">
+        <div className={ROW_CLS}>
           <input
-            className="tg-input left"
+            className={INPUT_LEFT_CLS}
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="Model ID"
@@ -138,7 +196,7 @@ function PromptTab({
       <SectionHeader>System Prompt</SectionHeader>
       <Card>
         <textarea
-          className="tg-textarea"
+          className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe how the bot should behave"
@@ -146,12 +204,10 @@ function PromptTab({
       </Card>
       <SectionFooter>Sent as the system message on every /ask request.</SectionFooter>
 
-      <div className="tg-action">
-        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
-          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-        </button>
-      </div>
-    </div>
+      <PrimaryButton disabled={saving || !dirty} onClick={save}>
+        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+      </PrimaryButton>
+    </Stack>
   );
 }
 
@@ -201,42 +257,40 @@ function RateLimitTab({
   };
 
   return (
-    <div className="tg-stack">
+    <Stack>
       <SectionHeader>Limits</SectionHeader>
       <Card>
-        <label className="tg-row">
-          <span className="tg-row-label">Capacity</span>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Capacity</span>
           <input
             type="number"
-            className="tg-input"
+            className={INPUT_CLS}
             value={capacity}
             onChange={(e) => setCapacity(Number(e.target.value))}
           />
         </label>
-        <label className="tg-row">
-          <span className="tg-row-label">Refill amount</span>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Refill amount</span>
           <input
             type="number"
-            className="tg-input"
+            className={INPUT_CLS}
             value={refillAmount}
             onChange={(e) => setRefillAmount(Number(e.target.value))}
           />
         </label>
-        <label className="tg-row">
-          <span className="tg-row-label">Refill every</span>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Refill every</span>
           <input
             type="number"
-            className="tg-input"
+            className={INPUT_CLS}
             value={refillIntervalMin}
             onChange={(e) => setRefillIntervalMin(Number(e.target.value))}
           />
-          <span className="tg-row-value" style={{ flex: "0 0 auto" }}>
-            min
-          </span>
+          <span className="shrink-0 text-tg-hint text-[15px]">min</span>
         </label>
-        <div className="tg-row">
-          <span className="tg-row-label">Owner exempt</span>
-          <span className="tg-row-value" style={{ flex: 1 }} />
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Owner exempt</span>
+          <span className="flex-1" />
           <Toggle value={ownerExempt} onChange={setOwnerExempt} />
         </div>
       </Card>
@@ -245,37 +299,35 @@ function RateLimitTab({
         the interval.
       </SectionFooter>
 
-      <div className="tg-action">
-        <button className="tg-button" disabled={saving || !dirty} onClick={save}>
-          {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-        </button>
-      </div>
+      <PrimaryButton disabled={saving || !dirty} onClick={save}>
+        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+      </PrimaryButton>
 
       <SectionHeader>My Bucket</SectionHeader>
       <Card>
         {bucket ? (
           <>
-            <div className="tg-row">
-              <span className="tg-row-label">Tokens</span>
-              <span className="tg-row-value">
+            <div className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>Tokens</span>
+              <span className={ROW_VALUE_CLS}>
                 {bucket.tokens.toLocaleString()} / {capacity.toLocaleString()}
               </span>
             </div>
-            <div className="tg-row">
-              <span className="tg-row-label">Last refill</span>
-              <span className="tg-row-value">
+            <div className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>Last refill</span>
+              <span className={ROW_VALUE_CLS}>
                 {new Date(bucket.lastRefillTs).toLocaleString()}
               </span>
             </div>
-            <button className="tg-button-row" onClick={reset}>
-              Reset to capacity
-            </button>
+            <RowButton onClick={reset}>Reset to capacity</RowButton>
           </>
         ) : (
-          <div className="tg-empty">No bucket yet — will be seeded on first /ask.</div>
+          <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
+            No bucket yet — will be seeded on first /ask.
+          </div>
         )}
       </Card>
-    </div>
+    </Stack>
   );
 }
 
@@ -311,14 +363,14 @@ function WhitelistList({
       <SectionHeader>{kind === "users" ? "Allowed Users" : "Allowed Chats"}</SectionHeader>
       <Card>
         {entries.length === 0 ? (
-          <div className="tg-empty">No entries</div>
+          <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">No entries</div>
         ) : (
           entries.map((e) => (
-            <div key={e.id} className="tg-row">
-              <span className="tg-row-label tg-mono">{e.id}</span>
-              <span className="tg-row-value">{e.label ?? ""}</span>
+            <div key={e.id} className={ROW_CLS}>
+              <span className="shrink-0 font-mono text-sm">{e.id}</span>
+              <span className={ROW_VALUE_CLS}>{e.label ?? ""}</span>
               <button
-                className="tg-button-destructive"
+                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
                 onClick={() => onRemove(e.id)}
               >
                 Remove
@@ -330,32 +382,28 @@ function WhitelistList({
 
       <SectionHeader>Add {kind === "users" ? "User" : "Chat"}</SectionHeader>
       <Card>
-        <label className="tg-row">
-          <span className="tg-row-label">ID</span>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>ID</span>
           <input
-            className="tg-input"
+            className={INPUT_CLS}
             placeholder={kind === "users" ? "123456789" : "-1001234567890"}
             value={id}
             onChange={(e) => setId(e.target.value)}
             inputMode="numeric"
           />
         </label>
-        <label className="tg-row">
-          <span className="tg-row-label">Name</span>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Name</span>
           <input
-            className="tg-input"
+            className={INPUT_CLS}
             placeholder="Optional"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
         </label>
-        <button
-          className="tg-button-row"
-          onClick={submit}
-          disabled={!id.trim() || busy}
-        >
+        <RowButton onClick={submit} disabled={!id.trim() || busy}>
           {busy ? "Adding…" : `Add ${kind === "users" ? "User" : "Chat"}`}
-        </button>
+        </RowButton>
       </Card>
     </>
   );
@@ -374,10 +422,10 @@ function WhitelistTab() {
     });
   }, []);
 
-  if (!loaded) return <div className="tg-loading">Loading…</div>;
+  if (!loaded) return <div className="text-center text-tg-hint py-20">Loading…</div>;
 
   return (
-    <div className="tg-stack">
+    <Stack>
       <WhitelistList
         kind="users"
         entries={users}
@@ -390,7 +438,7 @@ function WhitelistTab() {
         onAdd={async (e) => setChats(await api.addWhitelist("chats", e))}
         onRemove={async (id) => setChats(await api.removeWhitelist("chats", id))}
       />
-    </div>
+    </Stack>
   );
 }
 
@@ -418,15 +466,19 @@ function AdminView({ onBack }: { onBack: () => void }) {
     { id: "ratelimit", label: "Limits" },
     { id: "whitelist", label: "Whitelist" },
   ];
+  const activeIdx = tabs.findIndex((t) => t.id === tab);
 
   return (
     <>
-      <div className="tg-tabs" role="tablist">
+      <div
+        className="relative flex bg-tg-section rounded-[10px] p-[3px] mb-5 shadow-[0_0_0_1px_var(--tg-separator)]"
+        role="tablist"
+      >
         <div
-          className="tg-tab-indicator"
+          className="absolute top-[3px] bottom-[3px] left-[3px] z-0 pointer-events-none bg-tg-button rounded-lg transition-transform duration-[180ms] ease-tg-spring"
           style={{
             width: `calc((100% - 6px) / ${tabs.length})`,
-            transform: `translateX(${tabs.findIndex((t) => t.id === tab) * 100}%)`,
+            transform: `translateX(${activeIdx * 100}%)`,
           }}
         />
         {tabs.map((t) => (
@@ -435,7 +487,7 @@ function AdminView({ onBack }: { onBack: () => void }) {
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`tg-tab ${tab === t.id ? "active" : ""}`}
+            className="relative z-10 flex-1 border-0 bg-transparent px-1.5 py-2 rounded-lg text-tg-text text-[13px] font-medium cursor-pointer transition-colors aria-selected:text-tg-button-text"
           >
             {t.label}
           </button>
@@ -443,7 +495,7 @@ function AdminView({ onBack }: { onBack: () => void }) {
       </div>
 
       {!settings ? (
-        <div className="tg-loading">Loading…</div>
+        <div className="text-center text-tg-hint py-20">Loading…</div>
       ) : tab === "prompt" ? (
         <PromptTab settings={settings} onSaved={setSettings} />
       ) : tab === "ratelimit" ? (
@@ -467,10 +519,12 @@ function App() {
   }, []);
 
   return (
-    <div className="tg-page">
-      <div className="tg-title">{view === "admin" ? "Bot Admin" : "Settings"}</div>
+    <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
+      <div className="px-1 pt-2 pb-4 text-xl font-semibold">
+        {view === "admin" ? "Bot Admin" : "Settings"}
+      </div>
       {!me ? (
-        <div className="tg-loading">Loading…</div>
+        <div className="text-center text-tg-hint py-20">Loading…</div>
       ) : view === "main" ? (
         <MainView me={me} onMe={setMe} onOpenAdmin={() => setView("admin")} />
       ) : (
