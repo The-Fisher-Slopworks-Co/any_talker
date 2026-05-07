@@ -59,7 +59,7 @@ function PromptTab({
             className="tg-input left tg-mono"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder="anthropic/claude-sonnet-4-5"
+            placeholder="Model ID"
           />
         </div>
       </Card>
@@ -71,7 +71,7 @@ function PromptTab({
           className="tg-textarea"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="You are a helpful assistant…"
+          placeholder="Describe how the bot should behave"
         />
       </Card>
       <SectionFooter>Sent as the system message on every /ask request.</SectionFooter>
@@ -263,7 +263,7 @@ function WhitelistList({
         <div className="tg-row">
           <input
             className="tg-input left tg-mono"
-            placeholder={kind === "users" ? "User ID" : "Chat ID (e.g. -100…)"}
+            placeholder={kind === "users" ? "User ID" : "Chat ID"}
             value={id}
             onChange={(e) => setId(e.target.value)}
             inputMode="numeric"
@@ -272,7 +272,7 @@ function WhitelistList({
         <div className="tg-row">
           <input
             className="tg-input left"
-            placeholder="Label (optional)"
+            placeholder="Name"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
