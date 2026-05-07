@@ -126,6 +126,51 @@ describe("askHandler", () => {
     }
   });
 
+  test("onAIStart fires immediately before the AI call", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const events: string[] = [];
+
+    class WatchAI implements AIClient {
+      async ask(): Promise<AskResult> {
+        events.push("ai");
+        return { text: "ok", totalTokens: 1 };
+      }
+    }
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai: new WatchAI(),
+        onAIStart: () => events.push("typing"),
+      }),
+    );
+    expect(out.kind).toBe("answered");
+    expect(events).toEqual(["typing", "ai"]);
+  });
+
+  test("onAIStart is NOT called when request is denied", async () => {
+    let called = false;
+    const out = await askHandler(
+      baseInput({ onAIStart: () => (called = true) }),
+    );
+    expect(out.kind).toBe("denied");
+    expect(called).toBe(false);
+  });
+
+  test("onAIStart is NOT called when rate-limited", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const rlStorage = new MemoryStorage();
+    await rlStorage.saveBucket("42", { tokens: 0, lastRefillTs: 1000 });
+    const rl = new TokenBucketLimiter(rlStorage);
+    let called = false;
+    const out = await askHandler(
+      baseInput({ storage, rateLimiter: rl, onAIStart: () => (called = true) }),
+    );
+    expect(out.kind).toBe("rateLimited");
+    expect(called).toBe(false);
+  });
+
   test("answered: deducts tokens from bucket", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

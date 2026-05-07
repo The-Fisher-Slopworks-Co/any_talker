@@ -64,20 +64,40 @@ export function createBot(deps: BotDeps): Bot {
       }
     }
 
-    const outcome = await askHandler({
-      storage: deps.storage,
-      rateLimiter: deps.rateLimiter,
-      ai: deps.ai,
-      ownerId: deps.ownerId,
-      now: Date.now(),
-      chatId: String(chatId),
-      userId,
-      sender,
-      userText,
-      quote,
-      image,
-      replyTarget,
-    });
+    let typingTimer: ReturnType<typeof setInterval> | null = null;
+    const stopTyping = () => {
+      if (typingTimer !== null) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+      }
+    };
+    const startTyping = () => {
+      ctx.replyWithChatAction("typing").catch(() => {});
+      typingTimer = setInterval(() => {
+        ctx.replyWithChatAction("typing").catch(() => {});
+      }, 4000);
+    };
+
+    let outcome;
+    try {
+      outcome = await askHandler({
+        storage: deps.storage,
+        rateLimiter: deps.rateLimiter,
+        ai: deps.ai,
+        ownerId: deps.ownerId,
+        now: Date.now(),
+        chatId: String(chatId),
+        userId,
+        sender,
+        userText,
+        quote,
+        image,
+        replyTarget,
+        onAIStart: startTyping,
+      });
+    } finally {
+      stopTyping();
+    }
 
     switch (outcome.kind) {
       case "denied":
