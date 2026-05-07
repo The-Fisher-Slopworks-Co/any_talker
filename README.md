@@ -9,7 +9,7 @@ Telegram bot with AI integration via OpenRouter.
    - `OPENROUTER_API_KEY` — from openrouter.ai
    - `BOT_OWNER_ID` — your Telegram user ID
    - `WEBAPP_URL` — public HTTPS URL where the admin Web App is served (e.g. https://bot.example.com/)
-2. Start KeyDB: `docker run -p 6379:6379 eqalpha/keydb`
+2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 
 ## Run
