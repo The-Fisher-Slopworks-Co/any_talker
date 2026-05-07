@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import type { Settings, WhitelistEntry, BucketState } from "../../shared/types";
+import type { Settings, WhitelistEntry, BucketState, User } from "../../shared/types";
 
 declare global {
   interface Window {
@@ -11,6 +11,8 @@ declare global {
         };
         ready: () => void;
         expand: () => void;
+        openTelegramLink?: (url: string) => void;
+        openLink?: (url: string) => void;
         BackButton?: {
           show: () => void;
           hide: () => void;
@@ -23,6 +25,7 @@ declare global {
 }
 
 export type MeResponse = { isOwner: boolean; displayName: string | null };
+export type UserSettingsResponse = { user: User; displayName: string | null };
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -54,4 +57,9 @@ export const api = {
   getMe: () => req<MeResponse>("GET", "/api/me"),
   putMe: (displayName: string | null) =>
     req<MeResponse>("PUT", "/api/me", { displayName }),
+  listAdminUsers: () => req<{ users: User[] }>("GET", "/api/admin/users"),
+  getAdminUser: (id: string) =>
+    req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
+  putAdminUser: (id: string, displayName: string | null) =>
+    req<UserSettingsResponse>("PUT", `/api/admin/users/${id}`, { displayName }),
 };

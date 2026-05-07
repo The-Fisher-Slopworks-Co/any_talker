@@ -4,6 +4,7 @@ import type {
   WhitelistEntry,
   BucketState,
   ConversationNode,
+  User,
 } from "../shared/types";
 
 export class MemoryStorage implements Storage {
@@ -15,6 +16,7 @@ export class MemoryStorage implements Storage {
   private buckets = new Map<string, BucketState>();
   private conversations = new Map<string, ConversationNode>();
   private userNames = new Map<string, string>();
+  private users = new Map<string, User>();
 
   private convKey(chatId: string, botMsgId: number): string {
     return `${chatId}:${botMsgId}`;
@@ -60,6 +62,21 @@ export class MemoryStorage implements Storage {
   async setUserName(userId: string, name: string | null): Promise<void> {
     if (name === null) this.userNames.delete(userId);
     else this.userNames.set(userId, name);
+  }
+
+  async listUsers(): Promise<User[]> {
+    return [...this.users.values()]
+      .map((u) => ({ ...u }))
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  }
+
+  async upsertUser(user: User): Promise<void> {
+    this.users.set(user.id, { ...user });
+  }
+
+  async getUser(id: string): Promise<User | null> {
+    const u = this.users.get(id);
+    return u ? { ...u } : null;
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {

@@ -5,6 +5,7 @@ import type {
   WhitelistEntry,
   BucketState,
   ConversationNode,
+  User,
 } from "../shared/types";
 import { CONVERSATION_TTL_SECONDS } from "../shared/types";
 
@@ -67,6 +68,22 @@ export class KeyDBStorage implements Storage {
     const key = `${PREFIX}user_name:${userId}`;
     if (name === null) await this.client.del(key);
     else await this.client.set(key, name);
+  }
+
+  async listUsers(): Promise<User[]> {
+    const values = await this.client.hvals(`${PREFIX}users`);
+    return values
+      .map((raw) => JSON.parse(raw) as User)
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  }
+
+  async upsertUser(user: User): Promise<void> {
+    await this.client.hset(`${PREFIX}users`, user.id, JSON.stringify(user));
+  }
+
+  async getUser(id: string): Promise<User | null> {
+    const raw = await this.client.hget(`${PREFIX}users`, id);
+    return raw ? (JSON.parse(raw) as User) : null;
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {

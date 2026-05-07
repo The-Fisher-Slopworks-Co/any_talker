@@ -187,6 +187,106 @@ describe("/api/me", () => {
   });
 });
 
+describe("/api/admin/users", () => {
+  test("GET list returns empty initially", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ users: [] });
+  });
+
+  test("GET list returns upserted users sorted by lastSeenAt desc", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "10",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 100,
+    });
+    await d.storage.upsertUser({
+      id: "20",
+      firstName: "Bob",
+      lastName: null,
+      username: "bob",
+      lastSeenAt: 200,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users", body: null },
+      d,
+      owner,
+    );
+    const body = r.body as { users: { id: string }[] };
+    expect(body.users.map((u) => u.id)).toEqual(["20", "10"]);
+  });
+
+  test("GET /api/admin/users/:id returns 404 for unknown", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/999", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  test("PUT /api/admin/users/:id sets displayName for that user", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { displayName: "  Override  " },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserName("42")).toBe("Override");
+  });
+
+  test("PUT empty/whitespace clears displayName", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserName("42", "Override");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { displayName: "  " },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserName("42")).toBeNull();
+  });
+
+  test("non-owner gets 403", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
 describe("admin gating", () => {
   test("non-owner gets 403 from /api/settings", async () => {
     const r = await handleApi(

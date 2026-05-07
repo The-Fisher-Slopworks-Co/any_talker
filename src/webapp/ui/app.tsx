@@ -10,10 +10,33 @@ import {
   supportsTools,
   type OpenRouterModel,
 } from "./openrouter-models";
-import type { Settings, WhitelistEntry, BucketState } from "../../shared/types";
+import {
+  composeFullName,
+  type Settings,
+  type WhitelistEntry,
+  type BucketState,
+  type User,
+} from "../../shared/types";
 
-type Tab = "prompt" | "ratelimit" | "whitelist";
-type View = "main" | "admin";
+type Tab = "prompt" | "ratelimit" | "whitelist" | "users";
+type Route =
+  | { kind: "main" }
+  | { kind: "admin" }
+  | { kind: "user-edit"; userId: string };
+
+function userDisplayName(u: User): string {
+  return composeFullName(u.firstName, u.lastName) || `id:${u.id}`;
+}
+
+function openTelegramProfile(u: User): void {
+  const tg = window.Telegram?.WebApp;
+  if (!tg) return;
+  if (u.username) {
+    tg.openTelegramLink?.(`https://t.me/${u.username}`);
+    return;
+  }
+  tg.openLink?.(`tg://user?id=${u.id}`);
+}
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
@@ -114,11 +137,7 @@ function MainView({
 
   const tg = window.Telegram?.WebApp;
   const tgUser = tg?.initDataUnsafe?.user;
-  const tgName = tgUser
-    ? [tgUser.first_name, tgUser.last_name]
-        .filter((s): s is string => Boolean(s && s.trim().length > 0))
-        .join(" ")
-    : "";
+  const tgName = tgUser ? composeFullName(tgUser.first_name, tgUser.last_name) : "";
 
   const dirty = name.trim() !== (me.displayName ?? "");
 
@@ -559,7 +578,144 @@ function WhitelistTab() {
   );
 }
 
-function AdminView({ onBack }: { onBack: () => void }) {
+function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
+  const [users, setUsers] = useState<User[] | null>(null);
+
+  useEffect(() => {
+    api.listAdminUsers().then((r) => setUsers(r.users));
+  }, []);
+
+  if (users === null)
+    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+
+  return (
+    <Stack>
+      <SectionHeader>All Users</SectionHeader>
+      <Card>
+        {users.length === 0 ? (
+          <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
+            No users yet — they appear after their first message.
+          </div>
+        ) : (
+          users.map((u) => (
+            <div key={u.id} className={ROW_CLS}>
+              <div className="flex-1 min-w-0">
+                <div className="truncate">{userDisplayName(u)}</div>
+                <div className="text-[13px] text-tg-hint truncate">
+                  {u.username ? `@${u.username}` : `id ${u.id}`}
+                </div>
+              </div>
+              <button
+                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
+                onClick={() => openTelegramProfile(u)}
+              >
+                Open
+              </button>
+              <button
+                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
+                onClick={() => onEdit(u.id)}
+              >
+                Edit
+              </button>
+            </div>
+          ))
+        )}
+      </Card>
+      <SectionFooter>
+        Users are recorded automatically the first time they message the bot.
+      </SectionFooter>
+    </Stack>
+  );
+}
+
+function UserEditView({ userId }: { userId: string }) {
+  const [data, setData] = useState<{ user: User; displayName: string | null } | null>(
+    null,
+  );
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    api
+      .getAdminUser(userId)
+      .then((d) => {
+        setData(d);
+        setName(d.displayName ?? "");
+      })
+      .catch(() => setNotFound(true));
+  }, [userId]);
+
+  if (notFound)
+    return <div className="text-center text-tg-hint py-20">User not found.</div>;
+  if (!data) return <div className="text-center text-tg-hint py-20">Loading…</div>;
+
+  const { user } = data;
+  const fallbackName = userDisplayName(user);
+  const dirty = name.trim() !== (data.displayName ?? "");
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const next = await api.putAdminUser(userId, name.trim() || null);
+      setData(next);
+      setName(next.displayName ?? "");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Stack>
+      <SectionHeader>Profile</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Name</span>
+          <span className={ROW_VALUE_CLS}>{fallbackName}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Username</span>
+          <span className={ROW_VALUE_CLS}>
+            {user.username ? `@${user.username}` : "—"}
+          </span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>ID</span>
+          <span className={ROW_VALUE_CLS}>{user.id}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Last seen</span>
+          <span className={ROW_VALUE_CLS}>
+            {new Date(user.lastSeenAt).toLocaleString()}
+          </span>
+        </div>
+        <RowButton onClick={() => openTelegramProfile(user)}>
+          Open in Telegram
+        </RowButton>
+      </Card>
+
+      <SectionHeader>Display Name</SectionHeader>
+      <Card>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Name</span>
+          <input
+            className={INPUT_CLS}
+            placeholder={fallbackName}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+      </Card>
+      <SectionFooter>Override the name shown to the AI for this user.</SectionFooter>
+
+      <PrimaryButton disabled={saving || !dirty} onClick={save}>
+        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+      </PrimaryButton>
+    </Stack>
+  );
+}
+
+function AdminView({ onEditUser }: { onEditUser: (id: string) => void }) {
   const [tab, setTab] = useState<Tab>("prompt");
   const [settings, setSettings] = useState<Settings | null>(null);
 
@@ -567,23 +723,23 @@ function AdminView({ onBack }: { onBack: () => void }) {
     api.getSettings().then(setSettings);
   }, []);
 
-  useEffect(() => {
-    const back = window.Telegram?.WebApp?.BackButton;
-    if (!back) return;
-    back.show();
-    back.onClick(onBack);
-    return () => {
-      back.offClick(onBack);
-      back.hide();
-    };
-  }, [onBack]);
-
   const tabs: { id: Tab; label: string }[] = [
     { id: "prompt", label: "Prompt" },
     { id: "ratelimit", label: "Limits" },
     { id: "whitelist", label: "Whitelist" },
+    { id: "users", label: "Users" },
   ];
   const activeIdx = tabs.findIndex((t) => t.id === tab);
+
+  const renderTab = () => {
+    if (tab === "whitelist") return <WhitelistTab />;
+    if (tab === "users") return <UsersTab onEdit={onEditUser} />;
+    if (!settings)
+      return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    if (tab === "prompt")
+      return <PromptTab settings={settings} onSaved={setSettings} />;
+    return <RateLimitTab settings={settings} onSaved={setSettings} />;
+  };
 
   return (
     <>
@@ -611,21 +767,13 @@ function AdminView({ onBack }: { onBack: () => void }) {
         ))}
       </div>
 
-      {!settings ? (
-        <div className="text-center text-tg-hint py-20">Loading…</div>
-      ) : tab === "prompt" ? (
-        <PromptTab settings={settings} onSaved={setSettings} />
-      ) : tab === "ratelimit" ? (
-        <RateLimitTab settings={settings} onSaved={setSettings} />
-      ) : (
-        <WhitelistTab />
-      )}
+      {renderTab()}
     </>
   );
 }
 
 function App() {
-  const [view, setView] = useState<View>("main");
+  const [route, setRoute] = useState<Route>({ kind: "main" });
   const [me, setMe] = useState<MeResponse | null>(null);
 
   useEffect(() => {
@@ -635,17 +783,48 @@ function App() {
     api.getMe().then(setMe);
   }, []);
 
+  useEffect(() => {
+    const btn = window.Telegram?.WebApp?.BackButton;
+    if (!btn) return;
+    if (route.kind === "main") {
+      btn.hide();
+      return;
+    }
+    const handler = () => {
+      setRoute((r) =>
+        r.kind === "user-edit" ? { kind: "admin" } : { kind: "main" },
+      );
+    };
+    btn.show();
+    btn.onClick(handler);
+    return () => {
+      btn.offClick(handler);
+      btn.hide();
+    };
+  }, [route.kind]);
+
+  const ROUTE_TITLE: Record<Route["kind"], string> = {
+    main: "Settings",
+    admin: "Bot Admin",
+    "user-edit": "User Settings",
+  };
+  const title = ROUTE_TITLE[route.kind];
+
   return (
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
-      <div className="px-1 pt-2 pb-4 text-xl font-semibold">
-        {view === "admin" ? "Bot Admin" : "Settings"}
-      </div>
+      <div className="px-1 pt-2 pb-4 text-xl font-semibold">{title}</div>
       {!me ? (
         <div className="text-center text-tg-hint py-20">Loading…</div>
-      ) : view === "main" ? (
-        <MainView me={me} onMe={setMe} onOpenAdmin={() => setView("admin")} />
+      ) : route.kind === "main" ? (
+        <MainView
+          me={me}
+          onMe={setMe}
+          onOpenAdmin={() => setRoute({ kind: "admin" })}
+        />
+      ) : route.kind === "admin" ? (
+        <AdminView onEditUser={(id) => setRoute({ kind: "user-edit", userId: id })} />
       ) : (
-        <AdminView onBack={() => setView("main")} />
+        <UserEditView userId={route.userId} />
       )}
     </div>
   );

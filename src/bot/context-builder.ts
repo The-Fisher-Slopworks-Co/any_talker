@@ -1,6 +1,6 @@
 import type { Storage } from "../storage/types";
 import type { AIMessage } from "../ai/types";
-import { MAX_REPLY_CHAIN_DEPTH } from "../shared/types";
+import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 
 export type ReplyTarget = {
   messageId: number;
@@ -35,10 +35,7 @@ export function buildUserEnvelope(args: {
   const author =
     override.length > 0
       ? override
-      : [args.sender.firstName, args.sender.lastName]
-          .map((s) => (s ?? "").trim())
-          .filter((s) => s.length > 0)
-          .join(" ");
+      : composeFullName(args.sender.firstName, args.sender.lastName);
 
   const obj: Record<string, string> = { author };
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
