@@ -19,6 +19,7 @@ export type AskInput = {
   quote: string | null;
   image: Uint8Array | null;
   replyTarget: ReplyTarget | null;
+  onAIStart?: () => void;
 };
 
 export type AskOutcome =
@@ -72,6 +73,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     image: input.image,
     replyTarget: input.replyTarget,
   });
+
+  input.onAIStart?.();
 
   let result;
   try {
