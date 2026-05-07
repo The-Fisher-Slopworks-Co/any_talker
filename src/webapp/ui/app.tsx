@@ -3,6 +3,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { api, type MeResponse } from "./api-client";
+import {
+  fetchOpenRouterModels,
+  formatPricePerMillion,
+  supportsCaching,
+  supportsTools,
+  type OpenRouterModel,
+} from "./openrouter-models";
 import type { Settings, WhitelistEntry, BucketState } from "../../shared/types";
 
 type Tab = "prompt" | "ratelimit" | "whitelist";
@@ -158,6 +165,56 @@ function MainView({
   );
 }
 
+function ModelInfo({ model }: { model: OpenRouterModel | null | undefined }) {
+  if (model === undefined)
+    return <span className="text-tg-hint">Loading model info…</span>;
+  if (model === null)
+    return <span className="text-tg-hint">Unknown model ID.</span>;
+
+  const inputPrice = formatPricePerMillion(model.pricing.prompt);
+  const outputPrice = formatPricePerMillion(model.pricing.completion);
+  const imagePrice = formatPricePerMillion(model.pricing.image);
+  const modalities = model.architecture?.input_modalities ?? [];
+  const tools = supportsTools(model);
+  const caching = supportsCaching(model);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="font-medium text-tg-text">{model.name}</div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {inputPrice && (
+          <span>
+            <span className="text-tg-hint">Input</span> {inputPrice}
+          </span>
+        )}
+        {outputPrice && (
+          <span>
+            <span className="text-tg-hint">Output</span> {outputPrice}
+          </span>
+        )}
+        {imagePrice && (
+          <span>
+            <span className="text-tg-hint">Image</span> {imagePrice}
+          </span>
+        )}
+      </div>
+      {modalities.length > 0 && (
+        <div>
+          <span className="text-tg-hint">Modalities</span> {modalities.join(", ")}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-x-3">
+        <span>
+          <span className="text-tg-hint">Tools</span> {tools ? "yes" : "no"}
+        </span>
+        <span>
+          <span className="text-tg-hint">Caching</span> {caching ? "yes" : "no"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function PromptTab({
   settings,
   onSaved,
@@ -168,6 +225,13 @@ function PromptTab({
   const [models, setModels] = useState<string[]>(settings.models);
   const [prompt, setPrompt] = useState(settings.systemPrompt);
   const [saving, setSaving] = useState(false);
+  const [catalog, setCatalog] = useState<Map<string, OpenRouterModel> | null>(null);
+
+  useEffect(() => {
+    fetchOpenRouterModels()
+      .then(setCatalog)
+      .catch(() => setCatalog(new Map()));
+  }, []);
 
   const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
   const modelsDirty =
@@ -194,32 +258,52 @@ function PromptTab({
     setSaving(false);
   };
 
+  const lookupModel = (id: string): OpenRouterModel | null | undefined => {
+    const trimmedId = id.trim();
+    if (trimmedId.length === 0) return null;
+    if (catalog === null) return undefined;
+    return catalog.get(trimmedId) ?? null;
+  };
+
   return (
     <Stack>
       <SectionHeader>Models</SectionHeader>
       <Card>
-        {models.map((m, idx) => (
-          <div key={idx} className={ROW_CLS}>
-            <span className="shrink-0 text-tg-hint text-[15px] w-14">
-              {idx === 0 ? "Primary" : `#${idx + 1}`}
-            </span>
-            <input
-              className={INPUT_LEFT_CLS}
-              value={m}
-              onChange={(e) => updateAt(idx, e.target.value)}
-              placeholder="Model ID"
-            />
-            {idx > 0 && (
-              <button
-                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
-                onClick={() => removeAt(idx)}
-                aria-label="Remove fallback"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        ))}
+        {models.map((m, idx) => {
+          const info = m.trim().length > 0 ? lookupModel(m) : null;
+          return (
+            <div
+              key={idx}
+              className={`row relative flex flex-col gap-2 px-4 py-[11px]`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="shrink-0 text-tg-hint text-[15px] w-14">
+                  {idx === 0 ? "Primary" : `#${idx + 1}`}
+                </span>
+                <input
+                  className={INPUT_LEFT_CLS}
+                  value={m}
+                  onChange={(e) => updateAt(idx, e.target.value)}
+                  placeholder="Model ID"
+                />
+                {idx > 0 && (
+                  <button
+                    className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
+                    onClick={() => removeAt(idx)}
+                    aria-label="Remove fallback"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {m.trim().length > 0 && (
+                <div className="pl-[68px] text-[13px] leading-[1.45]">
+                  <ModelInfo model={info} />
+                </div>
+              )}
+            </div>
+          );
+        })}
         <RowButton onClick={addFallback}>Add fallback</RowButton>
       </Card>
       <SectionFooter>
