@@ -104,11 +104,9 @@ textarea {
 }
 
 .tg-section-header {
-  font-size: 13px;
-  font-weight: 400;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--tg-section-header);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   padding: 0 16px 6px;
 }
 
