@@ -2,7 +2,7 @@ import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
 import { isAllowed } from "../access";
-import { buildContext, type ReplyTarget } from "../context-builder";
+import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
 import { getOrInitSettings } from "../../settings";
 import { getAllTools } from "../../ai/tools/registry";
 
@@ -14,7 +14,9 @@ export type AskInput = {
   now: number;
   chatId: string;
   userId: string;
+  sender: Sender;
   userText: string;
+  quote: string | null;
   replyTarget: ReplyTarget | null;
 };
 
@@ -59,7 +61,9 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   const messages = await buildContext({
     storage: input.storage,
     chatId: input.chatId,
+    sender: input.sender,
     userText: input.userText,
+    quote: input.quote,
     replyTarget: input.replyTarget,
   });
 
@@ -88,12 +92,18 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     if (existing) parentBotMsgId = input.replyTarget.messageId;
   }
 
+  const envelope = buildUserEnvelope({
+    sender: input.sender,
+    quote: input.quote,
+    text: input.userText,
+  });
+
   return {
     kind: "answered",
     text: result.text,
     persistConversation: async (botMsgId) => {
       await input.storage.saveConversation(input.chatId, botMsgId, {
-        userQuestion: input.userText,
+        userQuestion: envelope,
         botAnswer: result.text,
         parentBotMsgId,
         ts: input.now,

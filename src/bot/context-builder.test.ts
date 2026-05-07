@@ -2,16 +2,74 @@ import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
 import { buildContext } from "./context-builder";
 
+const SENDER = { firstName: "John", lastName: "Doe" };
+const envelope = (extra: { quote?: string; text?: string } = {}) => {
+  const obj: Record<string, string> = { author: "John Doe" };
+  if (extra.quote !== undefined) obj.quote = extra.quote;
+  obj.text = extra.text ?? "";
+  return JSON.stringify(obj);
+};
+
 describe("buildContext", () => {
-  test("no reply: just current user message", async () => {
+  test("no reply: just current user JSON envelope", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "hello",
+      quote: null,
       replyTarget: null,
     });
-    expect(msgs).toEqual([{ role: "user", content: "hello" }]);
+    expect(msgs).toEqual([{ role: "user", content: envelope({ text: "hello" }) }]);
+  });
+
+  test("envelope contains author, quote, text in that exact order", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what does this mean",
+      quote: "to be or not to be",
+      replyTarget: null,
+    });
+    expect(msgs[0]!.content).toBe(
+      JSON.stringify({ author: "John Doe", quote: "to be or not to be", text: "what does this mean" }),
+    );
+    // Field order check (the keys must come out as author, quote, text):
+    expect(Object.keys(JSON.parse(msgs[0]!.content as string))).toEqual([
+      "author",
+      "quote",
+      "text",
+    ]);
+  });
+
+  test("author falls back to first name when last name missing", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: { firstName: "Alice", lastName: null },
+      userText: "hi",
+      quote: null,
+      replyTarget: null,
+    });
+    expect(JSON.parse(msgs[0]!.content as string).author).toBe("Alice");
+  });
+
+  test("quote field is omitted when not provided", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "hi",
+      quote: null,
+      replyTarget: null,
+    });
+    const parsed = JSON.parse(msgs[0]!.content as string);
+    expect("quote" in parsed).toBe(false);
   });
 
   test("reply to non-bot message includes synthetic context", async () => {
@@ -19,7 +77,9 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "what does that mean",
+      quote: null,
       replyTarget: { messageId: 999, text: "to be or not to be", authorFirstName: "Alice" },
     });
     expect(msgs).toEqual([
@@ -27,7 +87,7 @@ describe("buildContext", () => {
         role: "user",
         content: "Context (replied message from Alice): to be or not to be",
       },
-      { role: "user", content: "what does that mean" },
+      { role: "user", content: envelope({ text: "what does that mean" }) },
     ]);
   });
 
@@ -42,13 +102,15 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "follow-up",
+      quote: null,
       replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
-      { role: "user", content: "follow-up" },
+      { role: "user", content: envelope({ text: "follow-up" }) },
     ]);
   });
 
@@ -69,7 +131,9 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "Q3",
+      quote: null,
       replyTarget: { messageId: 200, text: "A2", authorFirstName: "Bot" },
     });
     expect(msgs).toEqual([
@@ -77,7 +141,7 @@ describe("buildContext", () => {
       { role: "assistant", content: "A1" },
       { role: "user", content: "Q2" },
       { role: "assistant", content: "A2" },
-      { role: "user", content: "Q3" },
+      { role: "user", content: envelope({ text: "Q3" }) },
     ]);
   });
 
@@ -86,12 +150,14 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "hi",
+      quote: null,
       replyTarget: { messageId: 500, text: "old bot reply", authorFirstName: "Bot" },
     });
     expect(msgs).toEqual([
       { role: "user", content: "Context (replied message from Bot): old bot reply" },
-      { role: "user", content: "hi" },
+      { role: "user", content: envelope({ text: "hi" }) },
     ]);
   });
 
@@ -111,7 +177,9 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "next",
+      quote: null,
       replyTarget: { messageId: depth, text: `A${depth}`, authorFirstName: "Bot" },
       maxDepth: 5,
     });
@@ -125,7 +193,9 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "what is this",
+      quote: null,
       replyTarget: { messageId: 12, text: null, authorFirstName: "Alice" },
     });
     expect(msgs[0]).toEqual({
@@ -139,7 +209,9 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "",
+      quote: null,
       replyTarget: { messageId: 999, text: "what is 2+2?", authorFirstName: "Alice" },
     });
     expect(msgs).toEqual([
@@ -158,12 +230,37 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
+      sender: SENDER,
       userText: "",
+      quote: null,
       replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
+    ]);
+  });
+
+  test("quote-only message (empty text) still produces envelope when reply is to bot msg", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+    });
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "",
+      quote: "explain this part",
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot" },
+    });
+    expect(msgs).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+      { role: "user", content: envelope({ quote: "explain this part", text: "" }) },
     ]);
   });
 });

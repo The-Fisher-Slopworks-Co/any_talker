@@ -26,6 +26,11 @@ export function createBot(deps: BotDeps): Bot {
     if (!userId || chatId === undefined) return;
     const userText = (ctx.match ?? "").toString().trim();
     const replyTarget = extractReplyTarget(ctx);
+    const sender = {
+      firstName: ctx.from?.first_name ?? null,
+      lastName: ctx.from?.last_name ?? null,
+    };
+    const quote = ctx.message?.quote?.text ?? null;
 
     const outcome = await askHandler({
       storage: deps.storage,
@@ -35,7 +40,9 @@ export function createBot(deps: BotDeps): Bot {
       now: Date.now(),
       chatId: String(chatId),
       userId,
+      sender,
       userText,
+      quote,
       replyTarget,
     });
 

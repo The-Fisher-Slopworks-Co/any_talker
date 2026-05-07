@@ -8,16 +8,39 @@ export type ReplyTarget = {
   authorFirstName: string | null;
 };
 
+export type Sender = {
+  firstName: string | null;
+  lastName: string | null;
+};
+
 export type BuildContextArgs = {
   storage: Storage;
   chatId: string;
+  sender: Sender;
   userText: string;
+  quote: string | null;
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
 };
 
+export function buildUserEnvelope(args: {
+  sender: Sender;
+  quote: string | null;
+  text: string;
+}): string {
+  const author = [args.sender.firstName, args.sender.lastName]
+    .map((s) => (s ?? "").trim())
+    .filter((s) => s.length > 0)
+    .join(" ");
+
+  const obj: Record<string, string> = { author };
+  if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
+  obj.text = args.text;
+  return JSON.stringify(obj);
+}
+
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, userText, replyTarget } = args;
+  const { storage, chatId, sender, userText, quote, replyTarget } = args;
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   const messages: AIMessage[] = [];
 
@@ -39,8 +62,12 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
     }
   }
 
-  if (userText.trim() !== "") {
-    messages.push({ role: "user", content: userText });
+  const hasQuote = quote !== null && quote.trim() !== "";
+  if (userText.trim() !== "" || hasQuote) {
+    messages.push({
+      role: "user",
+      content: buildUserEnvelope({ sender, quote, text: userText }),
+    });
   }
   return messages;
 }
