@@ -172,8 +172,12 @@ textarea {
   text-align: left;
 }
 
-.tg-input::placeholder {
+.tg-input::placeholder,
+.tg-textarea::placeholder {
   color: var(--tg-hint);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
 }
 
 .tg-textarea {
