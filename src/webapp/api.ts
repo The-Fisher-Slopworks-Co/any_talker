@@ -11,13 +11,48 @@ export type ApiRequest = {
 
 export type ApiResponse = { status: number; body: unknown };
 
+export type ApiActor = {
+  userId: string;
+  isOwner: boolean;
+};
+
 export type ApiDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ownerId: string;
 };
 
-export async function handleApi(req: ApiRequest, deps: ApiDeps): Promise<ApiResponse> {
+const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
+
+export async function handleApi(
+  req: ApiRequest,
+  deps: ApiDeps,
+  actor: ApiActor,
+): Promise<ApiResponse> {
+  if (req.path === "/api/me") {
+    if (req.method === "GET") {
+      const displayName = await deps.storage.getUserName(actor.userId);
+      return {
+        status: 200,
+        body: { isOwner: actor.isOwner, displayName },
+      };
+    }
+    if (req.method === "PUT") {
+      const body = (req.body ?? {}) as { displayName?: string | null };
+      const trimmed =
+        typeof body.displayName === "string" ? body.displayName.trim() : null;
+      const next = trimmed && trimmed.length > 0 ? trimmed : null;
+      await deps.storage.setUserName(actor.userId, next);
+      return {
+        status: 200,
+        body: { isOwner: actor.isOwner, displayName: next },
+      };
+    }
+  }
+
+  // Everything below this line is admin-only.
+  if (!actor.isOwner) return FORBIDDEN;
+
   if (req.path === "/api/settings") {
     if (req.method === "GET") {
       const s = await getOrInitSettings(deps.storage);

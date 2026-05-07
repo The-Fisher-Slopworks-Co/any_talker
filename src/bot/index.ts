@@ -32,9 +32,11 @@ export function createBot(deps: BotDeps): Bot {
     if (!userId || chatId === undefined) return;
 
     const replyTarget = extractReplyTarget(ctx);
+    const nameOverride = await deps.storage.getUserName(userId);
     const sender = {
       firstName: ctx.from?.first_name ?? null,
       lastName: ctx.from?.last_name ?? null,
+      nameOverride,
     };
     const quote = ctx.message?.quote?.text ?? null;
 

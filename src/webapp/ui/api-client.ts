@@ -6,12 +6,23 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData: string;
+        initDataUnsafe?: {
+          user?: { first_name?: string; last_name?: string; username?: string };
+        };
         ready: () => void;
         expand: () => void;
+        BackButton?: {
+          show: () => void;
+          hide: () => void;
+          onClick: (cb: () => void) => void;
+          offClick: (cb: () => void) => void;
+        };
       };
     };
   }
 }
+
+export type MeResponse = { isOwner: boolean; displayName: string | null };
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -40,4 +51,7 @@ export const api = {
   getMyBucket: () => req<{ bucket: BucketState | null }>("GET", "/api/ratelimit/me"),
   resetMyBucket: () =>
     req<{ bucket: BucketState | null }>("PUT", "/api/ratelimit/me", { reset: true }),
+  getMe: () => req<MeResponse>("GET", "/api/me"),
+  putMe: (displayName: string | null) =>
+    req<MeResponse>("PUT", "/api/me", { displayName }),
 };
