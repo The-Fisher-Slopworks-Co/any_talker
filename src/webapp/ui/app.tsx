@@ -260,30 +260,31 @@ function WhitelistList({
 
       <SectionHeader>Add {kind === "users" ? "User" : "Chat"}</SectionHeader>
       <Card>
-        <div className="tg-row">
+        <label className="tg-row">
+          <span className="tg-row-label">ID</span>
           <input
-            className="tg-input left"
-            placeholder={kind === "users" ? "User ID" : "Chat ID"}
+            className="tg-input"
+            placeholder={kind === "users" ? "123456789" : "-1001234567890"}
             value={id}
             onChange={(e) => setId(e.target.value)}
             inputMode="numeric"
           />
-        </div>
-        <div className="tg-row">
+        </label>
+        <label className="tg-row">
+          <span className="tg-row-label">Name</span>
           <input
-            className="tg-input left"
-            placeholder="Name"
+            className="tg-input"
+            placeholder="Optional"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
-        </div>
+        </label>
         <button
           className="tg-button-row"
           onClick={submit}
           disabled={!id.trim() || busy}
-          style={!id.trim() || busy ? { opacity: 0.5 } : undefined}
         >
-          {busy ? "Adding…" : "Add"}
+          {busy ? "Adding…" : `Add ${kind === "users" ? "User" : "Chat"}`}
         </button>
       </Card>
     </>
