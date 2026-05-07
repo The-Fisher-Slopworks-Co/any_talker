@@ -17,6 +17,7 @@ export type AskInput = {
   sender: Sender;
   userText: string;
   quote: string | null;
+  image: Uint8Array | null;
   replyTarget: ReplyTarget | null;
 };
 
@@ -40,7 +41,11 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   });
   if (!allowed) return { kind: "denied" };
 
-  if (input.userText.trim() === "" && input.replyTarget === null) {
+  if (
+    input.userText.trim() === "" &&
+    input.replyTarget === null &&
+    input.image === null
+  ) {
     return { kind: "usage" };
   }
 
@@ -64,6 +69,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     sender: input.sender,
     userText: input.userText,
     quote: input.quote,
+    image: input.image,
     replyTarget: input.replyTarget,
   });
 
