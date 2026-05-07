@@ -28,7 +28,10 @@ describe("PUT /api/settings", () => {
       {
         method: "PUT",
         path: "/api/settings",
-        body: { systemPrompt: "new", model: "openai/gpt-4o" },
+        body: {
+          systemPrompt: "new",
+          models: ["openai/gpt-4o", "anthropic/claude-3.5-sonnet"],
+        },
       },
       d,
       owner,
@@ -36,7 +39,10 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(200);
     const saved = await d.storage.getSettings();
     expect(saved?.systemPrompt).toBe("new");
-    expect(saved?.model).toBe("openai/gpt-4o");
+    expect(saved?.models).toEqual([
+      "openai/gpt-4o",
+      "anthropic/claude-3.5-sonnet",
+    ]);
     expect(saved?.rateLimit).toEqual(DEFAULT_SETTINGS.rateLimit);
   });
 

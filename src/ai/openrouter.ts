@@ -11,11 +11,14 @@ export class OpenRouterAIClient implements AIClient {
   }
 
   async ask(opts: {
-    model: string;
+    models: string[];
     system: string;
     messages: AIMessage[];
     tools: Tool[];
   }): Promise<AskResult> {
+    const [primary, ...fallbacks] = opts.models;
+    if (!primary) throw new Error("at least one model id is required");
+
     const toolMap: ToolSet = {};
     for (const t of opts.tools) {
       toolMap[t.name] = aiTool({
@@ -26,11 +29,15 @@ export class OpenRouterAIClient implements AIClient {
     }
 
     const result = await generateText({
-      model: this.provider(opts.model),
+      model: this.provider(primary),
       system: opts.system,
       messages: opts.messages,
       tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
       stopWhen: stepCountIs(5),
+      providerOptions:
+        fallbacks.length > 0
+          ? { openrouter: { models: fallbacks } }
+          : undefined,
     });
 
     return {
