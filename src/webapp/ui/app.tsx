@@ -165,33 +165,66 @@ function PromptTab({
   settings: Settings;
   onSaved: (s: Settings) => void;
 }) {
-  const [model, setModel] = useState(settings.model);
+  const [models, setModels] = useState<string[]>(settings.models);
   const [prompt, setPrompt] = useState(settings.systemPrompt);
   const [saving, setSaving] = useState(false);
 
-  const dirty = model !== settings.model || prompt !== settings.systemPrompt;
+  const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
+  const modelsDirty =
+    trimmed.length !== settings.models.length ||
+    trimmed.some((m, i) => m !== settings.models[i]);
+  const dirty = modelsDirty || prompt !== settings.systemPrompt;
+  const canSave = dirty && trimmed.length > 0;
+
+  const updateAt = (idx: number, value: string) => {
+    setModels((prev) => prev.map((m, i) => (i === idx ? value : m)));
+  };
+  const removeAt = (idx: number) => {
+    setModels((prev) => prev.filter((_, i) => i !== idx));
+  };
+  const addFallback = () => {
+    setModels((prev) => [...prev, ""]);
+  };
 
   const save = async () => {
     setSaving(true);
-    const next = await api.putSettings({ model, systemPrompt: prompt });
+    const next = await api.putSettings({ models: trimmed, systemPrompt: prompt });
     onSaved(next);
+    setModels(next.models);
     setSaving(false);
   };
 
   return (
     <Stack>
-      <SectionHeader>Model</SectionHeader>
+      <SectionHeader>Models</SectionHeader>
       <Card>
-        <div className={ROW_CLS}>
-          <input
-            className={INPUT_LEFT_CLS}
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="Model ID"
-          />
-        </div>
+        {models.map((m, idx) => (
+          <div key={idx} className={ROW_CLS}>
+            <span className="shrink-0 text-tg-hint text-[15px] w-14">
+              {idx === 0 ? "Primary" : `#${idx + 1}`}
+            </span>
+            <input
+              className={INPUT_LEFT_CLS}
+              value={m}
+              onChange={(e) => updateAt(idx, e.target.value)}
+              placeholder="Model ID"
+            />
+            {idx > 0 && (
+              <button
+                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
+                onClick={() => removeAt(idx)}
+                aria-label="Remove fallback"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+        <RowButton onClick={addFallback}>Add fallback</RowButton>
       </Card>
-      <SectionFooter>OpenRouter model ID.</SectionFooter>
+      <SectionFooter>
+        Primary OpenRouter model first; fallbacks are tried in order if it fails.
+      </SectionFooter>
 
       <SectionHeader>System Prompt</SectionHeader>
       <Card>
@@ -204,7 +237,7 @@ function PromptTab({
       </Card>
       <SectionFooter>Sent as the system message on every /ask request.</SectionFooter>
 
-      <PrimaryButton disabled={saving || !dirty} onClick={save}>
+      <PrimaryButton disabled={saving || !canSave} onClick={save}>
         {saving ? "Saving…" : dirty ? "Save" : "Saved"}
       </PrimaryButton>
     </Stack>

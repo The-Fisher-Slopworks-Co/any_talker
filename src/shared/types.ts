@@ -7,7 +7,7 @@ export type RateLimitConfig = {
 
 export type Settings = {
   systemPrompt: string;
-  model: string;
+  models: string[];
   rateLimit: RateLimitConfig;
 };
 
@@ -35,7 +35,7 @@ export type ConversationNode = {
 
 export const DEFAULT_SETTINGS: Settings = {
   systemPrompt: "You are a helpful assistant in a Telegram chat. Be concise.",
-  model: "anthropic/claude-sonnet-4-5",
+  models: ["anthropic/claude-sonnet-4-5"],
   rateLimit: {
     capacity: 30000,
     refillAmount: 3000,

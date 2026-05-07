@@ -79,7 +79,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   let result;
   try {
     result = await input.ai.ask({
-      model: settings.model,
+      models: settings.models,
       system: settings.systemPrompt,
       messages,
       tools: getAllTools(),

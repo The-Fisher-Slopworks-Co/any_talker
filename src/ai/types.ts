@@ -15,7 +15,7 @@ export type AskResult = {
 
 export interface AIClient {
   ask(opts: {
-    model: string;
+    models: string[];
     system: string;
     messages: AIMessage[];
     tools: Tool[];
