@@ -1,161 +1,74 @@
-:root {
-  --tg-bg: var(--tg-theme-bg-color, #ffffff);
-  --tg-secondary: var(--tg-theme-secondary-bg-color, #efeff4);
-  --tg-section: var(--tg-theme-section-bg-color, #ffffff);
-  --tg-header: var(--tg-theme-header-bg-color, #ffffff);
-  --tg-text: var(--tg-theme-text-color, #0f0f0f);
-  --tg-hint: var(--tg-theme-hint-color, #8a8a8e);
-  --tg-subtitle: var(--tg-theme-subtitle-text-color, #8a8a8e);
-  --tg-section-header: var(--tg-theme-section-header-text-color, #8a8a8e);
-  --tg-link: var(--tg-theme-link-color, #007aff);
-  --tg-accent: var(--tg-theme-accent-text-color, #007aff);
-  --tg-button: var(--tg-theme-button-color, #007aff);
-  --tg-button-text: var(--tg-theme-button-text-color, #ffffff);
-  --tg-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
-  --tg-separator: rgb(from var(--tg-text) r g b / 0.08);
+@import "tailwindcss";
+
+@theme {
+  --color-tg-bg: var(--tg-theme-bg-color, #ffffff);
+  --color-tg-secondary: var(--tg-theme-secondary-bg-color, #efeff4);
+  --color-tg-section: var(--tg-theme-section-bg-color, #ffffff);
+  --color-tg-text: var(--tg-theme-text-color, #0f0f0f);
+  --color-tg-hint: var(--tg-theme-hint-color, #8a8a8e);
+  --color-tg-section-header: var(--tg-theme-section-header-text-color, #8a8a8e);
+  --color-tg-link: var(--tg-theme-link-color, #007aff);
+  --color-tg-button: var(--tg-theme-button-color, #007aff);
+  --color-tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --color-tg-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
+  --ease-tg-spring: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-html,
-body {
-  margin: 0;
-  background: var(--tg-secondary);
-  color: var(--tg-text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  line-height: 1.4;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-font-smoothing: antialiased;
-  scrollbar-width: none;
+@layer base {
+  :root {
+    --tg-separator: rgb(from var(--color-tg-text) r g b / 0.08);
+  }
+  html,
+  body {
+    margin: 0;
+    background: var(--color-tg-secondary);
+    color: var(--color-tg-text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    scrollbar-width: none;
+  }
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+  input,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  input:focus,
+  textarea:focus {
+    outline: none;
+  }
+  textarea {
+    resize: vertical;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  ::placeholder {
+    color: var(--color-tg-hint);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+  }
 }
 
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  display: none;
-}
+/* Structural pieces that don't translate to inline utilities cleanly. */
 
-input,
-textarea,
-button {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-}
-
-input:focus,
-textarea:focus {
-  outline: none;
-}
-
-textarea {
-  resize: vertical;
-}
-
-input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.tg-page {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 16px 12px 32px;
-}
-
-.tg-title {
-  font-size: 20px;
-  font-weight: 600;
-  padding: 8px 4px 16px;
-}
-
-.tg-tabs {
-  position: relative;
-  display: flex;
-  background: var(--tg-section);
-  border-radius: 10px;
-  padding: 3px;
-  margin-bottom: 20px;
-  box-shadow: 0 0 0 1px var(--tg-separator);
-}
-
-.tg-tab-indicator {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  background: var(--tg-button);
-  border-radius: 8px;
-  transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.tg-tab {
-  flex: 1;
-  position: relative;
-  z-index: 1;
-  border: none;
-  background: transparent;
-  padding: 8px 6px;
-  border-radius: 8px;
-  color: var(--tg-text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.tg-tab.active {
-  color: var(--tg-button-text);
-}
-
-.tg-section-header {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--tg-section-header);
-  padding: 0 16px 6px;
-}
-
-.tg-section-footer {
-  font-size: 13px;
-  color: var(--tg-hint);
-  padding: 6px 16px 0;
-  line-height: 1.35;
-}
-
-.tg-card {
-  background: var(--tg-section);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.tg-card + .tg-section-header {
-  margin-top: 24px;
-}
-
-.tg-action {
-  margin-top: 16px;
-}
-
-.tg-action + .tg-section-header {
-  margin-top: 24px;
-}
-
-.tg-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
-  position: relative;
-}
-
-.tg-row + .tg-row::before,
-.tg-row + .tg-button-row::before {
+/* Hairline separator between consecutive rows within a card. */
+.row + .row::before,
+.row + .action-row::before {
   content: "";
   position: absolute;
   top: 0;
@@ -165,161 +78,40 @@ input[type="number"]::-webkit-outer-spin-button {
   background: var(--tg-separator);
 }
 
-.tg-row-label {
-  font-size: 16px;
-  flex: 0 0 auto;
+/* Extra spacing when a header / action follows a card or another action. */
+.card + .section-header,
+.action + .section-header {
+  margin-top: 24px;
 }
 
-.tg-row-value {
-  flex: 1 1 auto;
-  text-align: right;
-  color: var(--tg-hint);
-  font-size: 15px;
-}
-
-.tg-input {
-  flex: 1 1 auto;
-  background: transparent;
-  border: none;
-  padding: 0;
-  color: var(--tg-text);
-  font-size: 16px;
-  text-align: right;
-  min-width: 0;
-}
-
-.tg-input.left {
-  text-align: left;
-}
-
-.tg-input::placeholder,
-.tg-textarea::placeholder {
-  color: var(--tg-hint);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-  font-size: 16px;
-  font-weight: 400;
-}
-
-.tg-textarea {
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 12px 16px;
-  color: var(--tg-text);
-  font-size: 16px;
-  min-height: 180px;
-  display: block;
-  box-sizing: border-box;
-}
-
-.tg-button {
-  width: 100%;
-  background: var(--tg-button);
-  color: var(--tg-button-text);
-  border: none;
-  border-radius: 12px;
-  padding: 14px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.tg-button:active:not(:disabled) {
-  opacity: 0.75;
-}
-
-.tg-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.tg-button-row {
-  position: relative;
-  display: block;
-  background: var(--tg-section);
-  color: var(--tg-link);
-  border: none;
-  width: 100%;
-  text-align: center;
-  padding: 13px 16px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.tg-button-row:active:not(:disabled) {
-  background: var(--tg-separator);
-}
-
-.tg-button-row:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.tg-button-destructive {
-  color: var(--tg-destructive);
-  background: none;
-  border: none;
-  padding: 6px 8px;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.tg-toggle {
+/* iOS-style toggle: the sliding knob lives in ::after. */
+.toggle {
   position: relative;
   width: 51px;
   height: 31px;
   background: var(--tg-separator);
-  border-radius: 999px;
-  transition: background 0.2s;
-  cursor: pointer;
-  flex: 0 0 auto;
+  border-radius: 9999px;
   border: none;
   padding: 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: background 0.2s;
 }
-
-.tg-toggle.on {
+.toggle.on {
   background: #34c759;
 }
-
-.tg-toggle::after {
+.toggle::after {
   content: "";
   position: absolute;
   top: 2px;
   left: 2px;
   width: 27px;
   height: 27px;
-  background: #fff;
   border-radius: 50%;
-  transition: transform 0.2s;
+  background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s;
 }
-
-.tg-toggle.on::after {
+.toggle.on::after {
   transform: translateX(20px);
-}
-
-.tg-empty {
-  color: var(--tg-hint);
-  font-size: 15px;
-  padding: 14px 16px;
-  text-align: center;
-}
-
-.tg-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tg-mono {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 14px;
-}
-
-.tg-loading {
-  padding: 80px 0;
-  text-align: center;
-  color: var(--tg-hint);
 }
