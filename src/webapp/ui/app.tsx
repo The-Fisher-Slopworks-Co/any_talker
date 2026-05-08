@@ -5,11 +5,14 @@ import "./styles.css";
 import { api, type MeResponse } from "./api-client";
 import {
   fetchOpenRouterModels,
+  fetchOpenRouterEndpoints,
   lookupOpenRouterModel,
+  pickEndpointBySort,
   formatPricePerMillion,
   supportsCaching,
   supportsTools,
   type OpenRouterModel,
+  type OpenRouterEndpoint,
 } from "./openrouter-models";
 import {
   composeFullName,
@@ -231,15 +234,52 @@ function MainView({
   );
 }
 
-function ModelInfo({ model }: { model: OpenRouterModel | null | undefined }) {
+function ModelInfo({
+  model,
+  providerSort,
+}: {
+  model: OpenRouterModel | null | undefined;
+  providerSort: ProviderSort | null;
+}) {
+  const [endpoint, setEndpoint] = useState<
+    OpenRouterEndpoint | null | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (!model || !providerSort) {
+      setEndpoint(null);
+      return;
+    }
+    let cancelled = false;
+    setEndpoint(undefined);
+    fetchOpenRouterEndpoints(model.id)
+      .then((eps) => {
+        if (cancelled) return;
+        setEndpoint(pickEndpointBySort(eps, providerSort));
+      })
+      .catch(() => {
+        if (!cancelled) setEndpoint(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [model?.id, providerSort]);
+
   if (model === undefined)
     return <span className="text-tg-hint">Loading model info…</span>;
   if (model === null)
     return <span className="text-tg-hint">Unknown model ID.</span>;
 
-  const inputPrice = formatPricePerMillion(model.pricing.prompt);
-  const outputPrice = formatPricePerMillion(model.pricing.completion);
-  const imagePrice = formatPricePerMillion(model.pricing.image);
+  const useEndpoint = providerSort !== null && endpoint !== null && endpoint !== undefined;
+  const inputPrice = formatPricePerMillion(
+    useEndpoint ? endpoint.pricing.prompt : model.pricing.prompt,
+  );
+  const outputPrice = formatPricePerMillion(
+    useEndpoint ? endpoint.pricing.completion : model.pricing.completion,
+  );
+  const imagePrice = formatPricePerMillion(
+    useEndpoint ? endpoint.pricing.image : model.pricing.image,
+  );
   const modalities = model.architecture?.input_modalities ?? [];
   const tools = supportsTools(model);
   const caching = supportsCaching(model);
@@ -247,6 +287,21 @@ function ModelInfo({ model }: { model: OpenRouterModel | null | undefined }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="font-medium text-tg-text">{model.name}</div>
+      {providerSort !== null && (
+        <div className="text-tg-hint">
+          {endpoint === undefined
+            ? "Resolving provider…"
+            : endpoint === null
+              ? `No provider data for sort=${providerSort}; showing catalog values.`
+              : `Provider: ${endpoint.provider_name}`}
+          {endpoint && providerSort === "throughput" && endpoint.throughput_last_30m !== null && (
+            <> · {Math.round(endpoint.throughput_last_30m)} tok/s</>
+          )}
+          {endpoint && providerSort === "latency" && endpoint.latency_last_30m !== null && (
+            <> · {Math.round(endpoint.latency_last_30m)} ms</>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
         {inputPrice && (
           <span>
@@ -284,9 +339,11 @@ function ModelInfo({ model }: { model: OpenRouterModel | null | undefined }) {
 function ModelsCard({
   models,
   onChange,
+  providerSort,
 }: {
   models: string[];
   onChange: (next: string[]) => void;
+  providerSort: ProviderSort | null;
 }) {
   const [catalog, setCatalog] = useState<Map<string, OpenRouterModel> | null>(null);
 
@@ -339,7 +396,7 @@ function ModelsCard({
             </div>
             {m.trim().length > 0 && (
               <div className="pl-[68px] text-[13px] leading-[1.45]">
-                <ModelInfo model={info} />
+                <ModelInfo model={info} providerSort={providerSort} />
               </div>
             )}
           </div>
@@ -559,7 +616,11 @@ function PromptTab({
   return (
     <Stack>
       <SectionHeader>Models</SectionHeader>
-      <ModelsCard models={models} onChange={setModels} />
+      <ModelsCard
+        models={models}
+        onChange={setModels}
+        providerSort={providerSort}
+      />
       <SectionFooter>
         Primary OpenRouter model first; fallbacks are tried in order if it fails.
       </SectionFooter>
@@ -1177,7 +1238,11 @@ function ChatEditView({ chatId }: { chatId: string }) {
             : `Using global: ${global.models.join(", ")}`
         }
       >
-        <ModelsCard models={modelsValue} onChange={setModelsValue} />
+        <ModelsCard
+          models={modelsValue}
+          onChange={setModelsValue}
+          providerSort={psOverride ? psValue : global.providerSort}
+        />
       </OverrideSection>
 
       <OverrideSection

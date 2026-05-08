@@ -1,5 +1,23 @@
 import { test, expect, describe } from "bun:test";
-import { lookupOpenRouterModel, type OpenRouterModel } from "./openrouter-models";
+import {
+  lookupOpenRouterModel,
+  pickEndpointBySort,
+  type OpenRouterEndpoint,
+  type OpenRouterModel,
+} from "./openrouter-models";
+
+const ep = (
+  provider_name: string,
+  prompt: string | undefined,
+  completion: string | undefined,
+  throughput: number | null,
+  latency: number | null,
+): OpenRouterEndpoint => ({
+  provider_name,
+  pricing: { prompt, completion },
+  throughput_last_30m: throughput,
+  latency_last_30m: latency,
+});
 
 const model = (id: string, name: string): OpenRouterModel => ({
   id,
@@ -44,5 +62,49 @@ describe("lookupOpenRouterModel", () => {
   test("does not strip a leading colon (no base before it)", () => {
     const cat = new Map<string, OpenRouterModel>();
     expect(lookupOpenRouterModel(cat, ":nitro")).toBeNull();
+  });
+});
+
+describe("pickEndpointBySort", () => {
+  const A = ep("A", "0.000000040", "0.00000020", 100, 500);
+  const B = ep("B", "0.000000039", "0.00000018", 80, 700);
+  const C = ep("C", "0.000000050", "0.00000025", 150, 300);
+
+  test("returns null on empty input", () => {
+    expect(pickEndpointBySort([], "price")).toBeNull();
+  });
+
+  test("price: picks lowest sum of prompt+completion", () => {
+    expect(pickEndpointBySort([A, B, C], "price")?.provider_name).toBe("B");
+  });
+
+  test("price: missing pricing on a candidate counts as worst", () => {
+    const noPrice = ep("X", undefined, undefined, 200, 50);
+    expect(pickEndpointBySort([A, noPrice], "price")?.provider_name).toBe("A");
+  });
+
+  test("throughput: picks highest, ignoring nulls", () => {
+    const nullTp = ep("X", "0", "0", null, 10);
+    expect(pickEndpointBySort([A, B, C, nullTp], "throughput")?.provider_name).toBe(
+      "C",
+    );
+  });
+
+  test("throughput: returns null when no candidate has data", () => {
+    const x = ep("X", "0", "0", null, 10);
+    const y = ep("Y", "0", "0", null, 20);
+    expect(pickEndpointBySort([x, y], "throughput")).toBeNull();
+  });
+
+  test("latency: picks lowest, ignoring nulls", () => {
+    const nullLat = ep("X", "0", "0", 999, null);
+    expect(pickEndpointBySort([A, B, C, nullLat], "latency")?.provider_name).toBe(
+      "C",
+    );
+  });
+
+  test("latency: returns null when no candidate has data", () => {
+    const x = ep("X", "0", "0", 100, null);
+    expect(pickEndpointBySort([x], "latency")).toBeNull();
   });
 });
