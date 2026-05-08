@@ -5,11 +5,20 @@ export type RateLimitConfig = {
   ownerExempt: boolean;
 };
 
+export type ProviderSort = "price" | "throughput" | "latency";
+
+export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
+  "price",
+  "throughput",
+  "latency",
+];
+
 export type Settings = {
   systemPrompt: string;
   models: string[];
   rateLimit: RateLimitConfig;
   timezone: string;
+  providerSort: ProviderSort | null;
 };
 
 export type WhitelistEntry = {
@@ -51,6 +60,7 @@ export type ChatSettings = {
   rateLimit?: RateLimitConfig;
   botName?: string;
   timezone?: string;
+  providerSort?: ProviderSort | null;
 };
 
 export type ConversationNode = {
@@ -70,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
     ownerExempt: true,
   },
   timezone: "UTC",
+  providerSort: null,
 };
 
 export const MAX_REPLY_CHAIN_DEPTH = 20;
@@ -91,8 +102,13 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.models === undefined &&
     s.rateLimit === undefined &&
     s.botName === undefined &&
-    s.timezone === undefined
+    s.timezone === undefined &&
+    s.providerSort === undefined
   );
+}
+
+export function isValidProviderSort(v: unknown): v is ProviderSort {
+  return v === "price" || v === "throughput" || v === "latency";
 }
 
 export function isValidTimezone(tz: string): boolean {

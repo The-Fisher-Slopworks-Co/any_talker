@@ -62,7 +62,25 @@ describe("applyChatOverrides", () => {
         ownerExempt: false,
       },
       timezone: DEFAULT_SETTINGS.timezone,
+      providerSort: DEFAULT_SETTINGS.providerSort,
     });
+  });
+
+  test("provider sort: chat null overrides global value", () => {
+    const global = { ...DEFAULT_SETTINGS, providerSort: "throughput" as const };
+    const r = applyChatOverrides(global, { providerSort: null });
+    expect(r.providerSort).toBeNull();
+  });
+
+  test("provider sort: chat undefined inherits global value", () => {
+    const global = { ...DEFAULT_SETTINGS, providerSort: "price" as const };
+    const r = applyChatOverrides(global, { systemPrompt: "x" });
+    expect(r.providerSort).toBe("price");
+  });
+
+  test("provider sort: chat string overrides global", () => {
+    const r = applyChatOverrides(DEFAULT_SETTINGS, { providerSort: "latency" });
+    expect(r.providerSort).toBe("latency");
   });
 });
 

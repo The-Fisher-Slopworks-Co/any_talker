@@ -46,6 +46,54 @@ describe("PUT /api/settings", () => {
     expect(saved?.rateLimit).toEqual(DEFAULT_SETTINGS.rateLimit);
   });
 
+  test("accepts a valid providerSort", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { providerSort: "throughput" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.providerSort).toBe("throughput");
+  });
+
+  test("accepts null providerSort to clear it", async () => {
+    const d = deps();
+    await d.storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "price",
+    });
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { providerSort: null },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.providerSort).toBeNull();
+  });
+
+  test("rejects an invalid providerSort with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { providerSort: "nope" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("can update rateLimit only", async () => {
     const d = deps();
     const res = await handleApi(
@@ -530,6 +578,75 @@ describe("/api/admin/chats", () => {
     );
     expect(await d.storage.getChatSettings("-100")).toEqual({
       timezone: "Asia/Yekaterinburg",
+    });
+  });
+
+  test("PUT accepts providerSort string override", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { providerSort: "latency" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      providerSort: "latency",
+    });
+  });
+
+  test("PUT accepts providerSort=null to override-to-none", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { providerSort: null },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      providerSort: null,
+    });
+  });
+
+  test("PUT silently drops invalid providerSort string", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { systemPrompt: "p", providerSort: "fastest" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      systemPrompt: "p",
     });
   });
 

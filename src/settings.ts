@@ -22,7 +22,13 @@ function normalize(s: Settings): Settings {
     typeof s.timezone === "string" && s.timezone.length > 0
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
-  return { ...s, models, timezone };
+  const providerSort =
+    s.providerSort === "price" ||
+    s.providerSort === "throughput" ||
+    s.providerSort === "latency"
+      ? s.providerSort
+      : null;
+  return { ...s, models, timezone, providerSort };
 }
 
 export function applyChatOverrides(
@@ -35,6 +41,8 @@ export function applyChatOverrides(
     models: chat.models ?? global.models,
     rateLimit: chat.rateLimit ?? global.rateLimit,
     timezone: chat.timezone ?? global.timezone,
+    providerSort:
+      chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
   };
 }
 

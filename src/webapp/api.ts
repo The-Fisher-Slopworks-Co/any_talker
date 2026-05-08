@@ -6,7 +6,7 @@ import type {
   ChatSettings,
   RateLimitConfig,
 } from "../shared/types";
-import { isValidTimezone } from "../shared/types";
+import { isValidTimezone, isValidProviderSort } from "../shared/types";
 import { getOrInitSettings } from "../settings";
 
 export type ApiRequest = {
@@ -48,6 +48,11 @@ const BAD_TIMEZONE: ApiResponse = {
   body: { error: "invalid timezone" },
 };
 
+const BAD_PROVIDER_SORT: ApiResponse = {
+  status: 400,
+  body: { error: "invalid providerSort" },
+};
+
 function normalizeChatSettings(raw: unknown): ChatSettings {
   const body = (raw ?? {}) as {
     systemPrompt?: unknown;
@@ -55,6 +60,7 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     rateLimit?: unknown;
     botName?: unknown;
     timezone?: unknown;
+    providerSort?: unknown;
   };
   const out: ChatSettings = {};
   if (typeof body.systemPrompt === "string") {
@@ -96,6 +102,11 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     if (trimmed.length > 0 && isValidTimezone(trimmed)) {
       out.timezone = trimmed;
     }
+  }
+  if (body.providerSort === null) {
+    out.providerSort = null;
+  } else if (isValidProviderSort(body.providerSort)) {
+    out.providerSort = body.providerSort;
   }
   return out;
 }
@@ -155,6 +166,13 @@ export async function handleApi(
       const patch = (req.body ?? {}) as Partial<Settings>;
       if (patch.timezone !== undefined && !isValidTimezone(patch.timezone)) {
         return BAD_TIMEZONE;
+      }
+      if (
+        patch.providerSort !== undefined &&
+        patch.providerSort !== null &&
+        !isValidProviderSort(patch.providerSort)
+      ) {
+        return BAD_PROVIDER_SORT;
       }
       const next: Settings = {
         ...current,
