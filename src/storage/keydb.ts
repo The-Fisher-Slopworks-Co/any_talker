@@ -79,6 +79,16 @@ export class KeyDBStorage implements Storage {
     else await this.client.set(key, name);
   }
 
+  async getUserTimezone(userId: string): Promise<string | null> {
+    return await this.client.get(`${PREFIX}user_tz:${userId}`);
+  }
+
+  async setUserTimezone(userId: string, timezone: string | null): Promise<void> {
+    const key = `${PREFIX}user_tz:${userId}`;
+    if (timezone === null) await this.client.del(key);
+    else await this.client.set(key, timezone);
+  }
+
   async listUsers(): Promise<User[]> {
     const values = await this.client.hvals(`${PREFIX}users`);
     return values

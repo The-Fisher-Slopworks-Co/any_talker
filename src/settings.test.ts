@@ -61,6 +61,7 @@ describe("applyChatOverrides", () => {
         refillIntervalMs: 1000,
         ownerExempt: false,
       },
+      timezone: DEFAULT_SETTINGS.timezone,
     });
   });
 });

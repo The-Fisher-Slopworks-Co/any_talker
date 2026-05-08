@@ -32,4 +32,17 @@ describe("buildInstruction", () => {
     expect(out).toMatch(/\n\n# Формат ответа/);
     expect(out).toMatch(/\n\n# Персонаж/);
   });
+
+  test("appends a datetime section when timezone is provided", () => {
+    const now = new Date("2026-05-08T15:42:00Z");
+    const out = buildInstruction("X", { timezone: "Europe/Moscow", now });
+    expect(out).toContain("# Текущие дата и время");
+    expect(out).toContain("Таймзона пользователя: Europe/Moscow.");
+    expect(out).toMatch(/Сейчас 2026-05-08 18:42 \(/);
+  });
+
+  test("omits datetime section when no timezone provided", () => {
+    const out = buildInstruction("X");
+    expect(out).not.toContain("# Текущие дата и время");
+  });
 });

@@ -52,11 +52,13 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     return { kind: "usage" };
   }
 
-  const [settings, chatSettings] = await Promise.all([
+  const [settings, chatSettings, userTimezone] = await Promise.all([
     getEffectiveSettings(input.storage, input.chatId),
     input.storage.getChatSettings(input.chatId),
+    input.storage.getUserTimezone(input.userId),
   ]);
   const botName = chatSettings?.botName?.trim() || null;
+  const timezone = userTimezone ?? settings.timezone;
 
   const isOwner = input.userId === input.ownerId;
   const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
@@ -91,7 +93,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   try {
     result = await input.ai.ask({
       models: settings.models,
-      system: buildInstruction(settings.systemPrompt),
+      system: buildInstruction(settings.systemPrompt, { timezone }),
       messages,
       tools: getAllTools(),
     });

@@ -9,6 +9,7 @@ export type Settings = {
   systemPrompt: string;
   models: string[];
   rateLimit: RateLimitConfig;
+  timezone: string;
 };
 
 export type WhitelistEntry = {
@@ -49,6 +50,7 @@ export type ChatSettings = {
   models?: string[];
   rateLimit?: RateLimitConfig;
   botName?: string;
+  timezone?: string;
 };
 
 export type ConversationNode = {
@@ -67,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
     refillIntervalMs: 40 * 60 * 1000,
     ownerExempt: true,
   },
+  timezone: "UTC",
 };
 
 export const MAX_REPLY_CHAIN_DEPTH = 20;
@@ -87,6 +90,17 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.systemPrompt === undefined &&
     s.models === undefined &&
     s.rateLimit === undefined &&
-    s.botName === undefined
+    s.botName === undefined &&
+    s.timezone === undefined
   );
+}
+
+export function isValidTimezone(tz: string): boolean {
+  if (typeof tz !== "string" || tz.length === 0) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
 }

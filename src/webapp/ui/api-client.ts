@@ -31,7 +31,11 @@ declare global {
   }
 }
 
-export type MeResponse = { isOwner: boolean; displayName: string | null };
+export type MeResponse = {
+  isOwner: boolean;
+  displayName: string | null;
+  timezone: string | null;
+};
 export type UserSettingsResponse = { user: User; displayName: string | null };
 export type ChatSettingsResponse = { chat: Chat; settings: ChatSettings };
 
@@ -63,8 +67,8 @@ export const api = {
   resetMyBucket: () =>
     req<{ bucket: BucketState | null }>("PUT", "/api/ratelimit/me", { reset: true }),
   getMe: () => req<MeResponse>("GET", "/api/me"),
-  putMe: (displayName: string | null) =>
-    req<MeResponse>("PUT", "/api/me", { displayName }),
+  putMe: (patch: { displayName: string | null; timezone: string | null }) =>
+    req<MeResponse>("PUT", "/api/me", patch),
   listAdminUsers: () => req<{ users: User[] }>("GET", "/api/admin/users"),
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),

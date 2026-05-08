@@ -19,6 +19,7 @@ export class MemoryStorage implements Storage {
   private buckets = new Map<string, BucketState>();
   private conversations = new Map<string, ConversationNode>();
   private userNames = new Map<string, string>();
+  private userTimezones = new Map<string, string>();
   private users = new Map<string, User>();
   private chats = new Map<string, Chat>();
   private chatSettings = new Map<string, ChatSettings>();
@@ -75,6 +76,15 @@ export class MemoryStorage implements Storage {
   async setUserName(userId: string, name: string | null): Promise<void> {
     if (name === null) this.userNames.delete(userId);
     else this.userNames.set(userId, name);
+  }
+
+  async getUserTimezone(userId: string): Promise<string | null> {
+    return this.userTimezones.get(userId) ?? null;
+  }
+
+  async setUserTimezone(userId: string, timezone: string | null): Promise<void> {
+    if (timezone === null) this.userTimezones.delete(userId);
+    else this.userTimezones.set(userId, timezone);
   }
 
   async listUsers(): Promise<User[]> {

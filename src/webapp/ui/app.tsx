@@ -20,6 +20,11 @@ import {
   type ChatSettings,
   type RateLimitConfig,
 } from "../../shared/types";
+import {
+  getTimezoneAreas,
+  getTimezoneLocations,
+  splitTimezone,
+} from "./timezones";
 
 type Tab = "prompt" | "ratelimit" | "whitelist" | "users" | "chats";
 type Route =
@@ -148,20 +153,29 @@ function MainView({
   onOpenAdmin: () => void;
 }) {
   const [name, setName] = useState(me.displayName ?? "");
+  const [tzOverride, setTzOverride] = useState(me.timezone !== null);
+  const [tzValue, setTzValue] = useState(me.timezone ?? "UTC");
   const [saving, setSaving] = useState(false);
 
   const tg = window.Telegram?.WebApp;
   const tgUser = tg?.initDataUnsafe?.user;
   const tgName = tgUser ? composeFullName(tgUser.first_name, tgUser.last_name) : "";
 
-  const dirty = name.trim() !== (me.displayName ?? "");
+  const desiredTz = tzOverride ? tzValue : null;
+  const dirty =
+    name.trim() !== (me.displayName ?? "") || desiredTz !== me.timezone;
 
   const save = async () => {
     setSaving(true);
     try {
-      const next = await api.putMe(name.trim() || null);
+      const next = await api.putMe({
+        displayName: name.trim() || null,
+        timezone: desiredTz,
+      });
       onMe(next);
       setName(next.displayName ?? "");
+      setTzOverride(next.timezone !== null);
+      setTzValue(next.timezone ?? "UTC");
     } finally {
       setSaving(false);
     }
@@ -182,6 +196,22 @@ function MainView({
         </label>
       </Card>
       <SectionFooter>Name shown to the AI.</SectionFooter>
+
+      <SectionHeader>Timezone</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Use my timezone</span>
+          <span className="flex-1" />
+          <Toggle value={tzOverride} onChange={setTzOverride} />
+        </div>
+      </Card>
+      {tzOverride ? (
+        <TimezoneSelect value={tzValue} onChange={setTzValue} />
+      ) : null}
+      <SectionFooter>
+        Sent to the AI as the current date/time. Off uses the chat or global
+        timezone.
+      </SectionFooter>
 
       <PrimaryButton disabled={saving || !dirty} onClick={save}>
         {saving ? "Saving…" : dirty ? "Save" : "Saved"}
@@ -377,6 +407,67 @@ function RateLimitFields({
   );
 }
 
+function TimezoneSelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (tz: string) => void;
+}) {
+  const areas = getTimezoneAreas();
+  const { area, location } = splitTimezone(value);
+  const locations = getTimezoneLocations(area);
+
+  const areaOptions = areas.includes(area) ? areas : [area, ...areas];
+  const locationOptions =
+    location && !locations.includes(location)
+      ? [location, ...locations]
+      : locations;
+
+  const onAreaChange = (next: string) => {
+    const list = getTimezoneLocations(next);
+    if (list.length > 0) onChange(`${next}/${list[0]}`);
+  };
+
+  const onLocationChange = (next: string) => {
+    onChange(`${area}/${next}`);
+  };
+
+  return (
+    <Card>
+      <label className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>Area</span>
+        <select
+          className={INPUT_CLS}
+          value={area}
+          onChange={(e) => onAreaChange(e.target.value)}
+        >
+          {areaOptions.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>Location</span>
+        <select
+          className={INPUT_CLS}
+          value={location}
+          onChange={(e) => onLocationChange(e.target.value)}
+          disabled={locationOptions.length === 0}
+        >
+          {locationOptions.map((l) => (
+            <option key={l} value={l}>
+              {l.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
+      </label>
+    </Card>
+  );
+}
+
 function PromptTab({
   settings,
   onSaved,
@@ -386,20 +477,29 @@ function PromptTab({
 }) {
   const [models, setModels] = useState<string[]>(settings.models);
   const [prompt, setPrompt] = useState(settings.systemPrompt);
+  const [timezone, setTimezone] = useState(settings.timezone);
   const [saving, setSaving] = useState(false);
 
   const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
   const modelsDirty =
     trimmed.length !== settings.models.length ||
     trimmed.some((m, i) => m !== settings.models[i]);
-  const dirty = modelsDirty || prompt !== settings.systemPrompt;
+  const dirty =
+    modelsDirty ||
+    prompt !== settings.systemPrompt ||
+    timezone !== settings.timezone;
   const canSave = dirty && trimmed.length > 0;
 
   const save = async () => {
     setSaving(true);
-    const next = await api.putSettings({ models: trimmed, systemPrompt: prompt });
+    const next = await api.putSettings({
+      models: trimmed,
+      systemPrompt: prompt,
+      timezone,
+    });
     onSaved(next);
     setModels(next.models);
+    setTimezone(next.timezone);
     setSaving(false);
   };
 
@@ -422,6 +522,12 @@ function PromptTab({
       </Card>
       <SectionFooter>
         Character description embedded into the system instruction.
+      </SectionFooter>
+
+      <SectionHeader>Timezone</SectionHeader>
+      <TimezoneSelect value={timezone} onChange={setTimezone} />
+      <SectionFooter>
+        Default timezone used when the chat or user has no override.
       </SectionFooter>
 
       <PrimaryButton disabled={saving || !canSave} onClick={save}>
@@ -837,6 +943,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
   const [rlOverride, setRlOverride] = useState(false);
   const [rlValue, setRlValue] = useState<RateLimitConfig | null>(null);
   const [botNameValue, setBotNameValue] = useState("");
+  const [tzOverride, setTzOverride] = useState(false);
+  const [tzValue, setTzValue] = useState("UTC");
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -854,6 +962,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
         setRlOverride(d.settings.rateLimit !== undefined);
         setRlValue(d.settings.rateLimit ?? g.rateLimit);
         setBotNameValue(d.settings.botName ?? "");
+        setTzOverride(d.settings.timezone !== undefined);
+        setTzValue(d.settings.timezone ?? g.timezone);
       })
       .catch(() => setNotFound(true));
   }, [chatId]);
@@ -873,6 +983,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
     if (modelsOverride && trimmedModels.length > 0) next.models = trimmedModels;
     if (rlOverride) next.rateLimit = rlValue;
     if (trimmedBotName.length > 0) next.botName = trimmedBotName;
+    if (tzOverride) next.timezone = tzValue;
     return next;
   };
 
@@ -882,11 +993,13 @@ function ChatEditView({ chatId }: { chatId: string }) {
     promptOverride !== wasOverridden("systemPrompt") ||
     modelsOverride !== wasOverridden("models") ||
     rlOverride !== wasOverridden("rateLimit") ||
+    tzOverride !== wasOverridden("timezone") ||
     (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
     (modelsOverride &&
       JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
     (rlOverride &&
       JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
+    (tzOverride && payload.timezone !== original.timezone) ||
     trimmedBotName !== (original.botName ?? "");
 
   const canSave = dirty && (!modelsOverride || trimmedModels.length > 0);
@@ -903,6 +1016,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
       setRlOverride(result.settings.rateLimit !== undefined);
       setRlValue(result.settings.rateLimit ?? global.rateLimit);
       setBotNameValue(result.settings.botName ?? "");
+      setTzOverride(result.settings.timezone !== undefined);
+      setTzValue(result.settings.timezone ?? global.timezone);
     } finally {
       setSaving(false);
     }
@@ -999,6 +1114,19 @@ function ChatEditView({ chatId }: { chatId: string }) {
         }
       >
         <RateLimitFields value={rlValue} onChange={setRlValue} />
+      </OverrideSection>
+
+      <OverrideSection
+        title="Timezone"
+        override={tzOverride}
+        onToggle={setTzOverride}
+        footer={
+          tzOverride
+            ? "Used unless a user has set their own timezone."
+            : `Using global timezone (${global.timezone}).`
+        }
+      >
+        <TimezoneSelect value={tzValue} onChange={setTzValue} />
       </OverrideSection>
 
       <PrimaryButton disabled={saving || !canSave} onClick={save}>
