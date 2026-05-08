@@ -5,7 +5,10 @@ import type {
   BucketState,
   ConversationNode,
   User,
+  Chat,
+  ChatSettings,
 } from "../shared/types";
+import { isEmptyChatSettings } from "../shared/types";
 
 export class MemoryStorage implements Storage {
   private settings: Settings | null = null;
@@ -17,6 +20,12 @@ export class MemoryStorage implements Storage {
   private conversations = new Map<string, ConversationNode>();
   private userNames = new Map<string, string>();
   private users = new Map<string, User>();
+  private chats = new Map<string, Chat>();
+  private chatSettings = new Map<string, ChatSettings>();
+
+  private bucketKey(chatId: string, userId: string): string {
+    return `${chatId}:${userId}`;
+  }
 
   private convKey(chatId: string, botMsgId: number): string {
     return `${chatId}:${botMsgId}`;
@@ -46,13 +55,17 @@ export class MemoryStorage implements Storage {
     return this.whitelist[kind].has(id);
   }
 
-  async getBucket(userId: string): Promise<BucketState | null> {
-    const v = this.buckets.get(userId);
+  async getBucket(chatId: string, userId: string): Promise<BucketState | null> {
+    const v = this.buckets.get(this.bucketKey(chatId, userId));
     return v ? { ...v } : null;
   }
 
-  async saveBucket(userId: string, state: BucketState): Promise<void> {
-    this.buckets.set(userId, { ...state });
+  async saveBucket(
+    chatId: string,
+    userId: string,
+    state: BucketState,
+  ): Promise<void> {
+    this.buckets.set(this.bucketKey(chatId, userId), { ...state });
   }
 
   async getUserName(userId: string): Promise<string | null> {
@@ -77,6 +90,34 @@ export class MemoryStorage implements Storage {
   async getUser(id: string): Promise<User | null> {
     const u = this.users.get(id);
     return u ? { ...u } : null;
+  }
+
+  async listChats(): Promise<Chat[]> {
+    return [...this.chats.values()]
+      .map((c) => ({ ...c }))
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  }
+
+  async upsertChat(chat: Chat): Promise<void> {
+    this.chats.set(chat.id, { ...chat });
+  }
+
+  async getChat(id: string): Promise<Chat | null> {
+    const c = this.chats.get(id);
+    return c ? { ...c } : null;
+  }
+
+  async getChatSettings(chatId: string): Promise<ChatSettings | null> {
+    const s = this.chatSettings.get(chatId);
+    return s ? structuredClone(s) : null;
+  }
+
+  async saveChatSettings(chatId: string, settings: ChatSettings): Promise<void> {
+    if (isEmptyChatSettings(settings)) {
+      this.chatSettings.delete(chatId);
+      return;
+    }
+    this.chatSettings.set(chatId, structuredClone(settings));
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {

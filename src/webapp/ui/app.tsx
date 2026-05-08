@@ -16,13 +16,28 @@ import {
   type WhitelistEntry,
   type BucketState,
   type User,
+  type Chat,
+  type ChatSettings,
+  type RateLimitConfig,
 } from "../../shared/types";
 
-type Tab = "prompt" | "ratelimit" | "whitelist" | "users";
+type Tab = "prompt" | "ratelimit" | "whitelist" | "users" | "chats";
 type Route =
   | { kind: "main" }
   | { kind: "admin" }
-  | { kind: "user-edit"; userId: string };
+  | { kind: "user-edit"; userId: string }
+  | { kind: "chat-edit"; chatId: string };
+
+function chatTitle(c: Chat): string {
+  if (c.title && c.title.length > 0) return c.title;
+  if (c.username) return `@${c.username}`;
+  if (c.type === "private") return "Private chat";
+  return `id:${c.id}`;
+}
+
+function chatSubtitle(c: Chat): string {
+  return c.username && c.title ? `${c.type} · @${c.username}` : c.type;
+}
 
 function userDisplayName(u: User): string {
   return composeFullName(u.firstName, u.lastName) || `id:${u.id}`;
@@ -234,6 +249,134 @@ function ModelInfo({ model }: { model: OpenRouterModel | null | undefined }) {
   );
 }
 
+function ModelsCard({
+  models,
+  onChange,
+}: {
+  models: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [catalog, setCatalog] = useState<Map<string, OpenRouterModel> | null>(null);
+
+  useEffect(() => {
+    fetchOpenRouterModels()
+      .then(setCatalog)
+      .catch(() => setCatalog(new Map()));
+  }, []);
+
+  const lookupModel = (id: string): OpenRouterModel | null | undefined => {
+    const t = id.trim();
+    if (t.length === 0) return null;
+    if (catalog === null) return undefined;
+    return catalog.get(t) ?? null;
+  };
+
+  const updateAt = (idx: number, value: string) =>
+    onChange(models.map((m, i) => (i === idx ? value : m)));
+  const removeAt = (idx: number) => onChange(models.filter((_, i) => i !== idx));
+  const addFallback = () => onChange([...models, ""]);
+
+  return (
+    <Card>
+      {models.map((m, idx) => {
+        const info = m.trim().length > 0 ? lookupModel(m) : null;
+        return (
+          <div
+            key={idx}
+            className="row relative flex flex-col gap-2 px-4 py-[11px]"
+          >
+            <div className="flex items-center gap-3">
+              <span className="shrink-0 text-tg-hint text-[15px] w-14">
+                {idx === 0 ? "Primary" : `#${idx + 1}`}
+              </span>
+              <input
+                className={INPUT_LEFT_CLS}
+                value={m}
+                onChange={(e) => updateAt(idx, e.target.value)}
+                placeholder="Model ID"
+              />
+              {idx > 0 && (
+                <button
+                  className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
+                  onClick={() => removeAt(idx)}
+                  aria-label="Remove fallback"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            {m.trim().length > 0 && (
+              <div className="pl-[68px] text-[13px] leading-[1.45]">
+                <ModelInfo model={info} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <RowButton onClick={addFallback}>Add fallback</RowButton>
+    </Card>
+  );
+}
+
+function RateLimitFields({
+  value,
+  onChange,
+}: {
+  value: RateLimitConfig;
+  onChange: (next: RateLimitConfig) => void;
+}) {
+  const intervalMin = Math.round(value.refillIntervalMs / 60000);
+  return (
+    <Card>
+      <label className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>Capacity</span>
+        <input
+          type="number"
+          className={INPUT_CLS}
+          value={value.capacity}
+          onChange={(e) =>
+            onChange({ ...value, capacity: Number(e.target.value) })
+          }
+        />
+      </label>
+      <label className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>Refill amount</span>
+        <input
+          type="number"
+          className={INPUT_CLS}
+          value={value.refillAmount}
+          onChange={(e) =>
+            onChange({ ...value, refillAmount: Number(e.target.value) })
+          }
+        />
+      </label>
+      <label className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>Refill every</span>
+        <input
+          type="number"
+          className={INPUT_CLS}
+          value={intervalMin}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              refillIntervalMs: Number(e.target.value) * 60_000,
+            })
+          }
+        />
+        <span className="shrink-0 text-tg-hint text-[15px]">min</span>
+      </label>
+      <div className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>Owner exempt</span>
+        <span className="flex-1" />
+        <Toggle
+          value={value.ownerExempt}
+          onChange={(v) => onChange({ ...value, ownerExempt: v })}
+        />
+      </div>
+    </Card>
+  );
+}
+
 function PromptTab({
   settings,
   onSaved,
@@ -244,13 +387,6 @@ function PromptTab({
   const [models, setModels] = useState<string[]>(settings.models);
   const [prompt, setPrompt] = useState(settings.systemPrompt);
   const [saving, setSaving] = useState(false);
-  const [catalog, setCatalog] = useState<Map<string, OpenRouterModel> | null>(null);
-
-  useEffect(() => {
-    fetchOpenRouterModels()
-      .then(setCatalog)
-      .catch(() => setCatalog(new Map()));
-  }, []);
 
   const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
   const modelsDirty =
@@ -258,16 +394,6 @@ function PromptTab({
     trimmed.some((m, i) => m !== settings.models[i]);
   const dirty = modelsDirty || prompt !== settings.systemPrompt;
   const canSave = dirty && trimmed.length > 0;
-
-  const updateAt = (idx: number, value: string) => {
-    setModels((prev) => prev.map((m, i) => (i === idx ? value : m)));
-  };
-  const removeAt = (idx: number) => {
-    setModels((prev) => prev.filter((_, i) => i !== idx));
-  };
-  const addFallback = () => {
-    setModels((prev) => [...prev, ""]);
-  };
 
   const save = async () => {
     setSaving(true);
@@ -277,54 +403,10 @@ function PromptTab({
     setSaving(false);
   };
 
-  const lookupModel = (id: string): OpenRouterModel | null | undefined => {
-    const trimmedId = id.trim();
-    if (trimmedId.length === 0) return null;
-    if (catalog === null) return undefined;
-    return catalog.get(trimmedId) ?? null;
-  };
-
   return (
     <Stack>
       <SectionHeader>Models</SectionHeader>
-      <Card>
-        {models.map((m, idx) => {
-          const info = m.trim().length > 0 ? lookupModel(m) : null;
-          return (
-            <div
-              key={idx}
-              className={`row relative flex flex-col gap-2 px-4 py-[11px]`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="shrink-0 text-tg-hint text-[15px] w-14">
-                  {idx === 0 ? "Primary" : `#${idx + 1}`}
-                </span>
-                <input
-                  className={INPUT_LEFT_CLS}
-                  value={m}
-                  onChange={(e) => updateAt(idx, e.target.value)}
-                  placeholder="Model ID"
-                />
-                {idx > 0 && (
-                  <button
-                    className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
-                    onClick={() => removeAt(idx)}
-                    aria-label="Remove fallback"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              {m.trim().length > 0 && (
-                <div className="pl-[68px] text-[13px] leading-[1.45]">
-                  <ModelInfo model={info} />
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <RowButton onClick={addFallback}>Add fallback</RowButton>
-      </Card>
+      <ModelsCard models={models} onChange={setModels} />
       <SectionFooter>
         Primary OpenRouter model first; fallbacks are tried in order if it fails.
       </SectionFooter>
@@ -354,12 +436,7 @@ function RateLimitTab({
   settings: Settings;
   onSaved: (s: Settings) => void;
 }) {
-  const [capacity, setCapacity] = useState(settings.rateLimit.capacity);
-  const [refillAmount, setRefillAmount] = useState(settings.rateLimit.refillAmount);
-  const [refillIntervalMin, setRefillIntervalMin] = useState(
-    Math.round(settings.rateLimit.refillIntervalMs / 60000),
-  );
-  const [ownerExempt, setOwnerExempt] = useState(settings.rateLimit.ownerExempt);
+  const [config, setConfig] = useState<RateLimitConfig>(settings.rateLimit);
   const [bucket, setBucket] = useState<BucketState | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -368,21 +445,14 @@ function RateLimitTab({
   }, []);
 
   const dirty =
-    capacity !== settings.rateLimit.capacity ||
-    refillAmount !== settings.rateLimit.refillAmount ||
-    refillIntervalMin !== Math.round(settings.rateLimit.refillIntervalMs / 60000) ||
-    ownerExempt !== settings.rateLimit.ownerExempt;
+    config.capacity !== settings.rateLimit.capacity ||
+    config.refillAmount !== settings.rateLimit.refillAmount ||
+    config.refillIntervalMs !== settings.rateLimit.refillIntervalMs ||
+    config.ownerExempt !== settings.rateLimit.ownerExempt;
 
   const save = async () => {
     setSaving(true);
-    const next = await api.putSettings({
-      rateLimit: {
-        capacity,
-        refillAmount,
-        refillIntervalMs: refillIntervalMin * 60_000,
-        ownerExempt,
-      },
-    });
+    const next = await api.putSettings({ rateLimit: config });
     onSaved(next);
     setSaving(false);
   };
@@ -395,41 +465,7 @@ function RateLimitTab({
   return (
     <Stack>
       <SectionHeader>Limits</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Capacity</span>
-          <input
-            type="number"
-            className={INPUT_CLS}
-            value={capacity}
-            onChange={(e) => setCapacity(Number(e.target.value))}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Refill amount</span>
-          <input
-            type="number"
-            className={INPUT_CLS}
-            value={refillAmount}
-            onChange={(e) => setRefillAmount(Number(e.target.value))}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Refill every</span>
-          <input
-            type="number"
-            className={INPUT_CLS}
-            value={refillIntervalMin}
-            onChange={(e) => setRefillIntervalMin(Number(e.target.value))}
-          />
-          <span className="shrink-0 text-tg-hint text-[15px]">min</span>
-        </label>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Owner exempt</span>
-          <span className="flex-1" />
-          <Toggle value={ownerExempt} onChange={setOwnerExempt} />
-        </div>
-      </Card>
+      <RateLimitFields value={config} onChange={setConfig} />
       <SectionFooter>
         Tokens are deducted from each user's bucket per /ask. The bucket lazily refills based on
         the interval.
@@ -446,7 +482,7 @@ function RateLimitTab({
             <div className={ROW_CLS}>
               <span className={ROW_LABEL_CLS}>Tokens</span>
               <span className={ROW_VALUE_CLS}>
-                {bucket.tokens.toLocaleString()} / {capacity.toLocaleString()}
+                {bucket.tokens.toLocaleString()} / {config.capacity.toLocaleString()}
               </span>
             </div>
             <div className={ROW_CLS}>
@@ -715,7 +751,244 @@ function UserEditView({ userId }: { userId: string }) {
   );
 }
 
-function AdminView({ onEditUser }: { onEditUser: (id: string) => void }) {
+function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
+  const [chats, setChats] = useState<Chat[] | null>(null);
+
+  useEffect(() => {
+    api.listAdminChats().then((r) => setChats(r.chats));
+  }, []);
+
+  if (chats === null)
+    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+
+  return (
+    <Stack>
+      <SectionHeader>All Chats</SectionHeader>
+      <Card>
+        {chats.length === 0 ? (
+          <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
+            No chats yet — they appear after the first message.
+          </div>
+        ) : (
+          chats.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => onEdit(c.id)}
+              className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="truncate">{chatTitle(c)}</div>
+                <div className="text-[13px] text-tg-hint truncate">
+                  {chatSubtitle(c)}
+                </div>
+              </div>
+              <span className="text-tg-hint text-[15px]">›</span>
+            </button>
+          ))
+        )}
+      </Card>
+      <SectionFooter>
+        Per-chat overrides apply on top of the global Prompt / Limits / Models.
+      </SectionFooter>
+    </Stack>
+  );
+}
+
+function OverrideSection({
+  title,
+  footer,
+  override,
+  onToggle,
+  children,
+}: {
+  title: string;
+  footer?: ReactNode;
+  override: boolean;
+  onToggle: (v: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <SectionHeader>{title}</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Override global</span>
+          <span className="flex-1" />
+          <Toggle value={override} onChange={onToggle} />
+        </div>
+      </Card>
+      {override ? children : null}
+      {footer ? <SectionFooter>{footer}</SectionFooter> : null}
+    </>
+  );
+}
+
+function ChatEditView({ chatId }: { chatId: string }) {
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [global, setGlobal] = useState<Settings | null>(null);
+  const [original, setOriginal] = useState<ChatSettings | null>(null);
+
+  const [promptOverride, setPromptOverride] = useState(false);
+  const [promptValue, setPromptValue] = useState("");
+  const [modelsOverride, setModelsOverride] = useState(false);
+  const [modelsValue, setModelsValue] = useState<string[]>([]);
+  const [rlOverride, setRlOverride] = useState(false);
+  const [rlValue, setRlValue] = useState<RateLimitConfig | null>(null);
+
+  const [saving, setSaving] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    Promise.all([api.getSettings(), api.getAdminChat(chatId)])
+      .then(([g, d]) => {
+        setGlobal(g);
+        setChat(d.chat);
+        setOriginal(d.settings);
+        setPromptOverride(d.settings.systemPrompt !== undefined);
+        setPromptValue(d.settings.systemPrompt ?? g.systemPrompt);
+        setModelsOverride(d.settings.models !== undefined);
+        setModelsValue(d.settings.models ?? g.models);
+        setRlOverride(d.settings.rateLimit !== undefined);
+        setRlValue(d.settings.rateLimit ?? g.rateLimit);
+      })
+      .catch(() => setNotFound(true));
+  }, [chatId]);
+
+  if (notFound)
+    return <div className="text-center text-tg-hint py-20">Chat not found.</div>;
+  if (!chat || !global || !original || !rlValue)
+    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+
+  const trimmedModels = modelsValue.map((m) => m.trim()).filter((m) => m.length > 0);
+
+  const buildPayload = (): ChatSettings => {
+    const next: ChatSettings = {};
+    if (promptOverride) next.systemPrompt = promptValue;
+    if (modelsOverride && trimmedModels.length > 0) next.models = trimmedModels;
+    if (rlOverride) next.rateLimit = rlValue;
+    return next;
+  };
+
+  const payload = buildPayload();
+  const wasOverridden = (key: keyof ChatSettings) => original[key] !== undefined;
+  const dirty =
+    promptOverride !== wasOverridden("systemPrompt") ||
+    modelsOverride !== wasOverridden("models") ||
+    rlOverride !== wasOverridden("rateLimit") ||
+    (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
+    (modelsOverride &&
+      JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
+    (rlOverride &&
+      JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit));
+
+  const canSave = dirty && (!modelsOverride || trimmedModels.length > 0);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const result = await api.putAdminChat(chatId, buildPayload());
+      setOriginal(result.settings);
+      setPromptOverride(result.settings.systemPrompt !== undefined);
+      setPromptValue(result.settings.systemPrompt ?? global.systemPrompt);
+      setModelsOverride(result.settings.models !== undefined);
+      setModelsValue(result.settings.models ?? global.models);
+      setRlOverride(result.settings.rateLimit !== undefined);
+      setRlValue(result.settings.rateLimit ?? global.rateLimit);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Stack>
+      <SectionHeader>Chat</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Title</span>
+          <span className={ROW_VALUE_CLS}>{chatTitle(chat)}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Type</span>
+          <span className={ROW_VALUE_CLS}>{chat.type}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Username</span>
+          <span className={ROW_VALUE_CLS}>
+            {chat.username ? `@${chat.username}` : "—"}
+          </span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>ID</span>
+          <span className={ROW_VALUE_CLS}>{chat.id}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Last seen</span>
+          <span className={ROW_VALUE_CLS}>
+            {new Date(chat.lastSeenAt).toLocaleString()}
+          </span>
+        </div>
+      </Card>
+
+      <OverrideSection
+        title="System Prompt"
+        override={promptOverride}
+        onToggle={setPromptOverride}
+        footer={
+          promptOverride
+            ? "Sent as the system message in this chat."
+            : `Using global prompt (${global.systemPrompt.length} chars).`
+        }
+      >
+        <Card>
+          <textarea
+            className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
+            value={promptValue}
+            onChange={(e) => setPromptValue(e.target.value)}
+            placeholder="Describe how the bot should behave in this chat"
+          />
+        </Card>
+      </OverrideSection>
+
+      <OverrideSection
+        title="Models"
+        override={modelsOverride}
+        onToggle={setModelsOverride}
+        footer={
+          modelsOverride
+            ? "Primary first; fallbacks used in order if it fails."
+            : `Using global: ${global.models.join(", ")}`
+        }
+      >
+        <ModelsCard models={modelsValue} onChange={setModelsValue} />
+      </OverrideSection>
+
+      <OverrideSection
+        title="Rate Limit"
+        override={rlOverride}
+        onToggle={setRlOverride}
+        footer={
+          rlOverride
+            ? "These limits apply to this chat instead of the global config."
+            : "Using global limits."
+        }
+      >
+        <RateLimitFields value={rlValue} onChange={setRlValue} />
+      </OverrideSection>
+
+      <PrimaryButton disabled={saving || !canSave} onClick={save}>
+        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+      </PrimaryButton>
+    </Stack>
+  );
+}
+
+function AdminView({
+  onEditUser,
+  onEditChat,
+}: {
+  onEditUser: (id: string) => void;
+  onEditChat: (id: string) => void;
+}) {
   const [tab, setTab] = useState<Tab>("prompt");
   const [settings, setSettings] = useState<Settings | null>(null);
 
@@ -728,12 +1001,14 @@ function AdminView({ onEditUser }: { onEditUser: (id: string) => void }) {
     { id: "ratelimit", label: "Limits" },
     { id: "whitelist", label: "Whitelist" },
     { id: "users", label: "Users" },
+    { id: "chats", label: "Chats" },
   ];
   const activeIdx = tabs.findIndex((t) => t.id === tab);
 
   const renderTab = () => {
     if (tab === "whitelist") return <WhitelistTab />;
     if (tab === "users") return <UsersTab onEdit={onEditUser} />;
+    if (tab === "chats") return <ChatsTab onEdit={onEditChat} />;
     if (!settings)
       return <div className="text-center text-tg-hint py-20">Loading…</div>;
     if (tab === "prompt")
@@ -792,7 +1067,9 @@ function App() {
     }
     const handler = () => {
       setRoute((r) =>
-        r.kind === "user-edit" ? { kind: "admin" } : { kind: "main" },
+        r.kind === "user-edit" || r.kind === "chat-edit"
+          ? { kind: "admin" }
+          : { kind: "main" },
       );
     };
     btn.show();
@@ -807,25 +1084,39 @@ function App() {
     main: "Settings",
     admin: "Bot Admin",
     "user-edit": "User Settings",
+    "chat-edit": "Chat Settings",
   };
   const title = ROUTE_TITLE[route.kind];
+
+  const renderRoute = () => {
+    if (!me) return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    switch (route.kind) {
+      case "main":
+        return (
+          <MainView
+            me={me}
+            onMe={setMe}
+            onOpenAdmin={() => setRoute({ kind: "admin" })}
+          />
+        );
+      case "admin":
+        return (
+          <AdminView
+            onEditUser={(id) => setRoute({ kind: "user-edit", userId: id })}
+            onEditChat={(id) => setRoute({ kind: "chat-edit", chatId: id })}
+          />
+        );
+      case "user-edit":
+        return <UserEditView userId={route.userId} />;
+      case "chat-edit":
+        return <ChatEditView chatId={route.chatId} />;
+    }
+  };
 
   return (
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
       <div className="px-1 pt-2 pb-4 text-xl font-semibold">{title}</div>
-      {!me ? (
-        <div className="text-center text-tg-hint py-20">Loading…</div>
-      ) : route.kind === "main" ? (
-        <MainView
-          me={me}
-          onMe={setMe}
-          onOpenAdmin={() => setRoute({ kind: "admin" })}
-        />
-      ) : route.kind === "admin" ? (
-        <AdminView onEditUser={(id) => setRoute({ kind: "user-edit", userId: id })} />
-      ) : (
-        <UserEditView userId={route.userId} />
-      )}
+      {renderRoute()}
     </div>
   );
 }

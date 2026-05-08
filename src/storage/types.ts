@@ -4,6 +4,8 @@ import type {
   BucketState,
   ConversationNode,
   User,
+  Chat,
+  ChatSettings,
 } from "../shared/types";
 
 export interface Storage {
@@ -15,8 +17,8 @@ export interface Storage {
   removeWhitelist(kind: "users" | "chats", id: string): Promise<void>;
   isWhitelisted(kind: "users" | "chats", id: string): Promise<boolean>;
 
-  getBucket(userId: string): Promise<BucketState | null>;
-  saveBucket(userId: string, state: BucketState): Promise<void>;
+  getBucket(chatId: string, userId: string): Promise<BucketState | null>;
+  saveBucket(chatId: string, userId: string, state: BucketState): Promise<void>;
 
   getUserName(userId: string): Promise<string | null>;
   setUserName(userId: string, name: string | null): Promise<void>;
@@ -24,6 +26,13 @@ export interface Storage {
   listUsers(): Promise<User[]>;
   upsertUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;
+
+  listChats(): Promise<Chat[]>;
+  upsertChat(chat: Chat): Promise<void>;
+  getChat(id: string): Promise<Chat | null>;
+
+  getChatSettings(chatId: string): Promise<ChatSettings | null>;
+  saveChatSettings(chatId: string, settings: ChatSettings): Promise<void>;
 
   getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null>;
   saveConversation(

@@ -10,10 +10,12 @@ const cfg: RateLimitConfig = {
   ownerExempt: true,
 };
 
+const C = "c1";
+
 describe("TokenBucketLimiter", () => {
   test("first check seeds bucket at capacity", async () => {
     const lim = new TokenBucketLimiter(new MemoryStorage());
-    const r = await lim.check("u1", cfg, 1000);
+    const r = await lim.check(C, "u1", cfg, 1000);
     expect(r.allowed).toBe(true);
     if (r.allowed) {
       expect(r.bucket.tokens).toBe(30000);
@@ -24,17 +26,17 @@ describe("TokenBucketLimiter", () => {
   test("deduct subtracts tokens and persists", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await lim.check("u1", cfg, 1000);
-    await lim.deduct("u1", 500);
-    const b = await storage.getBucket("u1");
+    await lim.check(C, "u1", cfg, 1000);
+    await lim.deduct(C, "u1", 500);
+    const b = await storage.getBucket(C, "u1");
     expect(b?.tokens).toBe(29500);
   });
 
   test("denies when tokens <= 0", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await storage.saveBucket("u1", { tokens: 0, lastRefillTs: 1000 });
-    const r = await lim.check("u1", cfg, 1000);
+    await storage.saveBucket(C, "u1", { tokens: 0, lastRefillTs: 1000 });
+    const r = await lim.check(C, "u1", cfg, 1000);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
       expect(r.msUntilNextRefill).toBe(cfg.refillIntervalMs);
@@ -44,9 +46,9 @@ describe("TokenBucketLimiter", () => {
   test("refills lazily based on elapsed intervals", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await storage.saveBucket("u1", { tokens: 0, lastRefillTs: 1000 });
+    await storage.saveBucket(C, "u1", { tokens: 0, lastRefillTs: 1000 });
     // 2 full intervals elapsed → +6000
-    const r = await lim.check("u1", cfg, 1000 + 2 * cfg.refillIntervalMs);
+    const r = await lim.check(C, "u1", cfg, 1000 + 2 * cfg.refillIntervalMs);
     expect(r.allowed).toBe(true);
     if (r.allowed) {
       expect(r.bucket.tokens).toBe(6000);
@@ -57,8 +59,8 @@ describe("TokenBucketLimiter", () => {
   test("refill is capped at capacity", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await storage.saveBucket("u1", { tokens: 29000, lastRefillTs: 1000 });
-    const r = await lim.check("u1", cfg, 1000 + 100 * cfg.refillIntervalMs);
+    await storage.saveBucket(C, "u1", { tokens: 29000, lastRefillTs: 1000 });
+    const r = await lim.check(C, "u1", cfg, 1000 + 100 * cfg.refillIntervalMs);
     expect(r.allowed).toBe(true);
     if (r.allowed) expect(r.bucket.tokens).toBe(cfg.capacity);
   });
@@ -66,8 +68,8 @@ describe("TokenBucketLimiter", () => {
   test("partial interval does not refill", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await storage.saveBucket("u1", { tokens: 100, lastRefillTs: 1000 });
-    const r = await lim.check("u1", cfg, 1000 + cfg.refillIntervalMs - 1);
+    await storage.saveBucket(C, "u1", { tokens: 100, lastRefillTs: 1000 });
+    const r = await lim.check(C, "u1", cfg, 1000 + cfg.refillIntervalMs - 1);
     expect(r.allowed).toBe(true);
     if (r.allowed) {
       expect(r.bucket.tokens).toBe(100);
@@ -78,26 +80,37 @@ describe("TokenBucketLimiter", () => {
   test("reset puts bucket at full capacity", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await storage.saveBucket("u1", { tokens: -500, lastRefillTs: 1 });
-    await lim.reset("u1", cfg, 9999);
-    const b = await storage.getBucket("u1");
+    await storage.saveBucket(C, "u1", { tokens: -500, lastRefillTs: 1 });
+    await lim.reset(C, "u1", cfg, 9999);
+    const b = await storage.getBucket(C, "u1");
     expect(b).toEqual({ tokens: cfg.capacity, lastRefillTs: 9999 });
   });
 
   test("deduct can drive bucket negative (request already in flight)", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await storage.saveBucket("u1", { tokens: 100, lastRefillTs: 1 });
-    await lim.deduct("u1", 1000);
-    expect((await storage.getBucket("u1"))?.tokens).toBe(-900);
+    await storage.saveBucket(C, "u1", { tokens: 100, lastRefillTs: 1 });
+    await lim.deduct(C, "u1", 1000);
+    expect((await storage.getBucket(C, "u1"))?.tokens).toBe(-900);
   });
 
   test("deduct seeds a deficit bucket if storage was empty", async () => {
     const storage = new MemoryStorage();
     const lim = new TokenBucketLimiter(storage);
-    await lim.deduct("u1", 100);
-    const b = await storage.getBucket("u1");
+    await lim.deduct(C, "u1", 100);
+    const b = await storage.getBucket(C, "u1");
     expect(b).not.toBeNull();
     expect(b?.tokens).toBe(-100);
+  });
+
+  test("buckets are isolated per chat for the same user", async () => {
+    const storage = new MemoryStorage();
+    const lim = new TokenBucketLimiter(storage);
+    await lim.check("chat-a", "u1", cfg, 1000);
+    await lim.deduct("chat-a", "u1", 500);
+    const a = await storage.getBucket("chat-a", "u1");
+    const b = await storage.getBucket("chat-b", "u1");
+    expect(a?.tokens).toBe(29500);
+    expect(b).toBeNull();
   });
 });

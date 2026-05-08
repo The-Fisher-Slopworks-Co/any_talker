@@ -1,5 +1,5 @@
 import type { Storage } from "./storage/types";
-import type { Settings } from "./shared/types";
+import type { Settings, ChatSettings } from "./shared/types";
 import { DEFAULT_SETTINGS } from "./shared/types";
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
@@ -17,4 +17,27 @@ function normalize(s: Settings): Settings {
       ? [legacy]
       : DEFAULT_SETTINGS.models;
   return { ...s, models };
+}
+
+export function applyChatOverrides(
+  global: Settings,
+  chat: ChatSettings | null,
+): Settings {
+  if (!chat) return global;
+  return {
+    systemPrompt: chat.systemPrompt ?? global.systemPrompt,
+    models: chat.models ?? global.models,
+    rateLimit: chat.rateLimit ?? global.rateLimit,
+  };
+}
+
+export async function getEffectiveSettings(
+  storage: Storage,
+  chatId: string,
+): Promise<Settings> {
+  const [global, chat] = await Promise.all([
+    getOrInitSettings(storage),
+    storage.getChatSettings(chatId),
+  ]);
+  return applyChatOverrides(global, chat);
 }

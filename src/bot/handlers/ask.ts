@@ -3,7 +3,7 @@ import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
 import { isAllowed } from "../access";
 import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
-import { getOrInitSettings } from "../../settings";
+import { getEffectiveSettings } from "../../settings";
 import { getAllTools } from "../../ai/tools/registry";
 
 export type AskInput = {
@@ -50,12 +50,17 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     return { kind: "usage" };
   }
 
-  const settings = await getOrInitSettings(input.storage);
+  const settings = await getEffectiveSettings(input.storage, input.chatId);
 
   const isOwner = input.userId === input.ownerId;
   const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
   if (!skipRateLimit) {
-    const r = await input.rateLimiter.check(input.userId, settings.rateLimit, input.now);
+    const r = await input.rateLimiter.check(
+      input.chatId,
+      input.userId,
+      settings.rateLimit,
+      input.now,
+    );
     if (!r.allowed) {
       return {
         kind: "rateLimited",
@@ -89,7 +94,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   }
 
   if (!skipRateLimit) {
-    await input.rateLimiter.deduct(input.userId, result.totalTokens);
+    await input.rateLimiter.deduct(input.chatId, input.userId, result.totalTokens);
   }
 
   let parentBotMsgId: number | null = null;

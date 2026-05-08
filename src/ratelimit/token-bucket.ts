@@ -6,14 +6,15 @@ export class TokenBucketLimiter implements RateLimiter {
   constructor(private readonly storage: Storage) {}
 
   private async loadOrSeed(
+    chatId: string,
     userId: string,
     config: RateLimitConfig,
     now: number,
   ): Promise<BucketState> {
-    const existing = await this.storage.getBucket(userId);
+    const existing = await this.storage.getBucket(chatId, userId);
     if (existing) return existing;
     const seeded: BucketState = { tokens: config.capacity, lastRefillTs: now };
-    await this.storage.saveBucket(userId, seeded);
+    await this.storage.saveBucket(chatId, userId, seeded);
     return seeded;
   }
 
@@ -29,14 +30,15 @@ export class TokenBucketLimiter implements RateLimiter {
   }
 
   async check(
+    chatId: string,
     userId: string,
     config: RateLimitConfig,
     now: number,
   ): Promise<CheckResult> {
-    const seeded = await this.loadOrSeed(userId, config, now);
+    const seeded = await this.loadOrSeed(chatId, userId, config, now);
     const refilled = this.refill(seeded, config, now);
     if (refilled !== seeded) {
-      await this.storage.saveBucket(userId, refilled);
+      await this.storage.saveBucket(chatId, userId, refilled);
     }
     if (refilled.tokens <= 0) {
       const elapsed = now - refilled.lastRefillTs;
@@ -46,23 +48,28 @@ export class TokenBucketLimiter implements RateLimiter {
     return { allowed: true, bucket: refilled };
   }
 
-  async deduct(userId: string, tokens: number): Promise<void> {
-    const current = await this.storage.getBucket(userId);
+  async deduct(chatId: string, userId: string, tokens: number): Promise<void> {
+    const current = await this.storage.getBucket(chatId, userId);
     if (!current) {
-      await this.storage.saveBucket(userId, {
+      await this.storage.saveBucket(chatId, userId, {
         tokens: -tokens,
         lastRefillTs: Date.now(),
       });
       return;
     }
-    await this.storage.saveBucket(userId, {
+    await this.storage.saveBucket(chatId, userId, {
       tokens: current.tokens - tokens,
       lastRefillTs: current.lastRefillTs,
     });
   }
 
-  async reset(userId: string, config: RateLimitConfig, now: number): Promise<void> {
-    await this.storage.saveBucket(userId, {
+  async reset(
+    chatId: string,
+    userId: string,
+    config: RateLimitConfig,
+    now: number,
+  ): Promise<void> {
+    await this.storage.saveBucket(chatId, userId, {
       tokens: config.capacity,
       lastRefillTs: now,
     });

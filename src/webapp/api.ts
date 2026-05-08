@@ -1,6 +1,11 @@
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
-import type { Settings, WhitelistEntry } from "../shared/types";
+import type {
+  Settings,
+  WhitelistEntry,
+  ChatSettings,
+  RateLimitConfig,
+} from "../shared/types";
 import { getOrInitSettings } from "../settings";
 
 export type ApiRequest = {
@@ -28,6 +33,46 @@ function normalizeDisplayName(input: unknown): string | null {
   if (typeof input !== "string") return null;
   const trimmed = input.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeChatSettings(raw: unknown): ChatSettings {
+  const body = (raw ?? {}) as {
+    systemPrompt?: unknown;
+    models?: unknown;
+    rateLimit?: unknown;
+  };
+  const out: ChatSettings = {};
+  if (typeof body.systemPrompt === "string") {
+    out.systemPrompt = body.systemPrompt;
+  }
+  if (
+    Array.isArray(body.models) &&
+    body.models.every((m) => typeof m === "string") &&
+    body.models.length > 0
+  ) {
+    out.models = body.models as string[];
+  }
+  if (
+    body.rateLimit &&
+    typeof body.rateLimit === "object" &&
+    !Array.isArray(body.rateLimit)
+  ) {
+    const r = body.rateLimit as Partial<RateLimitConfig>;
+    if (
+      typeof r.capacity === "number" &&
+      typeof r.refillAmount === "number" &&
+      typeof r.refillIntervalMs === "number" &&
+      typeof r.ownerExempt === "boolean"
+    ) {
+      out.rateLimit = {
+        capacity: r.capacity,
+        refillAmount: r.refillAmount,
+        refillIntervalMs: r.refillIntervalMs,
+        ownerExempt: r.ownerExempt,
+      };
+    }
+  }
+  return out;
 }
 
 export async function handleApi(
@@ -127,17 +172,43 @@ export async function handleApi(
 
   if (req.path === "/api/ratelimit/me") {
     if (req.method === "GET") {
-      const bucket = await deps.storage.getBucket(deps.ownerId);
+      const bucket = await deps.storage.getBucket(deps.ownerId, deps.ownerId);
       return { status: 200, body: { bucket } };
     }
     if (req.method === "PUT") {
       const settings = await getOrInitSettings(deps.storage);
       const body = (req.body ?? {}) as { reset?: boolean };
       if (body.reset) {
-        await deps.rateLimiter.reset(deps.ownerId, settings.rateLimit, Date.now());
+        await deps.rateLimiter.reset(
+          deps.ownerId,
+          deps.ownerId,
+          settings.rateLimit,
+          Date.now(),
+        );
       }
-      const bucket = await deps.storage.getBucket(deps.ownerId);
+      const bucket = await deps.storage.getBucket(deps.ownerId, deps.ownerId);
       return { status: 200, body: { bucket } };
+    }
+  }
+
+  if (req.path === "/api/admin/chats" && req.method === "GET") {
+    const chats = await deps.storage.listChats();
+    return { status: 200, body: { chats } };
+  }
+
+  const chatMatch = req.path.match(/^\/api\/admin\/chats\/(.+)$/);
+  if (chatMatch) {
+    const id = chatMatch[1]!;
+    const chat = await deps.storage.getChat(id);
+    if (!chat) return { status: 404, body: { error: "chat not found" } };
+    if (req.method === "GET") {
+      const settings = await deps.storage.getChatSettings(id);
+      return { status: 200, body: { chat, settings: settings ?? {} } };
+    }
+    if (req.method === "PUT") {
+      const next = normalizeChatSettings(req.body);
+      await deps.storage.saveChatSettings(id, next);
+      return { status: 200, body: { chat, settings: next } };
     }
   }
 

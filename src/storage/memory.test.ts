@@ -48,10 +48,12 @@ describe("MemoryStorage whitelist", () => {
 });
 
 describe("MemoryStorage bucket", () => {
-  test("round-trips", async () => {
+  test("round-trips per (chat, user)", async () => {
     const s = new MemoryStorage();
-    await s.saveBucket("u1", { tokens: 100, lastRefillTs: 12345 });
-    expect(await s.getBucket("u1")).toEqual({ tokens: 100, lastRefillTs: 12345 });
+    await s.saveBucket("c1", "u1", { tokens: 100, lastRefillTs: 12345 });
+    expect(await s.getBucket("c1", "u1")).toEqual({ tokens: 100, lastRefillTs: 12345 });
+    expect(await s.getBucket("c2", "u1")).toBeNull();
+    expect(await s.getBucket("c1", "u2")).toBeNull();
   });
 });
 
