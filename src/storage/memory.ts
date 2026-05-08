@@ -4,6 +4,7 @@ import type {
   WhitelistEntry,
   BucketState,
   ConversationNode,
+  GuestConversationNode,
   User,
   Chat,
   ChatSettings,
@@ -18,6 +19,7 @@ export class MemoryStorage implements Storage {
   };
   private buckets = new Map<string, BucketState>();
   private conversations = new Map<string, ConversationNode>();
+  private guestConversations = new Map<string, GuestConversationNode>();
   private userNames = new Map<string, string>();
   private userTimezones = new Map<string, string>();
   private users = new Map<string, User>();
@@ -141,5 +143,19 @@ export class MemoryStorage implements Storage {
     node: ConversationNode,
   ): Promise<void> {
     this.conversations.set(this.convKey(chatId, botMsgId), { ...node });
+  }
+
+  async getGuestConversation(
+    inlineMessageId: string,
+  ): Promise<GuestConversationNode | null> {
+    const v = this.guestConversations.get(inlineMessageId);
+    return v ? { ...v } : null;
+  }
+
+  async saveGuestConversation(
+    inlineMessageId: string,
+    node: GuestConversationNode,
+  ): Promise<void> {
+    this.guestConversations.set(inlineMessageId, { ...node });
   }
 }

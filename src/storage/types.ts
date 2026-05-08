@@ -3,6 +3,7 @@ import type {
   WhitelistEntry,
   BucketState,
   ConversationNode,
+  GuestConversationNode,
   User,
   Chat,
   ChatSettings,
@@ -42,5 +43,11 @@ export interface Storage {
     chatId: string,
     botMsgId: number,
     node: ConversationNode,
+  ): Promise<void>;
+
+  getGuestConversation(inlineMessageId: string): Promise<GuestConversationNode | null>;
+  saveGuestConversation(
+    inlineMessageId: string,
+    node: GuestConversationNode,
   ): Promise<void>;
 }

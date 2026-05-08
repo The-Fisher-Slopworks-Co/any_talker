@@ -28,6 +28,10 @@ bun run typecheck
 - Per-user token-bucket rate limit (defaults: 30k capacity, +3k every 40 min). Configurable in admin UI.
 - Whitelist (chats and users). Owner bypasses whitelist.
 - Admin Web App opens via the chat menu button after `/start`.
+- **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
+  Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
+  guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest
+  invocations are silently ignored.
 
 ## Manual verification checklist (run on first deploy)
 
