@@ -25,8 +25,8 @@ export type OpenRouterEndpoint = {
     completion?: string;
     image?: string;
   };
-  latency_last_30m: number | null;
-  throughput_last_30m: number | null;
+  throughput: number | null;
+  latency: number | null;
 };
 
 let cache: Promise<Map<string, OpenRouterModel>> | null = null;
@@ -49,6 +49,11 @@ export function fetchOpenRouterModels(): Promise<Map<string, OpenRouterModel>> {
 
 const endpointCache = new Map<string, Promise<OpenRouterEndpoint[]>>();
 
+function authHeader(): Record<string, string> {
+  const initData = window.Telegram?.WebApp?.initData ?? "";
+  return { Authorization: `tma ${initData}` };
+}
+
 export function fetchOpenRouterEndpoints(
   modelId: string,
 ): Promise<OpenRouterEndpoint[]> {
@@ -56,13 +61,12 @@ export function fetchOpenRouterEndpoints(
   if (cached) return cached;
   const p = (async () => {
     const res = await fetch(
-      `https://openrouter.ai/api/v1/models/${modelId}/endpoints`,
+      `/api/openrouter/endpoints/${encodeURIComponent(modelId)}`,
+      { headers: authHeader() },
     );
     if (!res.ok) throw new Error(`OpenRouter endpoints: HTTP ${res.status}`);
-    const json = (await res.json()) as {
-      data?: { endpoints?: OpenRouterEndpoint[] };
-    };
-    return json.data?.endpoints ?? [];
+    const json = (await res.json()) as { endpoints?: OpenRouterEndpoint[] };
+    return json.endpoints ?? [];
   })().catch((err) => {
     endpointCache.delete(modelId);
     throw err;
@@ -70,6 +74,7 @@ export function fetchOpenRouterEndpoints(
   endpointCache.set(modelId, p);
   return p;
 }
+
 
 function priceSum(e: OpenRouterEndpoint): number {
   const parse = (p: string | undefined): number => {
@@ -92,22 +97,20 @@ export function pickEndpointBySort(
   }
   if (sort === "throughput") {
     const candidates = endpoints.filter(
-      (e) => e.throughput_last_30m !== null && e.throughput_last_30m !== undefined,
+      (e) => e.throughput !== null && e.throughput !== undefined,
     );
     if (candidates.length === 0) return null;
     return candidates.reduce((best, e) =>
-      (e.throughput_last_30m ?? 0) > (best.throughput_last_30m ?? 0) ? e : best,
+      (e.throughput ?? 0) > (best.throughput ?? 0) ? e : best,
     );
   }
   // sort === "latency"
   const candidates = endpoints.filter(
-    (e) => e.latency_last_30m !== null && e.latency_last_30m !== undefined,
+    (e) => e.latency !== null && e.latency !== undefined,
   );
   if (candidates.length === 0) return null;
   return candidates.reduce((best, e) =>
-    (e.latency_last_30m ?? Infinity) < (best.latency_last_30m ?? Infinity)
-      ? e
-      : best,
+    (e.latency ?? Infinity) < (best.latency ?? Infinity) ? e : best,
   );
 }
 

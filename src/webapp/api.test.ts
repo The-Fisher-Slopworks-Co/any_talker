@@ -13,6 +13,90 @@ function deps() {
 const owner = { userId: ownerId, isOwner: true };
 const guest = (id: string) => ({ userId: id, isOwner: false });
 
+describe("GET /api/openrouter/endpoints/:permaslug", () => {
+  test("calls fetcher and returns endpoints", async () => {
+    const calls: string[] = [];
+    const fetchOpenRouterStats = async (permaslug: string) => {
+      calls.push(permaslug);
+      return {
+        endpoints: [
+          {
+            provider_name: "DeepInfra",
+            pricing: { prompt: "0.000000039", completion: "0.00000019" },
+            throughput: 36,
+            latency: 343,
+          },
+        ],
+      };
+    };
+    const r = await handleApi(
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
+        body: null,
+      },
+      { ...deps(), fetchOpenRouterStats },
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(calls).toEqual(["openai/gpt-oss-120b"]);
+    expect(r.body).toEqual({
+      endpoints: [
+        {
+          provider_name: "DeepInfra",
+          pricing: { prompt: "0.000000039", completion: "0.00000019" },
+          throughput: 36,
+          latency: 343,
+        },
+      ],
+    });
+  });
+
+  test("rejects non-owner with 403", async () => {
+    const r = await handleApi(
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
+        body: null,
+      },
+      deps(),
+      guest("99"),
+    );
+    expect(r.status).toBe(403);
+  });
+
+  test("rejects an invalid permaslug with 400", async () => {
+    const r = await handleApi(
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/<bad>",
+        body: null,
+      },
+      { ...deps(), fetchOpenRouterStats: async () => ({ endpoints: [] }) },
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("returns 502 when the fetcher throws", async () => {
+    const r = await handleApi(
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
+        body: null,
+      },
+      {
+        ...deps(),
+        fetchOpenRouterStats: async () => {
+          throw new Error("upstream down");
+        },
+      },
+      owner,
+    );
+    expect(r.status).toBe(502);
+  });
+});
+
 describe("GET /api/settings", () => {
   test("returns defaults when storage empty", async () => {
     const res = await handleApi({ method: "GET", path: "/api/settings", body: null }, deps(), owner);

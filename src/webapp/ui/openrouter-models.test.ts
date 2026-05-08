@@ -15,8 +15,8 @@ const ep = (
 ): OpenRouterEndpoint => ({
   provider_name,
   pricing: { prompt, completion },
-  throughput_last_30m: throughput,
-  latency_last_30m: latency,
+  throughput,
+  latency,
 });
 
 const model = (id: string, name: string): OpenRouterModel => ({
