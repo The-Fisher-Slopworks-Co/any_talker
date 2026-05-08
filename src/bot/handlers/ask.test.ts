@@ -89,6 +89,7 @@ describe("askHandler", () => {
     expect(out.kind).toBe("answered");
     if (out.kind === "answered") {
       expect(out.text).toBe("hi back");
+      expect(out.botName).toBe(null);
       // After bot sends message id 999 in the chat, caller invokes:
       await out.persistConversation(999);
       const node = await storage.getConversation("c1", 999);
@@ -169,6 +170,24 @@ describe("askHandler", () => {
     );
     expect(out.kind).toBe("rateLimited");
     expect(called).toBe(false);
+  });
+
+  test("answered: returns botName from chat settings when set", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveChatSettings("c1", { botName: "  Helper  " });
+    const out = await askHandler(baseInput({ storage }));
+    if (out.kind !== "answered") throw new Error("expected answered");
+    expect(out.botName).toBe("Helper");
+  });
+
+  test("answered: returns null botName when chat settings has empty botName", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveChatSettings("c1", { systemPrompt: "p" });
+    const out = await askHandler(baseInput({ storage }));
+    if (out.kind !== "answered") throw new Error("expected answered");
+    expect(out.botName).toBe(null);
   });
 
   test("answered: deducts tokens from bucket", async () => {

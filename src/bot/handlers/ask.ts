@@ -29,6 +29,7 @@ export type AskOutcome =
   | {
       kind: "answered";
       text: string;
+      botName: string | null;
       persistConversation: (botMsgId: number) => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -50,7 +51,11 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     return { kind: "usage" };
   }
 
-  const settings = await getEffectiveSettings(input.storage, input.chatId);
+  const [settings, chatSettings] = await Promise.all([
+    getEffectiveSettings(input.storage, input.chatId),
+    input.storage.getChatSettings(input.chatId),
+  ]);
+  const botName = chatSettings?.botName?.trim() || null;
 
   const isOwner = input.userId === input.ownerId;
   const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
@@ -115,6 +120,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   return {
     kind: "answered",
     text: result.text,
+    botName,
     persistConversation: async (botMsgId) => {
       await input.storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,

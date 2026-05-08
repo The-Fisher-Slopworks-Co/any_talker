@@ -7,6 +7,7 @@ import { makeStartHandler } from "./handlers/start";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, downloadTelegramFile } from "./photo";
 import { resolveReplyAuthor } from "./reply";
+import { applyBotNamePrefix } from "./format";
 
 export type BotDeps = {
   botToken: string;
@@ -149,7 +150,9 @@ export function createBot(deps: BotDeps): Bot {
         await ctx.reply("⚠️ AI error. Try again later.");
         return;
       case "answered": {
-        const sent = await ctx.reply(outcome.text, {
+        const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
+        const sent = await ctx.reply(decorated.text, {
+          entities: decorated.entities,
           reply_parameters: ctx.message ? { message_id: ctx.message.message_id } : undefined,
         });
         await outcome.persistConversation(sent.message_id);

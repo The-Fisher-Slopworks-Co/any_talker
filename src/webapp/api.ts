@@ -40,6 +40,7 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     systemPrompt?: unknown;
     models?: unknown;
     rateLimit?: unknown;
+    botName?: unknown;
   };
   const out: ChatSettings = {};
   if (typeof body.systemPrompt === "string") {
@@ -71,6 +72,10 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
         ownerExempt: r.ownerExempt,
       };
     }
+  }
+  if (typeof body.botName === "string") {
+    const trimmed = body.botName.trim();
+    if (trimmed.length > 0) out.botName = trimmed;
   }
   return out;
 }
