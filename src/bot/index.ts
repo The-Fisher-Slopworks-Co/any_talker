@@ -1,13 +1,21 @@
 import { Bot, type Context } from "grammy";
+import type { InlineQueryResult } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
 import { askHandler } from "./handlers/ask";
+import { guestAskHandler } from "./handlers/guest";
 import { makeStartHandler } from "./handlers/start";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, downloadTelegramFile } from "./photo";
 import { resolveReplyAuthor } from "./reply";
 import { applyBotNamePrefix } from "./format";
+import type { SentGuestMessage } from "../types/telegram-guest";
+
+type AnswerGuestQuery = (args: {
+  guest_query_id: string;
+  result: InlineQueryResult;
+}) => Promise<SentGuestMessage>;
 
 export type BotDeps = {
   botToken: string;
@@ -25,7 +33,8 @@ export function createBot(deps: BotDeps): Bot {
 
   bot.use(async (ctx, next) => {
     const now = Date.now();
-    const from = ctx.from;
+    const guestMsg = ctx.update.guest_message;
+    const from = ctx.from ?? guestMsg?.from;
     if (from && !from.is_bot) {
       void deps.storage
         .upsertUser({
@@ -37,7 +46,7 @@ export function createBot(deps: BotDeps): Bot {
         })
         .catch((err) => console.error("upsertUser failed:", err));
     }
-    const chat = ctx.chat;
+    const chat = ctx.chat ?? guestMsg?.chat;
     if (chat) {
       void deps.storage
         .upsertChat({
@@ -48,6 +57,95 @@ export function createBot(deps: BotDeps): Bot {
           lastSeenAt: now,
         })
         .catch((err) => console.error("upsertChat failed:", err));
+    }
+    await next();
+  });
+
+  const dispatchGuest = async (
+    ctx: Context,
+    msg: NonNullable<Context["update"]["guest_message"]>,
+  ) => {
+    const guestQueryId = msg.guest_query_id;
+    if (!guestQueryId) return;
+    const userId = String(msg.from?.id ?? "");
+    if (!userId) return;
+    const chatId = String(msg.chat.id);
+
+    const userText = (msg.text ?? msg.caption ?? "").trim();
+
+    const nameOverride = await deps.storage.getUserName(userId);
+    const sender = {
+      firstName: msg.from?.first_name ?? null,
+      lastName: msg.from?.last_name ?? null,
+      nameOverride,
+    };
+
+    const outcome = await guestAskHandler({
+      storage: deps.storage,
+      rateLimiter: deps.rateLimiter,
+      ai: deps.ai,
+      ownerId: deps.ownerId,
+      now: Date.now(),
+      chatId,
+      userId,
+      sender,
+      userText,
+    });
+
+    const answerGuestQuery = (
+      ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
+    ).answerGuestQuery;
+    const answer = (text: string, botName: string | null) => {
+      const decorated = applyBotNamePrefix(text, botName);
+      return answerGuestQuery({
+        guest_query_id: guestQueryId,
+        result: {
+          type: "article",
+          id: "1",
+          title: "Reply",
+          input_message_content: {
+            message_text: decorated.text,
+            parse_mode: decorated.parseMode,
+            link_preview_options: { is_disabled: true },
+          },
+        },
+      });
+    };
+
+    switch (outcome.kind) {
+      case "denied":
+        return;
+      case "rateLimited":
+        await answer(
+          `Rate limit exceeded. Refilled in ~${outcome.minutesUntilNextRefill} min.`,
+          null,
+        ).catch((err) => console.error("answerGuestQuery failed:", err));
+        return;
+      case "error":
+        console.error("guest ask error:", outcome.message);
+        await answer("⚠️ AI error. Try again later.", null).catch((err) =>
+          console.error("answerGuestQuery failed:", err),
+        );
+        return;
+      case "answered": {
+        try {
+          const sent = await answer(outcome.text, outcome.botName);
+          if (sent.inline_message_id) {
+            await outcome.persistConversation(sent.inline_message_id);
+          }
+        } catch (err) {
+          console.error("answerGuestQuery failed:", err);
+        }
+        return;
+      }
+    }
+  };
+
+  bot.use(async (ctx, next) => {
+    const guestMsg = ctx.update.guest_message;
+    if (guestMsg) {
+      await dispatchGuest(ctx, guestMsg);
+      return;
     }
     await next();
   });

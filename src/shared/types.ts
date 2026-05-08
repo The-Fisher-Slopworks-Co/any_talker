@@ -70,6 +70,14 @@ export type ConversationNode = {
   ts: number;
 };
 
+export type GuestConversationNode = {
+  userQuestion: string;
+  botAnswer: string;
+  chatId: string;
+  userId: string;
+  ts: number;
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   systemPrompt: "You are a helpful assistant in a Telegram chat. Be concise.",
   models: ["anthropic/claude-sonnet-4-5"],
