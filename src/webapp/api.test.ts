@@ -119,14 +119,14 @@ describe("ratelimit endpoints", () => {
 
   test("PUT /api/ratelimit/me { reset: true } resets owner bucket to capacity", async () => {
     const d = deps();
-    await d.storage.saveBucket(ownerId, { tokens: -100, lastRefillTs: 1 });
+    await d.storage.saveBucket(ownerId, ownerId, { tokens: -100, lastRefillTs: 1 });
     const r = await handleApi(
       { method: "PUT", path: "/api/ratelimit/me", body: { reset: true } },
       d,
       owner,
     );
     expect(r.status).toBe(200);
-    const b = await d.storage.getBucket(ownerId);
+    const b = await d.storage.getBucket(ownerId, ownerId);
     expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
   });
 });
@@ -280,6 +280,164 @@ describe("/api/admin/users", () => {
   test("non-owner gets 403", async () => {
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
+describe("/api/admin/chats", () => {
+  test("GET list returns empty initially", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/chats", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ chats: [] });
+  });
+
+  test("GET list returns upserted chats sorted by lastSeenAt desc", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "supergroup",
+      title: "Old",
+      username: null,
+      lastSeenAt: 100,
+    });
+    await d.storage.upsertChat({
+      id: "-200",
+      type: "group",
+      title: "New",
+      username: null,
+      lastSeenAt: 200,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/chats", body: null },
+      d,
+      owner,
+    );
+    const body = r.body as { chats: { id: string }[] };
+    expect(body.chats.map((c) => c.id)).toEqual(["-200", "-100"]);
+  });
+
+  test("GET /api/admin/chats/:id 404 for unknown", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/chats/-999", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  test("GET returns empty settings when none set", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/chats/-100", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { settings: object }).settings).toEqual({});
+  });
+
+  test("PUT saves only the override fields, drops invalid models", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: {
+          systemPrompt: "chat-prompt",
+          models: [],
+          rateLimit: null,
+        },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const saved = await d.storage.getChatSettings("-100");
+    expect(saved).toEqual({ systemPrompt: "chat-prompt" });
+  });
+
+  test("PUT with all override fields saves all of them", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: {
+          systemPrompt: "p",
+          models: ["openai/gpt-4o"],
+          rateLimit: {
+            capacity: 1,
+            refillAmount: 1,
+            refillIntervalMs: 1000,
+            ownerExempt: false,
+          },
+        },
+      },
+      d,
+      owner,
+    );
+    const saved = await d.storage.getChatSettings("-100");
+    expect(saved).toEqual({
+      systemPrompt: "p",
+      models: ["openai/gpt-4o"],
+      rateLimit: {
+        capacity: 1,
+        refillAmount: 1,
+        refillIntervalMs: 1000,
+        ownerExempt: false,
+      },
+    });
+  });
+
+  test("PUT with empty body clears the chat overrides", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.saveChatSettings("-100", { systemPrompt: "x" });
+    await handleApi(
+      { method: "PUT", path: "/api/admin/chats/-100", body: {} },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toBeNull();
+  });
+
+  test("non-owner gets 403", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/chats", body: null },
       deps(),
       guest("42"),
     );

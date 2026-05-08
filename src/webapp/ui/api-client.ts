@@ -1,5 +1,12 @@
 /// <reference lib="dom" />
-import type { Settings, WhitelistEntry, BucketState, User } from "../../shared/types";
+import type {
+  Settings,
+  WhitelistEntry,
+  BucketState,
+  User,
+  Chat,
+  ChatSettings,
+} from "../../shared/types";
 
 declare global {
   interface Window {
@@ -26,6 +33,7 @@ declare global {
 
 export type MeResponse = { isOwner: boolean; displayName: string | null };
 export type UserSettingsResponse = { user: User; displayName: string | null };
+export type ChatSettingsResponse = { chat: Chat; settings: ChatSettings };
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -62,4 +70,9 @@ export const api = {
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
   putAdminUser: (id: string, displayName: string | null) =>
     req<UserSettingsResponse>("PUT", `/api/admin/users/${id}`, { displayName }),
+  listAdminChats: () => req<{ chats: Chat[] }>("GET", "/api/admin/chats"),
+  getAdminChat: (id: string) =>
+    req<ChatSettingsResponse>("GET", `/api/admin/chats/${id}`),
+  putAdminChat: (id: string, settings: ChatSettings) =>
+    req<ChatSettingsResponse>("PUT", `/api/admin/chats/${id}`, settings),
 };

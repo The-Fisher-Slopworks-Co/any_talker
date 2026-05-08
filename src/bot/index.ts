@@ -23,6 +23,7 @@ export function createBot(deps: BotDeps): Bot {
   const bot = new Bot(deps.botToken);
 
   bot.use(async (ctx, next) => {
+    const now = Date.now();
     const from = ctx.from;
     if (from && !from.is_bot) {
       void deps.storage
@@ -31,9 +32,21 @@ export function createBot(deps: BotDeps): Bot {
           firstName: from.first_name ?? null,
           lastName: from.last_name ?? null,
           username: from.username ?? null,
-          lastSeenAt: Date.now(),
+          lastSeenAt: now,
         })
         .catch((err) => console.error("upsertUser failed:", err));
+    }
+    const chat = ctx.chat;
+    if (chat) {
+      void deps.storage
+        .upsertChat({
+          id: String(chat.id),
+          type: chat.type,
+          title: "title" in chat ? chat.title ?? null : null,
+          username: "username" in chat ? chat.username ?? null : null,
+          lastSeenAt: now,
+        })
+        .catch((err) => console.error("upsertChat failed:", err));
     }
     await next();
   });

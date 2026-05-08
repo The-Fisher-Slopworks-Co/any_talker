@@ -6,8 +6,10 @@ import type {
   BucketState,
   ConversationNode,
   User,
+  Chat,
+  ChatSettings,
 } from "../shared/types";
-import { CONVERSATION_TTL_SECONDS } from "../shared/types";
+import { CONVERSATION_TTL_SECONDS, isEmptyChatSettings } from "../shared/types";
 
 const PREFIX = "at:";
 
@@ -51,13 +53,20 @@ export class KeyDBStorage implements Storage {
     return list.some((e) => e.id === id);
   }
 
-  async getBucket(userId: string): Promise<BucketState | null> {
-    const raw = await this.client.get(`${PREFIX}bucket:${userId}`);
+  async getBucket(chatId: string, userId: string): Promise<BucketState | null> {
+    const raw = await this.client.get(`${PREFIX}bucket:${chatId}:${userId}`);
     return raw ? (JSON.parse(raw) as BucketState) : null;
   }
 
-  async saveBucket(userId: string, state: BucketState): Promise<void> {
-    await this.client.set(`${PREFIX}bucket:${userId}`, JSON.stringify(state));
+  async saveBucket(
+    chatId: string,
+    userId: string,
+    state: BucketState,
+  ): Promise<void> {
+    await this.client.set(
+      `${PREFIX}bucket:${chatId}:${userId}`,
+      JSON.stringify(state),
+    );
   }
 
   async getUserName(userId: string): Promise<string | null> {
@@ -84,6 +93,36 @@ export class KeyDBStorage implements Storage {
   async getUser(id: string): Promise<User | null> {
     const raw = await this.client.hget(`${PREFIX}users`, id);
     return raw ? (JSON.parse(raw) as User) : null;
+  }
+
+  async listChats(): Promise<Chat[]> {
+    const values = await this.client.hvals(`${PREFIX}chats`);
+    return values
+      .map((raw) => JSON.parse(raw) as Chat)
+      .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
+  }
+
+  async upsertChat(chat: Chat): Promise<void> {
+    await this.client.hset(`${PREFIX}chats`, chat.id, JSON.stringify(chat));
+  }
+
+  async getChat(id: string): Promise<Chat | null> {
+    const raw = await this.client.hget(`${PREFIX}chats`, id);
+    return raw ? (JSON.parse(raw) as Chat) : null;
+  }
+
+  async getChatSettings(chatId: string): Promise<ChatSettings | null> {
+    const raw = await this.client.get(`${PREFIX}chat_settings:${chatId}`);
+    return raw ? (JSON.parse(raw) as ChatSettings) : null;
+  }
+
+  async saveChatSettings(chatId: string, settings: ChatSettings): Promise<void> {
+    const key = `${PREFIX}chat_settings:${chatId}`;
+    if (isEmptyChatSettings(settings)) {
+      await this.client.del(key);
+      return;
+    }
+    await this.client.set(key, JSON.stringify(settings));
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {

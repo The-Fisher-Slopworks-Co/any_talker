@@ -34,6 +34,22 @@ export type User = {
   lastSeenAt: number;
 };
 
+export type ChatType = "private" | "group" | "supergroup" | "channel";
+
+export type Chat = {
+  id: string;
+  type: ChatType;
+  title: string | null;
+  username: string | null;
+  lastSeenAt: number;
+};
+
+export type ChatSettings = {
+  systemPrompt?: string;
+  models?: string[];
+  rateLimit?: RateLimitConfig;
+};
+
 export type ConversationNode = {
   userQuestion: string;
   botAnswer: string;
@@ -63,4 +79,12 @@ export function composeFullName(
     .map((s) => (s ?? "").trim())
     .filter((s) => s.length > 0)
     .join(" ");
+}
+
+export function isEmptyChatSettings(s: ChatSettings): boolean {
+  return (
+    s.systemPrompt === undefined &&
+    s.models === undefined &&
+    s.rateLimit === undefined
+  );
 }

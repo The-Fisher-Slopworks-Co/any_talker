@@ -47,7 +47,7 @@ describe("askHandler", () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("42", { tokens: 0, lastRefillTs: 1000 });
+    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
     const rl = new TokenBucketLimiter(rlStorage);
     const out = await askHandler(baseInput({ storage, rateLimiter: rl }));
     expect(out.kind).toBe("rateLimited");
@@ -61,7 +61,7 @@ describe("askHandler", () => {
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: true },
     });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("1", { tokens: 0, lastRefillTs: 1000 });
+    await rlStorage.saveBucket("c1", "1", { tokens: 0, lastRefillTs: 1000 });
     const rl = new TokenBucketLimiter(rlStorage);
     const out = await askHandler(baseInput({ storage, userId: "1", rateLimiter: rl }));
     expect(out.kind).toBe("answered");
@@ -74,7 +74,7 @@ describe("askHandler", () => {
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
     });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("1", { tokens: 0, lastRefillTs: 1000 });
+    await rlStorage.saveBucket("c1", "1", { tokens: 0, lastRefillTs: 1000 });
     const rl = new TokenBucketLimiter(rlStorage);
     const out = await askHandler(baseInput({ storage, userId: "1", rateLimiter: rl }));
     expect(out.kind).toBe("rateLimited");
@@ -161,7 +161,7 @@ describe("askHandler", () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("42", { tokens: 0, lastRefillTs: 1000 });
+    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
     const rl = new TokenBucketLimiter(rlStorage);
     let called = false;
     const out = await askHandler(
@@ -179,7 +179,7 @@ describe("askHandler", () => {
     const ai = new FakeAI({ text: "ok", totalTokens: 1234 });
     const out = await askHandler(baseInput({ storage, rateLimiter: rl, ai }));
     expect(out.kind).toBe("answered");
-    expect((await rlStorage.getBucket("42"))?.tokens).toBe(
+    expect((await rlStorage.getBucket("c1", "42"))?.tokens).toBe(
       DEFAULT_SETTINGS.rateLimit.capacity - 1234,
     );
   });
