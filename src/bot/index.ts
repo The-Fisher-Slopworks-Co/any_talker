@@ -152,7 +152,7 @@ export function createBot(deps: BotDeps): Bot {
       case "answered": {
         const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
         const sent = await ctx.reply(decorated.text, {
-          entities: decorated.entities,
+          parse_mode: decorated.parseMode,
           reply_parameters: ctx.message ? { message_id: ctx.message.message_id } : undefined,
         });
         await outcome.persistConversation(sent.message_id);

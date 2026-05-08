@@ -1,18 +1,18 @@
-import type { MessageEntity } from "grammy/types";
+import { escapeHtmlText } from "./html";
 
 export type DecoratedMessage = {
   text: string;
-  entities: MessageEntity[] | undefined;
+  parseMode: "HTML";
 };
 
 export function applyBotNamePrefix(
-  text: string,
+  sanitizedBody: string,
   botName: string | null,
 ): DecoratedMessage {
   const trimmed = botName?.trim() ?? "";
-  if (trimmed.length === 0) return { text, entities: undefined };
+  if (trimmed.length === 0) return { text: sanitizedBody, parseMode: "HTML" };
   return {
-    text: `${trimmed}\n${text}`,
-    entities: [{ type: "bold", offset: 0, length: trimmed.length }],
+    text: `<b>${escapeHtmlText(trimmed)}</b>\n${sanitizedBody}`,
+    parseMode: "HTML",
   };
 }

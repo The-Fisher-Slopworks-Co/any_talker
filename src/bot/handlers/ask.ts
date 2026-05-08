@@ -6,6 +6,7 @@ import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "
 import { getEffectiveSettings } from "../../settings";
 import { getAllTools } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
+import { sanitizeHtml } from "../html";
 
 export type AskInput = {
   storage: Storage;
@@ -120,14 +121,16 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     text: input.userText,
   });
 
+  const sanitized = sanitizeHtml(result.text);
+
   return {
     kind: "answered",
-    text: result.text,
+    text: sanitized,
     botName,
     persistConversation: async (botMsgId) => {
       await input.storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
-        botAnswer: result.text,
+        botAnswer: sanitized,
         parentBotMsgId,
         ts: input.now,
       });
