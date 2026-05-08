@@ -1,3 +1,4 @@
+import { API_CONSTANTS } from "grammy";
 import { loadConfig } from "./config";
 import { KeyDBStorage } from "./storage/keydb";
 import { TokenBucketLimiter } from "./ratelimit/token-bucket";
@@ -6,6 +7,11 @@ import { registerTool } from "./ai/tools/registry";
 import { randomNumberTool } from "./ai/tools/random-number";
 import { createBot } from "./bot";
 import { startServer } from "./webapp/server";
+
+const ALLOWED_UPDATES = [
+  ...API_CONSTANTS.DEFAULT_UPDATE_TYPES,
+  "guest_message",
+] as const;
 
 async function main() {
   const config = loadConfig();
@@ -28,11 +34,16 @@ async function main() {
   });
 
   if (config.webhookUrl) {
-    await bot.api.setWebhook(`${config.webhookUrl}/telegram-webhook`);
+    await bot.api.setWebhook(`${config.webhookUrl}/telegram-webhook`, {
+      allowed_updates: [...ALLOWED_UPDATES],
+    });
     console.log("Webhook set:", config.webhookUrl);
   } else {
     await bot.api.deleteWebhook();
-    bot.start({ drop_pending_updates: true });
+    bot.start({
+      drop_pending_updates: true,
+      allowed_updates: [...ALLOWED_UPDATES],
+    });
     console.log("Bot started in long-polling mode");
   }
 
@@ -46,9 +57,20 @@ async function main() {
     rateLimiter,
   });
   console.log(`HTTP server listening on :${server.port}`);
+
+  return { bot, server };
 }
 
-main().catch((err) => {
+const handles = await main().catch((err) => {
   console.error("Fatal:", err);
   process.exit(1);
 });
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(async () => {
+    handles.server.stop();
+    await handles.bot.stop().catch((err) => {
+      console.error("bot.stop failed during hot-reload:", err);
+    });
+  });
+}
