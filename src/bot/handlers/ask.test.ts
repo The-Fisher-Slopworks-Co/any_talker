@@ -251,6 +251,46 @@ describe("askHandler", () => {
     expect(out.botName).toBe(null);
   });
 
+  test("provider sort: forwards global setting to the AI client", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "throughput",
+    });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBe(
+      "throughput",
+    );
+  });
+
+  test("provider sort: chat override beats global", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "throughput",
+    });
+    await storage.saveChatSettings("c1", { providerSort: "price" });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBe("price");
+  });
+
+  test("provider sort: chat null override turns off global sort", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "latency",
+    });
+    await storage.saveChatSettings("c1", { providerSort: null });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBeNull();
+  });
+
   test("answered: deducts tokens from bucket", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

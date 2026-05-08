@@ -20,6 +20,7 @@ import {
   type Chat,
   type ChatSettings,
   type RateLimitConfig,
+  type ProviderSort,
 } from "../../shared/types";
 import {
   getTimezoneAreas,
@@ -349,6 +350,51 @@ function ModelsCard({
   );
 }
 
+const PROVIDER_SORT_OPTIONS: {
+  value: ProviderSort | null;
+  label: string;
+}[] = [
+  { value: null, label: "Default" },
+  { value: "price", label: "Price" },
+  { value: "throughput", label: "Throughput" },
+  { value: "latency", label: "Latency" },
+];
+
+function ProviderSortField({
+  value,
+  onChange,
+}: {
+  value: ProviderSort | null;
+  onChange: (next: ProviderSort | null) => void;
+}) {
+  const activeIdx = PROVIDER_SORT_OPTIONS.findIndex((o) => o.value === value);
+  return (
+    <div
+      className="relative flex bg-tg-section rounded-[10px] p-[3px] shadow-[0_0_0_1px_var(--tg-separator)]"
+      role="radiogroup"
+    >
+      <div
+        className="absolute top-[3px] bottom-[3px] left-[3px] z-0 pointer-events-none bg-tg-button rounded-lg transition-transform duration-[180ms] ease-tg-spring"
+        style={{
+          width: `calc((100% - 6px) / ${PROVIDER_SORT_OPTIONS.length})`,
+          transform: `translateX(${activeIdx * 100}%)`,
+        }}
+      />
+      {PROVIDER_SORT_OPTIONS.map((o) => (
+        <button
+          key={o.label}
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className="relative z-10 flex-1 border-0 bg-transparent px-1.5 py-2 rounded-lg text-tg-text text-[13px] font-medium cursor-pointer transition-colors aria-checked:text-tg-button-text"
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function RateLimitFields({
   value,
   onChange,
@@ -479,6 +525,9 @@ function PromptTab({
   const [models, setModels] = useState<string[]>(settings.models);
   const [prompt, setPrompt] = useState(settings.systemPrompt);
   const [timezone, setTimezone] = useState(settings.timezone);
+  const [providerSort, setProviderSort] = useState<ProviderSort | null>(
+    settings.providerSort,
+  );
   const [saving, setSaving] = useState(false);
 
   const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
@@ -488,7 +537,8 @@ function PromptTab({
   const dirty =
     modelsDirty ||
     prompt !== settings.systemPrompt ||
-    timezone !== settings.timezone;
+    timezone !== settings.timezone ||
+    providerSort !== settings.providerSort;
   const canSave = dirty && trimmed.length > 0;
 
   const save = async () => {
@@ -497,10 +547,12 @@ function PromptTab({
       models: trimmed,
       systemPrompt: prompt,
       timezone,
+      providerSort,
     });
     onSaved(next);
     setModels(next.models);
     setTimezone(next.timezone);
+    setProviderSort(next.providerSort);
     setSaving(false);
   };
 
@@ -510,6 +562,13 @@ function PromptTab({
       <ModelsCard models={models} onChange={setModels} />
       <SectionFooter>
         Primary OpenRouter model first; fallbacks are tried in order if it fails.
+      </SectionFooter>
+
+      <SectionHeader>Provider Routing</SectionHeader>
+      <ProviderSortField value={providerSort} onChange={setProviderSort} />
+      <SectionFooter>
+        How OpenRouter picks a provider for the model.
+        Default lets OpenRouter decide; the others sort by price, throughput, or latency.
       </SectionFooter>
 
       <SectionHeader>System Prompt</SectionHeader>
@@ -946,6 +1005,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
   const [botNameValue, setBotNameValue] = useState("");
   const [tzOverride, setTzOverride] = useState(false);
   const [tzValue, setTzValue] = useState("UTC");
+  const [psOverride, setPsOverride] = useState(false);
+  const [psValue, setPsValue] = useState<ProviderSort | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -965,6 +1026,12 @@ function ChatEditView({ chatId }: { chatId: string }) {
         setBotNameValue(d.settings.botName ?? "");
         setTzOverride(d.settings.timezone !== undefined);
         setTzValue(d.settings.timezone ?? g.timezone);
+        setPsOverride(d.settings.providerSort !== undefined);
+        setPsValue(
+          d.settings.providerSort !== undefined
+            ? d.settings.providerSort
+            : g.providerSort,
+        );
       })
       .catch(() => setNotFound(true));
   }, [chatId]);
@@ -985,6 +1052,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
     if (rlOverride) next.rateLimit = rlValue;
     if (trimmedBotName.length > 0) next.botName = trimmedBotName;
     if (tzOverride) next.timezone = tzValue;
+    if (psOverride) next.providerSort = psValue;
     return next;
   };
 
@@ -995,12 +1063,14 @@ function ChatEditView({ chatId }: { chatId: string }) {
     modelsOverride !== wasOverridden("models") ||
     rlOverride !== wasOverridden("rateLimit") ||
     tzOverride !== wasOverridden("timezone") ||
+    psOverride !== wasOverridden("providerSort") ||
     (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
     (modelsOverride &&
       JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
     (rlOverride &&
       JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
     (tzOverride && payload.timezone !== original.timezone) ||
+    (psOverride && payload.providerSort !== original.providerSort) ||
     trimmedBotName !== (original.botName ?? "");
 
   const canSave = dirty && (!modelsOverride || trimmedModels.length > 0);
@@ -1019,6 +1089,12 @@ function ChatEditView({ chatId }: { chatId: string }) {
       setBotNameValue(result.settings.botName ?? "");
       setTzOverride(result.settings.timezone !== undefined);
       setTzValue(result.settings.timezone ?? global.timezone);
+      setPsOverride(result.settings.providerSort !== undefined);
+      setPsValue(
+        result.settings.providerSort !== undefined
+          ? result.settings.providerSort
+          : global.providerSort,
+      );
     } finally {
       setSaving(false);
     }
@@ -1128,6 +1204,19 @@ function ChatEditView({ chatId }: { chatId: string }) {
         }
       >
         <TimezoneSelect value={tzValue} onChange={setTzValue} />
+      </OverrideSection>
+
+      <OverrideSection
+        title="Provider Routing"
+        override={psOverride}
+        onToggle={setPsOverride}
+        footer={
+          psOverride
+            ? "How OpenRouter picks a provider for the model in this chat."
+            : `Using global routing (${global.providerSort ?? "default"}).`
+        }
+      >
+        <ProviderSortField value={psValue} onChange={setPsValue} />
       </OverrideSection>
 
       <PrimaryButton disabled={saving || !canSave} onClick={save}>

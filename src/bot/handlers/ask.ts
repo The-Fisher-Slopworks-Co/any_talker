@@ -97,6 +97,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       system: buildInstruction(settings.systemPrompt, { timezone }),
       messages,
       tools: getAllTools(),
+      providerSort: settings.providerSort,
     });
   } catch (err) {
     return { kind: "error", message: err instanceof Error ? err.message : String(err) };
