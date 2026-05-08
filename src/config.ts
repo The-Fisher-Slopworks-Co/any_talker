@@ -1,3 +1,5 @@
+import { resolveLogFormat, type LogFormat } from "./log";
+
 export type Config = {
   botToken: string;
   openrouterApiKey: string;
@@ -6,6 +8,8 @@ export type Config = {
   webhookUrl: string | undefined;
   keydbUrl: string;
   port: number;
+  logFormat: LogFormat;
+  logIncomingUpdates: boolean;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -26,5 +30,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     webhookUrl: env.WEBHOOK_URL,
     keydbUrl: env.KEYDB_URL ?? "redis://localhost:6379",
     port,
+    logFormat: resolveLogFormat(env),
+    logIncomingUpdates: parseBool("LOG_INCOMING_UPDATES", env.LOG_INCOMING_UPDATES, true),
   };
+}
+
+function parseBool(name: string, raw: string | undefined, defaultValue: boolean): boolean {
+  if (raw === undefined || raw === "") return defaultValue;
+  const v = raw.toLowerCase();
+  if (v === "1" || v === "true" || v === "yes" || v === "on") return true;
+  if (v === "0" || v === "false" || v === "no" || v === "off") return false;
+  throw new Error(`${name} must be true/false/1/0, got: ${raw}`);
 }

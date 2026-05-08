@@ -23,6 +23,8 @@ async function main() {
     storage,
     rateLimiter,
     ai,
+    logFormat: config.logFormat,
+    logIncomingUpdates: config.logIncomingUpdates,
   });
 
   if (config.webhookUrl) {
