@@ -172,6 +172,22 @@ describe("askHandler", () => {
     expect(called).toBe(false);
   });
 
+  test("answered: passes composed system instruction to AI", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      systemPrompt: "Grumpy pirate.",
+    });
+    const ai = new FakeAI();
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("# Формат сообщений");
+    expect(sys).toContain("# Формат ответа");
+    expect(sys).toContain("Grumpy pirate.");
+  });
+
   test("answered: returns botName from chat settings when set", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

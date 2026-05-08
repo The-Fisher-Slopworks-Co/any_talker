@@ -5,6 +5,7 @@ import { isAllowed } from "../access";
 import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
 import { getEffectiveSettings } from "../../settings";
 import { getAllTools } from "../../ai/tools/registry";
+import { buildInstruction } from "../../ai/instruction";
 
 export type AskInput = {
   storage: Storage;
@@ -90,7 +91,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   try {
     result = await input.ai.ask({
       models: settings.models,
-      system: settings.systemPrompt,
+      system: buildInstruction(settings.systemPrompt),
       messages,
       tools: getAllTools(),
     });

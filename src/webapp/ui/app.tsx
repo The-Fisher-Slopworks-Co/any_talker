@@ -420,7 +420,9 @@ function PromptTab({
           placeholder="Describe how the bot should behave"
         />
       </Card>
-      <SectionFooter>Sent as the system message on every /ask request.</SectionFooter>
+      <SectionFooter>
+        Character description embedded into the system instruction.
+      </SectionFooter>
 
       <PrimaryButton disabled={saving || !canSave} onClick={save}>
         {saving ? "Saving…" : dirty ? "Save" : "Saved"}
@@ -959,8 +961,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
         onToggle={setPromptOverride}
         footer={
           promptOverride
-            ? "Sent as the system message in this chat."
-            : `Using global prompt (${global.systemPrompt.length} chars).`
+            ? "Character description for this chat."
+            : `Using global character (${global.systemPrompt.length} chars).`
         }
       >
         <Card>
