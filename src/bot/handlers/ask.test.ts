@@ -188,6 +188,51 @@ describe("askHandler", () => {
     expect(sys).toContain("Grumpy pirate.");
   });
 
+  test("timezone resolution: user > chat > global", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      timezone: "Europe/London",
+    });
+    await storage.saveChatSettings("c1", { timezone: "Asia/Tokyo" });
+    await storage.setUserTimezone("42", "Asia/Yekaterinburg");
+
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("Таймзона пользователя: Asia/Yekaterinburg.");
+  });
+
+  test("timezone resolution falls back to chat when user has no override", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      timezone: "Europe/London",
+    });
+    await storage.saveChatSettings("c1", { timezone: "Asia/Tokyo" });
+
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("Таймзона пользователя: Asia/Tokyo.");
+  });
+
+  test("timezone resolution falls back to global when nothing else set", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      timezone: "Europe/London",
+    });
+
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("Таймзона пользователя: Europe/London.");
+  });
+
   test("answered: returns botName from chat settings when set", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

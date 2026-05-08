@@ -10,13 +10,19 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
 }
 
 function normalize(s: Settings): Settings {
-  if (Array.isArray(s.models) && s.models.length > 0) return s;
-  const legacy = (s as Settings & { model?: string }).model;
-  const models =
-    typeof legacy === "string" && legacy.length > 0
-      ? [legacy]
-      : DEFAULT_SETTINGS.models;
-  return { ...s, models };
+  let models = s.models;
+  if (!Array.isArray(models) || models.length === 0) {
+    const legacy = (s as Settings & { model?: string }).model;
+    models =
+      typeof legacy === "string" && legacy.length > 0
+        ? [legacy]
+        : DEFAULT_SETTINGS.models;
+  }
+  const timezone =
+    typeof s.timezone === "string" && s.timezone.length > 0
+      ? s.timezone
+      : DEFAULT_SETTINGS.timezone;
+  return { ...s, models, timezone };
 }
 
 export function applyChatOverrides(
@@ -28,6 +34,7 @@ export function applyChatOverrides(
     systemPrompt: chat.systemPrompt ?? global.systemPrompt,
     models: chat.models ?? global.models,
     rateLimit: chat.rateLimit ?? global.rateLimit,
+    timezone: chat.timezone ?? global.timezone,
   };
 }
 

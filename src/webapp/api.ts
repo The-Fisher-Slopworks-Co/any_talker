@@ -6,6 +6,7 @@ import type {
   ChatSettings,
   RateLimitConfig,
 } from "../shared/types";
+import { isValidTimezone } from "../shared/types";
 import { getOrInitSettings } from "../settings";
 
 export type ApiRequest = {
@@ -35,12 +36,25 @@ function normalizeDisplayName(input: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function normalizeTimezoneOrNull(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  if (trimmed.length === 0 || !isValidTimezone(trimmed)) return null;
+  return trimmed;
+}
+
+const BAD_TIMEZONE: ApiResponse = {
+  status: 400,
+  body: { error: "invalid timezone" },
+};
+
 function normalizeChatSettings(raw: unknown): ChatSettings {
   const body = (raw ?? {}) as {
     systemPrompt?: unknown;
     models?: unknown;
     rateLimit?: unknown;
     botName?: unknown;
+    timezone?: unknown;
   };
   const out: ChatSettings = {};
   if (typeof body.systemPrompt === "string") {
@@ -77,6 +91,12 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     const trimmed = body.botName.trim();
     if (trimmed.length > 0) out.botName = trimmed;
   }
+  if (typeof body.timezone === "string") {
+    const trimmed = body.timezone.trim();
+    if (trimmed.length > 0 && isValidTimezone(trimmed)) {
+      out.timezone = trimmed;
+    }
+  }
   return out;
 }
 
@@ -87,19 +107,37 @@ export async function handleApi(
 ): Promise<ApiResponse> {
   if (req.path === "/api/me") {
     if (req.method === "GET") {
-      const displayName = await deps.storage.getUserName(actor.userId);
+      const [displayName, timezone] = await Promise.all([
+        deps.storage.getUserName(actor.userId),
+        deps.storage.getUserTimezone(actor.userId),
+      ]);
       return {
         status: 200,
-        body: { isOwner: actor.isOwner, displayName },
+        body: { isOwner: actor.isOwner, displayName, timezone },
       };
     }
     if (req.method === "PUT") {
-      const body = (req.body ?? {}) as { displayName?: string | null };
-      const next = normalizeDisplayName(body.displayName);
-      await deps.storage.setUserName(actor.userId, next);
+      const body = (req.body ?? {}) as {
+        displayName?: string | null;
+        timezone?: string | null;
+      };
+      let nextTz: string | null = null;
+      if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
+        nextTz = normalizeTimezoneOrNull(body.timezone);
+        if (nextTz === null) return BAD_TIMEZONE;
+      }
+      const nextName = normalizeDisplayName(body.displayName);
+      await Promise.all([
+        deps.storage.setUserName(actor.userId, nextName),
+        deps.storage.setUserTimezone(actor.userId, nextTz),
+      ]);
       return {
         status: 200,
-        body: { isOwner: actor.isOwner, displayName: next },
+        body: {
+          isOwner: actor.isOwner,
+          displayName: nextName,
+          timezone: nextTz,
+        },
       };
     }
   }
@@ -115,6 +153,9 @@ export async function handleApi(
     if (req.method === "PUT") {
       const current = await getOrInitSettings(deps.storage);
       const patch = (req.body ?? {}) as Partial<Settings>;
+      if (patch.timezone !== undefined && !isValidTimezone(patch.timezone)) {
+        return BAD_TIMEZONE;
+      }
       const next: Settings = {
         ...current,
         ...patch,

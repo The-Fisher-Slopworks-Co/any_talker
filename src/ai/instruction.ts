@@ -26,10 +26,38 @@ function characterSection(description: string): string {
 ${description}`;
 }
 
-export function buildInstruction(characterDescription: string): string {
-  return [
+function datetimeSection(timezone: string, now: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZoneName: "shortOffset",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const date = `${get("year")}-${get("month")}-${get("day")}`;
+  const time = `${get("hour")}:${get("minute")}`;
+  const offset = get("timeZoneName").replace(/^GMT/, "UTC");
+  return `# Текущие дата и время
+
+Сейчас ${date} ${time} (${offset}).
+Таймзона пользователя: ${timezone}.`;
+}
+
+export function buildInstruction(
+  characterDescription: string,
+  opts: { timezone?: string; now?: Date } = {},
+): string {
+  const sections: string[] = [
     MESSAGE_FORMAT,
     RESPONSE_FORMAT,
     characterSection(characterDescription),
-  ].join("\n\n");
+  ];
+  if (opts.timezone) {
+    sections.push(datetimeSection(opts.timezone, opts.now ?? new Date()));
+  }
+  return sections.join("\n\n");
 }

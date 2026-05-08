@@ -140,7 +140,11 @@ describe("/api/me", () => {
       guest("42"),
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ isOwner: false, displayName: null });
+    expect(r.body).toEqual({
+      isOwner: false,
+      displayName: null,
+      timezone: null,
+    });
   });
 
   test("PUT writes a name and GET returns it", async () => {
@@ -150,13 +154,21 @@ describe("/api/me", () => {
       d,
       guest("42"),
     );
-    expect(put.body).toEqual({ isOwner: false, displayName: "Alice" });
+    expect(put.body).toEqual({
+      isOwner: false,
+      displayName: "Alice",
+      timezone: null,
+    });
     const get = await handleApi(
       { method: "GET", path: "/api/me", body: null },
       d,
       guest("42"),
     );
-    expect(get.body).toEqual({ isOwner: false, displayName: "Alice" });
+    expect(get.body).toEqual({
+      isOwner: false,
+      displayName: "Alice",
+      timezone: null,
+    });
   });
 
   test("PUT empty / whitespace clears the override", async () => {
@@ -167,7 +179,11 @@ describe("/api/me", () => {
       d,
       guest("42"),
     );
-    expect(put.body).toEqual({ isOwner: false, displayName: null });
+    expect(put.body).toEqual({
+      isOwner: false,
+      displayName: null,
+      timezone: null,
+    });
     expect(await d.storage.getUserName("42")).toBeNull();
   });
 
@@ -183,7 +199,61 @@ describe("/api/me", () => {
       d,
       guest("99"),
     );
-    expect(r.body).toEqual({ isOwner: false, displayName: null });
+    expect(r.body).toEqual({
+      isOwner: false,
+      displayName: null,
+      timezone: null,
+    });
+  });
+
+  test("PUT accepts a valid timezone and persists it", async () => {
+    const d = deps();
+    const put = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { displayName: "Alice", timezone: "Europe/Moscow" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(put.status).toBe(200);
+    expect(put.body).toEqual({
+      isOwner: false,
+      displayName: "Alice",
+      timezone: "Europe/Moscow",
+    });
+    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
+  });
+
+  test("PUT rejects an invalid timezone with 400", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { timezone: "Mars/Phobos" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT clears timezone when empty string is provided", async () => {
+    const d = deps();
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { timezone: "" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserTimezone("42")).toBeNull();
   });
 });
 
@@ -437,6 +507,52 @@ describe("/api/admin/chats", () => {
     );
     expect(await d.storage.getChatSettings("-100")).toEqual({
       botName: "Helper",
+    });
+  });
+
+  test("PUT accepts timezone override", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { timezone: "Asia/Yekaterinburg" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      timezone: "Asia/Yekaterinburg",
+    });
+  });
+
+  test("PUT silently drops invalid timezone for chat overrides", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { systemPrompt: "p", timezone: "Mars/Phobos" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      systemPrompt: "p",
     });
   });
 
