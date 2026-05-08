@@ -834,6 +834,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
   const [modelsValue, setModelsValue] = useState<string[]>([]);
   const [rlOverride, setRlOverride] = useState(false);
   const [rlValue, setRlValue] = useState<RateLimitConfig | null>(null);
+  const [botNameValue, setBotNameValue] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -850,6 +851,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
         setModelsValue(d.settings.models ?? g.models);
         setRlOverride(d.settings.rateLimit !== undefined);
         setRlValue(d.settings.rateLimit ?? g.rateLimit);
+        setBotNameValue(d.settings.botName ?? "");
       })
       .catch(() => setNotFound(true));
   }, [chatId]);
@@ -861,11 +863,14 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   const trimmedModels = modelsValue.map((m) => m.trim()).filter((m) => m.length > 0);
 
+  const trimmedBotName = botNameValue.trim();
+
   const buildPayload = (): ChatSettings => {
     const next: ChatSettings = {};
     if (promptOverride) next.systemPrompt = promptValue;
     if (modelsOverride && trimmedModels.length > 0) next.models = trimmedModels;
     if (rlOverride) next.rateLimit = rlValue;
+    if (trimmedBotName.length > 0) next.botName = trimmedBotName;
     return next;
   };
 
@@ -879,7 +884,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
     (modelsOverride &&
       JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
     (rlOverride &&
-      JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit));
+      JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
+    trimmedBotName !== (original.botName ?? "");
 
   const canSave = dirty && (!modelsOverride || trimmedModels.length > 0);
 
@@ -894,6 +900,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
       setModelsValue(result.settings.models ?? global.models);
       setRlOverride(result.settings.rateLimit !== undefined);
       setRlValue(result.settings.rateLimit ?? global.rateLimit);
+      setBotNameValue(result.settings.botName ?? "");
     } finally {
       setSaving(false);
     }
@@ -928,6 +935,23 @@ function ChatEditView({ chatId }: { chatId: string }) {
           </span>
         </div>
       </Card>
+
+      <SectionHeader>Bot Name</SectionHeader>
+      <Card>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Name</span>
+          <input
+            className={INPUT_CLS}
+            placeholder="Leave empty to disable"
+            value={botNameValue}
+            onChange={(e) => setBotNameValue(e.target.value)}
+            maxLength={64}
+          />
+        </label>
+      </Card>
+      <SectionFooter>
+        When set, every AI reply in this chat starts with the name in bold.
+      </SectionFooter>
 
       <OverrideSection
         title="System Prompt"

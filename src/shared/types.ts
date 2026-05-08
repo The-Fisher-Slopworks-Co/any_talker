@@ -48,6 +48,7 @@ export type ChatSettings = {
   systemPrompt?: string;
   models?: string[];
   rateLimit?: RateLimitConfig;
+  botName?: string;
 };
 
 export type ConversationNode = {
@@ -85,6 +86,7 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
   return (
     s.systemPrompt === undefined &&
     s.models === undefined &&
-    s.rateLimit === undefined
+    s.rateLimit === undefined &&
+    s.botName === undefined
   );
 }

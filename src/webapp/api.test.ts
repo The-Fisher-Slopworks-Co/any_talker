@@ -417,6 +417,51 @@ describe("/api/admin/chats", () => {
     });
   });
 
+  test("PUT trims and saves botName", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { botName: "  Helper  " },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      botName: "Helper",
+    });
+  });
+
+  test("PUT with whitespace-only botName clears it", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.saveChatSettings("-100", { botName: "Old" });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { botName: "   " },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toBeNull();
+  });
+
   test("PUT with empty body clears the chat overrides", async () => {
     const d = deps();
     await d.storage.upsertChat({
