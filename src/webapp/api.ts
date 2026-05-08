@@ -8,6 +8,10 @@ import type {
 } from "../shared/types";
 import { isValidTimezone, isValidProviderSort } from "../shared/types";
 import { getOrInitSettings } from "../settings";
+import {
+  isValidPermaslug,
+  type FetchOpenRouterStats,
+} from "./openrouter-proxy";
 
 export type ApiRequest = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -26,6 +30,7 @@ export type ApiDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ownerId: string;
+  fetchOpenRouterStats?: FetchOpenRouterStats;
 };
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
@@ -181,6 +186,26 @@ export async function handleApi(
       };
       await deps.storage.saveSettings(next);
       return { status: 200, body: next };
+    }
+  }
+
+  const orMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);
+  if (orMatch && req.method === "GET") {
+    const permaslug = decodeURIComponent(orMatch[1]!);
+    if (!isValidPermaslug(permaslug)) {
+      return { status: 400, body: { error: "invalid permaslug" } };
+    }
+    if (!deps.fetchOpenRouterStats) {
+      return { status: 503, body: { error: "stats fetcher not configured" } };
+    }
+    try {
+      const data = await deps.fetchOpenRouterStats(permaslug);
+      return { status: 200, body: data };
+    } catch (err) {
+      return {
+        status: 502,
+        body: { error: err instanceof Error ? err.message : String(err) },
+      };
     }
   }
 

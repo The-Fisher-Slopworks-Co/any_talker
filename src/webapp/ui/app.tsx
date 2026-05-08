@@ -294,11 +294,11 @@ function ModelInfo({
             : endpoint === null
               ? `No provider data for sort=${providerSort}; showing catalog values.`
               : `Provider: ${endpoint.provider_name}`}
-          {endpoint && providerSort === "throughput" && endpoint.throughput_last_30m !== null && (
-            <> · {Math.round(endpoint.throughput_last_30m)} tok/s</>
+          {endpoint && providerSort === "throughput" && endpoint.throughput !== null && (
+            <> · {Math.round(endpoint.throughput)} tok/s</>
           )}
-          {endpoint && providerSort === "latency" && endpoint.latency_last_30m !== null && (
-            <> · {Math.round(endpoint.latency_last_30m)} ms</>
+          {endpoint && providerSort === "latency" && endpoint.latency !== null && (
+            <> · {Math.round(endpoint.latency)} ms</>
           )}
         </div>
       )}

@@ -3,6 +3,7 @@ import { handleApi, type ApiRequest } from "./api";
 import { verifyInitData } from "./auth";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
+import { fetchOpenRouterStats } from "./openrouter-proxy";
 import indexHtml from "./ui/index.html";
 
 export type ServerDeps = {
@@ -20,6 +21,7 @@ export function startServer(deps: ServerDeps) {
     storage: deps.storage,
     rateLimiter: deps.rateLimiter,
     ownerId: deps.ownerId,
+    fetchOpenRouterStats,
   };
 
   const grammyHandler = deps.webhookUrl
