@@ -3,6 +3,7 @@ import type { InlineQueryResult } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
+import type { LogFormat } from "../log";
 import { askHandler } from "./handlers/ask";
 import { guestAskHandler } from "./handlers/guest";
 import { makeStartHandler } from "./handlers/start";
@@ -11,6 +12,7 @@ import { pickPhotoSize, downloadTelegramFile } from "./photo";
 import { resolveReplyAuthor } from "./reply";
 import { applyBotNamePrefix } from "./format";
 import type { SentGuestMessage } from "../types/telegram-guest";
+import { makeIncomingUpdateLogger } from "./log-update";
 
 type AnswerGuestQuery = (args: {
   guest_query_id: string;
@@ -24,12 +26,21 @@ export type BotDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ai: AIClient;
+  logFormat: LogFormat;
+  logIncomingUpdates: boolean;
 };
 
 const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
 
 export function createBot(deps: BotDeps): Bot {
   const bot = new Bot(deps.botToken);
+
+  bot.use(
+    makeIncomingUpdateLogger({
+      format: deps.logFormat,
+      enabled: deps.logIncomingUpdates,
+    }),
+  );
 
   bot.use(async (ctx, next) => {
     const now = Date.now();

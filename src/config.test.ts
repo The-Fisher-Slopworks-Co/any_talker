@@ -15,6 +15,44 @@ test("loadConfig returns required fields when all env vars present", () => {
   expect(cfg.keydbUrl).toBe("redis://localhost:6379");
   expect(cfg.port).toBe(8080);
   expect(cfg.webhookUrl).toBeUndefined();
+  expect(cfg.logFormat).toBe("pretty");
+  expect(cfg.logIncomingUpdates).toBe(true);
+});
+
+test("loadConfig honours LOG_FORMAT and LOG_INCOMING_UPDATES", () => {
+  const cfg = loadConfig({
+    BOT_TOKEN: "tok",
+    OPENROUTER_API_KEY: "or",
+    BOT_OWNER_ID: "1",
+    WEBAPP_URL: "https://example.com",
+    LOG_FORMAT: "json",
+    LOG_INCOMING_UPDATES: "false",
+  });
+  expect(cfg.logFormat).toBe("json");
+  expect(cfg.logIncomingUpdates).toBe(false);
+});
+
+test("loadConfig defaults logFormat to json when NODE_ENV=production", () => {
+  const cfg = loadConfig({
+    BOT_TOKEN: "tok",
+    OPENROUTER_API_KEY: "or",
+    BOT_OWNER_ID: "1",
+    WEBAPP_URL: "https://example.com",
+    NODE_ENV: "production",
+  });
+  expect(cfg.logFormat).toBe("json");
+});
+
+test("loadConfig rejects unparseable LOG_INCOMING_UPDATES", () => {
+  expect(() =>
+    loadConfig({
+      BOT_TOKEN: "tok",
+      OPENROUTER_API_KEY: "or",
+      BOT_OWNER_ID: "1",
+      WEBAPP_URL: "https://example.com",
+      LOG_INCOMING_UPDATES: "maybe",
+    }),
+  ).toThrow(/LOG_INCOMING_UPDATES/);
 });
 
 test("loadConfig throws on missing required field", () => {
