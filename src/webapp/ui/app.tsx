@@ -5,6 +5,7 @@ import "./styles.css";
 import { api, type MeResponse } from "./api-client";
 import {
   fetchOpenRouterModels,
+  lookupOpenRouterModel,
   formatPricePerMillion,
   supportsCaching,
   supportsTools,
@@ -298,7 +299,7 @@ function ModelsCard({
     const t = id.trim();
     if (t.length === 0) return null;
     if (catalog === null) return undefined;
-    return catalog.get(t) ?? null;
+    return lookupOpenRouterModel(catalog, t);
   };
 
   const updateAt = (idx: number, value: string) =>

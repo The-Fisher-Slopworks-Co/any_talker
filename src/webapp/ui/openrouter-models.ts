@@ -34,6 +34,21 @@ export function fetchOpenRouterModels(): Promise<Map<string, OpenRouterModel>> {
   return cache;
 }
 
+// OpenRouter accepts routing suffixes like `:nitro`, `:floor`, `:online`, `:auto`
+// that don't appear as their own entries in /models — they resolve to a base
+// model server-side. Some suffixes (e.g. `:free`) ARE real catalog entries, so
+// try the exact ID first before falling back to the part before the colon.
+export function lookupOpenRouterModel(
+  catalog: Map<string, OpenRouterModel>,
+  id: string,
+): OpenRouterModel | null {
+  const exact = catalog.get(id);
+  if (exact) return exact;
+  const colon = id.lastIndexOf(":");
+  if (colon <= 0) return null;
+  return catalog.get(id.slice(0, colon)) ?? null;
+}
+
 export function supportsTools(m: OpenRouterModel): boolean {
   return (m.supported_parameters ?? []).includes("tools");
 }
