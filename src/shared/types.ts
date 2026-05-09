@@ -70,11 +70,14 @@ export type ConversationNode = {
   ts: number;
 };
 
-export type GuestConversationNode = {
+export type GuestThreadTurn = {
   userQuestion: string;
   botAnswer: string;
+};
+
+export type GuestThreadNode = {
   chatId: string;
-  userId: string;
+  turns: GuestThreadTurn[];
   ts: number;
 };
 

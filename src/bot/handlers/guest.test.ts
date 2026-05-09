@@ -24,6 +24,7 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => ({
   userId: "42",
   sender: { firstName: "Jane", lastName: null, nameOverride: null },
   userText: "hello",
+  priorThread: null,
   ...overrides,
 });
 
@@ -100,22 +101,70 @@ describe("guestAskHandler", () => {
       expect(out.minutesUntilNextRefill).toBeGreaterThan(0);
   });
 
-  test("answered: persistConversation stores under inline_message_id", async () => {
+  test("answered: persistThread stores a fresh thread keyed by chatId", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "the answer", totalTokens: 200 });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
     if (out.kind !== "answered") return;
-    await out.persistConversation("inline-abc");
-    const node = await storage.getGuestConversation("inline-abc");
-    expect(node).toEqual({
-      userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
-      botAnswer: "the answer",
+    await out.persistThread();
+    expect(await storage.getGuestThread("c1")).toEqual({
       chatId: "c1",
-      userId: "42",
+      turns: [
+        {
+          userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
+          botAnswer: "the answer",
+        },
+      ],
       ts: 1000,
     });
+  });
+
+  test("answered with priorThread: prepends prior turns to AI messages", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "ok", totalTokens: 1 });
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "A1" }],
+      ts: 500,
+    };
+    await guestAskHandler(baseInput({ storage, ai, priorThread }));
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+      {
+        role: "user",
+        content: JSON.stringify({ author: "Jane", text: "hello" }),
+      },
+    ]);
+  });
+
+  test("answered with priorThread: persistThread appends the new turn", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "second answer", totalTokens: 1 });
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "A1" }],
+      ts: 500,
+    };
+    const out = await guestAskHandler(
+      baseInput({ storage, ai, priorThread, now: 2000 }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistThread();
+    const stored = await storage.getGuestThread("c1");
+    expect(stored?.turns).toEqual([
+      { userQuestion: "Q1", botAnswer: "A1" },
+      {
+        userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
+        botAnswer: "second answer",
+      },
+    ]);
+    expect(stored?.ts).toBe(2000);
   });
 
   test("answered: deducts tokens from bucket", async () => {

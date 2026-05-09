@@ -91,6 +91,12 @@ export function createBot(deps: BotDeps): Bot {
       nameOverride,
     };
 
+    const replyToOurBot =
+      msg.reply_to_message?.from?.id === ctx.me.id;
+    const priorThread = replyToOurBot
+      ? await deps.storage.getGuestThread(chatId)
+      : null;
+
     const outcome = await guestAskHandler({
       storage: deps.storage,
       rateLimiter: deps.rateLimiter,
@@ -101,6 +107,7 @@ export function createBot(deps: BotDeps): Bot {
       userId,
       sender,
       userText,
+      priorThread,
     });
 
     const answerGuestQuery = (
@@ -140,10 +147,8 @@ export function createBot(deps: BotDeps): Bot {
         return;
       case "answered": {
         try {
-          const sent = await answer(outcome.text, outcome.botName);
-          if (sent.inline_message_id) {
-            await outcome.persistConversation(sent.inline_message_id);
-          }
+          await answer(outcome.text, outcome.botName);
+          await outcome.persistThread();
         } catch (err) {
           console.error("answerGuestQuery failed:", err);
         }
