@@ -7,6 +7,7 @@ import { getAllTools } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { AIMessage } from "../../ai/types";
+import type { GuestThreadNode } from "../../shared/types";
 
 export type GuestAskInput = {
   storage: Storage;
@@ -18,6 +19,7 @@ export type GuestAskInput = {
   userId: string;
   sender: Sender;
   userText: string;
+  priorThread: GuestThreadNode | null;
   onAIStart?: () => void;
 };
 
@@ -28,7 +30,7 @@ export type GuestAskOutcome =
       kind: "answered";
       text: string;
       botName: string | null;
-      persistConversation: (inlineMessageId: string) => Promise<void>;
+      persistThread: () => Promise<void>;
     }
   | { kind: "error"; message: string };
 
@@ -71,7 +73,14 @@ export async function guestAskHandler(
     quote: null,
     text: input.userText,
   });
-  const messages: AIMessage[] = [{ role: "user", content: envelope }];
+  const messages: AIMessage[] = [];
+  if (input.priorThread) {
+    for (const turn of input.priorThread.turns) {
+      messages.push({ role: "user", content: turn.userQuestion });
+      messages.push({ role: "assistant", content: turn.botAnswer });
+    }
+  }
+  messages.push({ role: "user", content: envelope });
 
   input.onAIStart?.();
 
@@ -105,12 +114,14 @@ export async function guestAskHandler(
     kind: "answered",
     text: sanitized,
     botName,
-    persistConversation: async (inlineMessageId) => {
-      await input.storage.saveGuestConversation(inlineMessageId, {
-        userQuestion: envelope,
-        botAnswer: sanitized,
+    persistThread: async () => {
+      const turns = [
+        ...(input.priorThread?.turns ?? []),
+        { userQuestion: envelope, botAnswer: sanitized },
+      ];
+      await input.storage.saveGuestThread(input.chatId, {
         chatId: input.chatId,
-        userId: input.userId,
+        turns,
         ts: input.now,
       });
     },

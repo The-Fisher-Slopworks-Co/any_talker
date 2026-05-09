@@ -5,7 +5,7 @@ import type {
   WhitelistEntry,
   BucketState,
   ConversationNode,
-  GuestConversationNode,
+  GuestThreadNode,
   User,
   Chat,
   ChatSettings,
@@ -151,19 +151,14 @@ export class KeyDBStorage implements Storage {
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
 
-  async getGuestConversation(
-    inlineMessageId: string,
-  ): Promise<GuestConversationNode | null> {
-    const raw = await this.client.get(`${PREFIX}guest_msg:${inlineMessageId}`);
-    return raw ? (JSON.parse(raw) as GuestConversationNode) : null;
+  async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {
+    const raw = await this.client.get(`${PREFIX}guest_thread:${chatId}`);
+    return raw ? (JSON.parse(raw) as GuestThreadNode) : null;
   }
 
-  async saveGuestConversation(
-    inlineMessageId: string,
-    node: GuestConversationNode,
-  ): Promise<void> {
-    const key = `${PREFIX}guest_msg:${inlineMessageId}`;
-    await this.client.set(key, JSON.stringify(node));
+  async saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void> {
+    const key = `${PREFIX}guest_thread:${chatId}`;
+    await this.client.set(key, JSON.stringify(thread));
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
 }
