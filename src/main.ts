@@ -21,7 +21,7 @@ async function main() {
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
   const rateLimiter = new TokenBucketLimiter(storage);
-  const ai = new OpenRouterAIClient(config.openrouterApiKey);
+  const ai = new OpenRouterAIClient(config.openrouterApiKey, config.logFormat);
 
   registerTool(randomNumberTool);
   registerTool(randomChoiceTool);
