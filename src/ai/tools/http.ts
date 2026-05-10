@@ -130,16 +130,15 @@ export async function safeFetch(url: string, opts: SafeFetchOptions): Promise<Re
   throw new Error(`Too many redirects (>${maxRedirects})`);
 }
 
-export async function readBodyCapped(response: Response, maxBytes: number): Promise<Uint8Array> {
+export async function readTextCapped(response: Response, maxBytes: number): Promise<string> {
   const declared = Number(response.headers.get("content-length") ?? "");
   if (Number.isFinite(declared) && declared > maxBytes) {
     throw new Error(`Response too large (${declared} bytes)`);
   }
   const reader = response.body?.getReader();
-  if (!reader) {
-    return new Uint8Array(0);
-  }
-  const chunks: Uint8Array[] = [];
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let out = "";
   let total = 0;
   for (;;) {
     const { done, value } = await reader.read();
@@ -150,18 +149,8 @@ export async function readBodyCapped(response: Response, maxBytes: number): Prom
       await reader.cancel().catch(() => {});
       throw new Error(`Response too large (>${maxBytes} bytes)`);
     }
-    chunks.push(value);
+    out += decoder.decode(value, { stream: true });
   }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+  out += decoder.decode();
   return out;
-}
-
-export async function readTextCapped(response: Response, maxBytes: number): Promise<string> {
-  const buf = await readBodyCapped(response, maxBytes);
-  return new TextDecoder().decode(buf);
 }

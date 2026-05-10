@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 export type TelegramUser = {
   id: number;
   first_name?: string;
@@ -68,9 +70,8 @@ export async function verifyInitData(
 
 function hexDigestsEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
+  const ab = Buffer.from(a, "hex");
+  const bb = Buffer.from(b, "hex");
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
 }
