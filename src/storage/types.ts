@@ -1,6 +1,7 @@
 import type {
   Settings,
   WhitelistEntry,
+  WhitelistKind,
   BucketState,
   ConversationNode,
   GuestThreadNode,
@@ -14,10 +15,10 @@ export interface Storage {
   getSettings(): Promise<Settings | null>;
   saveSettings(settings: Settings): Promise<void>;
 
-  listWhitelist(kind: "users" | "chats"): Promise<WhitelistEntry[]>;
-  addWhitelist(kind: "users" | "chats", entry: WhitelistEntry): Promise<void>;
-  removeWhitelist(kind: "users" | "chats", id: string): Promise<void>;
-  isWhitelisted(kind: "users" | "chats", id: string): Promise<boolean>;
+  listWhitelist(kind: WhitelistKind): Promise<WhitelistEntry[]>;
+  addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void>;
+  removeWhitelist(kind: WhitelistKind, id: string): Promise<void>;
+  isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean>;
 
   getBucket(chatId: string, userId: string): Promise<BucketState | null>;
   saveBucket(chatId: string, userId: string, state: BucketState): Promise<void>;

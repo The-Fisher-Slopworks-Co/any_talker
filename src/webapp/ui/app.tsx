@@ -23,6 +23,7 @@ import {
   composeFullName,
   type Settings,
   type WhitelistEntry,
+  type WhitelistKind,
   type BucketState,
   type User,
   type Chat,
@@ -48,8 +49,8 @@ type Route =
   | { kind: "main" }
   | { kind: "admin" }
   | { kind: "admin-section"; section: AdminSection }
-  | { kind: "user-edit"; userId: string; from?: AdminSection }
-  | { kind: "chat-edit"; chatId: string; from?: AdminSection }
+  | { kind: "user-edit"; userId: string; from: AdminSection }
+  | { kind: "chat-edit"; chatId: string; from: AdminSection }
   | { kind: "my-reminders" };
 
 const ADMIN_SECTIONS: {
@@ -219,7 +220,7 @@ function WhitelistToggleButton({
   label,
   initial,
 }: {
-  kind: "users" | "chats";
+  kind: WhitelistKind;
   id: string;
   label: string;
   initial: boolean;
@@ -953,7 +954,7 @@ function WhitelistList({
   onOpen,
   onRemove,
 }: {
-  kind: "users" | "chats";
+  kind: WhitelistKind;
   entries: WhitelistEntry[];
   onOpen: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
@@ -1111,7 +1112,7 @@ function UserEditView({ userId }: { userId: string }) {
     setSaving(true);
     try {
       const next = await api.putAdminUser(userId, name.trim() || null);
-      setData(next);
+      setData((prev) => (prev ? { ...prev, ...next } : null));
       setName(next.displayName ?? "");
     } finally {
       setSaving(false);
@@ -1265,7 +1266,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [whitelisted, setWhitelisted] = useState<boolean | null>(null);
+  const [whitelisted, setWhitelisted] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getSettings(), api.getAdminChat(chatId)])
@@ -1295,7 +1296,7 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   if (notFound)
     return <div className="text-center text-tg-hint py-20">Chat not found.</div>;
-  if (!chat || !global || !original || !rlValue || whitelisted === null)
+  if (!chat || !global || !original || !rlValue)
     return <div className="text-center text-tg-hint py-20">Loading…</div>;
 
   const trimmedModels = modelsValue.map((m) => m.trim()).filter((m) => m.length > 0);
@@ -1583,9 +1584,8 @@ function App() {
       setRoute((r) => {
         switch (r.kind) {
           case "user-edit":
-            return { kind: "admin-section", section: r.from ?? "users" };
           case "chat-edit":
-            return { kind: "admin-section", section: r.from ?? "chats" };
+            return { kind: "admin-section", section: r.from };
           case "admin-section":
             return { kind: "admin" };
           case "admin":

@@ -2,6 +2,7 @@
 import type {
   Settings,
   WhitelistEntry,
+  WhitelistKind,
   BucketState,
   User,
   Chat,
@@ -68,9 +69,9 @@ export const api = {
   putSettings: (patch: Partial<Settings>) => req<Settings>("PUT", "/api/settings", patch),
   getWhitelist: () =>
     req<{ users: WhitelistEntry[]; chats: WhitelistEntry[] }>("GET", "/api/whitelist"),
-  addWhitelist: (kind: "users" | "chats", entry: WhitelistEntry) =>
+  addWhitelist: (kind: WhitelistKind, entry: WhitelistEntry) =>
     req<WhitelistEntry[]>("POST", `/api/whitelist/${kind}`, entry),
-  removeWhitelist: (kind: "users" | "chats", id: string) =>
+  removeWhitelist: (kind: WhitelistKind, id: string) =>
     req<WhitelistEntry[]>("DELETE", `/api/whitelist/${kind}/${id}`),
   getMyBucket: () => req<{ bucket: BucketState | null }>("GET", "/api/ratelimit/me"),
   resetMyBucket: () =>
@@ -82,12 +83,20 @@ export const api = {
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
   putAdminUser: (id: string, displayName: string | null) =>
-    req<UserSettingsResponse>("PUT", `/api/admin/users/${id}`, { displayName }),
+    req<Omit<UserSettingsResponse, "whitelisted">>(
+      "PUT",
+      `/api/admin/users/${id}`,
+      { displayName },
+    ),
   listAdminChats: () => req<{ chats: Chat[] }>("GET", "/api/admin/chats"),
   getAdminChat: (id: string) =>
     req<ChatSettingsResponse>("GET", `/api/admin/chats/${id}`),
   putAdminChat: (id: string, settings: ChatSettings) =>
-    req<ChatSettingsResponse>("PUT", `/api/admin/chats/${id}`, settings),
+    req<Omit<ChatSettingsResponse, "whitelisted">>(
+      "PUT",
+      `/api/admin/chats/${id}`,
+      settings,
+    ),
   listMyReminders: () =>
     req<RemindersResponse>("GET", "/api/me/reminders"),
   listAdminReminders: () =>
