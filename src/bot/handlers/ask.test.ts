@@ -23,7 +23,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   chatId: "c1",
   userId: "42",
   askMessageId: 1,
-  sender: { firstName: "John", lastName: "Doe", nameOverride: null },
+  sender: { firstName: "John", lastName: "Doe", nameOverride: null, gender: null },
   userText: "hello",
   quote: null,
   image: null,

@@ -10,8 +10,13 @@ import type {
   User,
   Chat,
   ChatSettings,
+  Gender,
 } from "../shared/types";
-import { CONVERSATION_TTL_SECONDS, isEmptyChatSettings } from "../shared/types";
+import {
+  CONVERSATION_TTL_SECONDS,
+  isEmptyChatSettings,
+  isValidGender,
+} from "../shared/types";
 import type { Reminder } from "../reminders/types";
 
 const PREFIX = "at:";
@@ -91,6 +96,17 @@ export class KeyDBStorage implements Storage {
     const key = `${PREFIX}user_tz:${userId}`;
     if (timezone === null) await this.client.del(key);
     else await this.client.set(key, timezone);
+  }
+
+  async getUserGender(userId: string): Promise<Gender | null> {
+    const raw = await this.client.get(`${PREFIX}user_gender:${userId}`);
+    return isValidGender(raw) ? raw : null;
+  }
+
+  async setUserGender(userId: string, gender: Gender | null): Promise<void> {
+    const key = `${PREFIX}user_gender:${userId}`;
+    if (gender === null) await this.client.del(key);
+    else await this.client.set(key, gender);
   }
 
   async listUsers(): Promise<User[]> {

@@ -2,7 +2,12 @@ import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
 import { buildContext } from "./context-builder";
 
-const SENDER = { firstName: "John", lastName: "Doe", nameOverride: null };
+const SENDER = {
+  firstName: "John",
+  lastName: "Doe",
+  nameOverride: null,
+  gender: null,
+};
 const envelope = (extra: { quote?: string; text?: string } = {}) => {
   const obj: Record<string, string> = { author: "John Doe" };
   if (extra.quote !== undefined) obj.quote = extra.quote;
@@ -52,7 +57,7 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
-      sender: { firstName: "Alice", lastName: null, nameOverride: null },
+      sender: { firstName: "Alice", lastName: null, nameOverride: null, gender: null },
       userText: "hi",
       quote: null,
       replyTarget: null,
@@ -66,7 +71,7 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
-      sender: { firstName: "John", lastName: "Doe", nameOverride: "Pseudonym" },
+      sender: { firstName: "John", lastName: "Doe", nameOverride: "Pseudonym", gender: null },
       userText: "hi",
       quote: null,
       replyTarget: null,
@@ -80,13 +85,49 @@ describe("buildContext", () => {
     const msgs = await buildContext({
       storage,
       chatId: "c1",
-      sender: { firstName: "John", lastName: "Doe", nameOverride: "   " },
+      sender: { firstName: "John", lastName: "Doe", nameOverride: "   ", gender: null },
       userText: "hi",
       quote: null,
       replyTarget: null,
       image: null,
     });
     expect(JSON.parse(msgs[0]!.content as string).author).toBe("John Doe");
+  });
+
+  test("gender field appears between author and text when set", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: { firstName: "Саша", lastName: null, nameOverride: null, gender: "female" },
+      userText: "привет",
+      quote: null,
+      replyTarget: null,
+      image: null,
+    });
+    expect(msgs[0]!.content).toBe(
+      JSON.stringify({ author: "Саша", gender: "female", text: "привет" }),
+    );
+    expect(Object.keys(JSON.parse(msgs[0]!.content as string))).toEqual([
+      "author",
+      "gender",
+      "text",
+    ]);
+  });
+
+  test("gender is omitted when null", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "hi",
+      quote: null,
+      replyTarget: null,
+      image: null,
+    });
+    const parsed = JSON.parse(msgs[0]!.content as string);
+    expect("gender" in parsed).toBe(false);
   });
 
   test("quote field is omitted when not provided", async () => {
