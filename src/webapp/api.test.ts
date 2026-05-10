@@ -836,6 +836,175 @@ describe("admin gating", () => {
   });
 });
 
+describe("/api/me/reminders", () => {
+  test("returns only the actor's reminders, sorted by fireAt asc", async () => {
+    const d = deps();
+    await d.storage.saveReminder({
+      id: "a",
+      userId: "42",
+      fireAtMs: 200,
+      text: "mine-late",
+      target: { kind: "guest_dm", userId: "42" },
+      createdAtMs: 0,
+    });
+    await d.storage.saveReminder({
+      id: "b",
+      userId: "42",
+      fireAtMs: 100,
+      text: "mine-early",
+      target: { kind: "guest_dm", userId: "42" },
+      createdAtMs: 0,
+    });
+    await d.storage.saveReminder({
+      id: "c",
+      userId: "99",
+      fireAtMs: 50,
+      text: "other",
+      target: { kind: "guest_dm", userId: "99" },
+      createdAtMs: 0,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/reminders", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    const out = r.body as {
+      reminders: { id: string }[];
+      chats: Record<string, unknown>;
+    };
+    expect(out.reminders.map((x) => x.id)).toEqual(["b", "a"]);
+    expect(out.chats).toEqual({});
+  });
+
+  test("empty when actor has none", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/reminders", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ reminders: [], chats: {} });
+  });
+
+  test("includes chat metadata for ask_reply targets", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "c1",
+      type: "supergroup",
+      title: "Team Chat",
+      username: null,
+      lastSeenAt: 1000,
+    });
+    await d.storage.saveReminder({
+      id: "r1",
+      userId: "42",
+      fireAtMs: 100,
+      text: "ping",
+      target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
+      createdAtMs: 0,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/reminders", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    const out = r.body as { chats: Record<string, { title: string }> };
+    expect(out.chats["c1"]?.title).toBe("Team Chat");
+  });
+});
+
+describe("/api/admin/reminders", () => {
+  test("returns all reminders for owner", async () => {
+    const d = deps();
+    await d.storage.saveReminder({
+      id: "a",
+      userId: "42",
+      fireAtMs: 200,
+      text: "x",
+      target: { kind: "guest_dm", userId: "42" },
+      createdAtMs: 0,
+    });
+    await d.storage.saveReminder({
+      id: "b",
+      userId: "99",
+      fireAtMs: 100,
+      text: "y",
+      target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
+      createdAtMs: 0,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/reminders", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const out = r.body as {
+      reminders: { id: string }[];
+      chats: Record<string, unknown>;
+      users: Record<string, unknown>;
+    };
+    expect(out.reminders.map((x) => x.id)).toEqual(["b", "a"]);
+    expect(out.chats).toEqual({});
+    expect(out.users).toEqual({});
+  });
+
+  test("admin response embeds known user records", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Jane",
+      lastName: "Doe",
+      username: "jane",
+      lastSeenAt: 100,
+    });
+    await d.storage.saveReminder({
+      id: "r1",
+      userId: "42",
+      fireAtMs: 100,
+      text: "x",
+      target: { kind: "guest_dm", userId: "42" },
+      createdAtMs: 0,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/reminders", body: null },
+      d,
+      owner,
+    );
+    const out = r.body as { users: Record<string, { username: string }> };
+    expect(out.users["42"]?.username).toBe("jane");
+  });
+
+  test("user response does NOT include users field", async () => {
+    const d = deps();
+    await d.storage.saveReminder({
+      id: "r",
+      userId: "42",
+      fireAtMs: 100,
+      text: "x",
+      target: { kind: "guest_dm", userId: "42" },
+      createdAtMs: 0,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/reminders", body: null },
+      d,
+      guest("42"),
+    );
+    const out = r.body as Record<string, unknown>;
+    expect("users" in out).toBe(false);
+  });
+
+  test("non-owner gets 403", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/reminders", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
 describe("unknown route", () => {
   test("returns 404", async () => {
     const r = await handleApi({ method: "GET", path: "/api/nope", body: null }, deps(), owner);

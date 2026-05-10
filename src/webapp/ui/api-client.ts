@@ -7,6 +7,7 @@ import type {
   Chat,
   ChatSettings,
 } from "../../shared/types";
+import type { Reminder } from "../../reminders/types";
 
 declare global {
   interface Window {
@@ -79,4 +80,14 @@ export const api = {
     req<ChatSettingsResponse>("GET", `/api/admin/chats/${id}`),
   putAdminChat: (id: string, settings: ChatSettings) =>
     req<ChatSettingsResponse>("PUT", `/api/admin/chats/${id}`, settings),
+  listMyReminders: () =>
+    req<RemindersResponse>("GET", "/api/me/reminders"),
+  listAdminReminders: () =>
+    req<RemindersResponse>("GET", "/api/admin/reminders"),
+};
+
+export type RemindersResponse = {
+  reminders: Reminder[];
+  chats: Record<string, Chat>;
+  users?: Record<string, User>;
 };
