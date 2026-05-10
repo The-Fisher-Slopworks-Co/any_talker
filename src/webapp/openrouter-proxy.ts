@@ -1,3 +1,7 @@
+import { fetchWithTimeout } from "../ai/tools/http";
+
+const OPENROUTER_TIMEOUT_MS = 10_000;
+
 export type ProxyEndpoint = {
   provider_name: string;
   pricing: {
@@ -36,7 +40,12 @@ export const fetchOpenRouterStats: FetchOpenRouterStats = async (
   if (cached && now - cached.ts < TTL_MS) return cached.data;
 
   const url = `https://openrouter.ai/api/frontend/stats/endpoint?permaslug=${encodeURIComponent(permaslug)}`;
-  const res = await fetch(url, { headers: { accept: "application/json" } });
+  const res = await fetchWithTimeout(
+    url,
+    { headers: { accept: "application/json" } },
+    OPENROUTER_TIMEOUT_MS,
+    "OpenRouter stats",
+  );
   if (!res.ok) throw new Error(`OpenRouter stats: HTTP ${res.status}`);
   const json = (await res.json()) as FrontendStats;
   const endpoints: ProxyEndpoint[] = (json.data ?? [])

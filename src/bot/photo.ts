@@ -1,3 +1,7 @@
+import { fetchWithTimeout } from "../ai/tools/http";
+
+const TELEGRAM_TIMEOUT_MS = 10_000;
+
 export type PhotoSizeLike = {
   file_id: string;
   width: number;
@@ -24,8 +28,11 @@ export async function downloadTelegramFile(
   botToken: string,
   fileId: string,
 ): Promise<Uint8Array> {
-  const fileRes = await fetch(
+  const fileRes = await fetchWithTimeout(
     `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`,
+    {},
+    TELEGRAM_TIMEOUT_MS,
+    "Telegram getFile",
   );
   const fileJson = (await fileRes.json()) as {
     ok: boolean;
@@ -35,8 +42,11 @@ export async function downloadTelegramFile(
   if (!fileJson.ok || !fileJson.result?.file_path) {
     throw new Error(`getFile failed: ${fileJson.description ?? "unknown"}`);
   }
-  const dlRes = await fetch(
+  const dlRes = await fetchWithTimeout(
     `https://api.telegram.org/file/bot${botToken}/${fileJson.result.file_path}`,
+    {},
+    TELEGRAM_TIMEOUT_MS,
+    "Telegram file download",
   );
   if (!dlRes.ok) {
     throw new Error(`file download failed: HTTP ${dlRes.status}`);
