@@ -79,6 +79,19 @@ const BAD_PROVIDER_SORT: ApiResponse = {
   body: { error: "invalid providerSort" },
 };
 
+const BAD_MODELS: ApiResponse = {
+  status: 400,
+  body: { error: "models must be a non-empty array of non-empty strings" },
+};
+
+function isValidModelsList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((m) => typeof m === "string" && m.trim().length > 0)
+  );
+}
+
 async function collectReminderChats(
   storage: Storage,
   reminders: Reminder[],
@@ -266,6 +279,9 @@ export async function handleApi(
         !isValidProviderSort(patch.providerSort)
       ) {
         return BAD_PROVIDER_SORT;
+      }
+      if (patch.models !== undefined && !isValidModelsList(patch.models)) {
+        return BAD_MODELS;
       }
       const next: Settings = {
         ...current,
