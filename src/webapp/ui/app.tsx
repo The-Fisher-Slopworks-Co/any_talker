@@ -1076,24 +1076,28 @@ function UserEditView({ userId }: { userId: string }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [whitelist, setWhitelist] = useState<WhitelistEntry[] | null>(null);
+  const [whitelistBusy, setWhitelistBusy] = useState(false);
 
   useEffect(() => {
-    api
-      .getAdminUser(userId)
-      .then((d) => {
+    Promise.all([api.getAdminUser(userId), api.getWhitelist()])
+      .then(([d, wl]) => {
         setData(d);
         setName(d.displayName ?? "");
+        setWhitelist(wl.users);
       })
       .catch(() => setNotFound(true));
   }, [userId]);
 
   if (notFound)
     return <div className="text-center text-tg-hint py-20">User not found.</div>;
-  if (!data) return <div className="text-center text-tg-hint py-20">Loading…</div>;
+  if (!data || whitelist === null)
+    return <div className="text-center text-tg-hint py-20">Loading…</div>;
 
   const { user } = data;
   const fallbackName = userDisplayName(user);
   const dirty = name.trim() !== (data.displayName ?? "");
+  const isWhitelisted = whitelist.some((e) => e.id === user.id);
 
   const save = async () => {
     setSaving(true);
@@ -1103,6 +1107,18 @@ function UserEditView({ userId }: { userId: string }) {
       setName(next.displayName ?? "");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleWhitelist = async () => {
+    setWhitelistBusy(true);
+    try {
+      const next = isWhitelisted
+        ? await api.removeWhitelist("users", user.id)
+        : await api.addWhitelist("users", { id: user.id, label: fallbackName });
+      setWhitelist(next);
+    } finally {
+      setWhitelistBusy(false);
     }
   };
 
@@ -1132,6 +1148,13 @@ function UserEditView({ userId }: { userId: string }) {
         </div>
         <RowButton onClick={() => openTelegramProfile(user)}>
           Open in Telegram
+        </RowButton>
+        <RowButton onClick={toggleWhitelist} disabled={whitelistBusy}>
+          {whitelistBusy
+            ? "Updating…"
+            : isWhitelisted
+              ? "Remove from whitelist"
+              : "Add to whitelist"}
         </RowButton>
       </Card>
 
@@ -1247,13 +1270,16 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [whitelist, setWhitelist] = useState<WhitelistEntry[] | null>(null);
+  const [whitelistBusy, setWhitelistBusy] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.getSettings(), api.getAdminChat(chatId)])
-      .then(([g, d]) => {
+    Promise.all([api.getSettings(), api.getAdminChat(chatId), api.getWhitelist()])
+      .then(([g, d, wl]) => {
         setGlobal(g);
         setChat(d.chat);
         setOriginal(d.settings);
+        setWhitelist(wl.chats);
         setPromptOverride(d.settings.systemPrompt !== undefined);
         setPromptValue(d.settings.systemPrompt ?? g.systemPrompt);
         setModelsOverride(d.settings.models !== undefined);
@@ -1275,8 +1301,22 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   if (notFound)
     return <div className="text-center text-tg-hint py-20">Chat not found.</div>;
-  if (!chat || !global || !original || !rlValue)
+  if (!chat || !global || !original || !rlValue || whitelist === null)
     return <div className="text-center text-tg-hint py-20">Loading…</div>;
+
+  const isWhitelisted = whitelist.some((e) => e.id === chat.id);
+
+  const toggleWhitelist = async () => {
+    setWhitelistBusy(true);
+    try {
+      const next = isWhitelisted
+        ? await api.removeWhitelist("chats", chat.id)
+        : await api.addWhitelist("chats", { id: chat.id, label: chatTitle(chat) });
+      setWhitelist(next);
+    } finally {
+      setWhitelistBusy(false);
+    }
+  };
 
   const trimmedModels = modelsValue.map((m) => m.trim()).filter((m) => m.length > 0);
 
@@ -1365,6 +1405,13 @@ function ChatEditView({ chatId }: { chatId: string }) {
             {new Date(chat.lastSeenAt).toLocaleString()}
           </span>
         </div>
+        <RowButton onClick={toggleWhitelist} disabled={whitelistBusy}>
+          {whitelistBusy
+            ? "Updating…"
+            : isWhitelisted
+              ? "Remove from whitelist"
+              : "Add to whitelist"}
+        </RowButton>
       </Card>
 
       <SectionHeader>Bot Name</SectionHeader>
