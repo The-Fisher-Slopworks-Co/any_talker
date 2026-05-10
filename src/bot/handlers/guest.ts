@@ -7,7 +7,7 @@ import { getAllTools } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { AIMessage } from "../../ai/types";
-import type { GuestThreadNode } from "../../shared/types";
+import { MAX_REPLY_CHAIN_DEPTH, type GuestThreadNode } from "../../shared/types";
 
 export type GuestAskInput = {
   storage: Storage;
@@ -73,12 +73,11 @@ export async function guestAskHandler(
     quote: null,
     text: input.userText,
   });
+  const priorTurns = input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
   const messages: AIMessage[] = [];
-  if (input.priorThread) {
-    for (const turn of input.priorThread.turns) {
-      messages.push({ role: "user", content: turn.userQuestion });
-      messages.push({ role: "assistant", content: turn.botAnswer });
-    }
+  for (const turn of priorTurns) {
+    messages.push({ role: "user", content: turn.userQuestion });
+    messages.push({ role: "assistant", content: turn.botAnswer });
   }
   messages.push({ role: "user", content: envelope });
 
@@ -124,9 +123,9 @@ export async function guestAskHandler(
     botName,
     persistThread: async () => {
       const turns = [
-        ...(input.priorThread?.turns ?? []),
+        ...priorTurns,
         { userQuestion: envelope, botAnswer: sanitized },
-      ];
+      ].slice(-MAX_REPLY_CHAIN_DEPTH);
       await input.storage.saveGuestThread(input.chatId, {
         chatId: input.chatId,
         turns,
