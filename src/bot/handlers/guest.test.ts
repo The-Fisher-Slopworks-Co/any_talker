@@ -25,6 +25,7 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => ({
   sender: { firstName: "Jane", lastName: null, nameOverride: null, gender: null },
   userText: "hello",
   priorThread: null,
+  lang: "en",
   ...overrides,
 });
 

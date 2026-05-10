@@ -10,6 +10,7 @@ import type {
   ChatSettings,
   Gender,
 } from "../shared/types";
+import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 
 export interface Storage {
@@ -32,6 +33,9 @@ export interface Storage {
 
   getUserGender(userId: string): Promise<Gender | null>;
   setUserGender(userId: string, gender: Gender | null): Promise<void>;
+
+  getUserLang(userId: string): Promise<Lang | null>;
+  setUserLang(userId: string, lang: Lang | null): Promise<void>;
 
   listUsers(): Promise<User[]>;
   upsertUser(user: User): Promise<void>;

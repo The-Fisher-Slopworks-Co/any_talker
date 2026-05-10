@@ -32,12 +32,16 @@ import {
   type ProviderSort,
   type Gender,
 } from "../../shared/types";
+import { resolveLang, t, type Lang } from "../../shared/i18n";
+import { I18nProvider, useI18n } from "./i18n-context";
 import type { Reminder } from "../../reminders/types";
 import {
   getTimezoneAreas,
   getTimezoneLocations,
   splitTimezone,
 } from "./timezones";
+
+type Strings = ReturnType<typeof t>;
 
 type AdminSection =
   | "prompt"
@@ -54,51 +58,45 @@ type Route =
   | { kind: "chat-edit"; chatId: string; from: AdminSection }
   | { kind: "my-reminders" };
 
-const ADMIN_SECTIONS: {
-  id: AdminSection;
-  label: string;
-  description: string;
-}[] = [
-  {
-    id: "prompt",
-    label: "Prompt",
-    description: "Models, character, timezone, provider routing",
-  },
-  {
-    id: "ratelimit",
-    label: "Limits",
-    description: "Token-bucket capacity and refill",
-  },
-  {
-    id: "whitelist",
-    label: "Whitelist",
-    description: "Allowed users and chats",
-  },
-  {
-    id: "users",
-    label: "Users",
-    description: "All users the bot has seen",
-  },
-  {
-    id: "chats",
-    label: "Chats",
-    description: "All chats and per-chat overrides",
-  },
-  {
-    id: "reminders",
-    label: "Reminders",
-    description: "Pending reminders for everyone",
-  },
+const ADMIN_SECTION_IDS: readonly AdminSection[] = [
+  "prompt",
+  "ratelimit",
+  "whitelist",
+  "users",
+  "chats",
+  "reminders",
 ];
 
-function adminSectionTitle(section: AdminSection): string {
-  return ADMIN_SECTIONS.find((s) => s.id === section)?.label ?? "";
+function adminSection(s: Strings, id: AdminSection): {
+  label: string;
+  description: string;
+} {
+  switch (id) {
+    case "prompt":
+      return { label: s.ui_admin_prompt, description: s.ui_admin_prompt_desc };
+    case "ratelimit":
+      return { label: s.ui_admin_limits, description: s.ui_admin_limits_desc };
+    case "whitelist":
+      return {
+        label: s.ui_admin_whitelist,
+        description: s.ui_admin_whitelist_desc,
+      };
+    case "users":
+      return { label: s.ui_admin_users, description: s.ui_admin_users_desc };
+    case "chats":
+      return { label: s.ui_admin_chats, description: s.ui_admin_chats_desc };
+    case "reminders":
+      return {
+        label: s.ui_admin_reminders,
+        description: s.ui_admin_reminders_desc,
+      };
+  }
 }
 
-function chatTitle(c: Chat): string {
+function chatTitle(s: Strings, c: Chat): string {
   if (c.title && c.title.length > 0) return c.title;
   if (c.username) return `@${c.username}`;
-  if (c.type === "private") return "Private chat";
+  if (c.type === "private") return s.ui_chat_private;
   return `id:${c.id}`;
 }
 
@@ -111,13 +109,14 @@ function userDisplayName(u: User): string {
 }
 
 function reminderTargetLabel(
+  s: Strings,
   r: Reminder,
   chats: Record<string, Chat>,
 ): string {
-  if (r.target.kind === "guest_dm") return "DM";
+  if (r.target.kind === "guest_dm") return s.ui_reminders_dm;
   const chat = chats[r.target.chatId];
-  if (chat) return chatTitle(chat);
-  return `chat ${r.target.chatId}`;
+  if (chat) return chatTitle(s, chat);
+  return s.ui_reminders_chat_fallback(r.target.chatId);
 }
 
 function openTelegramProfile(u: User): void {
@@ -195,6 +194,25 @@ function PrimaryButton({
   );
 }
 
+function SaveButton({
+  saving,
+  dirty,
+  disabled,
+  onClick,
+}: {
+  saving: boolean;
+  dirty: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const { t: s } = useI18n();
+  return (
+    <PrimaryButton disabled={disabled ?? (saving || !dirty)} onClick={onClick}>
+      {saving ? s.ui_saving : dirty ? s.ui_save : s.ui_saved}
+    </PrimaryButton>
+  );
+}
+
 function RowButton({
   disabled,
   onClick,
@@ -226,6 +244,7 @@ function WhitelistToggleButton({
   label: string;
   initial: boolean;
 }) {
+  const { t: s } = useI18n();
   const [whitelisted, setWhitelisted] = useState(initial);
   const [busy, setBusy] = useState(false);
   const toggle = async () => {
@@ -244,7 +263,11 @@ function WhitelistToggleButton({
   };
   return (
     <RowButton onClick={toggle} disabled={busy}>
-      {busy ? "Updating…" : whitelisted ? "Remove from whitelist" : "Add to whitelist"}
+      {busy
+        ? s.ui_updating
+        : whitelisted
+          ? s.ui_whitelist_remove
+          : s.ui_whitelist_add}
     </RowButton>
   );
 }
@@ -276,6 +299,7 @@ function ReminderCard({
   onUserClick?: (userId: string) => void;
   emptyText: string;
 }) {
+  const { t: s } = useI18n();
   return (
     <Card>
       {reminders.length === 0 ? (
@@ -294,7 +318,7 @@ function ReminderCard({
                 {new Date(r.fireAtMs).toLocaleString()}
               </span>
               <span className="text-[13px] text-tg-hint truncate">
-                {reminderTargetLabel(r, chats)}
+                {reminderTargetLabel(s, r, chats)}
               </span>
             </div>
             <div className="text-[15px] whitespace-pre-wrap break-words">
@@ -333,6 +357,7 @@ function RemindersList({
   showUserId: boolean;
   onUserClick?: (userId: string) => void;
 }) {
+  const { t: s } = useI18n();
   const [data, setData] = useState<RemindersResponse | null>(null);
 
   useEffect(() => {
@@ -340,7 +365,7 @@ function RemindersList({
   }, [fetchReminders]);
 
   if (data === null)
-    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
 
   return (
     <Stack>
@@ -369,11 +394,17 @@ function MainView({
   onOpenAdmin: () => void;
   onOpenMyReminders: () => void;
 }) {
+  const { t: s } = useI18n();
   const [name, setName] = useState(me.displayName ?? "");
   const [tzOverride, setTzOverride] = useState(me.timezone !== null);
   const [tzValue, setTzValue] = useState(me.timezone ?? "UTC");
   const [genderOn, setGenderOn] = useState(me.gender !== null);
   const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
+  const resolvedLang: Lang = resolveLang(
+    me.language,
+    window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code,
+  );
+  const [langValue, setLangValue] = useState<Lang>(resolvedLang);
   const [saving, setSaving] = useState(false);
 
   const tg = window.Telegram?.WebApp;
@@ -385,7 +416,8 @@ function MainView({
   const dirty =
     name.trim() !== (me.displayName ?? "") ||
     desiredTz !== me.timezone ||
-    desiredGender !== me.gender;
+    desiredGender !== me.gender ||
+    langValue !== resolvedLang;
 
   const save = async () => {
     setSaving(true);
@@ -394,6 +426,7 @@ function MainView({
         displayName: name.trim() || null,
         timezone: desiredTz,
         gender: desiredGender,
+        language: langValue,
       });
       onMe(next);
       setName(next.displayName ?? "");
@@ -401,6 +434,12 @@ function MainView({
       setTzValue(next.timezone ?? "UTC");
       setGenderOn(next.gender !== null);
       setGenderValue(next.gender ?? "male");
+      setLangValue(
+        resolveLang(
+          next.language,
+          window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code,
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -408,24 +447,24 @@ function MainView({
 
   return (
     <Stack>
-      <SectionHeader>Display Name</SectionHeader>
+      <SectionHeader>{s.ui_main_display_name}</SectionHeader>
       <Card>
         <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Name</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_main_name}</span>
           <input
             className={INPUT_CLS}
-            placeholder={tgName || "Your name"}
+            placeholder={tgName || s.ui_main_your_name}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </label>
       </Card>
-      <SectionFooter>Name shown to the AI.</SectionFooter>
+      <SectionFooter>{s.ui_main_name_footer}</SectionFooter>
 
-      <SectionHeader>Gender</SectionHeader>
+      <SectionHeader>{s.ui_main_gender}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Tell the AI</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_main_tell_ai}</span>
           <span className="flex-1" />
           <Toggle value={genderOn} onChange={setGenderOn} />
         </div>
@@ -437,7 +476,7 @@ function MainView({
             className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
             onClick={() => setGenderValue("male")}
           >
-            <span className={ROW_LABEL_CLS}>Male</span>
+            <span className={ROW_LABEL_CLS}>{s.ui_main_male}</span>
             <span className="flex-1" />
             {genderValue === "male" ? <span className="text-tg-link">✓</span> : null}
           </button>
@@ -446,20 +485,18 @@ function MainView({
             className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
             onClick={() => setGenderValue("female")}
           >
-            <span className={ROW_LABEL_CLS}>Female</span>
+            <span className={ROW_LABEL_CLS}>{s.ui_main_female}</span>
             <span className="flex-1" />
             {genderValue === "female" ? <span className="text-tg-link">✓</span> : null}
           </button>
         </Card>
       ) : null}
-      <SectionFooter>
-        Sent to the AI so it uses correct grammatical gender. Off omits the field.
-      </SectionFooter>
+      <SectionFooter>{s.ui_main_gender_footer}</SectionFooter>
 
-      <SectionHeader>Timezone</SectionHeader>
+      <SectionHeader>{s.ui_main_timezone}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Use my timezone</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_main_use_my_tz}</span>
           <span className="flex-1" />
           <Toggle value={tzOverride} onChange={setTzOverride} />
         </div>
@@ -467,25 +504,43 @@ function MainView({
       {tzOverride ? (
         <TimezoneSelect value={tzValue} onChange={setTzValue} />
       ) : null}
-      <SectionFooter>
-        Sent to the AI as the current date/time. Off uses the chat or global
-        timezone.
-      </SectionFooter>
+      <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
 
-      <PrimaryButton disabled={saving || !dirty} onClick={save}>
-        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-      </PrimaryButton>
-
-      <SectionHeader>Reminders</SectionHeader>
+      <SectionHeader>{s.ui_main_language}</SectionHeader>
       <Card>
-        <RowButton onClick={onOpenMyReminders}>My reminders</RowButton>
+        <button
+          type="button"
+          className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+          onClick={() => setLangValue("en")}
+        >
+          <span className={ROW_LABEL_CLS}>{s.ui_main_lang_english}</span>
+          <span className="flex-1" />
+          {langValue === "en" ? <span className="text-tg-link">✓</span> : null}
+        </button>
+        <button
+          type="button"
+          className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+          onClick={() => setLangValue("ru")}
+        >
+          <span className={ROW_LABEL_CLS}>{s.ui_main_lang_russian}</span>
+          <span className="flex-1" />
+          {langValue === "ru" ? <span className="text-tg-link">✓</span> : null}
+        </button>
+      </Card>
+      <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
+
+      <SaveButton saving={saving} dirty={dirty} onClick={save} />
+
+      <SectionHeader>{s.ui_main_reminders}</SectionHeader>
+      <Card>
+        <RowButton onClick={onOpenMyReminders}>{s.ui_main_my_reminders}</RowButton>
       </Card>
 
       {me.isOwner && (
         <>
-          <SectionHeader>Bot Configuration</SectionHeader>
+          <SectionHeader>{s.ui_main_bot_config}</SectionHeader>
           <Card>
-            <RowButton onClick={onOpenAdmin}>Admin panel</RowButton>
+            <RowButton onClick={onOpenAdmin}>{s.ui_main_admin_panel}</RowButton>
           </Card>
         </>
       )}
@@ -500,6 +555,7 @@ function ModelInfo({
   model: OpenRouterModel | null | undefined;
   providerSort: ProviderSort | null;
 }) {
+  const { t: s } = useI18n();
   const [endpoint, setEndpoint] = useState<
     OpenRouterEndpoint | null | undefined
   >(undefined);
@@ -525,9 +581,9 @@ function ModelInfo({
   }, [model?.id, providerSort]);
 
   if (model === undefined)
-    return <span className="text-tg-hint">Loading model info…</span>;
+    return <span className="text-tg-hint">{s.ui_modelinfo_loading}</span>;
   if (model === null)
-    return <span className="text-tg-hint">Unknown model ID.</span>;
+    return <span className="text-tg-hint">{s.ui_modelinfo_unknown}</span>;
 
   const useEndpoint = providerSort !== null && endpoint !== null && endpoint !== undefined;
   const inputPrice = formatPricePerMillion(
@@ -549,46 +605,46 @@ function ModelInfo({
       {providerSort !== null && (
         <div className="text-tg-hint">
           {endpoint === undefined
-            ? "Resolving provider…"
+            ? s.ui_modelinfo_resolving_provider
             : endpoint === null
-              ? `No provider data for sort=${providerSort}; showing catalog values.`
-              : `Provider: ${endpoint.provider_name}`}
+              ? s.ui_modelinfo_no_provider_data(providerSort)
+              : `${s.ui_modelinfo_provider_prefix}${endpoint.provider_name}`}
           {endpoint && providerSort === "throughput" && endpoint.throughput !== null && (
-            <> · {Math.round(endpoint.throughput)} tok/s</>
+            <> · {Math.round(endpoint.throughput)} {s.ui_modelinfo_tokps}</>
           )}
           {endpoint && providerSort === "latency" && endpoint.latency !== null && (
-            <> · {Math.round(endpoint.latency)} ms</>
+            <> · {Math.round(endpoint.latency)} {s.ui_modelinfo_ms}</>
           )}
         </div>
       )}
       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
         {inputPrice && (
           <span>
-            <span className="text-tg-hint">Input</span> {inputPrice}
+            <span className="text-tg-hint">{s.ui_modelinfo_input}</span> {inputPrice}
           </span>
         )}
         {outputPrice && (
           <span>
-            <span className="text-tg-hint">Output</span> {outputPrice}
+            <span className="text-tg-hint">{s.ui_modelinfo_output}</span> {outputPrice}
           </span>
         )}
         {imagePrice && (
           <span>
-            <span className="text-tg-hint">Image</span> {imagePrice}
+            <span className="text-tg-hint">{s.ui_modelinfo_image}</span> {imagePrice}
           </span>
         )}
       </div>
       {modalities.length > 0 && (
         <div>
-          <span className="text-tg-hint">Modalities</span> {modalities.join(", ")}
+          <span className="text-tg-hint">{s.ui_modelinfo_modalities}</span> {modalities.join(", ")}
         </div>
       )}
       <div className="flex flex-wrap gap-x-3">
         <span>
-          <span className="text-tg-hint">Tools</span> {tools ? "yes" : "no"}
+          <span className="text-tg-hint">{s.ui_modelinfo_tools}</span> {tools ? s.ui_yes : s.ui_no}
         </span>
         <span>
-          <span className="text-tg-hint">Caching</span> {caching ? "yes" : "no"}
+          <span className="text-tg-hint">{s.ui_modelinfo_caching}</span> {caching ? s.ui_yes : s.ui_no}
         </span>
       </div>
     </div>
@@ -604,6 +660,7 @@ function ModelsCard({
   onChange: (next: string[]) => void;
   providerSort: ProviderSort | null;
 }) {
+  const { t: s } = useI18n();
   const [catalog, setCatalog] = useState<Map<string, OpenRouterModel> | null>(null);
 
   useEffect(() => {
@@ -613,10 +670,10 @@ function ModelsCard({
   }, []);
 
   const lookupModel = (id: string): OpenRouterModel | null | undefined => {
-    const t = id.trim();
-    if (t.length === 0) return null;
+    const trimmed = id.trim();
+    if (trimmed.length === 0) return null;
     if (catalog === null) return undefined;
-    return lookupOpenRouterModel(catalog, t);
+    return lookupOpenRouterModel(catalog, trimmed);
   };
 
   const updateAt = (idx: number, value: string) =>
@@ -635,21 +692,23 @@ function ModelsCard({
           >
             <div className="flex items-center gap-3">
               <span className="shrink-0 text-tg-hint text-[15px] w-14">
-                {idx === 0 ? "Primary" : `#${idx + 1}`}
+                {idx === 0
+                  ? s.ui_models_primary
+                  : s.ui_models_fallback_n(idx + 1)}
               </span>
               <input
                 className={INPUT_LEFT_CLS}
                 value={m}
                 onChange={(e) => updateAt(idx, e.target.value)}
-                placeholder="Model ID"
+                placeholder={s.ui_models_model_id}
               />
               {idx > 0 && (
                 <button
                   className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
                   onClick={() => removeAt(idx)}
-                  aria-label="Remove fallback"
+                  aria-label={s.ui_models_remove_fallback}
                 >
-                  Remove
+                  {s.ui_remove}
                 </button>
               )}
             </div>
@@ -661,20 +720,10 @@ function ModelsCard({
           </div>
         );
       })}
-      <RowButton onClick={addFallback}>Add fallback</RowButton>
+      <RowButton onClick={addFallback}>{s.ui_models_add_fallback}</RowButton>
     </Card>
   );
 }
-
-const PROVIDER_SORT_OPTIONS: {
-  value: ProviderSort | null;
-  label: string;
-}[] = [
-  { value: null, label: "Default" },
-  { value: "price", label: "Price" },
-  { value: "throughput", label: "Throughput" },
-  { value: "latency", label: "Latency" },
-];
 
 function ProviderSortField({
   value,
@@ -683,7 +732,14 @@ function ProviderSortField({
   value: ProviderSort | null;
   onChange: (next: ProviderSort | null) => void;
 }) {
-  const activeIdx = PROVIDER_SORT_OPTIONS.findIndex((o) => o.value === value);
+  const { t: s } = useI18n();
+  const options: { value: ProviderSort | null; label: string }[] = [
+    { value: null, label: s.ui_sort_default },
+    { value: "price", label: s.ui_sort_price },
+    { value: "throughput", label: s.ui_sort_throughput },
+    { value: "latency", label: s.ui_sort_latency },
+  ];
+  const activeIdx = options.findIndex((o) => o.value === value);
   return (
     <div
       className="relative flex bg-tg-section rounded-[10px] p-[3px] shadow-[0_0_0_1px_var(--tg-separator)]"
@@ -692,11 +748,11 @@ function ProviderSortField({
       <div
         className="absolute top-[3px] bottom-[3px] left-[3px] z-0 pointer-events-none bg-tg-button rounded-lg transition-transform duration-[180ms] ease-tg-spring"
         style={{
-          width: `calc((100% - 6px) / ${PROVIDER_SORT_OPTIONS.length})`,
+          width: `calc((100% - 6px) / ${options.length})`,
           transform: `translateX(${activeIdx * 100}%)`,
         }}
       />
-      {PROVIDER_SORT_OPTIONS.map((o) => (
+      {options.map((o) => (
         <button
           key={o.label}
           role="radio"
@@ -718,11 +774,12 @@ function RateLimitFields({
   value: RateLimitConfig;
   onChange: (next: RateLimitConfig) => void;
 }) {
+  const { t: s } = useI18n();
   const intervalMin = Math.round(value.refillIntervalMs / 60000);
   return (
     <Card>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>Capacity</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_capacity}</span>
         <input
           type="number"
           className={INPUT_CLS}
@@ -733,7 +790,7 @@ function RateLimitFields({
         />
       </label>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>Refill amount</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_refill_amount}</span>
         <input
           type="number"
           className={INPUT_CLS}
@@ -744,7 +801,7 @@ function RateLimitFields({
         />
       </label>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>Refill every</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_refill_every}</span>
         <input
           type="number"
           className={INPUT_CLS}
@@ -756,10 +813,10 @@ function RateLimitFields({
             })
           }
         />
-        <span className="shrink-0 text-tg-hint text-[15px]">min</span>
+        <span className="shrink-0 text-tg-hint text-[15px]">{s.ui_ratelimit_min_unit}</span>
       </label>
       <div className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>Owner exempt</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_owner_exempt}</span>
         <span className="flex-1" />
         <Toggle
           value={value.ownerExempt}
@@ -777,6 +834,7 @@ function TimezoneSelect({
   value: string;
   onChange: (tz: string) => void;
 }) {
+  const { t: s } = useI18n();
   const areas = getTimezoneAreas();
   const { area, location } = splitTimezone(value);
   const locations = getTimezoneLocations(area);
@@ -799,7 +857,7 @@ function TimezoneSelect({
   return (
     <Card>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>Area</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_tz_area}</span>
         <select
           className={INPUT_CLS}
           value={area}
@@ -813,7 +871,7 @@ function TimezoneSelect({
         </select>
       </label>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>Location</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_tz_location}</span>
         <select
           className={INPUT_CLS}
           value={location}
@@ -838,6 +896,7 @@ function PromptTab({
   settings: Settings;
   onSaved: (s: Settings) => void;
 }) {
+  const { t: s } = useI18n();
   const [models, setModels] = useState<string[]>(settings.models);
   const [prompt, setPrompt] = useState(settings.systemPrompt);
   const [timezone, setTimezone] = useState(settings.timezone);
@@ -874,45 +933,34 @@ function PromptTab({
 
   return (
     <Stack>
-      <SectionHeader>Models</SectionHeader>
+      <SectionHeader>{s.ui_prompt_models}</SectionHeader>
       <ModelsCard
         models={models}
         onChange={setModels}
         providerSort={providerSort}
       />
-      <SectionFooter>
-        Primary OpenRouter model first; fallbacks are tried in order if it fails.
-      </SectionFooter>
+      <SectionFooter>{s.ui_prompt_models_footer}</SectionFooter>
 
-      <SectionHeader>Provider Routing</SectionHeader>
+      <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
       <ProviderSortField value={providerSort} onChange={setProviderSort} />
-      <SectionFooter>
-        How OpenRouter picks a provider for the model.
-        Default lets OpenRouter decide; the others sort by price, throughput, or latency.
-      </SectionFooter>
+      <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
 
-      <SectionHeader>System Prompt</SectionHeader>
+      <SectionHeader>{s.ui_prompt_system_prompt}</SectionHeader>
       <Card>
         <textarea
           className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe how the bot should behave"
+          placeholder={s.ui_prompt_placeholder}
         />
       </Card>
-      <SectionFooter>
-        Character description embedded into the system instruction.
-      </SectionFooter>
+      <SectionFooter>{s.ui_prompt_system_prompt_footer}</SectionFooter>
 
-      <SectionHeader>Timezone</SectionHeader>
+      <SectionHeader>{s.ui_prompt_timezone}</SectionHeader>
       <TimezoneSelect value={timezone} onChange={setTimezone} />
-      <SectionFooter>
-        Default timezone used when the chat or user has no override.
-      </SectionFooter>
+      <SectionFooter>{s.ui_prompt_timezone_footer}</SectionFooter>
 
-      <PrimaryButton disabled={saving || !canSave} onClick={save}>
-        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-      </PrimaryButton>
+      <SaveButton saving={saving} dirty={dirty} disabled={saving || !canSave} onClick={save} />
     </Stack>
   );
 }
@@ -924,6 +972,7 @@ function RateLimitTab({
   settings: Settings;
   onSaved: (s: Settings) => void;
 }) {
+  const { t: s } = useI18n();
   const [config, setConfig] = useState<RateLimitConfig>(settings.rateLimit);
   const [bucket, setBucket] = useState<BucketState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -952,38 +1001,33 @@ function RateLimitTab({
 
   return (
     <Stack>
-      <SectionHeader>Limits</SectionHeader>
+      <SectionHeader>{s.ui_ratelimit_limits}</SectionHeader>
       <RateLimitFields value={config} onChange={setConfig} />
-      <SectionFooter>
-        Tokens are deducted from each user's bucket per /ask. The bucket lazily refills based on
-        the interval.
-      </SectionFooter>
+      <SectionFooter>{s.ui_ratelimit_footer}</SectionFooter>
 
-      <PrimaryButton disabled={saving || !dirty} onClick={save}>
-        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-      </PrimaryButton>
+      <SaveButton saving={saving} dirty={dirty} onClick={save} />
 
-      <SectionHeader>My Bucket</SectionHeader>
+      <SectionHeader>{s.ui_ratelimit_my_bucket}</SectionHeader>
       <Card>
         {bucket ? (
           <>
             <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>Tokens</span>
+              <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_tokens}</span>
               <span className={ROW_VALUE_CLS}>
                 {bucket.tokens.toLocaleString()} / {config.capacity.toLocaleString()}
               </span>
             </div>
             <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>Last refill</span>
+              <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_last_refill}</span>
               <span className={ROW_VALUE_CLS}>
                 {new Date(bucket.lastRefillTs).toLocaleString()}
               </span>
             </div>
-            <RowButton onClick={reset}>Reset to capacity</RowButton>
+            <RowButton onClick={reset}>{s.ui_ratelimit_reset}</RowButton>
           </>
         ) : (
           <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
-            No bucket yet — will be seeded on first /ask.
+            {s.ui_ratelimit_no_bucket}
           </div>
         )}
       </Card>
@@ -1002,12 +1046,19 @@ function WhitelistList({
   onOpen: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
 }) {
+  const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{kind === "users" ? "Allowed Users" : "Allowed Chats"}</SectionHeader>
+      <SectionHeader>
+        {kind === "users"
+          ? s.ui_whitelist_allowed_users
+          : s.ui_whitelist_allowed_chats}
+      </SectionHeader>
       <Card>
         {entries.length === 0 ? (
-          <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">No entries</div>
+          <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
+            {s.ui_whitelist_no_entries}
+          </div>
         ) : (
           entries.map((e) => (
             <div key={e.id} className={ROW_CLS}>
@@ -1019,20 +1070,22 @@ function WhitelistList({
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
                 onClick={() => onOpen(e.id)}
               >
-                Open
+                {s.ui_open}
               </button>
               <button
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
                 onClick={() => onRemove(e.id)}
               >
-                Remove
+                {s.ui_remove}
               </button>
             </div>
           ))
         )}
       </Card>
       <SectionFooter>
-        Add entries from a {kind === "users" ? "user" : "chat"}'s page via "Add to whitelist".
+        {kind === "users"
+          ? s.ui_whitelist_footer_users
+          : s.ui_whitelist_footer_chats}
       </SectionFooter>
     </>
   );
@@ -1045,6 +1098,7 @@ function WhitelistTab({
   onOpenUser: (id: string) => void;
   onOpenChat: (id: string) => void;
 }) {
+  const { t: s } = useI18n();
   const [users, setUsers] = useState<WhitelistEntry[]>([]);
   const [chats, setChats] = useState<WhitelistEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -1057,7 +1111,8 @@ function WhitelistTab({
     });
   }, []);
 
-  if (!loaded) return <div className="text-center text-tg-hint py-20">Loading…</div>;
+  if (!loaded)
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
 
   return (
     <Stack>
@@ -1078,6 +1133,7 @@ function WhitelistTab({
 }
 
 function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
+  const { t: s } = useI18n();
   const [users, setUsers] = useState<User[] | null>(null);
 
   useEffect(() => {
@@ -1085,15 +1141,15 @@ function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
   }, []);
 
   if (users === null)
-    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
 
   return (
     <Stack>
-      <SectionHeader>All Users</SectionHeader>
+      <SectionHeader>{s.ui_users_all}</SectionHeader>
       <Card>
         {users.length === 0 ? (
           <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
-            No users yet — they appear after their first message.
+            {s.ui_users_empty}
           </div>
         ) : (
           users.map((u) => (
@@ -1108,26 +1164,25 @@ function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
                 onClick={() => openTelegramProfile(u)}
               >
-                Open
+                {s.ui_open}
               </button>
               <button
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
                 onClick={() => onEdit(u.id)}
               >
-                Edit
+                {s.ui_edit}
               </button>
             </div>
           ))
         )}
       </Card>
-      <SectionFooter>
-        Users are recorded automatically the first time they message the bot.
-      </SectionFooter>
+      <SectionFooter>{s.ui_users_footer}</SectionFooter>
     </Stack>
   );
 }
 
 function UserEditView({ userId }: { userId: string }) {
+  const { t: s } = useI18n();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1144,8 +1199,9 @@ function UserEditView({ userId }: { userId: string }) {
   }, [userId]);
 
   if (notFound)
-    return <div className="text-center text-tg-hint py-20">User not found.</div>;
-  if (!data) return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_user_not_found}</div>;
+  if (!data)
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
 
   const { user } = data;
   const fallbackName = userDisplayName(user);
@@ -1164,30 +1220,30 @@ function UserEditView({ userId }: { userId: string }) {
 
   return (
     <Stack>
-      <SectionHeader>Profile</SectionHeader>
+      <SectionHeader>{s.ui_user_profile}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Name</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
           <span className={ROW_VALUE_CLS}>{fallbackName}</span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Username</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_username}</span>
           <span className={ROW_VALUE_CLS}>
-            {user.username ? `@${user.username}` : "—"}
+            {user.username ? `@${user.username}` : s.ui_dash}
           </span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>ID</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_id}</span>
           <span className={ROW_VALUE_CLS}>{user.id}</span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Last seen</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_last_seen}</span>
           <span className={ROW_VALUE_CLS}>
             {new Date(user.lastSeenAt).toLocaleString()}
           </span>
         </div>
         <RowButton onClick={() => openTelegramProfile(user)}>
-          Open in Telegram
+          {s.ui_user_open_in_tg}
         </RowButton>
         <WhitelistToggleButton
           kind="users"
@@ -1197,10 +1253,10 @@ function UserEditView({ userId }: { userId: string }) {
         />
       </Card>
 
-      <SectionHeader>Display Name</SectionHeader>
+      <SectionHeader>{s.ui_main_display_name}</SectionHeader>
       <Card>
         <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Name</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
           <input
             className={INPUT_CLS}
             placeholder={fallbackName}
@@ -1209,16 +1265,15 @@ function UserEditView({ userId }: { userId: string }) {
           />
         </label>
       </Card>
-      <SectionFooter>Override the name shown to the AI for this user.</SectionFooter>
+      <SectionFooter>{s.ui_user_display_name_footer}</SectionFooter>
 
-      <PrimaryButton disabled={saving || !dirty} onClick={save}>
-        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-      </PrimaryButton>
+      <SaveButton saving={saving} dirty={dirty} onClick={save} />
     </Stack>
   );
 }
 
 function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
+  const { t: s } = useI18n();
   const [chats, setChats] = useState<Chat[] | null>(null);
 
   useEffect(() => {
@@ -1226,15 +1281,15 @@ function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
   }, []);
 
   if (chats === null)
-    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
 
   return (
     <Stack>
-      <SectionHeader>All Chats</SectionHeader>
+      <SectionHeader>{s.ui_chats_all}</SectionHeader>
       <Card>
         {chats.length === 0 ? (
           <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
-            No chats yet — they appear after the first message.
+            {s.ui_chats_empty}
           </div>
         ) : (
           chats.map((c) => (
@@ -1244,7 +1299,7 @@ function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
               className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
             >
               <div className="flex-1 min-w-0">
-                <div className="truncate">{chatTitle(c)}</div>
+                <div className="truncate">{chatTitle(s, c)}</div>
                 <div className="text-[13px] text-tg-hint truncate">
                   {chatSubtitle(c)}
                 </div>
@@ -1254,9 +1309,7 @@ function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
           ))
         )}
       </Card>
-      <SectionFooter>
-        Per-chat overrides apply on top of the global Prompt / Limits / Models.
-      </SectionFooter>
+      <SectionFooter>{s.ui_chats_footer}</SectionFooter>
     </Stack>
   );
 }
@@ -1274,12 +1327,13 @@ function OverrideSection({
   onToggle: (v: boolean) => void;
   children: ReactNode;
 }) {
+  const { t: s } = useI18n();
   return (
     <>
       <SectionHeader>{title}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Override global</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_override_global}</span>
           <span className="flex-1" />
           <Toggle value={override} onChange={onToggle} />
         </div>
@@ -1291,6 +1345,7 @@ function OverrideSection({
 }
 
 function ChatEditView({ chatId }: { chatId: string }) {
+  const { t: s } = useI18n();
   const [chat, setChat] = useState<Chat | null>(null);
   const [global, setGlobal] = useState<Settings | null>(null);
   const [original, setOriginal] = useState<ChatSettings | null>(null);
@@ -1338,9 +1393,9 @@ function ChatEditView({ chatId }: { chatId: string }) {
   }, [chatId]);
 
   if (notFound)
-    return <div className="text-center text-tg-hint py-20">Chat not found.</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_chat_not_found}</div>;
   if (!chat || !global || !original || !rlValue)
-    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
 
   const trimmedModels = modelsValue.map((m) => m.trim()).filter((m) => m.length > 0);
 
@@ -1403,28 +1458,28 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   return (
     <Stack>
-      <SectionHeader>Chat</SectionHeader>
+      <SectionHeader>{s.ui_chat_chat}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Title</span>
-          <span className={ROW_VALUE_CLS}>{chatTitle(chat)}</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_title}</span>
+          <span className={ROW_VALUE_CLS}>{chatTitle(s, chat)}</span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Type</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_type}</span>
           <span className={ROW_VALUE_CLS}>{chat.type}</span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Username</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_username}</span>
           <span className={ROW_VALUE_CLS}>
-            {chat.username ? `@${chat.username}` : "—"}
+            {chat.username ? `@${chat.username}` : s.ui_dash}
           </span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>ID</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_id}</span>
           <span className={ROW_VALUE_CLS}>{chat.id}</span>
         </div>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Last seen</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_last_seen}</span>
           <span className={ROW_VALUE_CLS}>
             {new Date(chat.lastSeenAt).toLocaleString()}
           </span>
@@ -1432,36 +1487,34 @@ function ChatEditView({ chatId }: { chatId: string }) {
         <WhitelistToggleButton
           kind="chats"
           id={chat.id}
-          label={chatTitle(chat)}
+          label={chatTitle(s, chat)}
           initial={whitelisted}
         />
       </Card>
 
-      <SectionHeader>Bot Name</SectionHeader>
+      <SectionHeader>{s.ui_chat_bot_name}</SectionHeader>
       <Card>
         <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Name</span>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
           <input
             className={INPUT_CLS}
-            placeholder="Leave empty to disable"
+            placeholder={s.ui_chat_bot_name_placeholder}
             value={botNameValue}
             onChange={(e) => setBotNameValue(e.target.value)}
             maxLength={64}
           />
         </label>
       </Card>
-      <SectionFooter>
-        When set, every AI reply in this chat starts with the name in bold.
-      </SectionFooter>
+      <SectionFooter>{s.ui_chat_bot_name_footer}</SectionFooter>
 
       <OverrideSection
-        title="System Prompt"
+        title={s.ui_chat_system_prompt}
         override={promptOverride}
         onToggle={setPromptOverride}
         footer={
           promptOverride
-            ? "Character description for this chat."
-            : `Using global character (${global.systemPrompt.length} chars).`
+            ? s.ui_chat_system_prompt_on_footer
+            : s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)
         }
       >
         <Card>
@@ -1469,19 +1522,19 @@ function ChatEditView({ chatId }: { chatId: string }) {
             className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
             value={promptValue}
             onChange={(e) => setPromptValue(e.target.value)}
-            placeholder="Describe how the bot should behave in this chat"
+            placeholder={s.ui_chat_prompt_placeholder}
           />
         </Card>
       </OverrideSection>
 
       <OverrideSection
-        title="Models"
+        title={s.ui_chat_models}
         override={modelsOverride}
         onToggle={setModelsOverride}
         footer={
           modelsOverride
-            ? "Primary first; fallbacks used in order if it fails."
-            : `Using global: ${global.models.join(", ")}`
+            ? s.ui_chat_models_on_footer
+            : s.ui_chat_models_off_footer(global.models.join(", "))
         }
       >
         <ModelsCard
@@ -1492,47 +1545,47 @@ function ChatEditView({ chatId }: { chatId: string }) {
       </OverrideSection>
 
       <OverrideSection
-        title="Rate Limit"
+        title={s.ui_chat_rate_limit}
         override={rlOverride}
         onToggle={setRlOverride}
         footer={
           rlOverride
-            ? "These limits apply to this chat instead of the global config."
-            : "Using global limits."
+            ? s.ui_chat_rate_limit_on_footer
+            : s.ui_chat_rate_limit_off_footer
         }
       >
         <RateLimitFields value={rlValue} onChange={setRlValue} />
       </OverrideSection>
 
       <OverrideSection
-        title="Timezone"
+        title={s.ui_chat_tz}
         override={tzOverride}
         onToggle={setTzOverride}
         footer={
           tzOverride
-            ? "Used unless a user has set their own timezone."
-            : `Using global timezone (${global.timezone}).`
+            ? s.ui_chat_tz_on_footer
+            : s.ui_chat_tz_off_footer(global.timezone)
         }
       >
         <TimezoneSelect value={tzValue} onChange={setTzValue} />
       </OverrideSection>
 
       <OverrideSection
-        title="Provider Routing"
+        title={s.ui_chat_provider_routing}
         override={psOverride}
         onToggle={setPsOverride}
         footer={
           psOverride
-            ? "How OpenRouter picks a provider for the model in this chat."
-            : `Using global routing (${global.providerSort ?? "default"}).`
+            ? s.ui_chat_provider_routing_on_footer
+            : s.ui_chat_provider_routing_off_footer(
+                global.providerSort ?? s.ui_sort_default,
+              )
         }
       >
         <ProviderSortField value={psValue} onChange={setPsValue} />
       </OverrideSection>
 
-      <PrimaryButton disabled={saving || !canSave} onClick={save}>
-        {saving ? "Saving…" : dirty ? "Save" : "Saved"}
-      </PrimaryButton>
+      <SaveButton saving={saving} dirty={dirty} disabled={saving || !canSave} onClick={save} />
     </Stack>
   );
 }
@@ -1542,24 +1595,28 @@ function AdminView({
 }: {
   onOpenSection: (section: AdminSection) => void;
 }) {
+  const { t: s } = useI18n();
   return (
     <Stack>
       <Card>
-        {ADMIN_SECTIONS.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => onOpenSection(s.id)}
-            className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="truncate">{s.label}</div>
-              <div className="text-[13px] text-tg-hint truncate">
-                {s.description}
+        {ADMIN_SECTION_IDS.map((id) => {
+          const { label, description } = adminSection(s, id);
+          return (
+            <button
+              key={id}
+              onClick={() => onOpenSection(id)}
+              className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="truncate">{label}</div>
+                <div className="text-[13px] text-tg-hint truncate">
+                  {description}
+                </div>
               </div>
-            </div>
-            <span className="text-tg-hint text-[15px]">›</span>
-          </button>
-        ))}
+              <span className="text-tg-hint text-[15px]">›</span>
+            </button>
+          );
+        })}
       </Card>
     </Stack>
   );
@@ -1574,6 +1631,7 @@ function AdminSectionView({
   onEditUser: (id: string, from: AdminSection) => void;
   onEditChat: (id: string, from: AdminSection) => void;
 }) {
+  const { t: s } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
   const needsSettings = section === "prompt" || section === "ratelimit";
   const goUser = (id: string) => onEditUser(id, section);
@@ -1591,30 +1649,29 @@ function AdminSectionView({
     return (
       <RemindersList
         fetchReminders={api.listAdminReminders}
-        header="All Reminders"
-        emptyText="No reminders scheduled by anyone."
-        footer="Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure."
+        header={s.ui_reminders_admin_header}
+        emptyText={s.ui_reminders_admin_empty}
+        footer={s.ui_reminders_admin_footer}
         showUserId={true}
         onUserClick={goUser}
       />
     );
   if (!settings)
-    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
   if (section === "prompt")
     return <PromptTab settings={settings} onSaved={setSettings} />;
   return <RateLimitTab settings={settings} onSaved={setSettings} />;
 }
 
-function App() {
+function AppShell({
+  me,
+  onMe,
+}: {
+  me: MeResponse | null;
+  onMe: (m: MeResponse) => void;
+}) {
+  const { t: s } = useI18n();
   const [route, setRoute] = useState<Route>({ kind: "main" });
-  const [me, setMe] = useState<MeResponse | null>(null);
-
-  useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    tg?.ready();
-    tg?.expand();
-    api.getMe().then(setMe);
-  }, []);
 
   useEffect(() => {
     const btn = window.Telegram?.WebApp?.BackButton;
@@ -1649,28 +1706,29 @@ function App() {
   const title = (() => {
     switch (route.kind) {
       case "main":
-        return "Settings";
+        return s.ui_route_settings;
       case "admin":
-        return "Bot Admin";
+        return s.ui_route_admin;
       case "admin-section":
-        return adminSectionTitle(route.section);
+        return adminSection(s, route.section).label;
       case "user-edit":
-        return "User Settings";
+        return s.ui_route_user_settings;
       case "chat-edit":
-        return "Chat Settings";
+        return s.ui_route_chat_settings;
       case "my-reminders":
-        return "My Reminders";
+        return s.ui_route_my_reminders;
     }
   })();
 
   const renderRoute = () => {
-    if (!me) return <div className="text-center text-tg-hint py-20">Loading…</div>;
+    if (!me)
+      return <div className="text-center text-tg-hint py-20">{s.ui_loading}</div>;
     switch (route.kind) {
       case "main":
         return (
           <MainView
             me={me}
-            onMe={setMe}
+            onMe={onMe}
             onOpenAdmin={() => setRoute({ kind: "admin" })}
             onOpenMyReminders={() => setRoute({ kind: "my-reminders" })}
           />
@@ -1703,9 +1761,9 @@ function App() {
         return (
           <RemindersList
             fetchReminders={api.listMyReminders}
-            header="Upcoming"
-            emptyText="No reminders scheduled."
-            footer="Ask the bot in chat to schedule a reminder."
+            header={s.ui_reminders_upcoming}
+            emptyText={s.ui_reminders_empty_my}
+            footer={s.ui_reminders_footer_my}
             showUserId={false}
           />
         );
@@ -1717,6 +1775,27 @@ function App() {
       <div className="px-1 pt-2 pb-4 text-xl font-semibold">{title}</div>
       {renderRoute()}
     </div>
+  );
+}
+
+function App() {
+  const [me, setMe] = useState<MeResponse | null>(null);
+
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
+    api.getMe().then(setMe);
+  }, []);
+
+  const tg = window.Telegram?.WebApp;
+  const tgCode = tg?.initDataUnsafe?.user?.language_code;
+  const lang: Lang = resolveLang(me?.language ?? null, tgCode);
+
+  return (
+    <I18nProvider lang={lang}>
+      <AppShell me={me} onMe={setMe} />
+    </I18nProvider>
   );
 }
 
