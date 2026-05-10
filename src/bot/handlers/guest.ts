@@ -92,6 +92,14 @@ export async function guestAskHandler(
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      toolCallContext: {
+        source: "guest",
+        chatId: input.chatId,
+        userId: input.userId,
+        replyToMessageId: null,
+        timezone,
+        now: input.now,
+      },
     });
   } catch (err) {
     return {

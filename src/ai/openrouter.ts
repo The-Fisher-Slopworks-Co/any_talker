@@ -1,7 +1,7 @@
 import { generateText, tool as aiTool, stepCountIs, type ToolSet } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";
-import type { Tool } from "./tools/registry";
+import type { Tool, ToolCallContext } from "./tools/registry";
 import type { ProviderSort } from "../shared/types";
 
 export class OpenRouterAIClient implements AIClient {
@@ -17,6 +17,7 @@ export class OpenRouterAIClient implements AIClient {
     messages: AIMessage[];
     tools: Tool[];
     providerSort?: ProviderSort | null;
+    toolCallContext: ToolCallContext;
   }): Promise<AskResult> {
     const [primary, ...fallbacks] = opts.models;
     if (!primary) throw new Error("at least one model id is required");
@@ -26,7 +27,8 @@ export class OpenRouterAIClient implements AIClient {
       toolMap[t.name] = aiTool({
         description: t.description,
         inputSchema: t.parameters,
-        execute: async (input: unknown) => t.execute(input),
+        execute: async (input: unknown) =>
+          t.execute(input, opts.toolCallContext),
       });
     }
 
@@ -44,7 +46,7 @@ export class OpenRouterAIClient implements AIClient {
       system: opts.system,
       messages: opts.messages,
       tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(8),
       providerOptions:
         Object.keys(openrouterOpts).length > 0
           ? { openrouter: openrouterOpts }

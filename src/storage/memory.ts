@@ -10,6 +10,7 @@ import type {
   ChatSettings,
 } from "../shared/types";
 import { isEmptyChatSettings } from "../shared/types";
+import type { Reminder } from "../reminders/types";
 
 export class MemoryStorage implements Storage {
   private settings: Settings | null = null;
@@ -25,6 +26,8 @@ export class MemoryStorage implements Storage {
   private users = new Map<string, User>();
   private chats = new Map<string, Chat>();
   private chatSettings = new Map<string, ChatSettings>();
+  private reminders = new Map<string, Reminder>();
+  private privateChats = new Set<string>();
 
   private bucketKey(chatId: string, userId: string): string {
     return `${chatId}:${userId}`;
@@ -152,5 +155,43 @@ export class MemoryStorage implements Storage {
 
   async saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void> {
     this.guestThreads.set(chatId, structuredClone(thread));
+  }
+
+  async saveReminder(reminder: Reminder): Promise<void> {
+    this.reminders.set(reminder.id, structuredClone(reminder));
+  }
+
+  async fetchDueReminders(nowMs: number): Promise<Reminder[]> {
+    const out: Reminder[] = [];
+    for (const r of this.reminders.values()) {
+      if (r.fireAtMs <= nowMs) out.push(structuredClone(r));
+    }
+    return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
+  }
+
+  async listRemindersForUser(userId: string): Promise<Reminder[]> {
+    const out: Reminder[] = [];
+    for (const r of this.reminders.values()) {
+      if (r.userId === userId) out.push(structuredClone(r));
+    }
+    return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
+  }
+
+  async listAllReminders(): Promise<Reminder[]> {
+    return [...this.reminders.values()]
+      .map((r) => structuredClone(r))
+      .sort((a, b) => a.fireAtMs - b.fireAtMs);
+  }
+
+  async deleteReminder(id: string, _userId: string): Promise<void> {
+    this.reminders.delete(id);
+  }
+
+  async recordPrivateChat(userId: string): Promise<void> {
+    this.privateChats.add(userId);
+  }
+
+  async userHasPrivateChat(userId: string): Promise<boolean> {
+    return this.privateChats.has(userId);
   }
 }
