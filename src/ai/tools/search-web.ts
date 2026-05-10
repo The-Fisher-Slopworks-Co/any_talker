@@ -28,7 +28,7 @@ type FirecrawlResponse = {
   };
 };
 
-function createSemaphore(limit: number, maxQueueDepth: number) {
+export function createSemaphore(limit: number, maxQueueDepth: number) {
   let active = 0;
   const queue: Array<() => void> = [];
 
@@ -38,13 +38,21 @@ function createSemaphore(limit: number, maxQueueDepth: number) {
         throw new Error(`Search queue full (${queue.length} waiting, max ${maxQueueDepth})`);
       }
       await new Promise<void>((resolve) => queue.push(resolve));
+      // Permit transferred from the releaser; do not bump `active` here —
+      // otherwise a concurrent acquire that arrives between the releaser's
+      // dequeue and our resume could grab the same slot.
+    } else {
+      active++;
     }
-    active++;
     try {
       return await fn();
     } finally {
-      active--;
-      queue.shift()?.();
+      const next = queue.shift();
+      if (next) {
+        next();
+      } else {
+        active--;
+      }
     }
   };
 }
