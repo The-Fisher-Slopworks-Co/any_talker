@@ -229,32 +229,42 @@ export async function handleApi(
       };
     }
     if (req.method === "PUT") {
-      const body = (req.body ?? {}) as {
-        displayName?: string | null;
-        timezone?: string | null;
-        gender?: string | null;
-      };
-      let nextTz: string | null = null;
-      if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
-        nextTz = normalizeTimezoneOrNull(body.timezone);
-        if (nextTz === null) return BAD_TIMEZONE;
-      }
-      const nextName = normalizeDisplayName(body.displayName);
-      const nextGender = normalizeGender(body.gender);
-      if (nextGender === "invalid") return BAD_GENDER;
-      await Promise.all([
-        deps.storage.setUserName(actor.userId, nextName),
-        deps.storage.setUserTimezone(actor.userId, nextTz),
-        deps.storage.setUserGender(actor.userId, nextGender),
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const [currentName, currentTz, currentGender] = await Promise.all([
+        deps.storage.getUserName(actor.userId),
+        deps.storage.getUserTimezone(actor.userId),
+        deps.storage.getUserGender(actor.userId),
       ]);
+      let displayName = currentName;
+      let timezone = currentTz;
+      let gender: Gender | null = currentGender;
+      const writes: Promise<void>[] = [];
+
+      if ("displayName" in body) {
+        displayName = normalizeDisplayName(body.displayName);
+        writes.push(deps.storage.setUserName(actor.userId, displayName));
+      }
+      if ("timezone" in body) {
+        if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
+          const next = normalizeTimezoneOrNull(body.timezone);
+          if (next === null) return BAD_TIMEZONE;
+          timezone = next;
+        } else {
+          timezone = null;
+        }
+        writes.push(deps.storage.setUserTimezone(actor.userId, timezone));
+      }
+      if ("gender" in body) {
+        const nextGender = normalizeGender(body.gender);
+        if (nextGender === "invalid") return BAD_GENDER;
+        gender = nextGender;
+        writes.push(deps.storage.setUserGender(actor.userId, gender));
+      }
+
+      await Promise.all(writes);
       return {
         status: 200,
-        body: {
-          isOwner: actor.isOwner,
-          displayName: nextName,
-          timezone: nextTz,
-          gender: nextGender,
-        },
+        body: { isOwner: actor.isOwner, displayName, timezone, gender },
       };
     }
   }
