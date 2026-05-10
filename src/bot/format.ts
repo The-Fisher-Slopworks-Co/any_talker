@@ -7,6 +7,7 @@ export type DecoratedMessage = {
 
 export const TELEGRAM_TEXT_MAX = 4096;
 const TRUNCATE_MARKER = "\n…";
+const MAX_ENTITY_LENGTH = 10;
 
 export function applyBotNamePrefix(
   sanitizedBody: string,
@@ -33,7 +34,7 @@ function safeSliceHtml(html: string, max: number): string {
   }
   const lastAmp = cut.lastIndexOf("&");
   const lastSemi = cut.lastIndexOf(";");
-  if (lastAmp > lastSemi && cut.length - lastAmp <= 10) {
+  if (lastAmp > lastSemi && cut.length - lastAmp <= MAX_ENTITY_LENGTH) {
     cut = cut.slice(0, lastAmp);
   }
   return cut;
