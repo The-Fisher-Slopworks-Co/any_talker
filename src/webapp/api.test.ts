@@ -178,6 +178,65 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(400);
   });
 
+  test("rejects an empty models array with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { models: [] },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+    expect((await d.storage.getSettings())?.models).toEqual(
+      DEFAULT_SETTINGS.models,
+    );
+  });
+
+  test("rejects models that is not an array with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { models: "openai/gpt-4o" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects models containing a non-string entry with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { models: ["openai/gpt-4o", 42] },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects models containing an empty string with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { models: ["openai/gpt-4o", "  "] },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("can update rateLimit only", async () => {
     const d = deps();
     const res = await handleApi(
