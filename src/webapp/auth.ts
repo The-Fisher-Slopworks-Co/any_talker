@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 export type TelegramUser = {
   id: number;
   first_name?: string;
@@ -46,7 +48,7 @@ export async function verifyInitData(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  if (computed !== hash) return { ok: false, reason: "bad hash" };
+  if (!hexDigestsEqual(computed, hash)) return { ok: false, reason: "bad hash" };
 
   const authDate = Number(params.get("auth_date") ?? "0");
   if (!authDate || nowMs - authDate * 1000 > MAX_AGE_MS) {
@@ -64,4 +66,10 @@ export async function verifyInitData(
   if (typeof user.id !== "number") return { ok: false, reason: "bad user id" };
 
   return { ok: true, user };
+}
+
+function hexDigestsEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  if (!/^[0-9a-f]*$/i.test(a) || !/^[0-9a-f]*$/i.test(b)) return false;
+  return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 }
