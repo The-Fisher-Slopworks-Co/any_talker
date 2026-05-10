@@ -329,8 +329,7 @@ export async function handleApi(
       const body = (req.body ?? {}) as { displayName?: string | null };
       const displayName = normalizeDisplayName(body.displayName);
       await deps.storage.setUserName(id, displayName);
-      const whitelisted = await deps.storage.isWhitelisted("users", id);
-      return { status: 200, body: { user, displayName, whitelisted } };
+      return { status: 200, body: { user, displayName } };
     }
   }
 
@@ -363,20 +362,21 @@ export async function handleApi(
   const chatMatch = req.path.match(/^\/api\/admin\/chats\/(.+)$/);
   if (chatMatch) {
     const id = chatMatch[1]!;
-    const chat = await deps.storage.getChat(id);
-    if (!chat) return { status: 404, body: { error: "chat not found" } };
     if (req.method === "GET") {
-      const [settings, whitelisted] = await Promise.all([
+      const [chat, settings, whitelisted] = await Promise.all([
+        deps.storage.getChat(id),
         deps.storage.getChatSettings(id),
         deps.storage.isWhitelisted("chats", id),
       ]);
+      if (!chat) return { status: 404, body: { error: "chat not found" } };
       return { status: 200, body: { chat, settings: settings ?? {}, whitelisted } };
     }
     if (req.method === "PUT") {
+      const chat = await deps.storage.getChat(id);
+      if (!chat) return { status: 404, body: { error: "chat not found" } };
       const next = normalizeChatSettings(req.body);
       await deps.storage.saveChatSettings(id, next);
-      const whitelisted = await deps.storage.isWhitelisted("chats", id);
-      return { status: 200, body: { chat, settings: next, whitelisted } };
+      return { status: 200, body: { chat, settings: next } };
     }
   }
 

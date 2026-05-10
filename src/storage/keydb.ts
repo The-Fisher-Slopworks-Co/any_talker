@@ -3,6 +3,7 @@ import type { Storage } from "./types";
 import type {
   Settings,
   WhitelistEntry,
+  WhitelistKind,
   BucketState,
   ConversationNode,
   GuestThreadNode,
@@ -34,24 +35,24 @@ export class KeyDBStorage implements Storage {
     await this.client.set(`${PREFIX}settings`, JSON.stringify(settings));
   }
 
-  async listWhitelist(kind: "users" | "chats"): Promise<WhitelistEntry[]> {
+  async listWhitelist(kind: WhitelistKind): Promise<WhitelistEntry[]> {
     const raw = await this.client.get(`${PREFIX}whitelist:${kind}`);
     return raw ? (JSON.parse(raw) as WhitelistEntry[]) : [];
   }
 
-  async addWhitelist(kind: "users" | "chats", entry: WhitelistEntry): Promise<void> {
+  async addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void> {
     const list = await this.listWhitelist(kind);
     const next = [...list.filter((e) => e.id !== entry.id), { ...entry }];
     await this.client.set(`${PREFIX}whitelist:${kind}`, JSON.stringify(next));
   }
 
-  async removeWhitelist(kind: "users" | "chats", id: string): Promise<void> {
+  async removeWhitelist(kind: WhitelistKind, id: string): Promise<void> {
     const list = await this.listWhitelist(kind);
     const next = list.filter((e) => e.id !== id);
     await this.client.set(`${PREFIX}whitelist:${kind}`, JSON.stringify(next));
   }
 
-  async isWhitelisted(kind: "users" | "chats", id: string): Promise<boolean> {
+  async isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean> {
     const list = await this.listWhitelist(kind);
     return list.some((e) => e.id === id);
   }

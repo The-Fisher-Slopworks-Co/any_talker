@@ -2,6 +2,7 @@ import type { Storage } from "./types";
 import type {
   Settings,
   WhitelistEntry,
+  WhitelistKind,
   BucketState,
   ConversationNode,
   GuestThreadNode,
@@ -14,7 +15,7 @@ import type { Reminder } from "../reminders/types";
 
 export class MemoryStorage implements Storage {
   private settings: Settings | null = null;
-  private whitelist: Record<"users" | "chats", Map<string, WhitelistEntry>> = {
+  private whitelist: Record<WhitelistKind, Map<string, WhitelistEntry>> = {
     users: new Map(),
     chats: new Map(),
   };
@@ -45,19 +46,19 @@ export class MemoryStorage implements Storage {
     this.settings = structuredClone(settings);
   }
 
-  async listWhitelist(kind: "users" | "chats"): Promise<WhitelistEntry[]> {
+  async listWhitelist(kind: WhitelistKind): Promise<WhitelistEntry[]> {
     return [...this.whitelist[kind].values()];
   }
 
-  async addWhitelist(kind: "users" | "chats", entry: WhitelistEntry): Promise<void> {
+  async addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void> {
     this.whitelist[kind].set(entry.id, { ...entry });
   }
 
-  async removeWhitelist(kind: "users" | "chats", id: string): Promise<void> {
+  async removeWhitelist(kind: WhitelistKind, id: string): Promise<void> {
     this.whitelist[kind].delete(id);
   }
 
-  async isWhitelisted(kind: "users" | "chats", id: string): Promise<boolean> {
+  async isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean> {
     return this.whitelist[kind].has(id);
   }
 

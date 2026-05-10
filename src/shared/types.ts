@@ -21,6 +21,8 @@ export type Settings = {
   providerSort: ProviderSort | null;
 };
 
+export type WhitelistKind = "users" | "chats";
+
 export type WhitelistEntry = {
   id: string;
   label?: string;
