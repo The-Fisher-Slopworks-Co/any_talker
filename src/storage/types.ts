@@ -8,6 +8,7 @@ import type {
   User,
   Chat,
   ChatSettings,
+  Gender,
 } from "../shared/types";
 import type { Reminder } from "../reminders/types";
 
@@ -28,6 +29,9 @@ export interface Storage {
 
   getUserTimezone(userId: string): Promise<string | null>;
   setUserTimezone(userId: string, timezone: string | null): Promise<void>;
+
+  getUserGender(userId: string): Promise<Gender | null>;
+  setUserGender(userId: string, gender: Gender | null): Promise<void>;
 
   listUsers(): Promise<User[]>;
   upsertUser(user: User): Promise<void>;

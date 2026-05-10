@@ -276,6 +276,7 @@ describe("/api/me", () => {
       isOwner: false,
       displayName: null,
       timezone: null,
+      gender: null,
     });
   });
 
@@ -290,6 +291,7 @@ describe("/api/me", () => {
       isOwner: false,
       displayName: "Alice",
       timezone: null,
+      gender: null,
     });
     const get = await handleApi(
       { method: "GET", path: "/api/me", body: null },
@@ -300,6 +302,7 @@ describe("/api/me", () => {
       isOwner: false,
       displayName: "Alice",
       timezone: null,
+      gender: null,
     });
   });
 
@@ -315,6 +318,7 @@ describe("/api/me", () => {
       isOwner: false,
       displayName: null,
       timezone: null,
+      gender: null,
     });
     expect(await d.storage.getUserName("42")).toBeNull();
   });
@@ -335,6 +339,7 @@ describe("/api/me", () => {
       isOwner: false,
       displayName: null,
       timezone: null,
+      gender: null,
     });
   });
 
@@ -354,6 +359,7 @@ describe("/api/me", () => {
       isOwner: false,
       displayName: "Alice",
       timezone: "Europe/Moscow",
+      gender: null,
     });
     expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
   });
@@ -370,6 +376,57 @@ describe("/api/me", () => {
       guest("42"),
     );
     expect(r.status).toBe(400);
+  });
+
+  test("PUT accepts a valid gender and persists it", async () => {
+    const d = deps();
+    const put = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { gender: "female" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(put.status).toBe(200);
+    expect(put.body).toEqual({
+      isOwner: false,
+      displayName: null,
+      timezone: null,
+      gender: "female",
+    });
+    expect(await d.storage.getUserGender("42")).toBe("female");
+  });
+
+  test("PUT rejects an invalid gender with 400", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { gender: "other" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT clears gender when null is provided", async () => {
+    const d = deps();
+    await d.storage.setUserGender("42", "male");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { gender: null },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserGender("42")).toBeNull();
   });
 
   test("PUT clears timezone when empty string is provided", async () => {
