@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { api, type MeResponse } from "./api-client";
+import { api, type MeResponse, type RemindersResponse } from "./api-client";
 import {
   fetchOpenRouterModels,
   fetchOpenRouterEndpoints,
@@ -25,18 +25,68 @@ import {
   type RateLimitConfig,
   type ProviderSort,
 } from "../../shared/types";
+import type { Reminder } from "../../reminders/types";
 import {
   getTimezoneAreas,
   getTimezoneLocations,
   splitTimezone,
 } from "./timezones";
 
-type Tab = "prompt" | "ratelimit" | "whitelist" | "users" | "chats";
+type AdminSection =
+  | "prompt"
+  | "ratelimit"
+  | "whitelist"
+  | "users"
+  | "chats"
+  | "reminders";
 type Route =
   | { kind: "main" }
   | { kind: "admin" }
+  | { kind: "admin-section"; section: AdminSection }
   | { kind: "user-edit"; userId: string }
-  | { kind: "chat-edit"; chatId: string };
+  | { kind: "chat-edit"; chatId: string }
+  | { kind: "my-reminders" };
+
+const ADMIN_SECTIONS: {
+  id: AdminSection;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "prompt",
+    label: "Prompt",
+    description: "Models, character, timezone, provider routing",
+  },
+  {
+    id: "ratelimit",
+    label: "Limits",
+    description: "Token-bucket capacity and refill",
+  },
+  {
+    id: "whitelist",
+    label: "Whitelist",
+    description: "Allowed users and chats",
+  },
+  {
+    id: "users",
+    label: "Users",
+    description: "All users the bot has seen",
+  },
+  {
+    id: "chats",
+    label: "Chats",
+    description: "All chats and per-chat overrides",
+  },
+  {
+    id: "reminders",
+    label: "Reminders",
+    description: "Pending reminders for everyone",
+  },
+];
+
+function adminSectionTitle(section: AdminSection): string {
+  return ADMIN_SECTIONS.find((s) => s.id === section)?.label ?? "";
+}
 
 function chatTitle(c: Chat): string {
   if (c.title && c.title.length > 0) return c.title;
@@ -51,6 +101,16 @@ function chatSubtitle(c: Chat): string {
 
 function userDisplayName(u: User): string {
   return composeFullName(u.firstName, u.lastName) || `id:${u.id}`;
+}
+
+function reminderTargetLabel(
+  r: Reminder,
+  chats: Record<string, Chat>,
+): string {
+  if (r.target.kind === "guest_dm") return "DM";
+  const chat = chats[r.target.chatId];
+  if (chat) return chatTitle(chat);
+  return `chat ${r.target.chatId}`;
 }
 
 function openTelegramProfile(u: User): void {
@@ -148,14 +208,125 @@ function RowButton({
   );
 }
 
+function reminderUserLabel(
+  r: Reminder,
+  users: Record<string, User> | undefined,
+): { primary: string; secondary: string | null } {
+  const u = users?.[r.userId];
+  if (!u) return { primary: `id ${r.userId}`, secondary: null };
+  return {
+    primary: userDisplayName(u),
+    secondary: u.username ? `@${u.username}` : `id ${u.id}`,
+  };
+}
+
+function ReminderCard({
+  reminders,
+  chats,
+  users,
+  showUserId,
+  onUserClick,
+  emptyText,
+}: {
+  reminders: Reminder[];
+  chats: Record<string, Chat>;
+  users?: Record<string, User>;
+  showUserId: boolean;
+  onUserClick?: (userId: string) => void;
+  emptyText: string;
+}) {
+  return (
+    <Card>
+      {reminders.length === 0 ? (
+        <div className="px-4 py-3.5 text-center text-tg-hint text-[15px]">
+          {emptyText}
+        </div>
+      ) : reminders.map((r) => {
+        const userLabel = showUserId ? reminderUserLabel(r, users) : null;
+        const userText = userLabel
+          ? `${userLabel.primary}${userLabel.secondary ? ` · ${userLabel.secondary}` : ""}`
+          : null;
+        return (
+          <div key={r.id} className="row relative flex flex-col gap-1 px-4 py-[11px]">
+            <div className="flex items-center justify-between gap-3">
+              <span className="shrink-0 text-base font-medium">
+                {new Date(r.fireAtMs).toLocaleString()}
+              </span>
+              <span className="text-[13px] text-tg-hint truncate">
+                {reminderTargetLabel(r, chats)}
+              </span>
+            </div>
+            <div className="text-[15px] whitespace-pre-wrap break-words">
+              {r.text}
+            </div>
+            {userText &&
+              (onUserClick ? (
+                <button
+                  className="self-start bg-transparent border-0 p-0 text-left text-[13px] text-tg-link cursor-pointer"
+                  onClick={() => onUserClick(r.userId)}
+                >
+                  {userText}
+                </button>
+              ) : (
+                <div className="text-[13px] text-tg-hint">{userText}</div>
+              ))}
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
+function RemindersList({
+  fetchReminders,
+  header,
+  emptyText,
+  footer,
+  showUserId,
+  onUserClick,
+}: {
+  fetchReminders: () => Promise<RemindersResponse>;
+  header: string;
+  emptyText: string;
+  footer: ReactNode;
+  showUserId: boolean;
+  onUserClick?: (userId: string) => void;
+}) {
+  const [data, setData] = useState<RemindersResponse | null>(null);
+
+  useEffect(() => {
+    fetchReminders().then(setData);
+  }, [fetchReminders]);
+
+  if (data === null)
+    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+
+  return (
+    <Stack>
+      <SectionHeader>{header}</SectionHeader>
+      <ReminderCard
+        reminders={data.reminders}
+        chats={data.chats}
+        users={data.users}
+        showUserId={showUserId}
+        onUserClick={onUserClick}
+        emptyText={emptyText}
+      />
+      <SectionFooter>{footer}</SectionFooter>
+    </Stack>
+  );
+}
+
 function MainView({
   me,
   onMe,
   onOpenAdmin,
+  onOpenMyReminders,
 }: {
   me: MeResponse;
   onMe: (m: MeResponse) => void;
   onOpenAdmin: () => void;
+  onOpenMyReminders: () => void;
 }) {
   const [name, setName] = useState(me.displayName ?? "");
   const [tzOverride, setTzOverride] = useState(me.timezone !== null);
@@ -221,6 +392,11 @@ function MainView({
       <PrimaryButton disabled={saving || !dirty} onClick={save}>
         {saving ? "Saving…" : dirty ? "Save" : "Saved"}
       </PrimaryButton>
+
+      <SectionHeader>Reminders</SectionHeader>
+      <Card>
+        <RowButton onClick={onOpenMyReminders}>My reminders</RowButton>
+      </Card>
 
       {me.isOwner && (
         <>
@@ -1292,68 +1468,68 @@ function ChatEditView({ chatId }: { chatId: string }) {
 }
 
 function AdminView({
+  onOpenSection,
+}: {
+  onOpenSection: (section: AdminSection) => void;
+}) {
+  return (
+    <Stack>
+      <Card>
+        {ADMIN_SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onOpenSection(s.id)}
+            className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="truncate">{s.label}</div>
+              <div className="text-[13px] text-tg-hint truncate">
+                {s.description}
+              </div>
+            </div>
+            <span className="text-tg-hint text-[15px]">›</span>
+          </button>
+        ))}
+      </Card>
+    </Stack>
+  );
+}
+
+function AdminSectionView({
+  section,
   onEditUser,
   onEditChat,
 }: {
+  section: AdminSection;
   onEditUser: (id: string) => void;
   onEditChat: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<Tab>("prompt");
   const [settings, setSettings] = useState<Settings | null>(null);
+  const needsSettings = section === "prompt" || section === "ratelimit";
 
   useEffect(() => {
-    api.getSettings().then(setSettings);
-  }, []);
+    if (needsSettings) api.getSettings().then(setSettings);
+  }, [needsSettings]);
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "prompt", label: "Prompt" },
-    { id: "ratelimit", label: "Limits" },
-    { id: "whitelist", label: "Whitelist" },
-    { id: "users", label: "Users" },
-    { id: "chats", label: "Chats" },
-  ];
-  const activeIdx = tabs.findIndex((t) => t.id === tab);
-
-  const renderTab = () => {
-    if (tab === "whitelist") return <WhitelistTab />;
-    if (tab === "users") return <UsersTab onEdit={onEditUser} />;
-    if (tab === "chats") return <ChatsTab onEdit={onEditChat} />;
-    if (!settings)
-      return <div className="text-center text-tg-hint py-20">Loading…</div>;
-    if (tab === "prompt")
-      return <PromptTab settings={settings} onSaved={setSettings} />;
-    return <RateLimitTab settings={settings} onSaved={setSettings} />;
-  };
-
-  return (
-    <>
-      <div
-        className="relative flex bg-tg-section rounded-[10px] p-[3px] mb-5 shadow-[0_0_0_1px_var(--tg-separator)]"
-        role="tablist"
-      >
-        <div
-          className="absolute top-[3px] bottom-[3px] left-[3px] z-0 pointer-events-none bg-tg-button rounded-lg transition-transform duration-[180ms] ease-tg-spring"
-          style={{
-            width: `calc((100% - 6px) / ${tabs.length})`,
-            transform: `translateX(${activeIdx * 100}%)`,
-          }}
-        />
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className="relative z-10 flex-1 border-0 bg-transparent px-1.5 py-2 rounded-lg text-tg-text text-[13px] font-medium cursor-pointer transition-colors aria-selected:text-tg-button-text"
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {renderTab()}
-    </>
-  );
+  if (section === "whitelist") return <WhitelistTab />;
+  if (section === "users") return <UsersTab onEdit={onEditUser} />;
+  if (section === "chats") return <ChatsTab onEdit={onEditChat} />;
+  if (section === "reminders")
+    return (
+      <RemindersList
+        fetchReminders={api.listAdminReminders}
+        header="All Reminders"
+        emptyText="No reminders scheduled by anyone."
+        footer="Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure."
+        showUserId={true}
+        onUserClick={onEditUser}
+      />
+    );
+  if (!settings)
+    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+  if (section === "prompt")
+    return <PromptTab settings={settings} onSaved={setSettings} />;
+  return <RateLimitTab settings={settings} onSaved={setSettings} />;
 }
 
 function App() {
@@ -1375,11 +1551,20 @@ function App() {
       return;
     }
     const handler = () => {
-      setRoute((r) =>
-        r.kind === "user-edit" || r.kind === "chat-edit"
-          ? { kind: "admin" }
-          : { kind: "main" },
-      );
+      setRoute((r) => {
+        switch (r.kind) {
+          case "user-edit":
+            return { kind: "admin-section", section: "users" };
+          case "chat-edit":
+            return { kind: "admin-section", section: "chats" };
+          case "admin-section":
+            return { kind: "admin" };
+          case "admin":
+          case "my-reminders":
+          case "main":
+            return { kind: "main" };
+        }
+      });
     };
     btn.show();
     btn.onClick(handler);
@@ -1389,13 +1574,22 @@ function App() {
     };
   }, [route.kind]);
 
-  const ROUTE_TITLE: Record<Route["kind"], string> = {
-    main: "Settings",
-    admin: "Bot Admin",
-    "user-edit": "User Settings",
-    "chat-edit": "Chat Settings",
-  };
-  const title = ROUTE_TITLE[route.kind];
+  const title = (() => {
+    switch (route.kind) {
+      case "main":
+        return "Settings";
+      case "admin":
+        return "Bot Admin";
+      case "admin-section":
+        return adminSectionTitle(route.section);
+      case "user-edit":
+        return "User Settings";
+      case "chat-edit":
+        return "Chat Settings";
+      case "my-reminders":
+        return "My Reminders";
+    }
+  })();
 
   const renderRoute = () => {
     if (!me) return <div className="text-center text-tg-hint py-20">Loading…</div>;
@@ -1406,11 +1600,21 @@ function App() {
             me={me}
             onMe={setMe}
             onOpenAdmin={() => setRoute({ kind: "admin" })}
+            onOpenMyReminders={() => setRoute({ kind: "my-reminders" })}
           />
         );
       case "admin":
         return (
           <AdminView
+            onOpenSection={(section) =>
+              setRoute({ kind: "admin-section", section })
+            }
+          />
+        );
+      case "admin-section":
+        return (
+          <AdminSectionView
+            section={route.section}
             onEditUser={(id) => setRoute({ kind: "user-edit", userId: id })}
             onEditChat={(id) => setRoute({ kind: "chat-edit", chatId: id })}
           />
@@ -1419,6 +1623,16 @@ function App() {
         return <UserEditView userId={route.userId} />;
       case "chat-edit":
         return <ChatEditView chatId={route.chatId} />;
+      case "my-reminders":
+        return (
+          <RemindersList
+            fetchReminders={api.listMyReminders}
+            header="Upcoming"
+            emptyText="No reminders scheduled."
+            footer="Ask the bot in chat to schedule a reminder."
+            showUserId={false}
+          />
+        );
     }
   };
 

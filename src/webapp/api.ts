@@ -1,12 +1,15 @@
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type {
+  Chat,
   Settings,
+  User,
   WhitelistEntry,
   ChatSettings,
   RateLimitConfig,
 } from "../shared/types";
 import { isValidTimezone, isValidProviderSort } from "../shared/types";
+import type { Reminder } from "../reminders/types";
 import { getOrInitSettings } from "../settings";
 import {
   isValidPermaslug,
@@ -57,6 +60,60 @@ const BAD_PROVIDER_SORT: ApiResponse = {
   status: 400,
   body: { error: "invalid providerSort" },
 };
+
+async function collectReminderChats(
+  storage: Storage,
+  reminders: Reminder[],
+): Promise<Record<string, Chat>> {
+  const ids = new Set<string>();
+  for (const r of reminders) {
+    if (r.target.kind === "ask_reply") ids.add(r.target.chatId);
+  }
+  if (ids.size === 0) return {};
+  const entries = await Promise.all(
+    [...ids].map(async (id) => [id, await storage.getChat(id)] as const),
+  );
+  const out: Record<string, Chat> = {};
+  for (const [id, chat] of entries) {
+    if (chat) out[id] = chat;
+  }
+  return out;
+}
+
+async function collectReminderUsers(
+  storage: Storage,
+  reminders: Reminder[],
+): Promise<Record<string, User>> {
+  const ids = new Set<string>(reminders.map((r) => r.userId));
+  if (ids.size === 0) return {};
+  const entries = await Promise.all(
+    [...ids].map(async (id) => [id, await storage.getUser(id)] as const),
+  );
+  const out: Record<string, User> = {};
+  for (const [id, user] of entries) {
+    if (user) out[id] = user;
+  }
+  return out;
+}
+
+async function respondMyReminders(
+  storage: Storage,
+  reminders: Reminder[],
+): Promise<ApiResponse> {
+  const chats = await collectReminderChats(storage, reminders);
+  return { status: 200, body: { reminders, chats } };
+}
+
+async function respondAdminReminders(
+  storage: Storage,
+  reminders: Reminder[],
+): Promise<ApiResponse> {
+  const [chats, users] = await Promise.all([
+    collectReminderChats(storage, reminders),
+    collectReminderUsers(storage, reminders),
+  ]);
+  return { status: 200, body: { reminders, chats, users } };
+}
 
 function normalizeChatSettings(raw: unknown): ChatSettings {
   const body = (raw ?? {}) as {
@@ -121,6 +178,13 @@ export async function handleApi(
   deps: ApiDeps,
   actor: ApiActor,
 ): Promise<ApiResponse> {
+  if (req.path === "/api/me/reminders" && req.method === "GET") {
+    return respondMyReminders(
+      deps.storage,
+      await deps.storage.listRemindersForUser(actor.userId),
+    );
+  }
+
   if (req.path === "/api/me") {
     if (req.method === "GET") {
       const [displayName, timezone] = await Promise.all([
@@ -210,8 +274,10 @@ export async function handleApi(
   }
 
   if (req.path === "/api/whitelist" && req.method === "GET") {
-    const users = await deps.storage.listWhitelist("users");
-    const chats = await deps.storage.listWhitelist("chats");
+    const [users, chats] = await Promise.all([
+      deps.storage.listWhitelist("users"),
+      deps.storage.listWhitelist("chats"),
+    ]);
     return { status: 200, body: { users, chats } };
   }
 
@@ -236,6 +302,13 @@ export async function handleApi(
   if (req.path === "/api/admin/users" && req.method === "GET") {
     const users = await deps.storage.listUsers();
     return { status: 200, body: { users } };
+  }
+
+  if (req.path === "/api/admin/reminders" && req.method === "GET") {
+    return respondAdminReminders(
+      deps.storage,
+      await deps.storage.listAllReminders(),
+    );
   }
 
   const userMatch = req.path.match(/^\/api\/admin\/users\/(.+)$/);
