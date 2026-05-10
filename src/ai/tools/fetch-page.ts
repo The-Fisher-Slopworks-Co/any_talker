@@ -2,11 +2,8 @@ import { z } from "zod";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
-import { fetchWithTimeout } from "./http";
+import { readTextCapped, safeFetch } from "./http";
 import type { Tool } from "./registry";
-
-const PRIVATE_HOST =
-  /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|169\.254\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|::1|fe80:|fc[0-9a-f]{2}:|fd[0-9a-f]{2}:|::ffff:(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)\d+\.\d+)/i;
 
 const MAX_LENGTH = 50_000;
 const MAX_BODY_BYTES = 10_000_000;
@@ -26,39 +23,29 @@ export const fetchPageTool: Tool<Input, string> = {
     "Fetch a public web page by URL and return its content as Markdown. Uses Readability to extract the main article body where possible; falls back to converting the full HTML page otherwise.",
   parameters: Schema,
   execute: async ({ url }, _ctx) => {
-    const { hostname } = new URL(url);
-    if (PRIVATE_HOST.test(hostname)) {
-      throw new Error("Blocked: private and local addresses are not allowed");
-    }
-
-    const response = await fetchWithTimeout(
-      url,
-      {
+    const response = await safeFetch(url, {
+      init: {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; AnyTalkerBot/1.0)",
           Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
         },
       },
-      TIMEOUT_MS,
-      `Fetching ${url}`,
-    );
+      timeoutMs: TIMEOUT_MS,
+      timeoutLabel: `Fetching ${url}`,
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const bodyLength = Number(response.headers.get("content-length") ?? 0);
-    if (bodyLength > MAX_BODY_BYTES) {
-      throw new Error(`Response too large (${bodyLength} bytes)`);
-    }
-
     const contentType = response.headers.get("content-type") ?? "";
+    const body = await readTextCapped(response, MAX_BODY_BYTES);
+
     if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
-      return (await response.text()).slice(0, MAX_LENGTH);
+      return body.slice(0, MAX_LENGTH);
     }
 
-    const html = await response.text();
-    const window = parseHTML(html);
+    const window = parseHTML(body);
 
     let article: ReturnType<Readability["parse"]> | null = null;
     try {
@@ -76,6 +63,6 @@ export const fetchPageTool: Tool<Input, string> = {
       return parts.join("\n\n").slice(0, MAX_LENGTH);
     }
 
-    return td.turndown(html).slice(0, MAX_LENGTH);
+    return td.turndown(body).slice(0, MAX_LENGTH);
   },
 };

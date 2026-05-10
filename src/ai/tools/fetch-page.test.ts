@@ -54,9 +54,87 @@ describe("fetch_page tool", () => {
       "http://172.16.0.1/internal",
       "http://0.0.0.0/",
       "http://169.254.169.254/latest/meta-data/",
-    ])("blocks private/local URL: %s", async (url) => {
+    ])("blocks IPv4 private/local URL: %s", async (url) => {
       await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow("Blocked");
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      "http://[::1]/",
+      "http://[fc00::1]/",
+      "http://[fd12:3456:789a::1]/",
+      "http://[fe80::1]/",
+      "http://[::ffff:127.0.0.1]/",
+    ])("blocks IPv6 private/local URL: %s", async (url) => {
+      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow("Blocked");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    test("rejects non-http(s) protocols", async () => {
+      await expect(
+        fetchPageTool.execute({ url: "file:///etc/passwd" }, ctx),
+      ).rejects.toThrow();
+    });
+
+    test("blocks redirect to a private address", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 302,
+            headers: { location: "http://127.0.0.1/admin" },
+          }),
+        ),
+      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/redir" }, ctx),
+      ).rejects.toThrow("Blocked");
+    });
+
+    test("blocks redirect to an IPv6 loopback", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 301,
+            headers: { location: "http://[::1]/" },
+          }),
+        ),
+      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/redir" }, ctx),
+      ).rejects.toThrow("Blocked");
+    });
+
+    test("follows redirects to public hosts", async () => {
+      let call = 0;
+      mockFetch.mockImplementation(() => {
+        call++;
+        if (call === 1) {
+          return Promise.resolve(
+            new Response(null, {
+              status: 302,
+              headers: { location: "https://example.org/final" },
+            }),
+          );
+        }
+        return Promise.resolve(htmlResponse("<html><body><p>landed</p></body></html>"));
+      });
+      const result = await fetchPageTool.execute({ url: "https://example.com/start" }, ctx);
+      expect(result.length).toBeGreaterThan(0);
+      expect(call).toBe(2);
+    });
+
+    test("rejects after exceeding redirect limit", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 302,
+            headers: { location: "https://example.org/loop" },
+          }),
+        ),
+      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/loop" }, ctx),
+      ).rejects.toThrow("Too many redirects");
     });
   });
 
@@ -70,7 +148,7 @@ describe("fetch_page tool", () => {
       );
     });
 
-    test("throws when content-length exceeds limit", async () => {
+    test("throws when declared content-length exceeds limit", async () => {
       mockFetch.mockImplementation(() =>
         Promise.resolve(
           new Response("body", {
@@ -82,6 +160,27 @@ describe("fetch_page tool", () => {
       await expect(fetchPageTool.execute({ url: "https://example.com/huge" }, ctx)).rejects.toThrow(
         "Response too large"
       );
+    });
+
+    test("throws when streamed body exceeds limit (no content-length)", async () => {
+      const big = new Uint8Array(10_000_002);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(big);
+          controller.close();
+        },
+      });
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response(stream, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        ),
+      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/chunked" }, ctx),
+      ).rejects.toThrow("Response too large");
     });
   });
 
