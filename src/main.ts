@@ -5,6 +5,7 @@ import { TokenBucketLimiter } from "./ratelimit/token-bucket";
 import { OpenRouterAIClient } from "./ai/openrouter";
 import { registerTool } from "./ai/tools/registry";
 import { randomNumberTool } from "./ai/tools/random-number";
+import { randomChoiceTool } from "./ai/tools/random-choice";
 import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
 import { createBot } from "./bot";
@@ -23,6 +24,7 @@ async function main() {
   const ai = new OpenRouterAIClient(config.openrouterApiKey);
 
   registerTool(randomNumberTool);
+  registerTool(randomChoiceTool);
   for (const t of createReminderTools({ storage })) registerTool(t);
 
   const bot = createBot({
