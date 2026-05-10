@@ -503,6 +503,68 @@ describe("/api/me", () => {
     expect(r.status).toBe(200);
     expect(await d.storage.getUserTimezone("42")).toBeNull();
   });
+
+  test("PUT with only displayName preserves timezone and gender", async () => {
+    const d = deps();
+    await d.storage.setUserName("42", "OldName");
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.setUserGender("42", "female");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { displayName: "NewName" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      isOwner: false,
+      displayName: "NewName",
+      timezone: "Europe/Moscow",
+      gender: "female",
+    });
+    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.getUserGender("42")).toBe("female");
+  });
+
+  test("PUT with only timezone preserves displayName and gender", async () => {
+    const d = deps();
+    await d.storage.setUserName("42", "Alice");
+    await d.storage.setUserGender("42", "male");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { timezone: "America/New_York" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserName("42")).toBe("Alice");
+    expect(await d.storage.getUserGender("42")).toBe("male");
+    expect(await d.storage.getUserTimezone("42")).toBe("America/New_York");
+  });
+
+  test("PUT with empty body preserves all fields", async () => {
+    const d = deps();
+    await d.storage.setUserName("42", "Alice");
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.setUserGender("42", "female");
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: {} },
+      d,
+      guest("42"),
+    );
+    expect(r.body).toEqual({
+      isOwner: false,
+      displayName: "Alice",
+      timezone: "Europe/Moscow",
+      gender: "female",
+    });
+  });
 });
 
 describe("/api/admin/users", () => {
