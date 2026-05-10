@@ -3,8 +3,10 @@ import { loadConfig } from "./config";
 import { KeyDBStorage } from "./storage/keydb";
 import { TokenBucketLimiter } from "./ratelimit/token-bucket";
 import { OpenRouterAIClient } from "./ai/openrouter";
-import { registerTool } from "./ai/tools/registry";
+import { registerTool, type Tool } from "./ai/tools/registry";
+import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
+import { randomChoiceTool } from "./ai/tools/random-choice";
 import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
 import { createBot } from "./bot";
@@ -22,8 +24,11 @@ async function main() {
   const rateLimiter = new TokenBucketLimiter(storage);
   const ai = new OpenRouterAIClient(config.openrouterApiKey);
 
-  registerTool(randomNumberTool);
-  for (const t of createReminderTools({ storage })) registerTool(t);
+  const logged = <TIn, TOut>(t: Tool<TIn, TOut>) =>
+    withLogging(t, config.logFormat);
+  registerTool(logged(randomNumberTool));
+  registerTool(logged(randomChoiceTool));
+  for (const t of createReminderTools({ storage })) registerTool(logged(t));
 
   const bot = createBot({
     botToken: config.botToken,
