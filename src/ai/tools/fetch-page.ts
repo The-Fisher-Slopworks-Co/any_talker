@@ -8,6 +8,7 @@ const PRIVATE_HOST =
   /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|169\.254\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|::1|fe80:|fc[0-9a-f]{2}:|fd[0-9a-f]{2}:|::ffff:(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)\d+\.\d+)/i;
 
 const MAX_LENGTH = 50_000;
+const MAX_BODY_BYTES = 10_000_000;
 const TIMEOUT_MS = 15_000;
 
 const Schema = z.object({
@@ -47,6 +48,11 @@ export const fetchPageTool: Tool<Input, string> = {
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const bodyLength = Number(response.headers.get("content-length") ?? 0);
+    if (bodyLength > MAX_BODY_BYTES) {
+      throw new Error(`Response too large (${bodyLength} bytes)`);
     }
 
     const contentType = response.headers.get("content-type") ?? "";

@@ -69,6 +69,20 @@ describe("fetch_page tool", () => {
         "HTTP 404"
       );
     });
+
+    test("throws when content-length exceeds limit", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response("body", {
+            status: 200,
+            headers: { "content-type": "text/plain", "content-length": "10000001" },
+          })
+        )
+      );
+      await expect(fetchPageTool.execute({ url: "https://example.com/huge" }, ctx)).rejects.toThrow(
+        "Response too large"
+      );
+    });
   });
 
   describe("content type handling", () => {
