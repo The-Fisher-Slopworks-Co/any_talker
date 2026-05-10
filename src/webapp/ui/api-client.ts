@@ -37,8 +37,16 @@ export type MeResponse = {
   displayName: string | null;
   timezone: string | null;
 };
-export type UserSettingsResponse = { user: User; displayName: string | null };
-export type ChatSettingsResponse = { chat: Chat; settings: ChatSettings };
+export type UserSettingsResponse = {
+  user: User;
+  displayName: string | null;
+  whitelisted: boolean;
+};
+export type ChatSettingsResponse = {
+  chat: Chat;
+  settings: ChatSettings;
+  whitelisted: boolean;
+};
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";

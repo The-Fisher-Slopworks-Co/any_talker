@@ -315,12 +315,13 @@ export async function handleApi(
   if (userMatch) {
     const id = userMatch[1]!;
     if (req.method === "GET") {
-      const [user, displayName] = await Promise.all([
+      const [user, displayName, whitelisted] = await Promise.all([
         deps.storage.getUser(id),
         deps.storage.getUserName(id),
+        deps.storage.isWhitelisted("users", id),
       ]);
       if (!user) return { status: 404, body: { error: "user not found" } };
-      return { status: 200, body: { user, displayName } };
+      return { status: 200, body: { user, displayName, whitelisted } };
     }
     if (req.method === "PUT") {
       const user = await deps.storage.getUser(id);
@@ -328,7 +329,8 @@ export async function handleApi(
       const body = (req.body ?? {}) as { displayName?: string | null };
       const displayName = normalizeDisplayName(body.displayName);
       await deps.storage.setUserName(id, displayName);
-      return { status: 200, body: { user, displayName } };
+      const whitelisted = await deps.storage.isWhitelisted("users", id);
+      return { status: 200, body: { user, displayName, whitelisted } };
     }
   }
 
@@ -364,13 +366,17 @@ export async function handleApi(
     const chat = await deps.storage.getChat(id);
     if (!chat) return { status: 404, body: { error: "chat not found" } };
     if (req.method === "GET") {
-      const settings = await deps.storage.getChatSettings(id);
-      return { status: 200, body: { chat, settings: settings ?? {} } };
+      const [settings, whitelisted] = await Promise.all([
+        deps.storage.getChatSettings(id),
+        deps.storage.isWhitelisted("chats", id),
+      ]);
+      return { status: 200, body: { chat, settings: settings ?? {}, whitelisted } };
     }
     if (req.method === "PUT") {
       const next = normalizeChatSettings(req.body);
       await deps.storage.saveChatSettings(id, next);
-      return { status: 200, body: { chat, settings: next } };
+      const whitelisted = await deps.storage.isWhitelisted("chats", id);
+      return { status: 200, body: { chat, settings: next, whitelisted } };
     }
   }
 
