@@ -32,7 +32,7 @@ async function main() {
   registerTool(logged(randomChoiceTool));
   registerTool(logged(fetchPageTool));
   if (config.firecrawlApiKey) {
-    registerTool(logged(createSearchWebTool(config.firecrawlApiKey)));
+    registerTool(logged(createSearchWebTool(config.firecrawlApiKey, config.firecrawlConcurrency)));
   } else {
     console.warn("FIRECRAWL_API_KEY not set, search_web tool disabled");
   }
