@@ -26,13 +26,33 @@ type FirecrawlResponse = {
   warning?: string;
 };
 
-export function createSearchWebTool(apiKey: string): Tool<Input, string> {
+function createSemaphore(limit: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+
+  return async function acquire<T>(fn: () => Promise<T>): Promise<T> {
+    if (active >= limit) {
+      await new Promise<void>((resolve) => queue.push(resolve));
+    }
+    active++;
+    try {
+      return await fn();
+    } finally {
+      active--;
+      queue.shift()?.();
+    }
+  };
+}
+
+export function createSearchWebTool(apiKey: string, concurrency: number): Tool<Input, string> {
+  const sem = createSemaphore(concurrency);
   return {
     name: "search_web",
     description:
       "Search the internet and return a list of relevant results with title, URL, and a short description for each. Use this to find current information, news, documentation, or anything that requires a web search.",
     parameters: Schema,
-    execute: async ({ query, limit }, _ctx) => {
+    execute: ({ query, limit }, _ctx) =>
+      sem(async () => {
       let response: Response;
       try {
         response = await fetch(FIRECRAWL_SEARCH_URL, {
@@ -80,6 +100,6 @@ export function createSearchWebTool(apiKey: string): Tool<Input, string> {
           return lines.join("\n");
         })
         .join("\n\n");
-    },
+      }),
   };
 }
