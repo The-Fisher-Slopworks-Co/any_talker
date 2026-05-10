@@ -83,7 +83,7 @@ export const api = {
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
   putAdminUser: (id: string, displayName: string | null) =>
-    req<Omit<UserSettingsResponse, "whitelisted">>(
+    req<{ user: User; displayName: string | null }>(
       "PUT",
       `/api/admin/users/${id}`,
       { displayName },
@@ -92,7 +92,7 @@ export const api = {
   getAdminChat: (id: string) =>
     req<ChatSettingsResponse>("GET", `/api/admin/chats/${id}`),
   putAdminChat: (id: string, settings: ChatSettings) =>
-    req<Omit<ChatSettingsResponse, "whitelisted">>(
+    req<{ chat: Chat; settings: ChatSettings }>(
       "PUT",
       `/api/admin/chats/${id}`,
       settings,
