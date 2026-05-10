@@ -1,4 +1,3 @@
-import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 export async function fetchWithTimeout(
@@ -82,7 +81,7 @@ export async function assertPublicHost(hostname: string): Promise<void> {
   }
   let addresses: Array<{ address: string }>;
   try {
-    addresses = await lookup(bare, { all: true, verbatim: true });
+    addresses = await Bun.dns.lookup(bare);
   } catch {
     throw new Error(PRIVATE_BLOCK_MESSAGE);
   }
