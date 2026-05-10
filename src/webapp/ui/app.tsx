@@ -48,8 +48,8 @@ type Route =
   | { kind: "main" }
   | { kind: "admin" }
   | { kind: "admin-section"; section: AdminSection }
-  | { kind: "user-edit"; userId: string }
-  | { kind: "chat-edit"; chatId: string }
+  | { kind: "user-edit"; userId: string; from?: AdminSection }
+  | { kind: "chat-edit"; chatId: string; from?: AdminSection }
   | { kind: "my-reminders" };
 
 const ADMIN_SECTIONS: {
@@ -1527,20 +1527,22 @@ function AdminSectionView({
   onEditChat,
 }: {
   section: AdminSection;
-  onEditUser: (id: string) => void;
-  onEditChat: (id: string) => void;
+  onEditUser: (id: string, from: AdminSection) => void;
+  onEditChat: (id: string, from: AdminSection) => void;
 }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const needsSettings = section === "prompt" || section === "ratelimit";
+  const goUser = (id: string) => onEditUser(id, section);
+  const goChat = (id: string) => onEditChat(id, section);
 
   useEffect(() => {
     if (needsSettings) api.getSettings().then(setSettings);
   }, [needsSettings]);
 
   if (section === "whitelist")
-    return <WhitelistTab onOpenUser={onEditUser} onOpenChat={onEditChat} />;
-  if (section === "users") return <UsersTab onEdit={onEditUser} />;
-  if (section === "chats") return <ChatsTab onEdit={onEditChat} />;
+    return <WhitelistTab onOpenUser={goUser} onOpenChat={goChat} />;
+  if (section === "users") return <UsersTab onEdit={goUser} />;
+  if (section === "chats") return <ChatsTab onEdit={goChat} />;
   if (section === "reminders")
     return (
       <RemindersList
@@ -1549,7 +1551,7 @@ function AdminSectionView({
         emptyText="No reminders scheduled by anyone."
         footer="Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure."
         showUserId={true}
-        onUserClick={onEditUser}
+        onUserClick={goUser}
       />
     );
   if (!settings)
@@ -1581,9 +1583,9 @@ function App() {
       setRoute((r) => {
         switch (r.kind) {
           case "user-edit":
-            return { kind: "admin-section", section: "users" };
+            return { kind: "admin-section", section: r.from ?? "users" };
           case "chat-edit":
-            return { kind: "admin-section", section: "chats" };
+            return { kind: "admin-section", section: r.from ?? "chats" };
           case "admin-section":
             return { kind: "admin" };
           case "admin":
@@ -1642,8 +1644,12 @@ function App() {
         return (
           <AdminSectionView
             section={route.section}
-            onEditUser={(id) => setRoute({ kind: "user-edit", userId: id })}
-            onEditChat={(id) => setRoute({ kind: "chat-edit", chatId: id })}
+            onEditUser={(id, from) =>
+              setRoute({ kind: "user-edit", userId: id, from })
+            }
+            onEditChat={(id, from) =>
+              setRoute({ kind: "chat-edit", chatId: id, from })
+            }
           />
         );
       case "user-edit":
