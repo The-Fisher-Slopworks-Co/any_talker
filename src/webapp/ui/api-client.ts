@@ -7,6 +7,7 @@ import type {
   User,
   Chat,
   ChatSettings,
+  Gender,
 } from "../../shared/types";
 import type { Reminder } from "../../reminders/types";
 
@@ -37,6 +38,7 @@ export type MeResponse = {
   isOwner: boolean;
   displayName: string | null;
   timezone: string | null;
+  gender: Gender | null;
 };
 export type UserSettingsResponse = {
   user: User;
@@ -77,8 +79,11 @@ export const api = {
   resetMyBucket: () =>
     req<{ bucket: BucketState | null }>("PUT", "/api/ratelimit/me", { reset: true }),
   getMe: () => req<MeResponse>("GET", "/api/me"),
-  putMe: (patch: { displayName: string | null; timezone: string | null }) =>
-    req<MeResponse>("PUT", "/api/me", patch),
+  putMe: (patch: {
+    displayName: string | null;
+    timezone: string | null;
+    gender: Gender | null;
+  }) => req<MeResponse>("PUT", "/api/me", patch),
   listAdminUsers: () => req<{ users: User[] }>("GET", "/api/admin/users"),
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),

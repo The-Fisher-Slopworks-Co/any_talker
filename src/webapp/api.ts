@@ -7,8 +7,13 @@ import type {
   WhitelistEntry,
   ChatSettings,
   RateLimitConfig,
+  Gender,
 } from "../shared/types";
-import { isValidTimezone, isValidProviderSort } from "../shared/types";
+import {
+  isValidTimezone,
+  isValidProviderSort,
+  isValidGender,
+} from "../shared/types";
 import type { Reminder } from "../reminders/types";
 import { getOrInitSettings } from "../settings";
 import {
@@ -55,6 +60,19 @@ const BAD_TIMEZONE: ApiResponse = {
   status: 400,
   body: { error: "invalid timezone" },
 };
+
+const BAD_GENDER: ApiResponse = {
+  status: 400,
+  body: { error: "invalid gender" },
+};
+
+function normalizeGender(input: unknown): Gender | null | "invalid" {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== "string") return "invalid";
+  const trimmed = input.trim();
+  if (trimmed === "") return null;
+  return isValidGender(trimmed) ? trimmed : "invalid";
+}
 
 const BAD_PROVIDER_SORT: ApiResponse = {
   status: 400,
@@ -187,19 +205,21 @@ export async function handleApi(
 
   if (req.path === "/api/me") {
     if (req.method === "GET") {
-      const [displayName, timezone] = await Promise.all([
+      const [displayName, timezone, gender] = await Promise.all([
         deps.storage.getUserName(actor.userId),
         deps.storage.getUserTimezone(actor.userId),
+        deps.storage.getUserGender(actor.userId),
       ]);
       return {
         status: 200,
-        body: { isOwner: actor.isOwner, displayName, timezone },
+        body: { isOwner: actor.isOwner, displayName, timezone, gender },
       };
     }
     if (req.method === "PUT") {
       const body = (req.body ?? {}) as {
         displayName?: string | null;
         timezone?: string | null;
+        gender?: string | null;
       };
       let nextTz: string | null = null;
       if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
@@ -207,9 +227,12 @@ export async function handleApi(
         if (nextTz === null) return BAD_TIMEZONE;
       }
       const nextName = normalizeDisplayName(body.displayName);
+      const nextGender = normalizeGender(body.gender);
+      if (nextGender === "invalid") return BAD_GENDER;
       await Promise.all([
         deps.storage.setUserName(actor.userId, nextName),
         deps.storage.setUserTimezone(actor.userId, nextTz),
+        deps.storage.setUserGender(actor.userId, nextGender),
       ]);
       return {
         status: 200,
@@ -217,6 +240,7 @@ export async function handleApi(
           isOwner: actor.isOwner,
           displayName: nextName,
           timezone: nextTz,
+          gender: nextGender,
         },
       };
     }

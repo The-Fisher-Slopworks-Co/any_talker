@@ -1,5 +1,6 @@
 import type { Storage } from "../storage/types";
 import type { AIMessage } from "../ai/types";
+import type { Gender } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 
 export type ReplyTarget = {
@@ -13,6 +14,7 @@ export type Sender = {
   firstName: string | null;
   lastName: string | null;
   nameOverride: string | null;
+  gender: Gender | null;
 };
 
 export type BuildContextArgs = {
@@ -38,6 +40,7 @@ export function buildUserEnvelope(args: {
       : composeFullName(args.sender.firstName, args.sender.lastName);
 
   const obj: Record<string, string> = { author };
+  if (args.sender.gender !== null) obj.gender = args.sender.gender;
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
   obj.text = args.text;
   return JSON.stringify(obj);
