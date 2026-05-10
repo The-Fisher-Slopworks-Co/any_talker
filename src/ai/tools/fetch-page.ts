@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
+import { fetchWithTimeout } from "./http";
 import type { Tool } from "./registry";
 
 const PRIVATE_HOST =
@@ -30,21 +31,17 @@ export const fetchPageTool: Tool<Input, string> = {
       throw new Error("Blocked: private and local addresses are not allowed");
     }
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+    const response = await fetchWithTimeout(
+      url,
+      {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; AnyTalkerBot/1.0)",
           Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
         },
-      });
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "TimeoutError") {
-        throw new Error(`Timed out after ${TIMEOUT_MS / 1000}s fetching ${url}`);
-      }
-      throw err;
-    }
+      },
+      TIMEOUT_MS,
+      `Fetching ${url}`,
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
