@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fetchWithTimeout } from "./http";
+import { fetchWithTimeout, readTextCapped } from "./http";
 import type { Tool } from "./registry";
 
 const FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search";
@@ -73,22 +73,24 @@ export function createSearchWebTool(apiKey: string, concurrency: number): Tool<I
         );
 
         if (!response.ok) {
-          const body = await response.text().catch(() => "");
+          const body = await readTextCapped(response, MAX_BODY_BYTES).catch(() => "");
           throw new Error(`Firecrawl error ${response.status}: ${response.statusText}${body ? ` — ${body}` : ""}`);
         }
 
-        const bodyLength = Number(response.headers.get("content-length") ?? 0);
-        if (bodyLength > MAX_BODY_BYTES) {
-          throw new Error(`Firecrawl response too large (${bodyLength} bytes)`);
-        }
-
-        let data: FirecrawlResponse;
+        let body: string;
         try {
-          data = (await response.json()) as FirecrawlResponse;
+          body = await readTextCapped(response, MAX_BODY_BYTES);
         } catch (err) {
           if (err instanceof DOMException && err.name === "TimeoutError") {
             throw new Error(`Search timed out after ${TIMEOUT_MS / 1000}s`);
           }
+          throw err;
+        }
+
+        let data: FirecrawlResponse;
+        try {
+          data = JSON.parse(body) as FirecrawlResponse;
+        } catch {
           throw new Error("Firecrawl returned a non-JSON response");
         }
 
