@@ -8,6 +8,7 @@ import type {
   Chat,
   ChatSettings,
 } from "../shared/types";
+import type { Reminder } from "../reminders/types";
 
 export interface Storage {
   getSettings(): Promise<Settings | null>;
@@ -47,4 +48,13 @@ export interface Storage {
 
   getGuestThread(chatId: string): Promise<GuestThreadNode | null>;
   saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void>;
+
+  saveReminder(reminder: Reminder): Promise<void>;
+  fetchDueReminders(nowMs: number): Promise<Reminder[]>;
+  listRemindersForUser(userId: string): Promise<Reminder[]>;
+  listAllReminders(): Promise<Reminder[]>;
+  deleteReminder(id: string, userId: string): Promise<void>;
+
+  recordPrivateChat(userId: string): Promise<void>;
+  userHasPrivateChat(userId: string): Promise<boolean>;
 }

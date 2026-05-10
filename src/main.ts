@@ -5,6 +5,8 @@ import { TokenBucketLimiter } from "./ratelimit/token-bucket";
 import { OpenRouterAIClient } from "./ai/openrouter";
 import { registerTool } from "./ai/tools/registry";
 import { randomNumberTool } from "./ai/tools/random-number";
+import { createReminderTools } from "./ai/tools/reminders";
+import { startScheduler } from "./reminders/scheduler";
 import { createBot } from "./bot";
 import { startServer } from "./webapp/server";
 
@@ -21,6 +23,7 @@ async function main() {
   const ai = new OpenRouterAIClient(config.openrouterApiKey);
 
   registerTool(randomNumberTool);
+  for (const t of createReminderTools({ storage })) registerTool(t);
 
   const bot = createBot({
     botToken: config.botToken,
@@ -58,7 +61,10 @@ async function main() {
   });
   console.log(`HTTP server listening on :${server.port}`);
 
-  return { bot, server };
+  const scheduler = startScheduler({ storage, api: bot.api });
+  console.log("Reminder scheduler started");
+
+  return { bot, server, scheduler };
 }
 
 const handles = await main().catch((err) => {
@@ -68,6 +74,7 @@ const handles = await main().catch((err) => {
 
 if (import.meta.hot) {
   import.meta.hot.dispose(async () => {
+    handles.scheduler.stop();
     handles.server.stop();
     await handles.bot.stop().catch((err) => {
       console.error("bot.stop failed during hot-reload:", err);

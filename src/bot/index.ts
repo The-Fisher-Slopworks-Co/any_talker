@@ -69,6 +69,11 @@ export function createBot(deps: BotDeps): Bot {
         })
         .catch((err) => console.error("upsertChat failed:", err));
     }
+    if (ctx.chat?.type === "private" && from && !from.is_bot) {
+      void deps.storage
+        .recordPrivateChat(String(from.id))
+        .catch((err) => console.error("recordPrivateChat failed:", err));
+    }
     await next();
   });
 
@@ -173,7 +178,8 @@ export function createBot(deps: BotDeps): Bot {
 
     const userId = String(ctx.from?.id ?? "");
     const chatId = ctx.chat?.id;
-    if (!userId || chatId === undefined) return;
+    const askMessageId = ctx.message?.message_id;
+    if (!userId || chatId === undefined || askMessageId === undefined) return;
 
     const replyTarget = extractReplyTarget(ctx);
     const nameOverride = await deps.storage.getUserName(userId);
@@ -237,6 +243,7 @@ export function createBot(deps: BotDeps): Bot {
         now: Date.now(),
         chatId: String(chatId),
         userId,
+        askMessageId,
         sender,
         userText,
         quote,

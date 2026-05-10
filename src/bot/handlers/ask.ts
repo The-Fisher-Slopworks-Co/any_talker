@@ -16,6 +16,7 @@ export type AskInput = {
   now: number;
   chatId: string;
   userId: string;
+  askMessageId: number;
   sender: Sender;
   userText: string;
   quote: string | null;
@@ -98,6 +99,14 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      toolCallContext: {
+        source: "ask",
+        chatId: input.chatId,
+        userId: input.userId,
+        replyToMessageId: input.askMessageId,
+        timezone,
+        now: input.now,
+      },
     });
   } catch (err) {
     return { kind: "error", message: err instanceof Error ? err.message : String(err) };

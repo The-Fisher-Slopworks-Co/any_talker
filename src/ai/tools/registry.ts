@@ -1,10 +1,21 @@
 import { z } from "zod";
 
+export type ToolCallSource = "ask" | "guest";
+
+export type ToolCallContext = {
+  source: ToolCallSource;
+  chatId: string;
+  userId: string;
+  replyToMessageId: number | null;
+  timezone: string;
+  now: number;
+};
+
 export type Tool<TInput = unknown, TOutput = unknown> = {
   name: string;
   description: string;
   parameters: z.ZodType<TInput>;
-  execute: (input: TInput) => Promise<TOutput> | TOutput;
+  execute: (input: TInput, ctx: ToolCallContext) => Promise<TOutput> | TOutput;
 };
 
 const registry = new Map<string, Tool>();

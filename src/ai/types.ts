@@ -1,4 +1,4 @@
-import type { Tool } from "./tools/registry";
+import type { Tool, ToolCallContext } from "./tools/registry";
 import type { ProviderSort } from "../shared/types";
 
 export type AIUserContentPart =
@@ -21,5 +21,6 @@ export interface AIClient {
     messages: AIMessage[];
     tools: Tool[];
     providerSort?: ProviderSort | null;
+    toolCallContext: ToolCallContext;
   }): Promise<AskResult>;
 }
