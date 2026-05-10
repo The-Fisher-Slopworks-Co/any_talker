@@ -2,7 +2,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
-import { api, type MeResponse, type RemindersResponse } from "./api-client";
+import {
+  api,
+  type MeResponse,
+  type RemindersResponse,
+  type UserSettingsResponse,
+} from "./api-client";
 import {
   fetchOpenRouterModels,
   fetchOpenRouterEndpoints,
@@ -205,6 +210,40 @@ function RowButton({
     >
       {children}
     </button>
+  );
+}
+
+function WhitelistToggleButton({
+  kind,
+  id,
+  label,
+  initial,
+}: {
+  kind: "users" | "chats";
+  id: string;
+  label: string;
+  initial: boolean;
+}) {
+  const [whitelisted, setWhitelisted] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const toggle = async () => {
+    setBusy(true);
+    try {
+      if (whitelisted) {
+        await api.removeWhitelist(kind, id);
+        setWhitelisted(false);
+      } else {
+        await api.addWhitelist(kind, { id, label });
+        setWhitelisted(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <RowButton onClick={toggle} disabled={busy}>
+      {busy ? "Updating…" : whitelisted ? "Remove from whitelist" : "Add to whitelist"}
+    </RowButton>
   );
 }
 
@@ -911,30 +950,14 @@ function RateLimitTab({
 function WhitelistList({
   kind,
   entries,
-  onAdd,
+  onOpen,
   onRemove,
 }: {
   kind: "users" | "chats";
   entries: WhitelistEntry[];
-  onAdd: (e: WhitelistEntry) => Promise<void>;
+  onOpen: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
 }) {
-  const [id, setId] = useState("");
-  const [label, setLabel] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async () => {
-    if (!id.trim() || busy) return;
-    setBusy(true);
-    try {
-      await onAdd({ id: id.trim(), label: label.trim() || undefined });
-      setId("");
-      setLabel("");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <>
       <SectionHeader>{kind === "users" ? "Allowed Users" : "Allowed Chats"}</SectionHeader>
@@ -944,8 +967,16 @@ function WhitelistList({
         ) : (
           entries.map((e) => (
             <div key={e.id} className={ROW_CLS}>
-              <span className="shrink-0 font-mono text-sm">{e.id}</span>
-              <span className={ROW_VALUE_CLS}>{e.label ?? ""}</span>
+              <div className="flex-1 min-w-0">
+                <div className="truncate">{e.label || `id:${e.id}`}</div>
+                <div className="text-[13px] text-tg-hint truncate">id {e.id}</div>
+              </div>
+              <button
+                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
+                onClick={() => onOpen(e.id)}
+              >
+                Open
+              </button>
               <button
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
                 onClick={() => onRemove(e.id)}
@@ -956,37 +987,20 @@ function WhitelistList({
           ))
         )}
       </Card>
-
-      <SectionHeader>Add {kind === "users" ? "User" : "Chat"}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>ID</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={kind === "users" ? "123456789" : "-1001234567890"}
-            value={id}
-            onChange={(e) => setId(e.target.value)}
-            inputMode="numeric"
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>Name</span>
-          <input
-            className={INPUT_CLS}
-            placeholder="Optional"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-        </label>
-        <RowButton onClick={submit} disabled={!id.trim() || busy}>
-          {busy ? "Adding…" : `Add ${kind === "users" ? "User" : "Chat"}`}
-        </RowButton>
-      </Card>
+      <SectionFooter>
+        Add entries from a {kind === "users" ? "user" : "chat"}'s page via "Add to whitelist".
+      </SectionFooter>
     </>
   );
 }
 
-function WhitelistTab() {
+function WhitelistTab({
+  onOpenUser,
+  onOpenChat,
+}: {
+  onOpenUser: (id: string) => void;
+  onOpenChat: (id: string) => void;
+}) {
   const [users, setUsers] = useState<WhitelistEntry[]>([]);
   const [chats, setChats] = useState<WhitelistEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -1006,13 +1020,13 @@ function WhitelistTab() {
       <WhitelistList
         kind="users"
         entries={users}
-        onAdd={async (e) => setUsers(await api.addWhitelist("users", e))}
+        onOpen={onOpenUser}
         onRemove={async (id) => setUsers(await api.removeWhitelist("users", id))}
       />
       <WhitelistList
         kind="chats"
         entries={chats}
-        onAdd={async (e) => setChats(await api.addWhitelist("chats", e))}
+        onOpen={onOpenChat}
         onRemove={async (id) => setChats(await api.removeWhitelist("chats", id))}
       />
     </Stack>
@@ -1070,34 +1084,28 @@ function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
 }
 
 function UserEditView({ userId }: { userId: string }) {
-  const [data, setData] = useState<{ user: User; displayName: string | null } | null>(
-    null,
-  );
+  const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [whitelist, setWhitelist] = useState<WhitelistEntry[] | null>(null);
-  const [whitelistBusy, setWhitelistBusy] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.getAdminUser(userId), api.getWhitelist()])
-      .then(([d, wl]) => {
+    api
+      .getAdminUser(userId)
+      .then((d) => {
         setData(d);
         setName(d.displayName ?? "");
-        setWhitelist(wl.users);
       })
       .catch(() => setNotFound(true));
   }, [userId]);
 
   if (notFound)
     return <div className="text-center text-tg-hint py-20">User not found.</div>;
-  if (!data || whitelist === null)
-    return <div className="text-center text-tg-hint py-20">Loading…</div>;
+  if (!data) return <div className="text-center text-tg-hint py-20">Loading…</div>;
 
   const { user } = data;
   const fallbackName = userDisplayName(user);
   const dirty = name.trim() !== (data.displayName ?? "");
-  const isWhitelisted = whitelist.some((e) => e.id === user.id);
 
   const save = async () => {
     setSaving(true);
@@ -1107,18 +1115,6 @@ function UserEditView({ userId }: { userId: string }) {
       setName(next.displayName ?? "");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const toggleWhitelist = async () => {
-    setWhitelistBusy(true);
-    try {
-      const next = isWhitelisted
-        ? await api.removeWhitelist("users", user.id)
-        : await api.addWhitelist("users", { id: user.id, label: fallbackName });
-      setWhitelist(next);
-    } finally {
-      setWhitelistBusy(false);
     }
   };
 
@@ -1149,13 +1145,12 @@ function UserEditView({ userId }: { userId: string }) {
         <RowButton onClick={() => openTelegramProfile(user)}>
           Open in Telegram
         </RowButton>
-        <RowButton onClick={toggleWhitelist} disabled={whitelistBusy}>
-          {whitelistBusy
-            ? "Updating…"
-            : isWhitelisted
-              ? "Remove from whitelist"
-              : "Add to whitelist"}
-        </RowButton>
+        <WhitelistToggleButton
+          kind="users"
+          id={user.id}
+          label={fallbackName}
+          initial={data.whitelisted}
+        />
       </Card>
 
       <SectionHeader>Display Name</SectionHeader>
@@ -1270,16 +1265,15 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [whitelist, setWhitelist] = useState<WhitelistEntry[] | null>(null);
-  const [whitelistBusy, setWhitelistBusy] = useState(false);
+  const [whitelisted, setWhitelisted] = useState<boolean | null>(null);
 
   useEffect(() => {
-    Promise.all([api.getSettings(), api.getAdminChat(chatId), api.getWhitelist()])
-      .then(([g, d, wl]) => {
+    Promise.all([api.getSettings(), api.getAdminChat(chatId)])
+      .then(([g, d]) => {
         setGlobal(g);
         setChat(d.chat);
         setOriginal(d.settings);
-        setWhitelist(wl.chats);
+        setWhitelisted(d.whitelisted);
         setPromptOverride(d.settings.systemPrompt !== undefined);
         setPromptValue(d.settings.systemPrompt ?? g.systemPrompt);
         setModelsOverride(d.settings.models !== undefined);
@@ -1301,22 +1295,8 @@ function ChatEditView({ chatId }: { chatId: string }) {
 
   if (notFound)
     return <div className="text-center text-tg-hint py-20">Chat not found.</div>;
-  if (!chat || !global || !original || !rlValue || whitelist === null)
+  if (!chat || !global || !original || !rlValue || whitelisted === null)
     return <div className="text-center text-tg-hint py-20">Loading…</div>;
-
-  const isWhitelisted = whitelist.some((e) => e.id === chat.id);
-
-  const toggleWhitelist = async () => {
-    setWhitelistBusy(true);
-    try {
-      const next = isWhitelisted
-        ? await api.removeWhitelist("chats", chat.id)
-        : await api.addWhitelist("chats", { id: chat.id, label: chatTitle(chat) });
-      setWhitelist(next);
-    } finally {
-      setWhitelistBusy(false);
-    }
-  };
 
   const trimmedModels = modelsValue.map((m) => m.trim()).filter((m) => m.length > 0);
 
@@ -1405,13 +1385,12 @@ function ChatEditView({ chatId }: { chatId: string }) {
             {new Date(chat.lastSeenAt).toLocaleString()}
           </span>
         </div>
-        <RowButton onClick={toggleWhitelist} disabled={whitelistBusy}>
-          {whitelistBusy
-            ? "Updating…"
-            : isWhitelisted
-              ? "Remove from whitelist"
-              : "Add to whitelist"}
-        </RowButton>
+        <WhitelistToggleButton
+          kind="chats"
+          id={chat.id}
+          label={chatTitle(chat)}
+          initial={whitelisted}
+        />
       </Card>
 
       <SectionHeader>Bot Name</SectionHeader>
@@ -1558,7 +1537,8 @@ function AdminSectionView({
     if (needsSettings) api.getSettings().then(setSettings);
   }, [needsSettings]);
 
-  if (section === "whitelist") return <WhitelistTab />;
+  if (section === "whitelist")
+    return <WhitelistTab onOpenUser={onEditUser} onOpenChat={onEditChat} />;
   if (section === "users") return <UsersTab onEdit={onEditUser} />;
   if (section === "chats") return <ChatsTab onEdit={onEditChat} />;
   if (section === "reminders")
