@@ -28,6 +28,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   quote: null,
   image: null,
   replyTarget: null,
+  lang: "en",
   ...overrides,
 });
 

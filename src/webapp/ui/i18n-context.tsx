@@ -1,0 +1,26 @@
+import { createContext, useContext, type ReactNode } from "react";
+import { t, type Lang } from "../../shared/i18n";
+
+type I18nValue = { lang: Lang; t: ReturnType<typeof t> };
+
+const I18nContext = createContext<I18nValue | null>(null);
+
+export function I18nProvider({
+  lang,
+  children,
+}: {
+  lang: Lang;
+  children: ReactNode;
+}) {
+  return (
+    <I18nContext.Provider value={{ lang, t: t(lang) }}>
+      {children}
+    </I18nContext.Provider>
+  );
+}
+
+export function useI18n(): I18nValue {
+  const value = useContext(I18nContext);
+  if (!value) throw new Error("useI18n used outside I18nProvider");
+  return value;
+}

@@ -14,6 +14,7 @@ import { resolveReplyAuthor } from "./reply";
 import { applyBotNamePrefix } from "./format";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
+import { makeLangMiddleware, type BotContext } from "./middleware/lang";
 
 type AnswerGuestQuery = (args: {
   guest_query_id: string;
@@ -33,8 +34,8 @@ export type BotDeps = {
 
 const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
 
-export function createBot(deps: BotDeps): Bot {
-  const bot = new Bot(deps.botToken);
+export function createBot(deps: BotDeps): Bot<BotContext> {
+  const bot = new Bot<BotContext>(deps.botToken);
 
   bot.use(
     makeIncomingUpdateLogger({
@@ -42,6 +43,8 @@ export function createBot(deps: BotDeps): Bot {
       enabled: deps.logIncomingUpdates,
     }),
   );
+
+  bot.use(makeLangMiddleware(deps.storage));
 
   bot.use(async (ctx, next) => {
     const now = Date.now();
@@ -79,7 +82,7 @@ export function createBot(deps: BotDeps): Bot {
   });
 
   const dispatchGuest = async (
-    ctx: Context,
+    ctx: BotContext,
     msg: NonNullable<Context["update"]["guest_message"]>,
   ) => {
     const guestQueryId = msg.guest_query_id;
@@ -118,6 +121,7 @@ export function createBot(deps: BotDeps): Bot {
       sender,
       userText,
       priorThread,
+      lang: ctx.lang,
     });
 
     const answerGuestQuery = (
@@ -145,13 +149,13 @@ export function createBot(deps: BotDeps): Bot {
         return;
       case "rateLimited":
         await answer(
-          `Rate limit exceeded. Refilled in ~${outcome.minutesUntilNextRefill} min.`,
+          ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
           null,
         ).catch((err) => console.error("answerGuestQuery failed:", err));
         return;
       case "error":
         console.error("guest ask error:", outcome.message);
-        await answer("⚠️ AI error. Try again later.", null).catch((err) =>
+        await answer(ctx.t.bot_ai_error, null).catch((err) =>
           console.error("answerGuestQuery failed:", err),
         );
         return;
@@ -178,7 +182,7 @@ export function createBot(deps: BotDeps): Bot {
 
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
-  const dispatchAsk = async (ctx: Context, userText: string) => {
+  const dispatchAsk = async (ctx: BotContext, userText: string) => {
     if (ctx.message?.forward_origin) return;
 
     const userId = String(ctx.from?.id ?? "");
@@ -208,7 +212,7 @@ export function createBot(deps: BotDeps): Bot {
           image = await downloadTelegramFile(deps.botToken, picked.file_id);
         } catch (err) {
           console.error("photo download failed:", err);
-          await ctx.reply("⚠️ Couldn't fetch the attached photo.");
+          await ctx.reply(ctx.t.bot_photo_cant_fetch);
           return;
         }
       }
@@ -258,6 +262,7 @@ export function createBot(deps: BotDeps): Bot {
         quote,
         image,
         replyTarget,
+        lang: ctx.lang,
         onAIStart: startTyping,
       });
     } finally {
@@ -268,16 +273,16 @@ export function createBot(deps: BotDeps): Bot {
       case "denied":
         return;
       case "usage":
-        await ctx.reply("Usage: /ask <text> or reply to a message with /ask");
+        await ctx.reply(ctx.t.bot_ask_usage);
         return;
       case "rateLimited":
         await ctx.reply(
-          `Rate limit exceeded. Refilled in ~${outcome.minutesUntilNextRefill} min.`,
+          ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
         );
         return;
       case "error":
         console.error("ask error:", outcome.message);
-        await ctx.reply("⚠️ AI error. Try again later.");
+        await ctx.reply(ctx.t.bot_ai_error);
         return;
       case "answered": {
         const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
@@ -324,16 +329,16 @@ export function createBot(deps: BotDeps): Bot {
       case "ignored":
         return;
       case "noUserId":
-        await ctx.reply("This contact isn't on Telegram — nothing to whitelist.");
+        await ctx.reply(ctx.t.bot_contact_no_user_id);
         return;
       case "isOwner":
-        await ctx.reply("You're already the owner — no whitelist entry needed.");
+        await ctx.reply(ctx.t.bot_contact_is_owner);
         return;
       case "alreadyWhitelisted":
-        await ctx.reply(`${outcome.label} is already whitelisted.`);
+        await ctx.reply(ctx.t.bot_contact_already_whitelisted(outcome.label));
         return;
       case "added":
-        await ctx.reply(`Added ${outcome.label} to the whitelist.`);
+        await ctx.reply(ctx.t.bot_contact_added(outcome.label));
         return;
     }
   });

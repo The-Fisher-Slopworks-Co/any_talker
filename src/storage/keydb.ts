@@ -17,6 +17,7 @@ import {
   isEmptyChatSettings,
   isValidGender,
 } from "../shared/types";
+import { isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 
 const PREFIX = "at:";
@@ -107,6 +108,17 @@ export class KeyDBStorage implements Storage {
     const key = `${PREFIX}user_gender:${userId}`;
     if (gender === null) await this.client.del(key);
     else await this.client.set(key, gender);
+  }
+
+  async getUserLang(userId: string): Promise<Lang | null> {
+    const raw = await this.client.get(`${PREFIX}user_lang:${userId}`);
+    return isValidLang(raw) ? raw : null;
+  }
+
+  async setUserLang(userId: string, lang: Lang | null): Promise<void> {
+    const key = `${PREFIX}user_lang:${userId}`;
+    if (lang === null) await this.client.del(key);
+    else await this.client.set(key, lang);
   }
 
   async listUsers(): Promise<User[]> {

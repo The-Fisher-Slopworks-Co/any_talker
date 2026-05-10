@@ -49,4 +49,22 @@ describe("buildInstruction", () => {
     const out = buildInstruction("X");
     expect(out).not.toContain("# Текущие дата и время");
   });
+
+  test("appends English language section when lang=en", () => {
+    const out = buildInstruction("X", { lang: "en" });
+    expect(out).toContain("# Response language");
+    expect(out).toContain("Reply in English");
+  });
+
+  test("appends Russian language section when lang=ru", () => {
+    const out = buildInstruction("X", { lang: "ru" });
+    expect(out).toContain("# Язык ответа");
+    expect(out).toContain("на русском");
+  });
+
+  test("omits language section when lang is not provided", () => {
+    const out = buildInstruction("X");
+    expect(out).not.toContain("# Response language");
+    expect(out).not.toContain("# Язык ответа");
+  });
 });

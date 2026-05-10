@@ -336,6 +336,7 @@ describe("/api/me", () => {
       displayName: null,
       timezone: null,
       gender: null,
+      language: null,
     });
   });
 
@@ -351,6 +352,7 @@ describe("/api/me", () => {
       displayName: "Alice",
       timezone: null,
       gender: null,
+      language: null,
     });
     const get = await handleApi(
       { method: "GET", path: "/api/me", body: null },
@@ -362,6 +364,7 @@ describe("/api/me", () => {
       displayName: "Alice",
       timezone: null,
       gender: null,
+      language: null,
     });
   });
 
@@ -378,6 +381,7 @@ describe("/api/me", () => {
       displayName: null,
       timezone: null,
       gender: null,
+      language: null,
     });
     expect(await d.storage.getUserName("42")).toBeNull();
   });
@@ -399,6 +403,7 @@ describe("/api/me", () => {
       displayName: null,
       timezone: null,
       gender: null,
+      language: null,
     });
   });
 
@@ -419,6 +424,7 @@ describe("/api/me", () => {
       displayName: "Alice",
       timezone: "Europe/Moscow",
       gender: null,
+      language: null,
     });
     expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
   });
@@ -454,6 +460,7 @@ describe("/api/me", () => {
       displayName: null,
       timezone: null,
       gender: "female",
+      language: null,
     });
     expect(await d.storage.getUserGender("42")).toBe("female");
   });
@@ -524,6 +531,7 @@ describe("/api/me", () => {
       displayName: "NewName",
       timezone: "Europe/Moscow",
       gender: "female",
+      language: null,
     });
     expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
     expect(await d.storage.getUserGender("42")).toBe("female");
@@ -563,7 +571,42 @@ describe("/api/me", () => {
       displayName: "Alice",
       timezone: "Europe/Moscow",
       gender: "female",
+      language: null,
     });
+  });
+
+  test("PUT accepts a valid language and persists it", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { language: "ru" } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { language: string }).language).toBe("ru");
+    expect(await d.storage.getUserLang("42")).toBe("ru");
+  });
+
+  test("PUT rejects an invalid language with 400", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { language: "de" } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT clears language when null is provided", async () => {
+    const d = deps();
+    await d.storage.setUserLang("42", "ru");
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { language: null } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserLang("42")).toBeNull();
   });
 });
 
