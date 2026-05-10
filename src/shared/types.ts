@@ -13,6 +13,8 @@ export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
   "latency",
 ];
 
+export type Gender = "male" | "female";
+
 export type Settings = {
   systemPrompt: string;
   models: string[];
@@ -122,6 +124,10 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
 
 export function isValidProviderSort(v: unknown): v is ProviderSort {
   return v === "price" || v === "throughput" || v === "latency";
+}
+
+export function isValidGender(v: unknown): v is Gender {
+  return v === "male" || v === "female";
 }
 
 export function isValidTimezone(tz: string): boolean {

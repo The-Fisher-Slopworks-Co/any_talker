@@ -30,6 +30,7 @@ import {
   type ChatSettings,
   type RateLimitConfig,
   type ProviderSort,
+  type Gender,
 } from "../../shared/types";
 import type { Reminder } from "../../reminders/types";
 import {
@@ -371,6 +372,8 @@ function MainView({
   const [name, setName] = useState(me.displayName ?? "");
   const [tzOverride, setTzOverride] = useState(me.timezone !== null);
   const [tzValue, setTzValue] = useState(me.timezone ?? "UTC");
+  const [genderOn, setGenderOn] = useState(me.gender !== null);
+  const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
   const [saving, setSaving] = useState(false);
 
   const tg = window.Telegram?.WebApp;
@@ -378,8 +381,11 @@ function MainView({
   const tgName = tgUser ? composeFullName(tgUser.first_name, tgUser.last_name) : "";
 
   const desiredTz = tzOverride ? tzValue : null;
+  const desiredGender: Gender | null = genderOn ? genderValue : null;
   const dirty =
-    name.trim() !== (me.displayName ?? "") || desiredTz !== me.timezone;
+    name.trim() !== (me.displayName ?? "") ||
+    desiredTz !== me.timezone ||
+    desiredGender !== me.gender;
 
   const save = async () => {
     setSaving(true);
@@ -387,11 +393,14 @@ function MainView({
       const next = await api.putMe({
         displayName: name.trim() || null,
         timezone: desiredTz,
+        gender: desiredGender,
       });
       onMe(next);
       setName(next.displayName ?? "");
       setTzOverride(next.timezone !== null);
       setTzValue(next.timezone ?? "UTC");
+      setGenderOn(next.gender !== null);
+      setGenderValue(next.gender ?? "male");
     } finally {
       setSaving(false);
     }
@@ -412,6 +421,40 @@ function MainView({
         </label>
       </Card>
       <SectionFooter>Name shown to the AI.</SectionFooter>
+
+      <SectionHeader>Gender</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>Tell the AI</span>
+          <span className="flex-1" />
+          <Toggle value={genderOn} onChange={setGenderOn} />
+        </div>
+      </Card>
+      {genderOn ? (
+        <Card>
+          <button
+            type="button"
+            className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+            onClick={() => setGenderValue("male")}
+          >
+            <span className={ROW_LABEL_CLS}>Male</span>
+            <span className="flex-1" />
+            {genderValue === "male" ? <span className="text-tg-link">✓</span> : null}
+          </button>
+          <button
+            type="button"
+            className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+            onClick={() => setGenderValue("female")}
+          >
+            <span className={ROW_LABEL_CLS}>Female</span>
+            <span className="flex-1" />
+            {genderValue === "female" ? <span className="text-tg-link">✓</span> : null}
+          </button>
+        </Card>
+      ) : null}
+      <SectionFooter>
+        Sent to the AI so it uses correct grammatical gender. Off omits the field.
+      </SectionFooter>
 
       <SectionHeader>Timezone</SectionHeader>
       <Card>

@@ -22,7 +22,7 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => ({
   now: 1_000,
   chatId: "c1",
   userId: "42",
-  sender: { firstName: "Jane", lastName: null, nameOverride: null },
+  sender: { firstName: "Jane", lastName: null, nameOverride: null, gender: null },
   userText: "hello",
   priorThread: null,
   ...overrides,

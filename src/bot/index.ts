@@ -89,11 +89,15 @@ export function createBot(deps: BotDeps): Bot {
 
     const userText = (msg.text ?? msg.caption ?? "").trim();
 
-    const nameOverride = await deps.storage.getUserName(userId);
+    const [nameOverride, gender] = await Promise.all([
+      deps.storage.getUserName(userId),
+      deps.storage.getUserGender(userId),
+    ]);
     const sender = {
       firstName: msg.from?.first_name ?? null,
       lastName: msg.from?.last_name ?? null,
       nameOverride,
+      gender,
     };
 
     const replyToOurBot =
@@ -182,11 +186,15 @@ export function createBot(deps: BotDeps): Bot {
     if (!userId || chatId === undefined || askMessageId === undefined) return;
 
     const replyTarget = extractReplyTarget(ctx);
-    const nameOverride = await deps.storage.getUserName(userId);
+    const [nameOverride, gender] = await Promise.all([
+      deps.storage.getUserName(userId),
+      deps.storage.getUserGender(userId),
+    ]);
     const sender = {
       firstName: ctx.from?.first_name ?? null,
       lastName: ctx.from?.last_name ?? null,
       nameOverride,
+      gender,
     };
     const quote = ctx.message?.quote?.text ?? null;
 
