@@ -7,6 +7,7 @@ import { registerTool, type Tool } from "./ai/tools/registry";
 import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
 import { randomChoiceTool } from "./ai/tools/random-choice";
+import { fetchPageTool } from "./ai/tools/fetch-page";
 import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
 import { createBot } from "./bot";
@@ -28,6 +29,7 @@ async function main() {
     withLogging(t, config.logFormat);
   registerTool(logged(randomNumberTool));
   registerTool(logged(randomChoiceTool));
+  registerTool(logged(fetchPageTool));
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
 
   const bot = createBot({
