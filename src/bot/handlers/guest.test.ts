@@ -3,7 +3,7 @@ import { MemoryStorage } from "../../storage/memory";
 import { TokenBucketLimiter } from "../../ratelimit/token-bucket";
 import type { AIClient, AskResult } from "../../ai/types";
 import { guestAskHandler, type GuestAskInput } from "./guest";
-import { DEFAULT_SETTINGS } from "../../shared/types";
+import { DEFAULT_SETTINGS, MAX_REPLY_CHAIN_DEPTH } from "../../shared/types";
 
 class FakeAI implements AIClient {
   constructor(public reply: AskResult = { text: "guest reply", totalTokens: 50 }) {}
@@ -165,6 +165,36 @@ describe("guestAskHandler", () => {
       },
     ]);
     expect(stored?.ts).toBe(2000);
+  });
+
+  test("priorThread is capped at MAX_REPLY_CHAIN_DEPTH on persist and AI input", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "newest", totalTokens: 1 });
+    const overflowTurns = Array.from({ length: MAX_REPLY_CHAIN_DEPTH + 5 }, (_, i) => ({
+      userQuestion: `Q${i}`,
+      botAnswer: `A${i}`,
+    }));
+    const priorThread = { chatId: "c1", turns: overflowTurns, ts: 500 };
+    const out = await guestAskHandler(
+      baseInput({ storage, ai, priorThread, now: 2000 }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages.length).toBe(MAX_REPLY_CHAIN_DEPTH * 2 + 1);
+    expect(call.messages[0]).toEqual({
+      role: "user",
+      content: `Q${overflowTurns.length - MAX_REPLY_CHAIN_DEPTH}`,
+    });
+
+    await out.persistThread();
+    const stored = await storage.getGuestThread("c1");
+    expect(stored?.turns.length).toBe(MAX_REPLY_CHAIN_DEPTH);
+    expect(stored?.turns[stored.turns.length - 1]?.botAnswer).toBe("newest");
+    expect(stored?.turns[0]?.userQuestion).toBe(
+      `Q${overflowTurns.length - MAX_REPLY_CHAIN_DEPTH + 1}`,
+    );
   });
 
   test("answered: deducts tokens from bucket", async () => {
