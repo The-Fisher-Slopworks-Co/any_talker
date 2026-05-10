@@ -33,15 +33,16 @@ export async function contactHandler(input: ContactInput): Promise<ContactOutcom
 
   const label = composeFullName(input.contact.first_name, input.contact.last_name);
 
-  if (await input.storage.isWhitelisted("users", targetId)) {
-    return { kind: "alreadyWhitelisted", label };
-  }
+  const [isWl, existing] = await Promise.all([
+    input.storage.isWhitelisted("users", targetId),
+    input.storage.getUser(targetId),
+  ]);
+  if (isWl) return { kind: "alreadyWhitelisted", label };
 
-  const existing = await input.storage.getUser(targetId);
   if (!existing) {
     await input.storage.upsertUser({
       id: targetId,
-      firstName: input.contact.first_name ?? null,
+      firstName: input.contact.first_name,
       lastName: input.contact.last_name ?? null,
       username: null,
       lastSeenAt: input.now,
