@@ -13,19 +13,23 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "@types/turndown": "^5.0.6"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "@openrouter/ai-sdk-provider": "latest",
     "ai": "latest",
     "bun-plugin-tailwind": "^0.1.2",
     "grammy": "latest",
+    "linkedom": "^0.18.12",
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "^4.2.4",
+    "turndown": "^7.2.4",
     "zod": "latest"
   }
 }
