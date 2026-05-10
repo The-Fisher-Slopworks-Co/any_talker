@@ -8,6 +8,7 @@ import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
 import { randomChoiceTool } from "./ai/tools/random-choice";
 import { fetchPageTool } from "./ai/tools/fetch-page";
+import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
 import { createBot } from "./bot";
@@ -30,6 +31,11 @@ async function main() {
   registerTool(logged(randomNumberTool));
   registerTool(logged(randomChoiceTool));
   registerTool(logged(fetchPageTool));
+  if (config.firecrawlApiKey) {
+    registerTool(logged(createSearchWebTool(config.firecrawlApiKey)));
+  } else {
+    console.warn("FIRECRAWL_API_KEY not set, search_web tool disabled");
+  }
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
 
   const bot = createBot({
