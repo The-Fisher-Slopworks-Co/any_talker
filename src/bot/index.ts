@@ -5,6 +5,7 @@ import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
 import type { LogFormat } from "../log";
 import { askHandler } from "./handlers/ask";
+import { contactHandler } from "./handlers/contact";
 import { guestAskHandler } from "./handlers/guest";
 import { makeStartHandler } from "./handlers/start";
 import type { ReplyTarget } from "./context-builder";
@@ -291,6 +292,42 @@ export function createBot(deps: BotDeps): Bot {
     const m = caption.match(ASK_CAPTION_RE);
     if (!m) return;
     await dispatchAsk(ctx, (m[1] ?? "").trim());
+  });
+
+  bot.on("message:contact", async (ctx) => {
+    if (ctx.message.forward_origin) return;
+    if (!ctx.from) return;
+    const c = ctx.message.contact;
+
+    const outcome = await contactHandler({
+      storage: deps.storage,
+      ownerId: deps.ownerId,
+      now: Date.now(),
+      isPrivateChat: ctx.chat?.type === "private",
+      fromUserId: String(ctx.from.id),
+      contact: {
+        user_id: c.user_id,
+        first_name: c.first_name,
+        last_name: c.last_name,
+      },
+    });
+
+    switch (outcome.kind) {
+      case "ignored":
+        return;
+      case "noUserId":
+        await ctx.reply("This contact isn't on Telegram — nothing to whitelist.");
+        return;
+      case "isOwner":
+        await ctx.reply("You're already the owner — no whitelist entry needed.");
+        return;
+      case "alreadyWhitelisted":
+        await ctx.reply(`${outcome.label} is already whitelisted.`);
+        return;
+      case "added":
+        await ctx.reply(`Added ${outcome.label} to the whitelist.`);
+        return;
+    }
   });
 
   bot.catch((err) => {
