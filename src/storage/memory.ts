@@ -12,6 +12,7 @@ import type {
   Gender,
 } from "../shared/types";
 import { isEmptyChatSettings } from "../shared/types";
+import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 
 export class MemoryStorage implements Storage {
@@ -26,6 +27,7 @@ export class MemoryStorage implements Storage {
   private userNames = new Map<string, string>();
   private userTimezones = new Map<string, string>();
   private userGenders = new Map<string, Gender>();
+  private userLangs = new Map<string, Lang>();
   private users = new Map<string, User>();
   private chats = new Map<string, Chat>();
   private chatSettings = new Map<string, ChatSettings>();
@@ -102,6 +104,15 @@ export class MemoryStorage implements Storage {
   async setUserGender(userId: string, gender: Gender | null): Promise<void> {
     if (gender === null) this.userGenders.delete(userId);
     else this.userGenders.set(userId, gender);
+  }
+
+  async getUserLang(userId: string): Promise<Lang | null> {
+    return this.userLangs.get(userId) ?? null;
+  }
+
+  async setUserLang(userId: string, lang: Lang | null): Promise<void> {
+    if (lang === null) this.userLangs.delete(userId);
+    else this.userLangs.set(userId, lang);
   }
 
   async listUsers(): Promise<User[]> {

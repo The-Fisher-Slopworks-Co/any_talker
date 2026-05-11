@@ -9,6 +9,7 @@ import type {
   ChatSettings,
   Gender,
 } from "../../shared/types";
+import type { Lang } from "../../shared/i18n";
 import type { Reminder } from "../../reminders/types";
 
 declare global {
@@ -17,7 +18,12 @@ declare global {
       WebApp?: {
         initData: string;
         initDataUnsafe?: {
-          user?: { first_name?: string; last_name?: string; username?: string };
+          user?: {
+            first_name?: string;
+            last_name?: string;
+            username?: string;
+            language_code?: string;
+          };
         };
         ready: () => void;
         expand: () => void;
@@ -39,6 +45,7 @@ export type MeResponse = {
   displayName: string | null;
   timezone: string | null;
   gender: Gender | null;
+  language: Lang | null;
 };
 export type UserSettingsResponse = {
   user: User;
@@ -80,9 +87,10 @@ export const api = {
     req<{ bucket: BucketState | null }>("PUT", "/api/ratelimit/me", { reset: true }),
   getMe: () => req<MeResponse>("GET", "/api/me"),
   putMe: (patch: {
-    displayName: string | null;
-    timezone: string | null;
-    gender: Gender | null;
+    displayName?: string | null;
+    timezone?: string | null;
+    gender?: Gender | null;
+    language?: Lang | null;
   }) => req<MeResponse>("PUT", "/api/me", patch),
   listAdminUsers: () => req<{ users: User[] }>("GET", "/api/admin/users"),
   getAdminUser: (id: string) =>

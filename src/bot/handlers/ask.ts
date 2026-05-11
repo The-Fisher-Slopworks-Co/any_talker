@@ -7,6 +7,7 @@ import { getEffectiveSettings } from "../../settings";
 import { getAllTools } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
+import type { Lang } from "../../shared/i18n";
 
 export type AskInput = {
   storage: Storage;
@@ -22,6 +23,7 @@ export type AskInput = {
   quote: string | null;
   image: Uint8Array | null;
   replyTarget: ReplyTarget | null;
+  lang: Lang;
   onAIStart?: () => void;
 };
 
@@ -95,7 +97,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   try {
     result = await input.ai.ask({
       models: settings.models,
-      system: buildInstruction(settings.systemPrompt, { timezone }),
+      system: buildInstruction(settings.systemPrompt, {
+        timezone,
+        lang: input.lang,
+      }),
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
