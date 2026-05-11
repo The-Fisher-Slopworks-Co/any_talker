@@ -106,7 +106,9 @@ describe("handleCheckCallback", () => {
     });
     expect(out.kind).toBe("resolved");
     expect(api.sent).toHaveLength(1);
-    expect(api.sent[0]?.text).toBe("Nikita n 11");
+    expect(api.sent[0]?.text).toBe(
+      `<a href="tg://user?id=user-1">Nikita</a> n 11`,
+    );
     const saved = await storage.getCheck("c1");
     expect(saved?.pendingMessageId).toBeNull();
     expect(saved?.counter).toBe(11);

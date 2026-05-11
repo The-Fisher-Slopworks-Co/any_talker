@@ -491,7 +491,7 @@ const en: Strings = {
   ui_check_target_name: "Name shown",
   ui_check_target_name_placeholder: "Nikita",
   ui_check_target_name_footer:
-    "Substituted for {name} inside the question and replies.",
+    "Substituted for {name} inside the question and replies, rendered as a clickable mention that pings the target user.",
   ui_check_schedule: "Time",
   ui_check_schedule_footer:
     "Daily wall-clock time in the timezone below. The bot fires at most once per day.",
@@ -505,7 +505,7 @@ const en: Strings = {
   ui_check_question_placeholder:
     "{name}, did you do sport today?",
   ui_check_question_footer:
-    "Sent at the scheduled time. {name} is replaced; {count} is the current counter.",
+    "Sent at the scheduled time. {name} becomes a clickable mention that pings the user; {count} is the current counter.",
   ui_check_yes_button: "\"Yes\" button label",
   ui_check_no_button: "\"No\" button label",
   ui_check_yes_reply: "Reply when Yes",
@@ -514,7 +514,7 @@ const en: Strings = {
   ui_check_no_reply: "Reply when No / timeout",
   ui_check_no_reply_placeholder: "{name}. Day without sport {count}",
   ui_check_replies_footer:
-    "{name} is replaced; {count} is the counter after this answer.",
+    "{name} becomes a clickable mention of the user; {count} is the counter after this answer.",
   ui_check_counter: "Counter",
   ui_check_counter_footer:
     "Current value of {count}. Adjust manually if needed.",
@@ -775,7 +775,7 @@ const ru: Strings = {
   ui_check_target_name: "Имя в сообщениях",
   ui_check_target_name_placeholder: "Никита",
   ui_check_target_name_footer:
-    "Подставляется на место {name} в вопросе и ответах.",
+    "Подставляется на место {name} в вопросе и ответах в виде кликабельного упоминания, которое пингует пользователя.",
   ui_check_schedule: "Время",
   ui_check_schedule_footer:
     "Время суток в указанном ниже часовом поясе. Бот сработает не больше одного раза в сутки.",
@@ -789,7 +789,7 @@ const ru: Strings = {
   ui_check_question_placeholder:
     "{name}, занялся ли ты сегодня спортом?",
   ui_check_question_footer:
-    "Отправляется в назначенное время. {name} — имя; {count} — текущий счётчик.",
+    "Отправляется в назначенное время. {name} — кликабельное упоминание, пингующее пользователя; {count} — текущий счётчик.",
   ui_check_yes_button: "Подпись кнопки «Да»",
   ui_check_no_button: "Подпись кнопки «Нет»",
   ui_check_yes_reply: "Ответ при «Да»",
@@ -798,7 +798,7 @@ const ru: Strings = {
   ui_check_no_reply: "Ответ при «Нет» / таймауте",
   ui_check_no_reply_placeholder: "{name}. День без спорта {count}",
   ui_check_replies_footer:
-    "{name} — имя; {count} — счётчик после этого ответа.",
+    "{name} — кликабельное упоминание пользователя; {count} — счётчик после этого ответа.",
   ui_check_counter: "Счётчик",
   ui_check_counter_footer:
     "Текущее значение {count}. При необходимости можно поправить вручную.",
