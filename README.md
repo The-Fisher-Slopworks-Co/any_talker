@@ -23,10 +23,10 @@ bun run typecheck
 
 ## Production deploy
 
-A ready-to-run Compose file is provided in `docker-compose.prod.yml`. It builds
-the bot from `Dockerfile`, runs KeyDB with persistence, and fronts both with
-Caddy for automatic HTTPS (Let's Encrypt). On a fresh server with DNS pointed
-at it:
+A ready-to-run Compose file is provided in `docker-compose.prod.yml`. It pulls
+the bot image from GHCR (published by CI on every push to `main`), runs KeyDB
+with persistence, and fronts both with Caddy for automatic HTTPS (Let's
+Encrypt). On a fresh server with DNS pointed at it:
 
 ```bash
 cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY, BOT_OWNER_ID,

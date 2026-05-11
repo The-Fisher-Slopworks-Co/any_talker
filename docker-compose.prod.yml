@@ -1,13 +1,14 @@
 # Production-ready Compose for any_talker.
 #
-# Quick start on a fresh server with a public IP and DNS pointing to it:
-#   1. git clone <repo> && cd any_talker
+# Quick start on a fresh server with a public IP and DNS pointing to it.
+# No source checkout is required — just the three files below:
+#   1. Grab docker-compose.prod.yml, .env.example and Caddyfile.example from the repo.
 #   2. cp .env.example .env  # fill required vars, including DOMAIN and LETSENCRYPT_EMAIL
 #   3. cp Caddyfile.example Caddyfile  # tweak only if you need extra routes
 #   4. docker compose -f docker-compose.prod.yml up -d
 #
 # What you get:
-#   - Bot built from the local Dockerfile, running in webhook mode.
+#   - Bot pulled from GHCR (pre-built by CI), running in webhook mode.
 #   - KeyDB with AOF + RDB persistence on a named volume.
 #   - Caddy as a reverse proxy, auto-issuing Let's Encrypt certs for ${DOMAIN}.
 #   - Bot and KeyDB are on an internal network and not exposed to the host;
@@ -18,10 +19,9 @@
 
 services:
   bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: any_talker:latest
+    # Pre-built image published from CI on each push to main. Override the tag
+    # (e.g. ghcr.io/...:<short-sha>) to pin to a specific revision.
+    image: ghcr.io/the-fisher-slopworks-co/any_talker:${BOT_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env
