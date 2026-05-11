@@ -11,6 +11,7 @@ import { lastScheduledFireMs } from "./schedule";
 import { formatQuestion } from "./format";
 import { buildCheckCallback } from "./callback-data";
 import { resolveCheck, type CheckApi } from "./resolve";
+import { checksProcessedTotal } from "../metrics";
 
 export async function runChecksTick(deps: {
   storage: Storage;
@@ -48,6 +49,7 @@ async function processCheck(
         answer: "timeout",
         fromUserId: null,
       });
+      checksProcessedTotal.inc({ outcome: "timeout" });
     }
     return;
   }
@@ -96,6 +98,7 @@ async function fireCheck(
     });
     messageId = sent.message_id;
   } catch (err) {
+    checksProcessedTotal.inc({ outcome: "fire_failed" });
     console.error(`[checks] fire failed id=${check.id}:`, err);
     return;
   }
@@ -106,6 +109,7 @@ async function fireCheck(
     pendingMessageId: messageId,
     pendingFiredAtMs: nowMs,
   });
+  checksProcessedTotal.inc({ outcome: "fired" });
 }
 
 export type ChecksScheduler = IntervalScheduler;

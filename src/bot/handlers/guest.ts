@@ -35,6 +35,7 @@ export type GuestAskOutcome =
       kind: "answered";
       text: string;
       botName: string | null;
+      totalTokens: number;
       persistThread: () => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -129,6 +130,7 @@ export async function guestAskHandler(
     kind: "answered",
     text: sanitized,
     botName,
+    totalTokens: result.totalTokens,
     persistThread: async () => {
       const turns = [
         ...priorTurns,

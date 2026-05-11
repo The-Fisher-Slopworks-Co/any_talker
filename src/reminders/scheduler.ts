@@ -7,6 +7,7 @@ import {
   type IntervalScheduler,
 } from "../shared/interval-scheduler";
 import { deliverReminder, type ReminderApi } from "./delivery";
+import { remindersDeliveredTotal } from "../metrics";
 
 export type Scheduler = IntervalScheduler;
 
@@ -29,6 +30,7 @@ export async function runReminderTick(deps: {
     due.map(async (reminder) => {
       const outcome = await deliverReminder(deps.api, reminder);
       if (outcome === "transient") {
+        remindersDeliveredTotal.inc({ outcome: "transient" });
         console.error(
           `[scheduler] transient delivery failure id=${reminder.id}, retrying next tick`,
         );
@@ -43,10 +45,12 @@ export async function runReminderTick(deps: {
         );
       }
       if (outcome === "permanent") {
+        remindersDeliveredTotal.inc({ outcome: "permanent" });
         console.error(
           `[scheduler] permanent delivery failure id=${reminder.id} kind=${reminder.target.kind}, dropped`,
         );
       } else {
+        remindersDeliveredTotal.inc({ outcome: "delivered" });
         console.log(
           `[scheduler] delivered id=${reminder.id} kind=${reminder.target.kind}`,
         );

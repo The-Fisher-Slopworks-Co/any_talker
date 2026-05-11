@@ -1,18 +1,24 @@
 # Production-ready Compose for any_talker.
 #
 # Quick start on a fresh server with a public IP and DNS pointing to it.
-# No source checkout is required — just the three files below:
-#   1. Grab docker-compose.prod.yml, .env.example and Caddyfile.example from the repo.
+# No source checkout is required — just the files below:
+#   1. Grab docker-compose.prod.yml, .env.example, Caddyfile.example,
+#      vmagent.yml and vector.yaml from the repo.
 #   2. cp .env.example .env  # fill required vars, including DOMAIN and LETSENCRYPT_EMAIL
 #   3. cp Caddyfile.example Caddyfile  # tweak only if you need extra routes
 #   4. docker compose -f docker-compose.prod.yml up -d
 #
 # What you get:
-#   - Bot pulled from GHCR (pre-built by CI), running in webhook mode.
+#   - Bot pulled from GHCR (pre-built by CI), running in webhook mode and
+#     exposing Prometheus metrics on :8080/metrics.
 #   - KeyDB with AOF + RDB persistence on a named volume.
 #   - Caddy as a reverse proxy, auto-issuing Let's Encrypt certs for ${DOMAIN}.
-#   - Bot and KeyDB are on an internal network and not exposed to the host;
-#     only Caddy publishes 80/443 to the world.
+#   - VictoriaMetrics (single-node) scrapes the bot's /metrics endpoint.
+#   - VictoriaLogs receives container logs forwarded by a Vector sidecar.
+#   - All services share an internal Docker network; only Caddy publishes
+#     80/443 to the world. The metrics and logs UIs stay private — open
+#     them with `docker compose -f docker-compose.prod.yml exec ...` or
+#     by adding a tunnel.
 #
 # WEBHOOK_URL and WEBAPP_URL in .env should both be https://${DOMAIN}
 # (Telegram requires HTTPS for webhooks and Web Apps).
@@ -34,6 +40,9 @@ services:
         condition: service_healthy
     networks:
       - internal
+    labels:
+      # Picked up by Vector's docker_logs source filter.
+      observability.collect: "true"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:8080/"]
       interval: 30s
@@ -56,6 +65,8 @@ services:
       - keydb_data:/data
     networks:
       - internal
+    labels:
+      observability.collect: "true"
     healthcheck:
       test: ["CMD", "keydb-cli", "ping"]
       interval: 10s
@@ -80,6 +91,70 @@ services:
       - bot
     networks:
       - internal
+    labels:
+      observability.collect: "true"
+
+  # VictoriaMetrics single-node: scrapes the bot's /metrics endpoint and
+  # stores the time series locally. Not exposed to the host network — query
+  # it from within the compose project (e.g. `docker compose exec ...`) or
+  # by adding a private tunnel.
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.115.0
+    restart: unless-stopped
+    command:
+      - --storageDataPath=/storage
+      - --retentionPeriod=${VM_RETENTION:-90d}
+      - --promscrape.config=/etc/vm/scrape.yml
+      - --promscrape.config.strictParse=false
+      - --httpListenAddr=:8428
+    volumes:
+      - ./vmagent.yml:/etc/vm/scrape.yml:ro
+      - vm_data:/storage
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:8428/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # VictoriaLogs: ingests Vector's elasticsearch-compatible stream and stores
+  # logs locally. Same access posture as VictoriaMetrics — internal only.
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.13.0-victorialogs
+    restart: unless-stopped
+    command:
+      - --storageDataPath=/vlogs
+      - --retentionPeriod=${VL_RETENTION:-30d}
+      - --httpListenAddr=:9428
+    volumes:
+      - vl_data:/vlogs
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:9428/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Vector tails Docker container logs and ships them to VictoriaLogs via
+  # the Elasticsearch bulk endpoint. The Docker socket is mounted read-only
+  # so Vector can discover containers and stream their stdout/stderr.
+  vector:
+    image: timberio/vector:0.49.0-alpine
+    restart: unless-stopped
+    command: ["--config", "/etc/vector/vector.yaml"]
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - vector_data:/var/lib/vector
+    depends_on:
+      victorialogs:
+        condition: service_healthy
+    networks:
+      - internal
 
 networks:
   internal:
@@ -89,3 +164,6 @@ volumes:
   keydb_data:
   caddy_data:
   caddy_config:
+  vm_data:
+  vl_data:
+  vector_data:
