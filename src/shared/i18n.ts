@@ -32,6 +32,7 @@ type Strings = {
   bot_contact_is_owner: string;
   bot_contact_already_whitelisted: (label: string) => string;
   bot_contact_added: (label: string) => string;
+  bot_check_wrong_user: string;
 
   ui_loading: string;
   ui_saving: string;
@@ -63,6 +64,8 @@ type Strings = {
   ui_admin_chats_desc: string;
   ui_admin_reminders: string;
   ui_admin_reminders_desc: string;
+  ui_admin_checks: string;
+  ui_admin_checks_desc: string;
 
   ui_main_display_name: string;
   ui_main_name: string;
@@ -197,6 +200,62 @@ type Strings = {
   ui_reminders_admin_footer: string;
   ui_reminders_dm: string;
   ui_reminders_chat_fallback: (id: string) => string;
+
+  ui_route_checks: string;
+  ui_route_check_edit: string;
+  ui_route_check_create: string;
+  ui_checks_all: string;
+  ui_checks_empty: string;
+  ui_checks_footer: string;
+  ui_checks_create: string;
+  ui_checks_enabled: string;
+  ui_checks_disabled: string;
+  ui_checks_paused_marker: string;
+  ui_checks_status: string;
+  ui_check_title: string;
+  ui_check_title_placeholder: string;
+  ui_check_chat_id: string;
+  ui_check_chat_id_placeholder: string;
+  ui_check_chat_id_footer: string;
+  ui_check_target_user_id: string;
+  ui_check_target_user_id_placeholder: string;
+  ui_check_target_user_id_footer: string;
+  ui_check_target_name: string;
+  ui_check_target_name_placeholder: string;
+  ui_check_target_name_footer: string;
+  ui_check_schedule: string;
+  ui_check_schedule_footer: string;
+  ui_check_timezone: string;
+  ui_check_timezone_footer: string;
+  ui_check_timeout: string;
+  ui_check_timeout_footer: string;
+  ui_check_question: string;
+  ui_check_question_placeholder: string;
+  ui_check_question_footer: string;
+  ui_check_yes_button: string;
+  ui_check_no_button: string;
+  ui_check_yes_reply: string;
+  ui_check_yes_reply_placeholder: string;
+  ui_check_no_reply: string;
+  ui_check_no_reply_placeholder: string;
+  ui_check_replies_footer: string;
+  ui_check_counter: string;
+  ui_check_counter_footer: string;
+  ui_check_counter_mode: string;
+  ui_check_counter_mode_always: string;
+  ui_check_counter_mode_reset: string;
+  ui_check_counter_mode_footer: string;
+  ui_check_enabled_label: string;
+  ui_check_enabled_footer: string;
+  ui_check_delete: string;
+  ui_check_delete_confirm: string;
+  ui_check_not_found: string;
+  ui_check_last_fired: string;
+  ui_check_last_fired_never: string;
+  ui_check_pending: string;
+  ui_check_pending_yes: string;
+  ui_check_pending_no: string;
+  ui_check_save_validation_error: (code: string) => string;
 };
 
 const en: Strings = {
@@ -216,6 +275,7 @@ const en: Strings = {
   bot_contact_already_whitelisted: (label) =>
     `${label} is already whitelisted.`,
   bot_contact_added: (label) => `Added ${label} to the whitelist.`,
+  bot_check_wrong_user: "This check isn't addressed to you.",
 
   ui_loading: "Loading…",
   ui_saving: "Saving…",
@@ -247,6 +307,8 @@ const en: Strings = {
   ui_admin_chats_desc: "All chats and per-chat overrides",
   ui_admin_reminders: "Reminders",
   ui_admin_reminders_desc: "Pending reminders for everyone",
+  ui_admin_checks: "Checks",
+  ui_admin_checks_desc: "Recurring daily questions with Yes/No buttons",
 
   ui_main_display_name: "Display Name",
   ui_main_name: "Name",
@@ -403,6 +465,76 @@ const en: Strings = {
     "Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure.",
   ui_reminders_dm: "DM",
   ui_reminders_chat_fallback: (id) => `chat ${id}`,
+
+  ui_route_checks: "Checks",
+  ui_route_check_edit: "Edit Check",
+  ui_route_check_create: "New Check",
+  ui_checks_all: "Recurring Checks",
+  ui_checks_empty: "No checks yet. Tap \"New check\" to create one.",
+  ui_checks_footer:
+    "Each check sends a question at a daily time. The target user taps Yes/No; non-answers time out as No.",
+  ui_checks_create: "New check",
+  ui_checks_enabled: "Enabled",
+  ui_checks_disabled: "Paused",
+  ui_checks_paused_marker: "paused",
+  ui_checks_status: "Status",
+  ui_check_title: "Title",
+  ui_check_title_placeholder: "e.g. Sport for Nikita",
+  ui_check_chat_id: "Chat ID",
+  ui_check_chat_id_placeholder: "-100123456789",
+  ui_check_chat_id_footer:
+    "Numeric Telegram chat ID where the question gets posted. For supergroups it starts with -100.",
+  ui_check_target_user_id: "Target user ID",
+  ui_check_target_user_id_placeholder: "123456789",
+  ui_check_target_user_id_footer:
+    "Numeric user ID who is being asked. Only this user's clicks count.",
+  ui_check_target_name: "Name shown",
+  ui_check_target_name_placeholder: "Nikita",
+  ui_check_target_name_footer:
+    "Substituted for {name} inside the question and replies.",
+  ui_check_schedule: "Time",
+  ui_check_schedule_footer:
+    "Daily wall-clock time in the timezone below. The bot fires at most once per day.",
+  ui_check_timezone: "Timezone",
+  ui_check_timezone_footer:
+    "Timezone used to interpret the daily time above.",
+  ui_check_timeout: "Timeout (minutes)",
+  ui_check_timeout_footer:
+    "If the user hasn't clicked within this many minutes, the check resolves as if they tapped No.",
+  ui_check_question: "Question",
+  ui_check_question_placeholder:
+    "{name}, did you do sport today?",
+  ui_check_question_footer:
+    "Sent at the scheduled time. {name} is replaced; {count} is the current counter.",
+  ui_check_yes_button: "\"Yes\" button label",
+  ui_check_no_button: "\"No\" button label",
+  ui_check_yes_reply: "Reply when Yes",
+  ui_check_yes_reply_placeholder:
+    "{name}, at least don't lie to yourself. Day without sport {count}",
+  ui_check_no_reply: "Reply when No / timeout",
+  ui_check_no_reply_placeholder: "{name}. Day without sport {count}",
+  ui_check_replies_footer:
+    "{name} is replaced; {count} is the counter after this answer.",
+  ui_check_counter: "Counter",
+  ui_check_counter_footer:
+    "Current value of {count}. Adjust manually if needed.",
+  ui_check_counter_mode: "Counter on Yes",
+  ui_check_counter_mode_always: "Always increment (trolling mode)",
+  ui_check_counter_mode_reset: "Reset to 0 (real streak)",
+  ui_check_counter_mode_footer:
+    "Always increment: counter grows whatever the user clicks. Reset on Yes: streak resets when the user confirms.",
+  ui_check_enabled_label: "Enabled",
+  ui_check_enabled_footer:
+    "Disabled checks neither fire nor time out. Pending question messages stay in the chat until resumed.",
+  ui_check_delete: "Delete check",
+  ui_check_delete_confirm: "Delete this check? This cannot be undone.",
+  ui_check_not_found: "Check not found.",
+  ui_check_last_fired: "Last fired",
+  ui_check_last_fired_never: "Never",
+  ui_check_pending: "Pending reply",
+  ui_check_pending_yes: "Yes",
+  ui_check_pending_no: "No",
+  ui_check_save_validation_error: (code) => `Validation error: ${code}`,
 };
 
 const ru: Strings = {
@@ -423,6 +555,7 @@ const ru: Strings = {
   bot_contact_already_whitelisted: (label) =>
     `${label} уже в белом списке.`,
   bot_contact_added: (label) => `${label} добавлен(а) в белый список.`,
+  bot_check_wrong_user: "Этот вопрос адресован не тебе.",
 
   ui_loading: "Загрузка…",
   ui_saving: "Сохранение…",
@@ -454,6 +587,8 @@ const ru: Strings = {
   ui_admin_chats_desc: "Все чаты и их переопределения",
   ui_admin_reminders: "Напоминания",
   ui_admin_reminders_desc: "Ожидающие напоминания всех пользователей",
+  ui_admin_checks: "Чеки",
+  ui_admin_checks_desc: "Циклические вопросы с кнопками Да/Нет",
 
   ui_main_display_name: "Имя для отображения",
   ui_main_name: "Имя",
@@ -614,6 +749,77 @@ const ru: Strings = {
     "Ожидающие напоминания всех пользователей. Доставки с временными ошибками остаются до успешной или окончательной ошибки.",
   ui_reminders_dm: "ЛС",
   ui_reminders_chat_fallback: (id) => `чат ${id}`,
+
+  ui_route_checks: "Чеки",
+  ui_route_check_edit: "Редактирование чека",
+  ui_route_check_create: "Новый чек",
+  ui_checks_all: "Циклические чеки",
+  ui_checks_empty: "Чеков ещё нет. Нажми «Новый чек», чтобы создать.",
+  ui_checks_footer:
+    "Каждый чек присылает вопрос в указанное время. Целевой пользователь жмёт Да/Нет; отсутствие ответа считается как Нет.",
+  ui_checks_create: "Новый чек",
+  ui_checks_enabled: "Включён",
+  ui_checks_disabled: "Пауза",
+  ui_checks_paused_marker: "пауза",
+  ui_checks_status: "Статус",
+  ui_check_title: "Название",
+  ui_check_title_placeholder: "напр. Спорт для Никиты",
+  ui_check_chat_id: "ID чата",
+  ui_check_chat_id_placeholder: "-100123456789",
+  ui_check_chat_id_footer:
+    "Числовой ID чата Telegram, куда отправляется вопрос. У супергрупп начинается с -100.",
+  ui_check_target_user_id: "ID пользователя",
+  ui_check_target_user_id_placeholder: "123456789",
+  ui_check_target_user_id_footer:
+    "Числовой ID того, кому задаётся вопрос. Только клики этого пользователя засчитываются.",
+  ui_check_target_name: "Имя в сообщениях",
+  ui_check_target_name_placeholder: "Никита",
+  ui_check_target_name_footer:
+    "Подставляется на место {name} в вопросе и ответах.",
+  ui_check_schedule: "Время",
+  ui_check_schedule_footer:
+    "Время суток в указанном ниже часовом поясе. Бот сработает не больше одного раза в сутки.",
+  ui_check_timezone: "Часовой пояс",
+  ui_check_timezone_footer:
+    "Часовой пояс, в котором интерпретируется время выше.",
+  ui_check_timeout: "Таймаут (минуты)",
+  ui_check_timeout_footer:
+    "Если за это время пользователь не нажал кнопку, чек резолвится как «Нет».",
+  ui_check_question: "Вопрос",
+  ui_check_question_placeholder:
+    "{name}, занялся ли ты сегодня спортом?",
+  ui_check_question_footer:
+    "Отправляется в назначенное время. {name} — имя; {count} — текущий счётчик.",
+  ui_check_yes_button: "Подпись кнопки «Да»",
+  ui_check_no_button: "Подпись кнопки «Нет»",
+  ui_check_yes_reply: "Ответ при «Да»",
+  ui_check_yes_reply_placeholder:
+    "{name}, хотя бы себе не ври. День без спорта {count}",
+  ui_check_no_reply: "Ответ при «Нет» / таймауте",
+  ui_check_no_reply_placeholder: "{name}. День без спорта {count}",
+  ui_check_replies_footer:
+    "{name} — имя; {count} — счётчик после этого ответа.",
+  ui_check_counter: "Счётчик",
+  ui_check_counter_footer:
+    "Текущее значение {count}. При необходимости можно поправить вручную.",
+  ui_check_counter_mode: "Счётчик при «Да»",
+  ui_check_counter_mode_always:
+    "Всегда увеличивать (режим подколки)",
+  ui_check_counter_mode_reset: "Сбрасывать в 0 (настоящий стрик)",
+  ui_check_counter_mode_footer:
+    "«Всегда увеличивать» — счётчик растёт независимо от ответа. «Сбрасывать» — обнуляется при «Да».",
+  ui_check_enabled_label: "Включён",
+  ui_check_enabled_footer:
+    "Выключенный чек не срабатывает и не таймаутится. Уже висящее сообщение с кнопками остаётся в чате до включения.",
+  ui_check_delete: "Удалить чек",
+  ui_check_delete_confirm: "Удалить чек? Действие нельзя отменить.",
+  ui_check_not_found: "Чек не найден.",
+  ui_check_last_fired: "Последний раз",
+  ui_check_last_fired_never: "Никогда",
+  ui_check_pending: "Ждёт ответа",
+  ui_check_pending_yes: "Да",
+  ui_check_pending_no: "Нет",
+  ui_check_save_validation_error: (code) => `Ошибка валидации: ${code}`,
 };
 
 export const MESSAGES: Record<Lang, Strings> = { en, ru };

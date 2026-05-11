@@ -5,6 +5,7 @@ import type { Settings } from "../../../../shared/types";
 import { LoadingState } from "../../components/states";
 import { RemindersList } from "../reminders-list";
 import { ChatsTab } from "./chats-tab";
+import { ChecksTab } from "./checks-tab";
 import { PromptTab } from "./prompt-tab";
 import { RateLimitTab } from "./rate-limit-tab";
 import { UsersTab } from "./users-tab";
@@ -15,10 +16,12 @@ export function AdminSectionView({
   section,
   onEditUser,
   onEditChat,
+  onEditCheck,
 }: {
   section: AdminSection;
   onEditUser: (id: string, from: AdminSection) => void;
   onEditChat: (id: string, from: AdminSection) => void;
+  onEditCheck: (id: string | null) => void;
 }) {
   const { t: s } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -34,6 +37,13 @@ export function AdminSectionView({
     return <WhitelistTab onOpenUser={goUser} onOpenChat={goChat} />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
   if (section === "chats") return <ChatsTab onEdit={goChat} />;
+  if (section === "checks")
+    return (
+      <ChecksTab
+        onEdit={(id) => onEditCheck(id)}
+        onCreate={() => onEditCheck(null)}
+      />
+    );
   if (section === "reminders")
     return (
       <RemindersList

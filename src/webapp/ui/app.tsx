@@ -13,6 +13,7 @@ import { AdminView } from "./views/admin/admin-view";
 import { AdminSectionView } from "./views/admin/admin-section-view";
 import { UserEditView } from "./views/admin/user-edit-view";
 import { ChatEditView } from "./views/admin/chat-edit-view";
+import { CheckEditView } from "./views/admin/check-edit-view";
 
 function AppShell({
   me,
@@ -37,6 +38,8 @@ function AppShell({
           case "user-edit":
           case "chat-edit":
             return { kind: "admin-section", section: r.from };
+          case "check-edit":
+            return { kind: "admin-section", section: "checks" };
           case "admin-section":
             return { kind: "admin" };
           case "admin":
@@ -66,6 +69,10 @@ function AppShell({
         return s.ui_route_user_settings;
       case "chat-edit":
         return s.ui_route_chat_settings;
+      case "check-edit":
+        return route.checkId === null
+          ? s.ui_route_check_create
+          : s.ui_route_check_edit;
       case "my-reminders":
         return s.ui_route_my_reminders;
     }
@@ -101,12 +108,22 @@ function AppShell({
             onEditChat={(id, from) =>
               setRoute({ kind: "chat-edit", chatId: id, from })
             }
+            onEditCheck={(id) => setRoute({ kind: "check-edit", checkId: id })}
           />
         );
       case "user-edit":
         return <UserEditView userId={route.userId} />;
       case "chat-edit":
         return <ChatEditView chatId={route.chatId} />;
+      case "check-edit":
+        return (
+          <CheckEditView
+            checkId={route.checkId}
+            onClose={() =>
+              setRoute({ kind: "admin-section", section: "checks" })
+            }
+          />
+        );
       case "my-reminders":
         return (
           <RemindersList
