@@ -1,0 +1,40 @@
+.git
+.github
+.gitignore
+.gitattributes
+
+# dependencies (will be installed fresh inside the image)
+node_modules
+
+# env files (must be provided at runtime, never baked in)
+.env
+.env.*
+!.env.example
+
+# build / cache / logs
+out
+dist
+coverage
+*.tgz
+*.lcov
+*.log
+logs
+.cache
+*.tsbuildinfo
+
+# editor / OS
+.idea
+.vscode
+*.swp
+.DS_Store
+
+# claude / worktrees
+.claude
+
+# docker / docs (not needed in the image)
+Dockerfile
+.dockerignore
+docker-compose.yml
+docs
+README.md
+CLAUDE.md
