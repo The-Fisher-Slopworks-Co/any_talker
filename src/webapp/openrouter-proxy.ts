@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { fetchWithTimeout } from "../ai/tools/http";
 
 const OPENROUTER_TIMEOUT_MS = 10_000;

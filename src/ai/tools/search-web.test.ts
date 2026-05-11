@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { test, expect, describe, mock, beforeEach, afterEach } from "bun:test";
 import { createSearchWebTool } from "./search-web";
 import type { ToolCallContext } from "./registry";
