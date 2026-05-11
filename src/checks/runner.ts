@@ -62,6 +62,7 @@ async function fireCheck(
   nowMs: number,
 ): Promise<void> {
   const text = formatTemplate(check.question, {
+    targetUserId: check.targetUserId,
     name: check.targetName,
     count: check.counter,
   });
@@ -69,6 +70,7 @@ async function fireCheck(
   let messageId: number;
   try {
     const sent = await api.sendMessage(check.chatId, text, {
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [

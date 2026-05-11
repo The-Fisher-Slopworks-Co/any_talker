@@ -12,6 +12,7 @@ export type CheckApi = {
     chat_id: string | number,
     text: string,
     other?: {
+      parse_mode?: "HTML";
       reply_parameters?: {
         message_id: number;
         allow_sending_without_reply?: boolean;
@@ -55,12 +56,14 @@ export async function resolveCheck(args: {
   const replyTemplate =
     answer === "yes" ? check.yesReply : check.noReply;
   const reply = formatTemplate(replyTemplate, {
+    targetUserId: check.targetUserId,
     name: check.targetName,
     count: newCounter,
   });
 
   try {
     await api.sendMessage(check.chatId, reply, {
+      parse_mode: "HTML",
       reply_parameters: {
         message_id: check.pendingMessageId,
         allow_sending_without_reply: true,

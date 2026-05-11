@@ -77,14 +77,16 @@ describe("resolveCheck", () => {
       fromUserId: "user-1",
     });
 
+    const expectedNoReply = `<a href="tg://user?id=user-1">Nikita</a>. Day 723`;
     expect(out).toEqual({
       kind: "resolved",
       newCounter: 723,
-      reply: "Nikita. Day 723",
+      reply: expectedNoReply,
     });
     expect(api.sent).toHaveLength(1);
-    expect(api.sent[0]?.text).toBe("Nikita. Day 723");
+    expect(api.sent[0]?.text).toBe(expectedNoReply);
     expect(api.sent[0]?.other).toEqual({
+      parse_mode: "HTML",
       reply_parameters: { message_id: 42, allow_sending_without_reply: true },
     });
     expect(api.editedMarkup).toEqual([{ chat_id: "chat-1", message_id: 42 }]);
@@ -111,7 +113,7 @@ describe("resolveCheck", () => {
     expect(out).toEqual({
       kind: "resolved",
       newCounter: 723,
-      reply: "Nikita, lying. Day 723",
+      reply: `<a href="tg://user?id=user-1">Nikita</a>, lying. Day 723`,
     });
     expect((await storage.getCheck("c1"))?.counter).toBe(723);
   });
@@ -133,7 +135,7 @@ describe("resolveCheck", () => {
     expect(out).toEqual({
       kind: "resolved",
       newCounter: 0,
-      reply: "Nikita, lying. Day 0",
+      reply: `<a href="tg://user?id=user-1">Nikita</a>, lying. Day 0`,
     });
     expect((await storage.getCheck("c1"))?.counter).toBe(0);
   });
@@ -173,7 +175,7 @@ describe("resolveCheck", () => {
     expect(out).toEqual({
       kind: "resolved",
       newCounter: 723,
-      reply: "Nikita. Day 723",
+      reply: `<a href="tg://user?id=user-1">Nikita</a>. Day 723`,
     });
   });
 
