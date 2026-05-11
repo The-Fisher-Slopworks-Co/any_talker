@@ -1,0 +1,281 @@
+import { useEffect, useState } from "react";
+import { useI18n } from "../../i18n-context";
+import { api } from "../../api-client";
+import type {
+  Chat,
+  ChatSettings,
+  ProviderSort,
+  RateLimitConfig,
+  Settings,
+} from "../../../../shared/types";
+import {
+  Card,
+  SectionFooter,
+  SectionHeader,
+  Stack,
+} from "../../components/layout";
+import { LoadingState } from "../../components/states";
+import { SaveButton } from "../../components/controls";
+import { ModelsCard } from "../../components/models-card";
+import { OverrideSection } from "../../components/override-section";
+import { ProviderSortField } from "../../components/provider-sort-field";
+import { RateLimitFields } from "../../components/rate-limit-fields";
+import { TimezoneSelect } from "../../components/timezone-select";
+import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
+import {
+  INPUT_CLS,
+  ROW_CLS,
+  ROW_LABEL_CLS,
+  ROW_VALUE_CLS,
+} from "../../components/row";
+import { chatTitle } from "../../lib/labels";
+
+export function ChatEditView({ chatId }: { chatId: string }) {
+  const { t: s } = useI18n();
+  const [chat, setChat] = useState<Chat | null>(null);
+  const [global, setGlobal] = useState<Settings | null>(null);
+  const [original, setOriginal] = useState<ChatSettings | null>(null);
+
+  const [promptOverride, setPromptOverride] = useState(false);
+  const [promptValue, setPromptValue] = useState("");
+  const [modelsOverride, setModelsOverride] = useState(false);
+  const [modelsValue, setModelsValue] = useState<string[]>([]);
+  const [rlOverride, setRlOverride] = useState(false);
+  const [rlValue, setRlValue] = useState<RateLimitConfig | null>(null);
+  const [botNameValue, setBotNameValue] = useState("");
+  const [tzOverride, setTzOverride] = useState(false);
+  const [tzValue, setTzValue] = useState("UTC");
+  const [psOverride, setPsOverride] = useState(false);
+  const [psValue, setPsValue] = useState<ProviderSort | null>(null);
+
+  const [saving, setSaving] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [whitelisted, setWhitelisted] = useState(false);
+
+  useEffect(() => {
+    Promise.all([api.getSettings(), api.getAdminChat(chatId)])
+      .then(([g, d]) => {
+        setGlobal(g);
+        setChat(d.chat);
+        setOriginal(d.settings);
+        setWhitelisted(d.whitelisted);
+        setPromptOverride(d.settings.systemPrompt !== undefined);
+        setPromptValue(d.settings.systemPrompt ?? g.systemPrompt);
+        setModelsOverride(d.settings.models !== undefined);
+        setModelsValue(d.settings.models ?? g.models);
+        setRlOverride(d.settings.rateLimit !== undefined);
+        setRlValue(d.settings.rateLimit ?? g.rateLimit);
+        setBotNameValue(d.settings.botName ?? "");
+        setTzOverride(d.settings.timezone !== undefined);
+        setTzValue(d.settings.timezone ?? g.timezone);
+        setPsOverride(d.settings.providerSort !== undefined);
+        setPsValue(
+          d.settings.providerSort !== undefined
+            ? d.settings.providerSort
+            : g.providerSort,
+        );
+      })
+      .catch(() => setNotFound(true));
+  }, [chatId]);
+
+  if (notFound) return <LoadingState text={s.ui_chat_not_found} />;
+  if (!chat || !global || !original || !rlValue) return <LoadingState />;
+
+  const trimmedModels = modelsValue
+    .map((m) => m.trim())
+    .filter((m) => m.length > 0);
+  const trimmedBotName = botNameValue.trim();
+
+  const buildPayload = (): ChatSettings => {
+    const next: ChatSettings = {};
+    if (promptOverride) next.systemPrompt = promptValue;
+    if (modelsOverride && trimmedModels.length > 0) next.models = trimmedModels;
+    if (rlOverride) next.rateLimit = rlValue;
+    if (trimmedBotName.length > 0) next.botName = trimmedBotName;
+    if (tzOverride) next.timezone = tzValue;
+    if (psOverride) next.providerSort = psValue;
+    return next;
+  };
+
+  const payload = buildPayload();
+  const wasOverridden = (key: keyof ChatSettings) => original[key] !== undefined;
+  const dirty =
+    promptOverride !== wasOverridden("systemPrompt") ||
+    modelsOverride !== wasOverridden("models") ||
+    rlOverride !== wasOverridden("rateLimit") ||
+    tzOverride !== wasOverridden("timezone") ||
+    psOverride !== wasOverridden("providerSort") ||
+    (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
+    (modelsOverride &&
+      JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
+    (rlOverride &&
+      JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
+    (tzOverride && payload.timezone !== original.timezone) ||
+    (psOverride && payload.providerSort !== original.providerSort) ||
+    trimmedBotName !== (original.botName ?? "");
+
+  const canSave = dirty && (!modelsOverride || trimmedModels.length > 0);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const result = await api.putAdminChat(chatId, buildPayload());
+      setOriginal(result.settings);
+      setPromptOverride(result.settings.systemPrompt !== undefined);
+      setPromptValue(result.settings.systemPrompt ?? global.systemPrompt);
+      setModelsOverride(result.settings.models !== undefined);
+      setModelsValue(result.settings.models ?? global.models);
+      setRlOverride(result.settings.rateLimit !== undefined);
+      setRlValue(result.settings.rateLimit ?? global.rateLimit);
+      setBotNameValue(result.settings.botName ?? "");
+      setTzOverride(result.settings.timezone !== undefined);
+      setTzValue(result.settings.timezone ?? global.timezone);
+      setPsOverride(result.settings.providerSort !== undefined);
+      setPsValue(
+        result.settings.providerSort !== undefined
+          ? result.settings.providerSort
+          : global.providerSort,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Stack>
+      <SectionHeader>{s.ui_chat_chat}</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_title}</span>
+          <span className={ROW_VALUE_CLS}>{chatTitle(s, chat)}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_type}</span>
+          <span className={ROW_VALUE_CLS}>{chat.type}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_username}</span>
+          <span className={ROW_VALUE_CLS}>
+            {chat.username ? `@${chat.username}` : s.ui_dash}
+          </span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_id}</span>
+          <span className={ROW_VALUE_CLS}>{chat.id}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_last_seen}</span>
+          <span className={ROW_VALUE_CLS}>
+            {new Date(chat.lastSeenAt).toLocaleString()}
+          </span>
+        </div>
+        <WhitelistToggleButton
+          kind="chats"
+          id={chat.id}
+          label={chatTitle(s, chat)}
+          initial={whitelisted}
+        />
+      </Card>
+
+      <SectionHeader>{s.ui_chat_bot_name}</SectionHeader>
+      <Card>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
+          <input
+            className={INPUT_CLS}
+            placeholder={s.ui_chat_bot_name_placeholder}
+            value={botNameValue}
+            onChange={(e) => setBotNameValue(e.target.value)}
+            maxLength={64}
+          />
+        </label>
+      </Card>
+      <SectionFooter>{s.ui_chat_bot_name_footer}</SectionFooter>
+
+      <OverrideSection
+        title={s.ui_chat_system_prompt}
+        override={promptOverride}
+        onToggle={setPromptOverride}
+        footer={
+          promptOverride
+            ? s.ui_chat_system_prompt_on_footer
+            : s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)
+        }
+      >
+        <Card>
+          <textarea
+            className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
+            value={promptValue}
+            onChange={(e) => setPromptValue(e.target.value)}
+            placeholder={s.ui_chat_prompt_placeholder}
+          />
+        </Card>
+      </OverrideSection>
+
+      <OverrideSection
+        title={s.ui_chat_models}
+        override={modelsOverride}
+        onToggle={setModelsOverride}
+        footer={
+          modelsOverride
+            ? s.ui_chat_models_on_footer
+            : s.ui_chat_models_off_footer(global.models.join(", "))
+        }
+      >
+        <ModelsCard
+          models={modelsValue}
+          onChange={setModelsValue}
+          providerSort={psOverride ? psValue : global.providerSort}
+        />
+      </OverrideSection>
+
+      <OverrideSection
+        title={s.ui_chat_rate_limit}
+        override={rlOverride}
+        onToggle={setRlOverride}
+        footer={
+          rlOverride
+            ? s.ui_chat_rate_limit_on_footer
+            : s.ui_chat_rate_limit_off_footer
+        }
+      >
+        <RateLimitFields value={rlValue} onChange={setRlValue} />
+      </OverrideSection>
+
+      <OverrideSection
+        title={s.ui_chat_tz}
+        override={tzOverride}
+        onToggle={setTzOverride}
+        footer={
+          tzOverride
+            ? s.ui_chat_tz_on_footer
+            : s.ui_chat_tz_off_footer(global.timezone)
+        }
+      >
+        <TimezoneSelect value={tzValue} onChange={setTzValue} />
+      </OverrideSection>
+
+      <OverrideSection
+        title={s.ui_chat_provider_routing}
+        override={psOverride}
+        onToggle={setPsOverride}
+        footer={
+          psOverride
+            ? s.ui_chat_provider_routing_on_footer
+            : s.ui_chat_provider_routing_off_footer(
+                global.providerSort ?? s.ui_sort_default,
+              )
+        }
+      >
+        <ProviderSortField value={psValue} onChange={setPsValue} />
+      </OverrideSection>
+
+      <SaveButton
+        saving={saving}
+        dirty={dirty}
+        disabled={saving || !canSave}
+        onClick={save}
+      />
+    </Stack>
+  );
+}
