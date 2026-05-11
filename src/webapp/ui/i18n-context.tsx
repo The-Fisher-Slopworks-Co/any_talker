@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { t, type Lang } from "../../shared/i18n";
 
 type I18nValue = { lang: Lang; t: ReturnType<typeof t> };
@@ -12,11 +12,8 @@ export function I18nProvider({
   lang: Lang;
   children: ReactNode;
 }) {
-  return (
-    <I18nContext.Provider value={{ lang, t: t(lang) }}>
-      {children}
-    </I18nContext.Provider>
-  );
+  const value = useMemo<I18nValue>(() => ({ lang, t: t(lang) }), [lang]);
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18nValue {

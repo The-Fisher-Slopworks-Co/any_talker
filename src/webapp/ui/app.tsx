@@ -32,7 +32,7 @@ import {
   type ProviderSort,
   type Gender,
 } from "../../shared/types";
-import { resolveLang, t, type Lang } from "../../shared/i18n";
+import { SUPPORTED_LANGS, resolveLang, t, type Lang } from "../../shared/i18n";
 import { I18nProvider, useI18n } from "./i18n-context";
 import type { Reminder } from "../../reminders/types";
 import {
@@ -66,6 +66,11 @@ const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "chats",
   "reminders",
 ];
+
+const LANG_LABEL_KEY = {
+  en: "ui_main_lang_english",
+  ru: "ui_main_lang_russian",
+} as const satisfies Record<Lang, keyof Strings>;
 
 function adminSection(s: Strings, id: AdminSection): {
   label: string;
@@ -394,16 +399,12 @@ function MainView({
   onOpenAdmin: () => void;
   onOpenMyReminders: () => void;
 }) {
-  const { t: s } = useI18n();
+  const { t: s, lang: resolvedLang } = useI18n();
   const [name, setName] = useState(me.displayName ?? "");
   const [tzOverride, setTzOverride] = useState(me.timezone !== null);
   const [tzValue, setTzValue] = useState(me.timezone ?? "UTC");
   const [genderOn, setGenderOn] = useState(me.gender !== null);
   const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
-  const resolvedLang: Lang = resolveLang(
-    me.language,
-    window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code,
-  );
   const [langValue, setLangValue] = useState<Lang>(resolvedLang);
   const [saving, setSaving] = useState(false);
 
@@ -434,12 +435,7 @@ function MainView({
       setTzValue(next.timezone ?? "UTC");
       setGenderOn(next.gender !== null);
       setGenderValue(next.gender ?? "male");
-      setLangValue(
-        resolveLang(
-          next.language,
-          window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code,
-        ),
-      );
+      setLangValue(next.language ?? resolvedLang);
     } finally {
       setSaving(false);
     }
@@ -508,24 +504,18 @@ function MainView({
 
       <SectionHeader>{s.ui_main_language}</SectionHeader>
       <Card>
-        <button
-          type="button"
-          className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
-          onClick={() => setLangValue("en")}
-        >
-          <span className={ROW_LABEL_CLS}>{s.ui_main_lang_english}</span>
-          <span className="flex-1" />
-          {langValue === "en" ? <span className="text-tg-link">✓</span> : null}
-        </button>
-        <button
-          type="button"
-          className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
-          onClick={() => setLangValue("ru")}
-        >
-          <span className={ROW_LABEL_CLS}>{s.ui_main_lang_russian}</span>
-          <span className="flex-1" />
-          {langValue === "ru" ? <span className="text-tg-link">✓</span> : null}
-        </button>
+        {SUPPORTED_LANGS.map((code) => (
+          <button
+            key={code}
+            type="button"
+            className={`${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`}
+            onClick={() => setLangValue(code)}
+          >
+            <span className={ROW_LABEL_CLS}>{s[LANG_LABEL_KEY[code]]}</span>
+            <span className="flex-1" />
+            {langValue === code ? <span className="text-tg-link">✓</span> : null}
+          </button>
+        ))}
       </Card>
       <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
 
