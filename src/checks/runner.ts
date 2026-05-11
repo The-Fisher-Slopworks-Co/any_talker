@@ -1,7 +1,12 @@
 import type { Storage } from "../storage/types";
+import {
+  startIntervalScheduler,
+  type IntervalScheduler,
+} from "../shared/interval-scheduler";
 import type { RecurringCheck } from "./types";
 import { lastScheduledFireMs } from "./schedule";
 import { formatQuestion } from "./format";
+import { buildCheckCallback } from "./callback-data";
 import { resolveCheck, type CheckApi } from "./resolve";
 
 export async function runChecksTick(deps: {
@@ -74,8 +79,14 @@ async function fireCheck(
       reply_markup: {
         inline_keyboard: [
           [
-            { text: check.yesButton, callback_data: `check:${check.id}:yes` },
-            { text: check.noButton, callback_data: `check:${check.id}:no` },
+            {
+              text: check.yesButton,
+              callback_data: buildCheckCallback(check.id, "yes"),
+            },
+            {
+              text: check.noButton,
+              callback_data: buildCheckCallback(check.id, "no"),
+            },
           ],
         ],
       },
@@ -94,7 +105,7 @@ async function fireCheck(
   });
 }
 
-export type ChecksScheduler = { stop(): void };
+export type ChecksScheduler = IntervalScheduler;
 
 const DEFAULT_INTERVAL_MS = 30_000;
 
@@ -103,37 +114,14 @@ export function startChecksScheduler(deps: {
   api: CheckApi;
   intervalMs?: number;
 }): ChecksScheduler {
-  const intervalMs = deps.intervalMs ?? DEFAULT_INTERVAL_MS;
-  let stopped = false;
-  let inFlight: Promise<void> | null = null;
-
-  const safeTick = async () => {
-    if (stopped) return;
-    try {
-      await runChecksTick({
+  return startIntervalScheduler({
+    intervalMs: deps.intervalMs ?? DEFAULT_INTERVAL_MS,
+    logPrefix: "[checks]",
+    tick: () =>
+      runChecksTick({
         storage: deps.storage,
         api: deps.api,
         nowMs: Date.now(),
-      });
-    } catch (err) {
-      console.error("[checks] tick failed:", err);
-    }
-  };
-
-  const tick = () => {
-    if (inFlight || stopped) return;
-    inFlight = safeTick().finally(() => {
-      inFlight = null;
-    });
-  };
-
-  tick();
-  const handle = setInterval(tick, intervalMs);
-
-  return {
-    stop() {
-      stopped = true;
-      clearInterval(handle);
-    },
-  };
+      }),
+  });
 }

@@ -34,9 +34,10 @@ export function ChecksTab({
           <EmptyState>{s.ui_checks_empty}</EmptyState>
         ) : (
           checks.map((c) => {
-            const time = `${pad2(c.scheduleHour)}:${pad2(c.scheduleMinute)}`;
-            const status = c.enabled ? null : ` · ${s.ui_checks_paused_marker}`;
-            const subtitle = `${time} · ${c.timezone}${status ?? ""}`;
+            const hh = String(c.scheduleHour).padStart(2, "0");
+            const mm = String(c.scheduleMinute).padStart(2, "0");
+            const status = c.enabled ? "" : ` · ${s.ui_checks_paused_marker}`;
+            const subtitle = `${hh}:${mm} · ${c.timezone}${status}`;
             return (
               <NavRow
                 key={c.id}
@@ -54,8 +55,4 @@ export function ChecksTab({
       </Card>
     </Stack>
   );
-}
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
 }

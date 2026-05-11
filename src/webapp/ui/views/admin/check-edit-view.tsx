@@ -25,6 +25,11 @@ import {
 const TEXTAREA_CLS =
   "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[100px]";
 
+function clampInt(raw: string, min: number, max: number): number {
+  const n = Math.floor(Number(raw) || min);
+  return Math.max(min, Math.min(max, n));
+}
+
 const DEFAULT_DRAFT = {
   title: "",
   chatId: "",
@@ -200,7 +205,7 @@ export function CheckEditView({
             max={23}
             value={draft.scheduleHour}
             onChange={(e) =>
-              set("scheduleHour", Math.max(0, Math.min(23, Number(e.target.value) || 0)))
+              set("scheduleHour", clampInt(e.target.value, 0, 23))
             }
           />
           <span className="text-tg-hint">:</span>
@@ -211,10 +216,7 @@ export function CheckEditView({
             max={59}
             value={draft.scheduleMinute}
             onChange={(e) =>
-              set(
-                "scheduleMinute",
-                Math.max(0, Math.min(59, Number(e.target.value) || 0)),
-              )
+              set("scheduleMinute", clampInt(e.target.value, 0, 59))
             }
           />
         </div>
@@ -227,13 +229,7 @@ export function CheckEditView({
             max={24 * 60}
             value={draft.timeoutMinutes}
             onChange={(e) =>
-              set(
-                "timeoutMinutes",
-                Math.max(
-                  1,
-                  Math.min(24 * 60, Number(e.target.value) || 1),
-                ),
-              )
+              set("timeoutMinutes", clampInt(e.target.value, 1, 24 * 60))
             }
           />
         </label>
@@ -311,7 +307,7 @@ export function CheckEditView({
             min={0}
             value={draft.counter}
             onChange={(e) =>
-              set("counter", Math.max(0, Math.floor(Number(e.target.value) || 0)))
+              set("counter", clampInt(e.target.value, 0, Number.MAX_SAFE_INTEGER))
             }
           />
         </label>
