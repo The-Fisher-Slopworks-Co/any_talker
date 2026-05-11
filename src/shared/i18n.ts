@@ -10,9 +10,7 @@ export function isValidLang(v: unknown): v is Lang {
 export function normalizeLang(code: string | null | undefined): Lang | null {
   if (typeof code !== "string" || code.length === 0) return null;
   const prefix = code.toLowerCase().split("-")[0]!;
-  return (SUPPORTED_LANGS as readonly string[]).includes(prefix)
-    ? (prefix as Lang)
-    : null;
+  return isValidLang(prefix) ? prefix : null;
 }
 
 export function resolveLang(

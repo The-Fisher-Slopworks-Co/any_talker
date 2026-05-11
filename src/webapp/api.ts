@@ -72,20 +72,15 @@ const BAD_LANG: ApiResponse = {
   body: { error: "invalid language" },
 };
 
-function normalizeLangInput(input: unknown): Lang | null | "invalid" {
+function normalizeEnumInput<T extends string>(
+  input: unknown,
+  isValid: (v: string) => v is T,
+): T | null | "invalid" {
   if (input === null || input === undefined) return null;
   if (typeof input !== "string") return "invalid";
   const trimmed = input.trim();
   if (trimmed === "") return null;
-  return isValidLang(trimmed) ? trimmed : "invalid";
-}
-
-function normalizeGender(input: unknown): Gender | null | "invalid" {
-  if (input === null || input === undefined) return null;
-  if (typeof input !== "string") return "invalid";
-  const trimmed = input.trim();
-  if (trimmed === "") return null;
-  return isValidGender(trimmed) ? trimmed : "invalid";
+  return isValid(trimmed) ? trimmed : "invalid";
 }
 
 const BAD_PROVIDER_SORT: ApiResponse = {
@@ -279,13 +274,13 @@ export async function handleApi(
         writes.push(deps.storage.setUserTimezone(actor.userId, timezone));
       }
       if ("gender" in body) {
-        const nextGender = normalizeGender(body.gender);
+        const nextGender = normalizeEnumInput(body.gender, isValidGender);
         if (nextGender === "invalid") return BAD_GENDER;
         gender = nextGender;
         writes.push(deps.storage.setUserGender(actor.userId, gender));
       }
       if ("language" in body) {
-        const nextLang = normalizeLangInput(body.language);
+        const nextLang = normalizeEnumInput(body.language, isValidLang);
         if (nextLang === "invalid") return BAD_LANG;
         language = nextLang;
         writes.push(deps.storage.setUserLang(actor.userId, language));
