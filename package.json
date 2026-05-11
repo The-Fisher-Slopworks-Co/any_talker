@@ -3,6 +3,7 @@
   "module": "src/main.ts",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "bun --hot ./src/main.ts",
     "start": "bun ./src/main.ts",

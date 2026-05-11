@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 export type Lang = "en" | "ru";
 
 export const SUPPORTED_LANGS: readonly Lang[] = ["en", "ru"];

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import type { Context, MiddlewareFn } from "grammy";
 import type { Storage } from "../../storage/types";
 import { resolveLang, t, type Lang } from "../../shared/i18n";

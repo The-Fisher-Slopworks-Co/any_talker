@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { languageSection, type Lang } from "../shared/i18n";
 
 const MESSAGE_FORMAT = `# Формат сообщений

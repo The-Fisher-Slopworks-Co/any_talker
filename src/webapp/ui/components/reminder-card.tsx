@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { useI18n } from "../i18n-context";
 import type { Reminder } from "../../../reminders/types";
 import type { Chat, User } from "../../../shared/types";

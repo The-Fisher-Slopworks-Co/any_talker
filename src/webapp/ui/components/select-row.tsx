@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { ROW_LABEL_CLS, SELECTABLE_ROW_CLS } from "./row";
 
 export function SelectRow({

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { Bot, type Context } from "grammy";
 import type { InlineQueryResult } from "grammy/types";
 import type { Storage } from "../storage/types";
