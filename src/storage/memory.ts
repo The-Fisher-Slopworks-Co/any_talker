@@ -14,6 +14,7 @@ import type {
 import { isEmptyChatSettings } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
+import type { RecurringCheck } from "../checks/types";
 
 export class MemoryStorage implements Storage {
   private settings: Settings | null = null;
@@ -33,6 +34,7 @@ export class MemoryStorage implements Storage {
   private chatSettings = new Map<string, ChatSettings>();
   private reminders = new Map<string, Reminder>();
   private privateChats = new Set<string>();
+  private checks = new Map<string, RecurringCheck>();
 
   private bucketKey(chatId: string, userId: string): string {
     return `${chatId}:${userId}`;
@@ -216,5 +218,24 @@ export class MemoryStorage implements Storage {
 
   async userHasPrivateChat(userId: string): Promise<boolean> {
     return this.privateChats.has(userId);
+  }
+
+  async saveCheck(check: RecurringCheck): Promise<void> {
+    this.checks.set(check.id, structuredClone(check));
+  }
+
+  async getCheck(id: string): Promise<RecurringCheck | null> {
+    const c = this.checks.get(id);
+    return c ? structuredClone(c) : null;
+  }
+
+  async listChecks(): Promise<RecurringCheck[]> {
+    return [...this.checks.values()]
+      .map((c) => structuredClone(c))
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  }
+
+  async deleteCheck(id: string): Promise<void> {
+    this.checks.delete(id);
   }
 }

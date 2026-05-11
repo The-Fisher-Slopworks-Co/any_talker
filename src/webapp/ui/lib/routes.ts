@@ -8,7 +8,8 @@ export type AdminSection =
   | "whitelist"
   | "users"
   | "chats"
-  | "reminders";
+  | "reminders"
+  | "checks";
 
 export type Route =
   | { kind: "main" }
@@ -16,6 +17,7 @@ export type Route =
   | { kind: "admin-section"; section: AdminSection }
   | { kind: "user-edit"; userId: string; from: AdminSection }
   | { kind: "chat-edit"; chatId: string; from: AdminSection }
+  | { kind: "check-edit"; checkId: string | null }
   | { kind: "my-reminders" };
 
 export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
@@ -25,6 +27,7 @@ export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "users",
   "chats",
   "reminders",
+  "checks",
 ];
 
 export function adminSection(
@@ -49,6 +52,11 @@ export function adminSection(
       return {
         label: s.ui_admin_reminders,
         description: s.ui_admin_reminders_desc,
+      };
+    case "checks":
+      return {
+        label: s.ui_admin_checks,
+        description: s.ui_admin_checks_desc,
       };
   }
 }

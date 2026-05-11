@@ -11,6 +11,8 @@ import type {
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
 import type { Reminder } from "../../reminders/types";
+import type { RecurringCheck } from "../../checks/types";
+import type { CheckInputFields } from "../../checks/validate";
 
 declare global {
   interface Window {
@@ -69,7 +71,23 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     headers: { ...authHeader(), "Content-Type": "application/json" },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(`${method} ${path}: ${res.status}`);
+  if (!res.ok) {
+    let errorCode: string | null = null;
+    try {
+      const data = (await res.json()) as { error?: unknown };
+      if (typeof data.error === "string") errorCode = data.error;
+    } catch {
+      // ignore
+    }
+    const err = new Error(
+      errorCode
+        ? `${method} ${path}: ${res.status} ${errorCode}`
+        : `${method} ${path}: ${res.status}`,
+    ) as Error & { code: string | null; status: number };
+    err.code = errorCode;
+    err.status = res.status;
+    throw err;
+  }
   return (await res.json()) as T;
 }
 
@@ -114,6 +132,16 @@ export const api = {
     req<RemindersResponse>("GET", "/api/me/reminders"),
   listAdminReminders: () =>
     req<RemindersResponse>("GET", "/api/admin/reminders"),
+  listChecks: () =>
+    req<{ checks: RecurringCheck[] }>("GET", "/api/admin/checks"),
+  getCheck: (id: string) =>
+    req<{ check: RecurringCheck }>("GET", `/api/admin/checks/${id}`),
+  createCheck: (input: CheckInputFields) =>
+    req<{ check: RecurringCheck }>("POST", "/api/admin/checks", input),
+  updateCheck: (id: string, input: CheckInputFields) =>
+    req<{ check: RecurringCheck }>("PUT", `/api/admin/checks/${id}`, input),
+  deleteCheck: (id: string) =>
+    req<{ ok: true }>("DELETE", `/api/admin/checks/${id}`),
 };
 
 export type RemindersResponse = {

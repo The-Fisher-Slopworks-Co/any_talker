@@ -11,6 +11,7 @@ import { fetchPageTool } from "./ai/tools/fetch-page";
 import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
+import { startChecksScheduler } from "./checks/runner";
 import { createBot } from "./bot";
 import { startServer } from "./webapp/server";
 
@@ -77,7 +78,10 @@ async function main() {
   const scheduler = startScheduler({ storage, api: bot.api });
   console.log("Reminder scheduler started");
 
-  return { bot, server, scheduler };
+  const checksScheduler = startChecksScheduler({ storage, api: bot.api });
+  console.log("Checks scheduler started");
+
+  return { bot, server, scheduler, checksScheduler };
 }
 
 const handles = await main().catch((err) => {
@@ -88,6 +92,7 @@ const handles = await main().catch((err) => {
 if (import.meta.hot) {
   import.meta.hot.dispose(async () => {
     handles.scheduler.stop();
+    handles.checksScheduler.stop();
     handles.server.stop();
     await handles.bot.stop().catch((err) => {
       console.error("bot.stop failed during hot-reload:", err);
