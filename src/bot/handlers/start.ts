@@ -1,4 +1,4 @@
-import type { Context } from "grammy";
+import type { BotContext } from "../middleware/lang";
 
 export type StartHandlerDeps = {
   ownerId: string;
@@ -6,13 +6,13 @@ export type StartHandlerDeps = {
 };
 
 export function makeStartHandler(deps: StartHandlerDeps) {
-  return async (ctx: Context): Promise<void> => {
+  return async (ctx: BotContext): Promise<void> => {
     const userId = String(ctx.from?.id ?? "");
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return;
 
     if (userId !== deps.ownerId) {
-      await ctx.reply("Hi! This bot is private.");
+      await ctx.reply(ctx.t.bot_private);
       return;
     }
 
@@ -20,12 +20,10 @@ export function makeStartHandler(deps: StartHandlerDeps) {
       chat_id: chatId,
       menu_button: {
         type: "web_app",
-        text: "Admin",
+        text: ctx.t.bot_admin_menu_label,
         web_app: { url: deps.webappUrl },
       },
     });
-    await ctx.reply(
-      "Admin panel installed. Tap the menu button to the left of the message input.",
-    );
+    await ctx.reply(ctx.t.bot_admin_installed);
   };
 }

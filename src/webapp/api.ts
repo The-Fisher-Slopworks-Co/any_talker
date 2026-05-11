@@ -14,6 +14,7 @@ import {
   isValidProviderSort,
   isValidGender,
 } from "../shared/types";
+import { isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import { getOrInitSettings } from "../settings";
 import {
@@ -66,12 +67,20 @@ const BAD_GENDER: ApiResponse = {
   body: { error: "invalid gender" },
 };
 
-function normalizeGender(input: unknown): Gender | null | "invalid" {
+const BAD_LANG: ApiResponse = {
+  status: 400,
+  body: { error: "invalid language" },
+};
+
+function normalizeEnumInput<T extends string>(
+  input: unknown,
+  isValid: (v: string) => v is T,
+): T | null | "invalid" {
   if (input === null || input === undefined) return null;
   if (typeof input !== "string") return "invalid";
   const trimmed = input.trim();
   if (trimmed === "") return null;
-  return isValidGender(trimmed) ? trimmed : "invalid";
+  return isValid(trimmed) ? trimmed : "invalid";
 }
 
 const BAD_PROVIDER_SORT: ApiResponse = {
@@ -218,26 +227,36 @@ export async function handleApi(
 
   if (req.path === "/api/me") {
     if (req.method === "GET") {
-      const [displayName, timezone, gender] = await Promise.all([
+      const [displayName, timezone, gender, language] = await Promise.all([
         deps.storage.getUserName(actor.userId),
         deps.storage.getUserTimezone(actor.userId),
         deps.storage.getUserGender(actor.userId),
+        deps.storage.getUserLang(actor.userId),
       ]);
       return {
         status: 200,
-        body: { isOwner: actor.isOwner, displayName, timezone, gender },
+        body: {
+          isOwner: actor.isOwner,
+          displayName,
+          timezone,
+          gender,
+          language,
+        },
       };
     }
     if (req.method === "PUT") {
       const body = (req.body ?? {}) as Record<string, unknown>;
-      const [currentName, currentTz, currentGender] = await Promise.all([
-        deps.storage.getUserName(actor.userId),
-        deps.storage.getUserTimezone(actor.userId),
-        deps.storage.getUserGender(actor.userId),
-      ]);
+      const [currentName, currentTz, currentGender, currentLang] =
+        await Promise.all([
+          deps.storage.getUserName(actor.userId),
+          deps.storage.getUserTimezone(actor.userId),
+          deps.storage.getUserGender(actor.userId),
+          deps.storage.getUserLang(actor.userId),
+        ]);
       let displayName = currentName;
       let timezone = currentTz;
       let gender: Gender | null = currentGender;
+      let language: Lang | null = currentLang;
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
@@ -255,16 +274,28 @@ export async function handleApi(
         writes.push(deps.storage.setUserTimezone(actor.userId, timezone));
       }
       if ("gender" in body) {
-        const nextGender = normalizeGender(body.gender);
+        const nextGender = normalizeEnumInput(body.gender, isValidGender);
         if (nextGender === "invalid") return BAD_GENDER;
         gender = nextGender;
         writes.push(deps.storage.setUserGender(actor.userId, gender));
+      }
+      if ("language" in body) {
+        const nextLang = normalizeEnumInput(body.language, isValidLang);
+        if (nextLang === "invalid") return BAD_LANG;
+        language = nextLang;
+        writes.push(deps.storage.setUserLang(actor.userId, language));
       }
 
       await Promise.all(writes);
       return {
         status: 200,
-        body: { isOwner: actor.isOwner, displayName, timezone, gender },
+        body: {
+          isOwner: actor.isOwner,
+          displayName,
+          timezone,
+          gender,
+          language,
+        },
       };
     }
   }

@@ -8,6 +8,7 @@ import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { AIMessage } from "../../ai/types";
 import { MAX_REPLY_CHAIN_DEPTH, type GuestThreadNode } from "../../shared/types";
+import type { Lang } from "../../shared/i18n";
 
 export type GuestAskInput = {
   storage: Storage;
@@ -20,6 +21,7 @@ export type GuestAskInput = {
   sender: Sender;
   userText: string;
   priorThread: GuestThreadNode | null;
+  lang: Lang;
   onAIStart?: () => void;
 };
 
@@ -87,7 +89,10 @@ export async function guestAskHandler(
   try {
     result = await input.ai.ask({
       models: settings.models,
-      system: buildInstruction(settings.systemPrompt, { timezone }),
+      system: buildInstruction(settings.systemPrompt, {
+        timezone,
+        lang: input.lang,
+      }),
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,

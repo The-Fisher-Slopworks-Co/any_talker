@@ -1,3 +1,5 @@
+import { languageSection, type Lang } from "../shared/i18n";
+
 const MESSAGE_FORMAT = `# Формат сообщений
 
 Сообщения пользователей приходят в JSON формате со следующими полями:
@@ -62,7 +64,7 @@ function datetimeSection(timezone: string, now: Date): string {
 
 export function buildInstruction(
   characterDescription: string,
-  opts: { timezone?: string; now?: Date } = {},
+  opts: { timezone?: string; now?: Date; lang?: Lang } = {},
 ): string {
   const sections: string[] = [
     MESSAGE_FORMAT,
@@ -71,6 +73,9 @@ export function buildInstruction(
   ];
   if (opts.timezone) {
     sections.push(datetimeSection(opts.timezone, opts.now ?? new Date()));
+  }
+  if (opts.lang) {
+    sections.push(languageSection(opts.lang));
   }
   return sections.join("\n\n");
 }

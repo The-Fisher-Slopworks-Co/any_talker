@@ -5,10 +5,11 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import { fetchOpenRouterStats } from "./openrouter-proxy";
 import indexHtml from "./ui/index.html";
+import type { BotContext } from "../bot/middleware/lang";
 
 export type ServerDeps = {
   port: number;
-  bot: Bot;
+  bot: Bot<BotContext>;
   botToken: string;
   ownerId: string;
   webhookUrl: string | undefined;
