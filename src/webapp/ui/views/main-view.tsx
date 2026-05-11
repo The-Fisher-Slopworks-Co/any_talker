@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { useState } from "react";
 import { useI18n } from "../i18n-context";
 import { api, type MeResponse } from "../api-client";

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { z } from "zod";
 import { fetchWithTimeout, readTextCapped } from "./http";
 import type { Tool } from "./registry";

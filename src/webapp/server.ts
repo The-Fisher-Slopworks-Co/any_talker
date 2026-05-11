@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { webhookCallback, type Bot } from "grammy";
 import { handleApi, type ApiRequest } from "./api";
 import { verifyInitData } from "./auth";

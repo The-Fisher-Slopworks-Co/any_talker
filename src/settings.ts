@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import type { Storage } from "./storage/types";
 import type { Settings, ChatSettings } from "./shared/types";
 import { DEFAULT_SETTINGS } from "./shared/types";
