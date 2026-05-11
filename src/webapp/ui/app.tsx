@@ -166,6 +166,17 @@ const INPUT_BASE_CLS =
 const INPUT_CLS = `${INPUT_BASE_CLS} text-right`;
 const INPUT_LEFT_CLS = `${INPUT_BASE_CLS} text-left`;
 
+function SelectChevron() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-tg-link text-[14px] leading-none"
+    >
+      ▼
+    </span>
+  );
+}
+
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -681,10 +692,8 @@ function ModelsCard({
             className="row relative flex flex-col gap-2 px-4 py-[11px]"
           >
             <div className="flex items-center gap-3">
-              <span className="shrink-0 text-tg-hint text-[15px] w-14">
-                {idx === 0
-                  ? s.ui_models_primary
-                  : s.ui_models_fallback_n(idx + 1)}
+              <span className="shrink-0 text-tg-hint text-[15px] w-6">
+                {s.ui_models_fallback_n(idx + 1)}
               </span>
               <input
                 className={INPUT_LEFT_CLS}
@@ -703,7 +712,7 @@ function ModelsCard({
               )}
             </div>
             {m.trim().length > 0 && (
-              <div className="pl-[68px] text-[13px] leading-[1.45]">
+              <div className="pl-[36px] text-[13px] leading-[1.45]">
                 <ModelInfo model={info} providerSort={providerSort} />
               </div>
             )}
@@ -848,32 +857,38 @@ function TimezoneSelect({
     <Card>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_tz_area}</span>
-        <select
-          className={INPUT_CLS}
-          value={area}
-          onChange={(e) => onAreaChange(e.target.value)}
-        >
-          {areaOptions.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+        <span className="relative flex flex-1 min-w-0 items-center">
+          <select
+            className={`${INPUT_CLS} w-full pr-5`}
+            value={area}
+            onChange={(e) => onAreaChange(e.target.value)}
+          >
+            {areaOptions.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <SelectChevron />
+        </span>
       </label>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_tz_location}</span>
-        <select
-          className={INPUT_CLS}
-          value={location}
-          onChange={(e) => onLocationChange(e.target.value)}
-          disabled={locationOptions.length === 0}
-        >
-          {locationOptions.map((l) => (
-            <option key={l} value={l}>
-              {l.replace(/_/g, " ")}
-            </option>
-          ))}
-        </select>
+        <span className="relative flex flex-1 min-w-0 items-center">
+          <select
+            className={`${INPUT_CLS} w-full pr-5`}
+            value={location}
+            onChange={(e) => onLocationChange(e.target.value)}
+            disabled={locationOptions.length === 0}
+          >
+            {locationOptions.map((l) => (
+              <option key={l} value={l}>
+                {l.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+          <SelectChevron />
+        </span>
       </label>
     </Card>
   );
