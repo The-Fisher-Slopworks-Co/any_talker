@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import type { ReactNode } from "react";
 import type { RemindersResponse } from "../api-client";
 import { SectionFooter, SectionHeader, Stack } from "../components/layout";

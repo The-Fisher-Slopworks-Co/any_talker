@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 const ALLOWED_TAGS = new Set(["b", "i", "u", "a", "code", "pre"]);
 const NAMED_ENTITIES = new Set(["lt", "gt", "amp", "quot"]);
 

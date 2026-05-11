@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 export function useLoadable<T>(

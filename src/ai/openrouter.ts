@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import { generateText, tool as aiTool, stepCountIs, type ToolSet } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";

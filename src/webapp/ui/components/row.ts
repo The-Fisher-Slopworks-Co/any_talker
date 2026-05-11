@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 export const ROW_CLS = "row relative flex items-center gap-3 px-4 py-[11px]";
 export const ROW_LABEL_CLS = "shrink-0 text-base";
 export const ROW_VALUE_CLS = "flex-1 text-right text-tg-hint text-[15px]";

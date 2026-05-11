@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 The Fisher Slopworks Co
+
 import type { t } from "../../../shared/i18n";
 
 export type Strings = ReturnType<typeof t>;
