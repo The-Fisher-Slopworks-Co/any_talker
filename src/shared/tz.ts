@@ -8,16 +8,42 @@ export type LocalParts = {
   minute: number;
 };
 
+// Constructing Intl.DateTimeFormat is expensive; the checks scheduler calls
+// these helpers on every tick for every check, so cache per (kind, tz).
+const localPartsFormatters = new Map<string, Intl.DateTimeFormat>();
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function localPartsFormatter(tz: string): Intl.DateTimeFormat {
+  let f = localPartsFormatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    localPartsFormatters.set(tz, f);
+  }
+  return f;
+}
+
+function offsetFormatter(tz: string): Intl.DateTimeFormat {
+  let f = offsetFormatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "longOffset",
+    });
+    offsetFormatters.set(tz, f);
+  }
+  return f;
+}
+
 export function formatLocalParts(utcMs: number, tz: string): LocalParts {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(utcMs));
+  const parts = localPartsFormatter(tz).formatToParts(new Date(utcMs));
   const get = (t: string) =>
     Number(parts.find((p) => p.type === t)?.value ?? "0");
   return {
@@ -30,11 +56,7 @@ export function formatLocalParts(utcMs: number, tz: string): LocalParts {
 }
 
 export function tzOffsetMinutesAt(utcMs: number, tz: string): number {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    timeZoneName: "longOffset",
-  });
-  const parts = fmt.formatToParts(new Date(utcMs));
+  const parts = offsetFormatter(tz).formatToParts(new Date(utcMs));
   const off =
     parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";
   const m = off.match(/GMT([+-])(\d{1,2}):?(\d{2})?/);

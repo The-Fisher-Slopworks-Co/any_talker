@@ -165,7 +165,7 @@ function isSafeUrl(url: string): boolean {
   return /^(https?:\/\/|tg:\/\/)/i.test(url);
 }
 
-function escapeAttrValue(value: string): string {
+export function escapeAttrValue(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
