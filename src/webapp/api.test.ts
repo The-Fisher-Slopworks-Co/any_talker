@@ -1000,6 +1000,78 @@ describe("/api/admin/chats", () => {
     expect(await d.storage.getChatSettings("-100")).toBeNull();
   });
 
+  test("PUT trims and saves keywordFilter", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: {
+          keywordFilter: { enabled: true, keywords: ["  Foo ", "", "bar"] },
+        },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      keywordFilter: { enabled: true, keywords: ["Foo", "bar"] },
+    });
+  });
+
+  test("PUT keeps keywordFilter when disabled but keywords present", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { keywordFilter: { enabled: false, keywords: ["foo"] } },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      keywordFilter: { enabled: false, keywords: ["foo"] },
+    });
+  });
+
+  test("PUT drops keywordFilter when disabled and keywords empty", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.saveChatSettings("-100", {
+      keywordFilter: { enabled: true, keywords: ["x"] },
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { keywordFilter: { enabled: false, keywords: [] } },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toBeNull();
+  });
+
   test("PUT with empty body clears the chat overrides", async () => {
     const d = deps();
     await d.storage.upsertChat({
