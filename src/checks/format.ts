@@ -9,10 +9,11 @@ function escapeAttr(s: string): string {
   return escapeHtml(s).replace(/"/g, "&quot;");
 }
 
-// `{name}` and `{count}` are replaced with HTML-safe values; the rest of
-// the template is HTML-escaped so plain-text input from the owner can
-// be sent with parse_mode=HTML without breaking the parser.
-export function formatTemplate(
+// Used for the initial question that gets posted at the scheduled time.
+// `{name}` becomes a clickable tg://user mention so the user gets pinged;
+// the rest of the template is HTML-escaped so plain-text input from the
+// owner survives parse_mode=HTML.
+export function formatQuestion(
   template: string,
   vars: { targetUserId: string; name: string; count: number },
 ): string {
@@ -30,4 +31,16 @@ export function formatTemplate(
   )
     .replaceAll(nameSentinel, nameHtml)
     .replaceAll(countSentinel, countHtml);
+}
+
+// Used for the yes/no/timeout reply. Plain-text substitution — no HTML
+// escaping, no mention link. The reply is sent without parse_mode so the
+// text appears verbatim.
+export function formatReply(
+  template: string,
+  vars: { name: string; count: number },
+): string {
+  return template
+    .replaceAll("{name}", vars.name)
+    .replaceAll("{count}", String(vars.count));
 }

@@ -1,6 +1,6 @@
 import type { Storage } from "../storage/types";
 import type { RecurringCheck, CheckAnswer } from "./types";
-import { formatTemplate } from "./format";
+import { formatReply } from "./format";
 
 export type CheckInlineKeyboardButton = {
   text: string;
@@ -55,15 +55,13 @@ export async function resolveCheck(args: {
 
   const replyTemplate =
     answer === "yes" ? check.yesReply : check.noReply;
-  const reply = formatTemplate(replyTemplate, {
-    targetUserId: check.targetUserId,
+  const reply = formatReply(replyTemplate, {
     name: check.targetName,
     count: newCounter,
   });
 
   try {
     await api.sendMessage(check.chatId, reply, {
-      parse_mode: "HTML",
       reply_parameters: {
         message_id: check.pendingMessageId,
         allow_sending_without_reply: true,

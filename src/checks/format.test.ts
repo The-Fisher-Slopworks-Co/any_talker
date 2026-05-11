@@ -1,10 +1,10 @@
 import { test, expect, describe } from "bun:test";
-import { formatTemplate } from "./format";
+import { formatQuestion, formatReply } from "./format";
 
-describe("formatTemplate", () => {
+describe("formatQuestion", () => {
   test("substitutes {name} as an HTML mention link to tg://user", () => {
     expect(
-      formatTemplate("{name}, hi", {
+      formatQuestion("{name}, hi", {
         targetUserId: "42",
         name: "Nikita",
         count: 0,
@@ -14,7 +14,7 @@ describe("formatTemplate", () => {
 
   test("substitutes {count} with the numeric value", () => {
     expect(
-      formatTemplate("Day {count}", {
+      formatQuestion("Day {count}", {
         targetUserId: "42",
         name: "x",
         count: 723,
@@ -22,21 +22,9 @@ describe("formatTemplate", () => {
     ).toBe("Day 723");
   });
 
-  test("substitutes both {name} and {count} in the example sentence", () => {
-    expect(
-      formatTemplate("{name}. Day without sport {count}", {
-        targetUserId: "42",
-        name: "Nikita",
-        count: 723,
-      }),
-    ).toBe(
-      `<a href="tg://user?id=42">Nikita</a>. Day without sport 723`,
-    );
-  });
-
   test("HTML-escapes literal characters in the template", () => {
     expect(
-      formatTemplate("<b>{name}</b> & co", {
+      formatQuestion("<b>{name}</b> & co", {
         targetUserId: "42",
         name: "Nikita",
         count: 0,
@@ -48,7 +36,7 @@ describe("formatTemplate", () => {
 
   test("HTML-escapes special characters inside the name", () => {
     expect(
-      formatTemplate("{name}", {
+      formatQuestion("{name}", {
         targetUserId: "42",
         name: `Bob <hax> & "y"`,
         count: 0,
@@ -60,7 +48,7 @@ describe("formatTemplate", () => {
 
   test("HTML-escapes special characters in the userId attribute", () => {
     expect(
-      formatTemplate("{name}", {
+      formatQuestion("{name}", {
         targetUserId: `4"2`,
         name: "x",
         count: 0,
@@ -70,7 +58,7 @@ describe("formatTemplate", () => {
 
   test("emits the mention for every {name} occurrence", () => {
     expect(
-      formatTemplate("{name}, {name}!", {
+      formatQuestion("{name}, {name}!", {
         targetUserId: "42",
         name: "Bob",
         count: 0,
@@ -79,24 +67,43 @@ describe("formatTemplate", () => {
       `<a href="tg://user?id=42">Bob</a>, <a href="tg://user?id=42">Bob</a>!`,
     );
   });
+});
 
-  test("renders count=0 as 0", () => {
+describe("formatReply", () => {
+  test("substitutes {name} as plain text without an HTML link", () => {
     expect(
-      formatTemplate("{count}", {
-        targetUserId: "1",
-        name: "x",
-        count: 0,
+      formatReply("{name}. Day without sport {count}", {
+        name: "Nikita",
+        count: 723,
       }),
-    ).toBe("0");
+    ).toBe("Nikita. Day without sport 723");
   });
 
-  test("leaves text without placeholders alone (only HTML-escaping)", () => {
+  test("does NOT HTML-escape special characters", () => {
     expect(
-      formatTemplate("hello world", {
-        targetUserId: "1",
-        name: "x",
+      formatReply("<b>{name}</b> & co", {
+        name: "Nikita",
         count: 0,
       }),
-    ).toBe("hello world");
+    ).toBe("<b>Nikita</b> & co");
+  });
+
+  test("substitutes all occurrences of {name} and {count}", () => {
+    expect(
+      formatReply("{name}, {name}! {count}+{count}", {
+        name: "Bob",
+        count: 7,
+      }),
+    ).toBe("Bob, Bob! 7+7");
+  });
+
+  test("count=0 renders as 0", () => {
+    expect(formatReply("{count}", { name: "x", count: 0 })).toBe("0");
+  });
+
+  test("leaves text without placeholders alone", () => {
+    expect(formatReply("hello world", { name: "x", count: 1 })).toBe(
+      "hello world",
+    );
   });
 });

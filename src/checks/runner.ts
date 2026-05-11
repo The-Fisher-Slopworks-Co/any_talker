@@ -1,7 +1,7 @@
 import type { Storage } from "../storage/types";
 import type { RecurringCheck } from "./types";
 import { lastScheduledFireMs } from "./schedule";
-import { formatTemplate } from "./format";
+import { formatQuestion } from "./format";
 import { resolveCheck, type CheckApi } from "./resolve";
 
 export async function runChecksTick(deps: {
@@ -61,7 +61,7 @@ async function fireCheck(
   check: RecurringCheck,
   nowMs: number,
 ): Promise<void> {
-  const text = formatTemplate(check.question, {
+  const text = formatQuestion(check.question, {
     targetUserId: check.targetUserId,
     name: check.targetName,
     count: check.counter,

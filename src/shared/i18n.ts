@@ -491,7 +491,7 @@ const en: Strings = {
   ui_check_target_name: "Name shown",
   ui_check_target_name_placeholder: "Nikita",
   ui_check_target_name_footer:
-    "Substituted for {name} inside the question and replies, rendered as a clickable mention that pings the target user.",
+    "Substituted for {name} in the question and replies. In the question it renders as a clickable mention that pings the user; in replies it appears as plain text.",
   ui_check_schedule: "Time",
   ui_check_schedule_footer:
     "Daily wall-clock time in the timezone below. The bot fires at most once per day.",
@@ -514,7 +514,7 @@ const en: Strings = {
   ui_check_no_reply: "Reply when No / timeout",
   ui_check_no_reply_placeholder: "{name}. Day without sport {count}",
   ui_check_replies_footer:
-    "{name} becomes a clickable mention of the user; {count} is the counter after this answer.",
+    "{name} is the target's plain-text name (no mention); {count} is the counter after this answer.",
   ui_check_counter: "Counter",
   ui_check_counter_footer:
     "Current value of {count}. Adjust manually if needed.",
@@ -775,7 +775,7 @@ const ru: Strings = {
   ui_check_target_name: "Имя в сообщениях",
   ui_check_target_name_placeholder: "Никита",
   ui_check_target_name_footer:
-    "Подставляется на место {name} в вопросе и ответах в виде кликабельного упоминания, которое пингует пользователя.",
+    "Подставляется на место {name} в вопросе и ответах. В вопросе — как кликабельное упоминание, пингующее пользователя; в ответах — просто текстом.",
   ui_check_schedule: "Время",
   ui_check_schedule_footer:
     "Время суток в указанном ниже часовом поясе. Бот сработает не больше одного раза в сутки.",
@@ -798,7 +798,7 @@ const ru: Strings = {
   ui_check_no_reply: "Ответ при «Нет» / таймауте",
   ui_check_no_reply_placeholder: "{name}. День без спорта {count}",
   ui_check_replies_footer:
-    "{name} — кликабельное упоминание пользователя; {count} — счётчик после этого ответа.",
+    "{name} — имя пользователя обычным текстом (без упоминания); {count} — счётчик после этого ответа.",
   ui_check_counter: "Счётчик",
   ui_check_counter_footer:
     "Текущее значение {count}. При необходимости можно поправить вручную.",
