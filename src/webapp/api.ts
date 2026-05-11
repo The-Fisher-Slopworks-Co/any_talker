@@ -16,6 +16,8 @@ import {
 } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
+import type { RecurringCheck } from "../checks/types";
+import { normalizeCheckInput } from "../checks/validate";
 import { getOrInitSettings } from "../settings";
 import {
   isValidPermaslug,
@@ -438,6 +440,60 @@ export async function handleApi(
   if (req.path === "/api/admin/chats" && req.method === "GET") {
     const chats = await deps.storage.listChats();
     return { status: 200, body: { chats } };
+  }
+
+  if (req.path === "/api/admin/checks") {
+    if (req.method === "GET") {
+      const checks = await deps.storage.listChecks();
+      return { status: 200, body: { checks } };
+    }
+    if (req.method === "POST") {
+      const parsed = normalizeCheckInput(req.body);
+      if (!parsed.ok) {
+        return { status: 400, body: { error: parsed.error } };
+      }
+      const now = Date.now();
+      const check: RecurringCheck = {
+        id: crypto.randomUUID(),
+        ...parsed.value,
+        lastFiredAtMs: 0,
+        pendingMessageId: null,
+        pendingFiredAtMs: null,
+        createdAtMs: now,
+      };
+      await deps.storage.saveCheck(check);
+      return { status: 200, body: { check } };
+    }
+  }
+
+  const checkMatch = req.path.match(/^\/api\/admin\/checks\/(.+)$/);
+  if (checkMatch) {
+    const id = checkMatch[1]!;
+    if (req.method === "GET") {
+      const check = await deps.storage.getCheck(id);
+      if (!check) return { status: 404, body: { error: "check not found" } };
+      return { status: 200, body: { check } };
+    }
+    if (req.method === "PUT") {
+      const existing = await deps.storage.getCheck(id);
+      if (!existing) {
+        return { status: 404, body: { error: "check not found" } };
+      }
+      const parsed = normalizeCheckInput(req.body);
+      if (!parsed.ok) {
+        return { status: 400, body: { error: parsed.error } };
+      }
+      const next: RecurringCheck = {
+        ...existing,
+        ...parsed.value,
+      };
+      await deps.storage.saveCheck(next);
+      return { status: 200, body: { check: next } };
+    }
+    if (req.method === "DELETE") {
+      await deps.storage.deleteCheck(id);
+      return { status: 200, body: { ok: true } };
+    }
   }
 
   const chatMatch = req.path.match(/^\/api\/admin\/chats\/(.+)$/);

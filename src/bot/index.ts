@@ -8,6 +8,8 @@ import { askHandler } from "./handlers/ask";
 import { contactHandler } from "./handlers/contact";
 import { guestAskHandler } from "./handlers/guest";
 import { makeStartHandler } from "./handlers/start";
+import { handleCheckCallback } from "./handlers/check-callback";
+import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, downloadTelegramFile } from "./photo";
 import { resolveReplyAuthor } from "./reply";
@@ -341,6 +343,32 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         await ctx.reply(ctx.t.bot_contact_added(outcome.label));
         return;
     }
+  });
+
+  bot.callbackQuery(CHECK_CALLBACK_RE, async (ctx) => {
+    const checkId = ctx.match[1]!;
+    const answer = ctx.match[2] as "yes" | "no";
+    const fromUserId = String(ctx.from.id);
+    const callbackMessageId = ctx.callbackQuery.message?.message_id;
+    if (callbackMessageId === undefined) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+    const outcome = await handleCheckCallback({
+      storage: deps.storage,
+      api: ctx.api,
+      checkId,
+      answer,
+      fromUserId,
+      callbackMessageId,
+    });
+    if (outcome.kind === "wrong_user") {
+      await ctx
+        .answerCallbackQuery({ text: ctx.t.bot_check_wrong_user })
+        .catch(() => {});
+      return;
+    }
+    await ctx.answerCallbackQuery().catch(() => {});
   });
 
   bot.catch((err) => {

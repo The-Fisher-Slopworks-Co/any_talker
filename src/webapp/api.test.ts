@@ -1226,6 +1226,165 @@ describe("/api/admin/reminders", () => {
   });
 });
 
+describe("/api/admin/checks", () => {
+  const validCheckBody = {
+    title: "Sport for Nikita",
+    chatId: "-100123456",
+    targetUserId: "42",
+    targetName: "Nikita",
+    scheduleHour: 23,
+    scheduleMinute: 30,
+    timezone: "Europe/Moscow",
+    question: "{name}, sport?",
+    yesButton: "Yes",
+    noButton: "No",
+    yesReply: "{name}, lying. Day {count}",
+    noReply: "{name}. Day {count}",
+    timeoutMinutes: 25,
+    counter: 722,
+    counterMode: "always_increment",
+    enabled: true,
+  };
+
+  test("GET list returns empty initially", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/checks", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ checks: [] });
+  });
+
+  test("POST creates a check with runtime defaults", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "POST", path: "/api/admin/checks", body: validCheckBody },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const body = r.body as { check: { id: string; lastFiredAtMs: number } };
+    expect(body.check.lastFiredAtMs).toBe(0);
+    const list = await d.storage.listChecks();
+    expect(list).toHaveLength(1);
+    expect(list[0]?.title).toBe("Sport for Nikita");
+  });
+
+  test("POST rejects invalid input with 400", async () => {
+    const r = await handleApi(
+      {
+        method: "POST",
+        path: "/api/admin/checks",
+        body: { ...validCheckBody, scheduleHour: 99 },
+      },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("GET single check returns 404 for unknown id", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/checks/nope", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  test("GET single check returns the check", async () => {
+    const d = deps();
+    const create = await handleApi(
+      { method: "POST", path: "/api/admin/checks", body: validCheckBody },
+      d,
+      owner,
+    );
+    const id = (create.body as { check: { id: string } }).check.id;
+    const r = await handleApi(
+      { method: "GET", path: `/api/admin/checks/${id}`, body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const body = r.body as { check: { id: string; title: string } };
+    expect(body.check.id).toBe(id);
+    expect(body.check.title).toBe("Sport for Nikita");
+  });
+
+  test("PUT updates an existing check, preserves runtime state", async () => {
+    const d = deps();
+    const create = await handleApi(
+      { method: "POST", path: "/api/admin/checks", body: validCheckBody },
+      d,
+      owner,
+    );
+    const id = (create.body as { check: { id: string } }).check.id;
+    const existing = await d.storage.getCheck(id);
+    if (!existing) throw new Error("missing");
+    await d.storage.saveCheck({
+      ...existing,
+      pendingMessageId: 99,
+      pendingFiredAtMs: 1234,
+      lastFiredAtMs: 5678,
+    });
+
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: `/api/admin/checks/${id}`,
+        body: { ...validCheckBody, counter: 999 },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const updated = await d.storage.getCheck(id);
+    expect(updated?.counter).toBe(999);
+    expect(updated?.pendingMessageId).toBe(99);
+    expect(updated?.lastFiredAtMs).toBe(5678);
+  });
+
+  test("PUT returns 404 for unknown id", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/checks/nope",
+        body: validCheckBody,
+      },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  test("DELETE removes the check", async () => {
+    const d = deps();
+    const create = await handleApi(
+      { method: "POST", path: "/api/admin/checks", body: validCheckBody },
+      d,
+      owner,
+    );
+    const id = (create.body as { check: { id: string } }).check.id;
+    const r = await handleApi(
+      { method: "DELETE", path: `/api/admin/checks/${id}`, body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getCheck(id)).toBeNull();
+  });
+
+  test("non-owner gets 403", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/checks", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
 describe("unknown route", () => {
   test("returns 404", async () => {
     const r = await handleApi({ method: "GET", path: "/api/nope", body: null }, deps(), owner);

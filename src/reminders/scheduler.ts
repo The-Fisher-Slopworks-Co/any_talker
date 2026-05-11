@@ -1,7 +1,11 @@
 import type { Storage } from "../storage/types";
+import {
+  startIntervalScheduler,
+  type IntervalScheduler,
+} from "../shared/interval-scheduler";
 import { deliverReminder, type ReminderApi } from "./delivery";
 
-export type Scheduler = { stop(): void };
+export type Scheduler = IntervalScheduler;
 
 export type SchedulerDeps = {
   storage: Storage;
@@ -49,37 +53,14 @@ export async function runReminderTick(deps: {
 }
 
 export function startScheduler(deps: SchedulerDeps): Scheduler {
-  const intervalMs = deps.intervalMs ?? DEFAULT_INTERVAL_MS;
-  let stopped = false;
-  let inFlight: Promise<void> | null = null;
-
-  const safeTick = async () => {
-    if (stopped) return;
-    try {
-      await runReminderTick({
+  return startIntervalScheduler({
+    intervalMs: deps.intervalMs ?? DEFAULT_INTERVAL_MS,
+    logPrefix: "[scheduler]",
+    tick: () =>
+      runReminderTick({
         storage: deps.storage,
         api: deps.api,
         nowMs: Date.now(),
-      });
-    } catch (err) {
-      console.error("[scheduler] tick failed:", err);
-    }
-  };
-
-  const tick = () => {
-    if (inFlight || stopped) return;
-    inFlight = safeTick().finally(() => {
-      inFlight = null;
-    });
-  };
-
-  tick();
-  const handle = setInterval(tick, intervalMs);
-
-  return {
-    stop() {
-      stopped = true;
-      clearInterval(handle);
-    },
-  };
+      }),
+  });
 }

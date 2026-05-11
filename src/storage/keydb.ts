@@ -19,6 +19,7 @@ import {
 } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
+import type { RecurringCheck } from "../checks/types";
 
 const PREFIX = "at:";
 const FETCH_DUE_LIMIT = 100;
@@ -293,5 +294,29 @@ export class KeyDBStorage implements Storage {
   async userHasPrivateChat(userId: string): Promise<boolean> {
     const v = await this.client.get(`${PREFIX}user_private_chat:${userId}`);
     return v !== null;
+  }
+
+  async saveCheck(check: RecurringCheck): Promise<void> {
+    await this.client.hset(
+      `${PREFIX}checks`,
+      check.id,
+      JSON.stringify(check),
+    );
+  }
+
+  async getCheck(id: string): Promise<RecurringCheck | null> {
+    const raw = await this.client.hget(`${PREFIX}checks`, id);
+    return raw ? (JSON.parse(raw) as RecurringCheck) : null;
+  }
+
+  async listChecks(): Promise<RecurringCheck[]> {
+    const values = await this.client.hvals(`${PREFIX}checks`);
+    return values
+      .map((raw) => JSON.parse(raw) as RecurringCheck)
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  }
+
+  async deleteCheck(id: string): Promise<void> {
+    await this.client.hdel(`${PREFIX}checks`, id);
   }
 }
