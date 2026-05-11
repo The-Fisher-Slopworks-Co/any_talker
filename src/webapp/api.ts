@@ -165,6 +165,7 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     botName?: unknown;
     timezone?: unknown;
     providerSort?: unknown;
+    keywordFilter?: unknown;
   };
   const out: ChatSettings = {};
   if (typeof body.systemPrompt === "string") {
@@ -211,6 +212,26 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     out.providerSort = null;
   } else if (isValidProviderSort(body.providerSort)) {
     out.providerSort = body.providerSort;
+  }
+  if (
+    body.keywordFilter &&
+    typeof body.keywordFilter === "object" &&
+    !Array.isArray(body.keywordFilter)
+  ) {
+    const f = body.keywordFilter as {
+      enabled?: unknown;
+      keywords?: unknown;
+    };
+    const keywords = Array.isArray(f.keywords)
+      ? f.keywords
+          .filter((k): k is string => typeof k === "string")
+          .map((k) => k.trim())
+          .filter((k) => k.length > 0)
+      : [];
+    const enabled = typeof f.enabled === "boolean" ? f.enabled : false;
+    if (enabled || keywords.length > 0) {
+      out.keywordFilter = { enabled, keywords };
+    }
   }
   return out;
 }

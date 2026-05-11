@@ -15,7 +15,7 @@ import {
   Stack,
 } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { SaveButton } from "../../components/controls";
+import { SaveButton, Toggle } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { OverrideSection } from "../../components/override-section";
 import { ProviderSortField } from "../../components/provider-sort-field";
@@ -47,6 +47,8 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   const [tzValue, setTzValue] = useState("UTC");
   const [psOverride, setPsOverride] = useState(false);
   const [psValue, setPsValue] = useState<ProviderSort | null>(null);
+  const [kfEnabled, setKfEnabled] = useState(false);
+  const [kfValue, setKfValue] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -74,6 +76,8 @@ export function ChatEditView({ chatId }: { chatId: string }) {
             ? d.settings.providerSort
             : g.providerSort,
         );
+        setKfEnabled(d.settings.keywordFilter?.enabled ?? false);
+        setKfValue((d.settings.keywordFilter?.keywords ?? []).join(", "));
       })
       .catch(() => setNotFound(true));
   }, [chatId]);
@@ -85,6 +89,10 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     .map((m) => m.trim())
     .filter((m) => m.length > 0);
   const trimmedBotName = botNameValue.trim();
+  const parsedKeywords = kfValue
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => k.length > 0);
 
   const buildPayload = (): ChatSettings => {
     const next: ChatSettings = {};
@@ -94,6 +102,12 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     if (trimmedBotName.length > 0) next.botName = trimmedBotName;
     if (tzOverride) next.timezone = tzValue;
     if (psOverride) next.providerSort = psValue;
+    if (kfEnabled || parsedKeywords.length > 0) {
+      next.keywordFilter = {
+        enabled: kfEnabled,
+        keywords: parsedKeywords,
+      };
+    }
     return next;
   };
 
@@ -112,7 +126,9 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
     (tzOverride && payload.timezone !== original.timezone) ||
     (psOverride && payload.providerSort !== original.providerSort) ||
-    trimmedBotName !== (original.botName ?? "");
+    trimmedBotName !== (original.botName ?? "") ||
+    JSON.stringify(payload.keywordFilter ?? null) !==
+      JSON.stringify(original.keywordFilter ?? null);
 
   const canSave = dirty && (!modelsOverride || trimmedModels.length > 0);
 
@@ -136,6 +152,8 @@ export function ChatEditView({ chatId }: { chatId: string }) {
           ? result.settings.providerSort
           : global.providerSort,
       );
+      setKfEnabled(result.settings.keywordFilter?.enabled ?? false);
+      setKfValue((result.settings.keywordFilter?.keywords ?? []).join(", "));
     } finally {
       setSaving(false);
     }
@@ -269,6 +287,22 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       >
         <ProviderSortField value={psValue} onChange={setPsValue} />
       </OverrideSection>
+
+      <SectionHeader>{s.ui_chat_keyword_filter}</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_keyword_filter_enabled}</span>
+          <span className="flex-1" />
+          <Toggle value={kfEnabled} onChange={setKfEnabled} />
+        </div>
+        <textarea
+          className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[80px]"
+          value={kfValue}
+          onChange={(e) => setKfValue(e.target.value)}
+          placeholder={s.ui_chat_keyword_filter_placeholder}
+        />
+      </Card>
+      <SectionFooter>{s.ui_chat_keyword_filter_footer}</SectionFooter>
 
       <SaveButton
         saving={saving}
