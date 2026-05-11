@@ -32,3 +32,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# editor
+.vscode
+*.swp
+
+# bun
+bun.lockb
+
+# git worktrees
+.claude/worktrees

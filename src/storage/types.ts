@@ -1,0 +1,69 @@
+import type {
+  Settings,
+  WhitelistEntry,
+  WhitelistKind,
+  BucketState,
+  ConversationNode,
+  GuestThreadNode,
+  User,
+  Chat,
+  ChatSettings,
+  Gender,
+} from "../shared/types";
+import type { Lang } from "../shared/i18n";
+import type { Reminder } from "../reminders/types";
+
+export interface Storage {
+  getSettings(): Promise<Settings | null>;
+  saveSettings(settings: Settings): Promise<void>;
+
+  listWhitelist(kind: WhitelistKind): Promise<WhitelistEntry[]>;
+  addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void>;
+  removeWhitelist(kind: WhitelistKind, id: string): Promise<void>;
+  isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean>;
+
+  getBucket(chatId: string, userId: string): Promise<BucketState | null>;
+  saveBucket(chatId: string, userId: string, state: BucketState): Promise<void>;
+
+  getUserName(userId: string): Promise<string | null>;
+  setUserName(userId: string, name: string | null): Promise<void>;
+
+  getUserTimezone(userId: string): Promise<string | null>;
+  setUserTimezone(userId: string, timezone: string | null): Promise<void>;
+
+  getUserGender(userId: string): Promise<Gender | null>;
+  setUserGender(userId: string, gender: Gender | null): Promise<void>;
+
+  getUserLang(userId: string): Promise<Lang | null>;
+  setUserLang(userId: string, lang: Lang | null): Promise<void>;
+
+  listUsers(): Promise<User[]>;
+  upsertUser(user: User): Promise<void>;
+  getUser(id: string): Promise<User | null>;
+
+  listChats(): Promise<Chat[]>;
+  upsertChat(chat: Chat): Promise<void>;
+  getChat(id: string): Promise<Chat | null>;
+
+  getChatSettings(chatId: string): Promise<ChatSettings | null>;
+  saveChatSettings(chatId: string, settings: ChatSettings): Promise<void>;
+
+  getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null>;
+  saveConversation(
+    chatId: string,
+    botMsgId: number,
+    node: ConversationNode,
+  ): Promise<void>;
+
+  getGuestThread(chatId: string): Promise<GuestThreadNode | null>;
+  saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void>;
+
+  saveReminder(reminder: Reminder): Promise<void>;
+  fetchDueReminders(nowMs: number): Promise<Reminder[]>;
+  listRemindersForUser(userId: string): Promise<Reminder[]>;
+  listAllReminders(): Promise<Reminder[]>;
+  deleteReminder(id: string, userId: string): Promise<void>;
+
+  recordPrivateChat(userId: string): Promise<void>;
+  userHasPrivateChat(userId: string): Promise<boolean>;
+}
