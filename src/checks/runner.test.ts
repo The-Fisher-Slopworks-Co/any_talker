@@ -148,11 +148,8 @@ describe("runChecksTick timeout path", () => {
     await runChecksTick({ storage, api, nowMs: now });
 
     expect(api.sent).toHaveLength(1);
-    expect(api.sent[0]?.text).toBe(
-      `<a href="tg://user?id=user-1">Nikita</a>. Day 723`,
-    );
+    expect(api.sent[0]?.text).toBe("Nikita. Day 723");
     expect(api.sent[0]?.other).toEqual({
-      parse_mode: "HTML",
       reply_parameters: { message_id: 42, allow_sending_without_reply: true },
     });
     const saved = await storage.getCheck("c1");
