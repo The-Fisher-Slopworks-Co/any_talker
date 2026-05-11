@@ -17,6 +17,7 @@ import { applyBotNamePrefix } from "./format";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
+import { makeKeywordFilterMiddleware } from "./middleware/keyword-filter";
 
 type AnswerGuestQuery = (args: {
   guest_query_id: string;
@@ -181,6 +182,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
     await next();
   });
+
+  bot.use(makeKeywordFilterMiddleware(deps.storage));
 
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 

@@ -188,6 +188,10 @@ type Strings = {
   ui_chat_provider_routing_on_footer: string;
   ui_chat_provider_routing_off_footer: (sort: string) => string;
   ui_chat_prompt_placeholder: string;
+  ui_chat_keyword_filter: string;
+  ui_chat_keyword_filter_enabled: string;
+  ui_chat_keyword_filter_placeholder: string;
+  ui_chat_keyword_filter_footer: string;
 
   ui_tz_area: string;
   ui_tz_location: string;
@@ -452,6 +456,11 @@ const en: Strings = {
     `Using global routing (${sort}).`,
   ui_chat_prompt_placeholder:
     "Describe how the bot should behave in this chat",
+  ui_chat_keyword_filter: "Keyword Filter",
+  ui_chat_keyword_filter_enabled: "Enabled",
+  ui_chat_keyword_filter_placeholder: "word1, word2, word3",
+  ui_chat_keyword_filter_footer:
+    "Comma-separated keywords. When enabled, any new message whose text or caption contains one of these substrings (case-insensitive) is deleted by the bot.",
 
   ui_tz_area: "Area",
   ui_tz_location: "Location",
@@ -734,6 +743,11 @@ const ru: Strings = {
   ui_chat_provider_routing_off_footer: (sort) =>
     `Используется глобальная маршрутизация (${sort}).`,
   ui_chat_prompt_placeholder: "Опиши, как должен вести себя бот в этом чате",
+  ui_chat_keyword_filter: "Фильтр по ключевым словам",
+  ui_chat_keyword_filter_enabled: "Включён",
+  ui_chat_keyword_filter_placeholder: "слово1, слово2, слово3",
+  ui_chat_keyword_filter_footer:
+    "Ключевые слова через запятую. Когда включено, новые сообщения, в тексте или подписи которых встречается одна из этих подстрок (без учёта регистра), удаляются ботом.",
 
   ui_tz_area: "Регион",
   ui_tz_location: "Местоположение",
