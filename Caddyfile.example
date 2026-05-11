@@ -1,0 +1,14 @@
+# Minimal production Caddyfile for any_talker.
+# Copy to ./Caddyfile (no extension change) and use as-is in 99% of cases.
+# Caddy auto-issues and renews Let's Encrypt certs for {$DOMAIN}.
+
+{
+	email {$LETSENCRYPT_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Everything (webhook + webapp + api) goes to the bot.
+	reverse_proxy bot:8080
+}
