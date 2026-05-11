@@ -5,6 +5,11 @@ import type { Update } from "@grammyjs/types/update";
 import type { Message } from "@grammyjs/types/message";
 import type { MiddlewareFn } from "grammy";
 import { formatLog, type LogFormat, type LogFields } from "../log";
+import {
+  commandsTotal,
+  normalizeCommandLabel,
+  updatesTotal,
+} from "../metrics";
 
 const MESSAGE_LIKE_KEYS = [
   "message",
@@ -145,8 +150,14 @@ export function makeIncomingUpdateLogger(
   opts: IncomingUpdateLoggerOptions,
 ): MiddlewareFn {
   return async (ctx, next) => {
+    const meta = extractUpdateMeta(ctx.update);
+    updatesTotal.inc({ type: meta.type });
+    if (typeof meta.flags.command === "string") {
+      commandsTotal.inc({
+        command: normalizeCommandLabel(meta.flags.command),
+      });
+    }
     if (opts.enabled) {
-      const meta = extractUpdateMeta(ctx.update);
       const fields =
         opts.format === "pretty" ? prettyFields(meta) : (meta as LogFields);
       console.log(

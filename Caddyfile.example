@@ -9,6 +9,12 @@
 {$DOMAIN} {
 	encode zstd gzip
 
-	# Everything (webhook + webapp + api) goes to the bot.
+	# Keep internal observability endpoints private. The bot stays on the
+	# internal Docker network, but if any HTTP path reaches Caddy we still
+	# want to refuse access to operational data.
+	@internal path /metrics /metrics/*
+	respond @internal 404
+
+	# Everything else (webhook + webapp + api) goes to the bot.
 	reverse_proxy bot:8080
 }

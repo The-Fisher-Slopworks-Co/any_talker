@@ -38,6 +38,8 @@ docker-compose.yml
 docker-compose.prod.yml
 Caddyfile
 Caddyfile.example
+vmagent.yml
+vector.yaml
 docs
 README.md
 CLAUDE.md

@@ -1,0 +1,31 @@
+# VictoriaMetrics scrape config. Mounted into the victoriametrics container
+# at /etc/vm/scrape.yml. The single-node `victoria-metrics` binary supports
+# `-promscrape.config` and behaves like Prometheus for scraping purposes.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    env: prod
+    app: any_talker
+
+scrape_configs:
+  # Scrape the bot's /metrics endpoint. The bot listens on :8080 on the
+  # internal Docker network; only Caddy is exposed to the host.
+  - job_name: any_talker
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - bot:8080
+        labels:
+          service: bot
+
+  # Self-scrape so VictoriaMetrics can monitor its own ingestion rate,
+  # series count, disk usage, etc.
+  - job_name: victoriametrics
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:8428
+        labels:
+          service: victoriametrics
