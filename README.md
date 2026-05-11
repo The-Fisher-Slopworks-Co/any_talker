@@ -32,16 +32,3 @@ bun run typecheck
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
   guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest
   invocations are silently ignored.
-
-## Manual verification checklist (run on first deploy)
-
-- [ ] `/start` from owner → menu button appears.
-- [ ] `/ask hello` from owner → AI reply.
-- [ ] `/ask Загадай число от 1 до 10` → AI calls `random_number` and replies with a number.
-- [ ] Reply to bot's previous answer with `/ask follow-up question` → context retained.
-- [ ] Non-whitelisted user in non-whitelisted chat → no reply.
-- [ ] Add user/chat in admin Web App → they can use `/ask`.
-- [ ] Remove user/chat → they can no longer use `/ask`.
-- [ ] Set `capacity=100` and `ownerExempt=false`, fire `/ask` → bucket exhausts, replies with "Refilled in N min".
-- [ ] Reset bucket via Web App → `/ask` works again.
-- [ ] Switch model in Web App → next `/ask` uses the new model.
