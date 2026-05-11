@@ -21,6 +21,24 @@ bun test         # unit tests
 bun run typecheck
 ```
 
+## Production deploy
+
+A ready-to-run Compose file is provided in `docker-compose.prod.yml`. It pulls
+the bot image from GHCR (published by CI on every push to `main`), runs KeyDB
+with persistence, and fronts both with Caddy for automatic HTTPS (Let's
+Encrypt). On a fresh server with DNS pointed at it:
+
+```bash
+cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY, BOT_OWNER_ID,
+                              # DOMAIN, LETSENCRYPT_EMAIL, and set
+                              # WEBHOOK_URL=WEBAPP_URL=https://<DOMAIN>
+cp Caddyfile.example Caddyfile
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Only Caddy exposes ports (80/443); the bot and KeyDB stay on an internal
+network.
+
 ## Features
 
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).

@@ -1,0 +1,91 @@
+# Production-ready Compose for any_talker.
+#
+# Quick start on a fresh server with a public IP and DNS pointing to it.
+# No source checkout is required — just the three files below:
+#   1. Grab docker-compose.prod.yml, .env.example and Caddyfile.example from the repo.
+#   2. cp .env.example .env  # fill required vars, including DOMAIN and LETSENCRYPT_EMAIL
+#   3. cp Caddyfile.example Caddyfile  # tweak only if you need extra routes
+#   4. docker compose -f docker-compose.prod.yml up -d
+#
+# What you get:
+#   - Bot pulled from GHCR (pre-built by CI), running in webhook mode.
+#   - KeyDB with AOF + RDB persistence on a named volume.
+#   - Caddy as a reverse proxy, auto-issuing Let's Encrypt certs for ${DOMAIN}.
+#   - Bot and KeyDB are on an internal network and not exposed to the host;
+#     only Caddy publishes 80/443 to the world.
+#
+# WEBHOOK_URL and WEBAPP_URL in .env should both be https://${DOMAIN}
+# (Telegram requires HTTPS for webhooks and Web Apps).
+
+services:
+  bot:
+    # Pre-built image published from CI on each push to main. Override the tag
+    # (e.g. ghcr.io/...:<short-sha>) to pin to a specific revision.
+    image: ghcr.io/the-fisher-slopworks-co/any_talker:${BOT_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      KEYDB_URL: redis://keydb:6379
+      PORT: "8080"
+    depends_on:
+      keydb:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  keydb:
+    image: eqalpha/keydb:latest
+    restart: unless-stopped
+    command:
+      - keydb-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "60 1"
+      - --maxmemory-policy
+      - "noeviction"
+    volumes:
+      - keydb_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "keydb-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env to your public hostname}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?set LETSENCRYPT_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - bot
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  keydb_data:
+  caddy_data:
+  caddy_config:
