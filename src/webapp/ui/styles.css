@@ -36,12 +36,14 @@
   }
   input,
   textarea,
-  button {
+  button,
+  select {
     font: inherit;
     color: inherit;
   }
   input:focus,
-  textarea:focus {
+  textarea:focus,
+  select:focus {
     outline: none;
   }
   textarea {
@@ -55,6 +57,20 @@
   input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
+  }
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    text-align: right;
+    text-align-last: right;
+    background-color: transparent;
+    cursor: pointer;
+  }
+  select option {
+    background-color: var(--color-tg-section);
+    color: var(--color-tg-text);
+    text-align: right;
   }
   ::placeholder {
     color: var(--color-tg-hint);

@@ -108,7 +108,6 @@ type Strings = {
   ui_sort_throughput: string;
   ui_sort_latency: string;
 
-  ui_models_primary: string;
   ui_models_fallback_n: (n: number) => string;
   ui_models_model_id: string;
   ui_models_remove_fallback: string;
@@ -288,7 +287,7 @@ const en: Strings = {
     "Primary OpenRouter model first; fallbacks are tried in order if it fails.",
   ui_prompt_provider_routing: "Provider Routing",
   ui_prompt_provider_routing_footer:
-    "How OpenRouter picks a provider for the model. Default lets OpenRouter decide; the others sort by price, throughput, or latency.",
+    "How OpenRouter picks a provider for the model. Auto lets OpenRouter decide; the others sort by price, throughput, or latency.",
   ui_prompt_system_prompt: "System Prompt",
   ui_prompt_system_prompt_footer:
     "Character description embedded into the system instruction.",
@@ -297,12 +296,11 @@ const en: Strings = {
   ui_prompt_timezone_footer:
     "Default timezone used when the chat or user has no override.",
 
-  ui_sort_default: "Default",
+  ui_sort_default: "Auto",
   ui_sort_price: "Price",
   ui_sort_throughput: "Throughput",
   ui_sort_latency: "Latency",
 
-  ui_models_primary: "Primary",
   ui_models_fallback_n: (n) => `#${n}`,
   ui_models_model_id: "Model ID",
   ui_models_remove_fallback: "Remove fallback",
@@ -496,7 +494,7 @@ const ru: Strings = {
     "Сначала основная модель OpenRouter; запасные пробуются по очереди при ошибке.",
   ui_prompt_provider_routing: "Маршрутизация провайдеров",
   ui_prompt_provider_routing_footer:
-    "Как OpenRouter выбирает провайдера для модели. Default — выбор OpenRouter; остальные сортируют по цене, скорости или задержке.",
+    "Как OpenRouter выбирает провайдера для модели. «Авто» — выбор OpenRouter; остальные сортируют по цене, скорости или задержке.",
   ui_prompt_system_prompt: "Системный промпт",
   ui_prompt_system_prompt_footer:
     "Описание персонажа, встраиваемое в системную инструкцию.",
@@ -505,12 +503,11 @@ const ru: Strings = {
   ui_prompt_timezone_footer:
     "Часовой пояс по умолчанию, когда у чата или пользователя нет своего.",
 
-  ui_sort_default: "По умолчанию",
+  ui_sort_default: "Авто",
   ui_sort_price: "Цена",
   ui_sort_throughput: "Скорость",
   ui_sort_latency: "Задержка",
 
-  ui_models_primary: "Основная",
   ui_models_fallback_n: (n) => `#${n}`,
   ui_models_model_id: "ID модели",
   ui_models_remove_fallback: "Удалить запасную",
