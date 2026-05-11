@@ -58,6 +58,11 @@ export type Chat = {
   lastSeenAt: number;
 };
 
+export type KeywordFilter = {
+  enabled: boolean;
+  keywords: string[];
+};
+
 export type ChatSettings = {
   systemPrompt?: string;
   models?: string[];
@@ -65,6 +70,7 @@ export type ChatSettings = {
   botName?: string;
   timezone?: string;
   providerSort?: ProviderSort | null;
+  keywordFilter?: KeywordFilter;
 };
 
 export type ConversationNode = {
@@ -118,8 +124,21 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.rateLimit === undefined &&
     s.botName === undefined &&
     s.timezone === undefined &&
-    s.providerSort === undefined
+    s.providerSort === undefined &&
+    s.keywordFilter === undefined
   );
+}
+
+export function messageMatchesKeyword(
+  text: string,
+  keywords: string[],
+): boolean {
+  if (text.length === 0 || keywords.length === 0) return false;
+  const haystack = text.toLowerCase();
+  return keywords.some((kw) => {
+    const needle = kw.toLowerCase();
+    return needle.length > 0 && haystack.includes(needle);
+  });
 }
 
 export function isValidProviderSort(v: unknown): v is ProviderSort {
