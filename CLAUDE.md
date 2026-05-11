@@ -1,3 +1,12 @@
+## Workflow
+
+- Do development in a git worktree.
+- Before starting a task, ask the user whether to use the current branch as the base or branch off `main` (or another specified branch).
+- Commit the changes immediately after finishing the task.
+- After committing, ask the user whether it's time to merge the branch.
+- Once the branch has been merged, the worktree and the branch can be deleted.
+
+## Bun
 
 Default to using Bun instead of Node.js.
 

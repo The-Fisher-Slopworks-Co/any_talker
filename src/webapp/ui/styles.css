@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  --color-tg-bg: var(--tg-theme-bg-color, #ffffff);
+  --color-tg-secondary: var(--tg-theme-secondary-bg-color, #efeff4);
+  --color-tg-section: var(--tg-theme-section-bg-color, #ffffff);
+  --color-tg-text: var(--tg-theme-text-color, #0f0f0f);
+  --color-tg-hint: var(--tg-theme-hint-color, #8a8a8e);
+  --color-tg-section-header: var(--tg-theme-section-header-text-color, #8a8a8e);
+  --color-tg-link: var(--tg-theme-link-color, #007aff);
+  --color-tg-button: var(--tg-theme-button-color, #007aff);
+  --color-tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --color-tg-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
+  --ease-tg-spring: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer base {
+  :root {
+    --tg-separator: rgb(from var(--color-tg-text) r g b / 0.08);
+  }
+  html,
+  body {
+    margin: 0;
+    background: var(--color-tg-secondary);
+    color: var(--color-tg-text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    scrollbar-width: none;
+  }
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+  input,
+  textarea,
+  button,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+  }
+  textarea {
+    resize: vertical;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    text-align: right;
+    text-align-last: right;
+    background-color: transparent;
+    cursor: pointer;
+  }
+  select option {
+    background-color: var(--color-tg-section);
+    color: var(--color-tg-text);
+    text-align: right;
+  }
+  ::placeholder {
+    color: var(--color-tg-hint);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+  }
+}
+
+/* Structural pieces that don't translate to inline utilities cleanly. */
+
+/* Hairline separator between consecutive rows within a card. */
+.row + .row::before,
+.row + .action-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--tg-separator);
+}
+
+/* Extra spacing when a header / action follows a card or another action. */
+.card + .section-header,
+.action + .section-header {
+  margin-top: 24px;
+}
+
+/* iOS-style toggle: the sliding knob lives in ::after. */
+.toggle {
+  position: relative;
+  width: 51px;
+  height: 31px;
+  background: var(--tg-separator);
+  border-radius: 9999px;
+  border: none;
+  padding: 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle.on {
+  background: #34c759;
+}
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s;
+}
+.toggle.on::after {
+  transform: translateX(20px);
+}
