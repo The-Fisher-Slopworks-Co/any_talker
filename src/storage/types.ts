@@ -12,6 +12,7 @@ import type {
 } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
+import type { RecurringCheck } from "../checks/types";
 
 export interface Storage {
   getSettings(): Promise<Settings | null>;
@@ -66,4 +67,9 @@ export interface Storage {
 
   recordPrivateChat(userId: string): Promise<void>;
   userHasPrivateChat(userId: string): Promise<boolean>;
+
+  saveCheck(check: RecurringCheck): Promise<void>;
+  getCheck(id: string): Promise<RecurringCheck | null>;
+  listChecks(): Promise<RecurringCheck[]>;
+  deleteCheck(id: string): Promise<void>;
 }
