@@ -6,6 +6,10 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
 import type { ProviderSort } from "../shared/types";
+import {
+  aiRequestDurationSeconds,
+  aiRequestsTotal,
+} from "../metrics";
 
 export class OpenRouterAIClient implements AIClient {
   private readonly provider: ReturnType<typeof createOpenRouter>;
@@ -44,21 +48,32 @@ export class OpenRouterAIClient implements AIClient {
       openrouterOpts.provider = { sort: opts.providerSort };
     }
 
-    const result = await generateText({
-      model: this.provider(primary),
-      system: opts.system,
-      messages: opts.messages,
-      tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
-      stopWhen: stepCountIs(8),
-      providerOptions:
-        Object.keys(openrouterOpts).length > 0
-          ? { openrouter: openrouterOpts }
-          : undefined,
-    });
+    const start = performance.now();
+    let outcome: "success" | "error" = "success";
+    try {
+      const result = await generateText({
+        model: this.provider(primary),
+        system: opts.system,
+        messages: opts.messages,
+        tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
+        stopWhen: stepCountIs(8),
+        providerOptions:
+          Object.keys(openrouterOpts).length > 0
+            ? { openrouter: openrouterOpts }
+            : undefined,
+      });
 
-    return {
-      text: result.text,
-      totalTokens: result.totalUsage.totalTokens ?? 0,
-    };
+      return {
+        text: result.text,
+        totalTokens: result.totalUsage.totalTokens ?? 0,
+      };
+    } catch (err) {
+      outcome = "error";
+      throw err;
+    } finally {
+      const seconds = (performance.now() - start) / 1000;
+      aiRequestsTotal.inc({ outcome });
+      aiRequestDurationSeconds.observe({ outcome }, seconds);
+    }
   }
 }

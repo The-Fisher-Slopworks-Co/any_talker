@@ -21,6 +21,13 @@ import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
 import { makeKeywordFilterMiddleware } from "./middleware/keyword-filter";
+import {
+  askDurationSeconds,
+  askTokensTotal,
+  askTotal,
+  checksProcessedTotal,
+  type AskOutcomeLabel,
+} from "../metrics";
 
 type AnswerGuestQuery = (args: {
   guest_query_id: string;
@@ -116,64 +123,79 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       ? await deps.storage.getGuestThread(chatId)
       : null;
 
-    const outcome = await guestAskHandler({
-      storage: deps.storage,
-      rateLimiter: deps.rateLimiter,
-      ai: deps.ai,
-      ownerId: deps.ownerId,
-      now: Date.now(),
-      chatId,
-      userId,
-      sender,
-      userText,
-      priorThread,
-      lang: ctx.lang,
-    });
-
-    const answerGuestQuery = (
-      ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
-    ).answerGuestQuery;
-    const answer = (text: string, botName: string | null) => {
-      const decorated = applyBotNamePrefix(text, botName);
-      return answerGuestQuery({
-        guest_query_id: guestQueryId,
-        result: {
-          type: "article",
-          id: "1",
-          title: "Reply",
-          input_message_content: {
-            message_text: decorated.text,
-            parse_mode: decorated.parseMode,
-            link_preview_options: { is_disabled: true },
-          },
-        },
+    const startedAt = performance.now();
+    let outcomeLabel: AskOutcomeLabel = "error";
+    try {
+      const outcome = await guestAskHandler({
+        storage: deps.storage,
+        rateLimiter: deps.rateLimiter,
+        ai: deps.ai,
+        ownerId: deps.ownerId,
+        now: Date.now(),
+        chatId,
+        userId,
+        sender,
+        userText,
+        priorThread,
+        lang: ctx.lang,
       });
-    };
+      outcomeLabel = askOutcomeLabel(outcome.kind);
 
-    switch (outcome.kind) {
-      case "denied":
-        return;
-      case "rateLimited":
-        await answer(
-          ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
-          null,
-        ).catch((err) => console.error("answerGuestQuery failed:", err));
-        return;
-      case "error":
-        console.error("guest ask error:", outcome.message);
-        await answer(ctx.t.bot_ai_error, null).catch((err) =>
-          console.error("answerGuestQuery failed:", err),
-        );
-        return;
-      case "answered": {
-        try {
-          await answer(outcome.text, outcome.botName);
-          await outcome.persistThread();
-        } catch (err) {
-          console.error("answerGuestQuery failed:", err);
+      const answerGuestQuery = (
+        ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
+      ).answerGuestQuery;
+      const answer = (text: string, botName: string | null) => {
+        const decorated = applyBotNamePrefix(text, botName);
+        return answerGuestQuery({
+          guest_query_id: guestQueryId,
+          result: {
+            type: "article",
+            id: "1",
+            title: "Reply",
+            input_message_content: {
+              message_text: decorated.text,
+              parse_mode: decorated.parseMode,
+              link_preview_options: { is_disabled: true },
+            },
+          },
+        });
+      };
+
+      switch (outcome.kind) {
+        case "denied":
+          return;
+        case "rateLimited":
+          await answer(
+            ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
+            null,
+          ).catch((err) => console.error("answerGuestQuery failed:", err));
+          return;
+        case "error":
+          console.error("guest ask error:", outcome.message);
+          await answer(ctx.t.bot_ai_error, null).catch((err) =>
+            console.error("answerGuestQuery failed:", err),
+          );
+          return;
+        case "answered": {
+          try {
+            await answer(outcome.text, outcome.botName);
+            await outcome.persistThread();
+            if (outcome.totalTokens > 0) {
+              askTokensTotal.inc({ source: "guest" }, outcome.totalTokens);
+            }
+          } catch (err) {
+            console.error("answerGuestQuery failed:", err);
+          }
+          return;
         }
-        return;
       }
+    } finally {
+      const seconds = (performance.now() - startedAt) / 1000;
+      askTotal.inc({ source: "guest", outcome: outcomeLabel });
+      askDurationSeconds.observe(
+        { source: "guest", outcome: outcomeLabel },
+        seconds,
+      );
     }
   };
 
@@ -254,53 +276,68 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }, 4000);
     };
 
-    let outcome;
+    const startedAt = performance.now();
+    let outcomeLabel: AskOutcomeLabel = "error";
     try {
-      outcome = await askHandler({
-        storage: deps.storage,
-        rateLimiter: deps.rateLimiter,
-        ai: deps.ai,
-        ownerId: deps.ownerId,
-        now: Date.now(),
-        chatId: String(chatId),
-        userId,
-        askMessageId,
-        sender,
-        userText,
-        quote,
-        image,
-        replyTarget,
-        lang: ctx.lang,
-        onAIStart: startTyping,
-      });
-    } finally {
-      stopTyping();
-    }
-
-    switch (outcome.kind) {
-      case "denied":
-        return;
-      case "usage":
-        await ctx.reply(ctx.t.bot_ask_usage);
-        return;
-      case "rateLimited":
-        await ctx.reply(
-          ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
-        );
-        return;
-      case "error":
-        console.error("ask error:", outcome.message);
-        await ctx.reply(ctx.t.bot_ai_error);
-        return;
-      case "answered": {
-        const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
-        const sent = await ctx.reply(decorated.text, {
-          parse_mode: decorated.parseMode,
-          reply_parameters: ctx.message ? { message_id: ctx.message.message_id } : undefined,
+      let outcome;
+      try {
+        outcome = await askHandler({
+          storage: deps.storage,
+          rateLimiter: deps.rateLimiter,
+          ai: deps.ai,
+          ownerId: deps.ownerId,
+          now: Date.now(),
+          chatId: String(chatId),
+          userId,
+          askMessageId,
+          sender,
+          userText,
+          quote,
+          image,
+          replyTarget,
+          lang: ctx.lang,
+          onAIStart: startTyping,
         });
-        await outcome.persistConversation(sent.message_id);
-        return;
+      } finally {
+        stopTyping();
       }
+      outcomeLabel = askOutcomeLabel(outcome.kind);
+
+      switch (outcome.kind) {
+        case "denied":
+          return;
+        case "usage":
+          await ctx.reply(ctx.t.bot_ask_usage);
+          return;
+        case "rateLimited":
+          await ctx.reply(
+            ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
+          );
+          return;
+        case "error":
+          console.error("ask error:", outcome.message);
+          await ctx.reply(ctx.t.bot_ai_error);
+          return;
+        case "answered": {
+          const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
+          const sent = await ctx.reply(decorated.text, {
+            parse_mode: decorated.parseMode,
+            reply_parameters: ctx.message ? { message_id: ctx.message.message_id } : undefined,
+          });
+          await outcome.persistConversation(sent.message_id);
+          if (outcome.totalTokens > 0) {
+            askTokensTotal.inc({ source: "ask" }, outcome.totalTokens);
+          }
+          return;
+        }
+      }
+    } finally {
+      const seconds = (performance.now() - startedAt) / 1000;
+      askTotal.inc({ source: "ask", outcome: outcomeLabel });
+      askDurationSeconds.observe(
+        { source: "ask", outcome: outcomeLabel },
+        seconds,
+      );
     }
   };
 
@@ -374,6 +411,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         .catch(() => {});
       return;
     }
+    if (outcome.kind === "resolved") {
+      checksProcessedTotal.inc({ outcome: `answered_${answer}` });
+    }
     await ctx.answerCallbackQuery().catch(() => {});
   });
 
@@ -394,4 +434,19 @@ function extractReplyTarget(ctx: Context): ReplyTarget | null {
     authorFirstName: resolveReplyAuthor(reply),
     image: null,
   };
+}
+
+function askOutcomeLabel(kind: string): AskOutcomeLabel {
+  switch (kind) {
+    case "answered":
+      return "answered";
+    case "denied":
+      return "denied";
+    case "usage":
+      return "usage";
+    case "rateLimited":
+      return "rate_limited";
+    default:
+      return "error";
+  }
 }

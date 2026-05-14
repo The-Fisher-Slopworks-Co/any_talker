@@ -7,6 +7,10 @@ import {
   type LogFormat,
   type LogLevel,
 } from "../../log";
+import {
+  toolCallDurationSeconds,
+  toolCallsTotal,
+} from "../../metrics";
 import type { Tool } from "./registry";
 
 export function withLogging<TIn, TOut>(
@@ -24,6 +28,7 @@ export function withLogging<TIn, TOut>(
         chat_id: ctx.chatId,
         user_id: ctx.userId,
       });
+      let outcome: "ok" | "error" = "ok";
       try {
         const result = await tool.execute(input, ctx);
         emit(format, "info", "tool_result", {
@@ -33,12 +38,17 @@ export function withLogging<TIn, TOut>(
         });
         return result;
       } catch (err) {
+        outcome = "error";
         emit(format, "error", "tool_error", {
           tool: tool.name,
           error: err instanceof Error ? err.message : String(err),
           duration_ms: Date.now() - start,
         });
         throw err;
+      } finally {
+        const seconds = (Date.now() - start) / 1000;
+        toolCallsTotal.inc({ tool: tool.name, outcome });
+        toolCallDurationSeconds.observe({ tool: tool.name }, seconds);
       }
     },
   };
