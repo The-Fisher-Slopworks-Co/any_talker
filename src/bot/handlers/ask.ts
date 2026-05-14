@@ -38,6 +38,7 @@ export type AskOutcome =
       kind: "answered";
       text: string;
       botName: string | null;
+      totalTokens: number;
       persistConversation: (botMsgId: number) => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -145,6 +146,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     kind: "answered",
     text: sanitized,
     botName,
+    totalTokens: result.totalTokens,
     persistConversation: async (botMsgId) => {
       await input.storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,

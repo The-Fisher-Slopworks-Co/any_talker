@@ -4,6 +4,10 @@
 import type { Storage } from "../storage/types";
 import type { RateLimiter, CheckResult } from "./types";
 import type { RateLimitConfig, BucketState } from "../shared/types";
+import {
+  rateLimitChecksTotal,
+  rateLimitTokensDeductedTotal,
+} from "../metrics";
 
 export class TokenBucketLimiter implements RateLimiter {
   constructor(private readonly storage: Storage) {}
@@ -46,12 +50,15 @@ export class TokenBucketLimiter implements RateLimiter {
     if (refilled.tokens <= 0) {
       const elapsed = now - refilled.lastRefillTs;
       const msUntilNextRefill = config.refillIntervalMs - elapsed;
+      rateLimitChecksTotal.inc({ result: "denied" });
       return { allowed: false, bucket: refilled, msUntilNextRefill };
     }
+    rateLimitChecksTotal.inc({ result: "allowed" });
     return { allowed: true, bucket: refilled };
   }
 
   async deduct(chatId: string, userId: string, tokens: number): Promise<void> {
+    if (tokens > 0) rateLimitTokensDeductedTotal.inc(tokens);
     const current = await this.storage.getBucket(chatId, userId);
     if (!current) {
       await this.storage.saveBucket(chatId, userId, {

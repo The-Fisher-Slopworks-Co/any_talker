@@ -1,0 +1,57 @@
+# Vector pipeline: read Docker container logs, parse JSON where possible,
+# and ship to VictoriaLogs via the Elasticsearch bulk ingestion endpoint.
+#
+# This config picks up any container labelled `observability.collect=true`
+# (see docker-compose.prod.yml). To collect from every container instead,
+# remove the `include_labels` filter on the docker_logs source.
+
+data_dir: /var/lib/vector
+
+sources:
+  containers:
+    type: docker_logs
+    docker_host: unix:///var/run/docker.sock
+    include_labels:
+      - "observability.collect=true"
+
+transforms:
+  # The bot emits one-line JSON (LOG_FORMAT=json in production). Try to parse
+  # each line and merge structured fields into the event; on parse failure
+  # the raw line stays in `.message` so the log is still ingested.
+  parse:
+    type: remap
+    inputs: [containers]
+    source: |
+      parsed, err = parse_json(.message)
+      if err == null && is_object(parsed) {
+        . = merge(., object!(parsed)) ?? .
+        if exists(.msg) {
+          .message = .msg
+          del(.msg)
+        }
+        if exists(.ts) {
+          .timestamp = .ts
+          del(.ts)
+        }
+      }
+      .stream_name = .container_name
+
+sinks:
+  victorialogs:
+    type: elasticsearch
+    inputs: [parse]
+    endpoints:
+      - http://victorialogs:9428/insert/elasticsearch/
+    mode: bulk
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    # VictoriaLogs-specific query parameters: `_stream_fields` selects which
+    # fields define a log stream, and `_msg_field` / `_time_field` pick the
+    # canonical message/timestamp fields. See:
+    # https://docs.victoriametrics.com/victorialogs/data-ingestion/vector/
+    query:
+      _stream_fields: stream_name,container_name,image
+      _msg_field: message
+      _time_field: timestamp
