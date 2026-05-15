@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { isIP } from "node:net";
+import { proxiedFetch } from "../../proxy";
 
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
@@ -10,7 +11,7 @@ export async function fetchWithTimeout(
   timeoutLabel: string,
 ): Promise<Response> {
   try {
-    return await fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    return await proxiedFetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     if (err instanceof DOMException && err.name === "TimeoutError") {
       throw new Error(`${timeoutLabel} timed out after ${timeoutMs / 1000}s`);

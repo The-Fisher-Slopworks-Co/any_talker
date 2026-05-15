@@ -7,6 +7,7 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
 import type { LogFormat } from "../log";
+import { proxiedFetch } from "../proxy";
 import { askHandler } from "./handlers/ask";
 import { contactHandler } from "./handlers/contact";
 import { guestAskHandler } from "./handlers/guest";
@@ -48,7 +49,9 @@ export type BotDeps = {
 const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
 
 export function createBot(deps: BotDeps): Bot<BotContext> {
-  const bot = new Bot<BotContext>(deps.botToken);
+  const bot = new Bot<BotContext>(deps.botToken, {
+    client: { fetch: proxiedFetch as unknown as typeof fetch },
+  });
 
   bot.use(
     makeIncomingUpdateLogger({

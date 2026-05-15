@@ -99,6 +99,16 @@ following metric families:
 | `process_heap_used_bytes` | gauge | — | V8 heap in use |
 | `bot_build_info` | gauge | `version`, `bun` | Always 1, carries metadata |
 
+## HTTP proxy
+
+The bot honours the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`
+environment variables (lowercase variants are also recognised). They apply
+to every outbound fetch: the Telegram Bot API (via grammY, which we route
+through Bun's native `fetch`), OpenRouter, the `fetch_page` / `search_web`
+tools, and Telegram file downloads. `NO_PROXY` is a comma-separated list of
+exact hostnames to bypass (`*` disables the proxy entirely; per-entry ports
+are supported as `host:port`).
+
 ## Features
 
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
