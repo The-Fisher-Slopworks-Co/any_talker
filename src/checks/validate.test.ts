@@ -106,4 +106,34 @@ describe("normalizeCheckInput", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.enabled).toBe(false);
   });
+
+  test("counterAnchorDate defaults to null when omitted", () => {
+    const r = normalizeCheckInput(valid());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.counterAnchorDate).toBeNull();
+  });
+
+  test("accepts a valid ISO counterAnchorDate", () => {
+    const r = normalizeCheckInput(valid({ counterAnchorDate: "2005-02-10" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.counterAnchorDate).toBe("2005-02-10");
+  });
+
+  test("empty-string counterAnchorDate normalizes to null", () => {
+    const r = normalizeCheckInput(valid({ counterAnchorDate: "" }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.counterAnchorDate).toBeNull();
+  });
+
+  test("rejects malformed counterAnchorDate", () => {
+    const r = normalizeCheckInput(valid({ counterAnchorDate: "2005/02/10" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("counter_anchor_date_invalid");
+  });
+
+  test("rejects impossible-day counterAnchorDate", () => {
+    const r = normalizeCheckInput(valid({ counterAnchorDate: "2025-02-30" }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("counter_anchor_date_invalid");
+  });
 });

@@ -58,6 +58,12 @@ export function formatLocalParts(utcMs: number, tz: string): LocalParts {
   };
 }
 
+export function localDateString(utcMs: number, tz: string): string {
+  const { year, month, day } = formatLocalParts(utcMs, tz);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${year.toString().padStart(4, "0")}-${pad(month)}-${pad(day)}`;
+}
+
 export function tzOffsetMinutesAt(utcMs: number, tz: string): number {
   const parts = offsetFormatter(tz).formatToParts(new Date(utcMs));
   const off =
