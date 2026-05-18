@@ -9,6 +9,7 @@ import {
   type CheckCounterMode,
   type ValidationError,
 } from "./types";
+import { isValidAnchorDate } from "./counter";
 
 export type CheckInputFields = {
   title: string;
@@ -26,6 +27,7 @@ export type CheckInputFields = {
   timeoutMinutes: number;
   counter: number;
   counterMode: CheckCounterMode;
+  counterAnchorDate: string | null;
   enabled: boolean;
 };
 
@@ -131,6 +133,19 @@ export function normalizeCheckInput(raw: unknown): NormalizedCheckInput {
     return { ok: false, error: "counter_mode_invalid" };
   }
 
+  let counterAnchorDate: string | null = null;
+  if (b.counterAnchorDate !== null && b.counterAnchorDate !== undefined) {
+    const raw =
+      typeof b.counterAnchorDate === "string" ? b.counterAnchorDate.trim() : "";
+    if (raw === "") {
+      counterAnchorDate = null;
+    } else if (isValidAnchorDate(raw)) {
+      counterAnchorDate = raw;
+    } else {
+      return { ok: false, error: "counter_anchor_date_invalid" };
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -149,6 +164,7 @@ export function normalizeCheckInput(raw: unknown): NormalizedCheckInput {
       timeoutMinutes: timeoutMinutes.value,
       counter: counter.value,
       counterMode: b.counterMode,
+      counterAnchorDate,
       enabled: b.enabled !== false,
     },
   };

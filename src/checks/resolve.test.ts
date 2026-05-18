@@ -56,6 +56,7 @@ function makeCheck(over: Partial<RecurringCheck> = {}): RecurringCheck {
     timeoutMinutes: 25,
     counter: 722,
     counterMode: "always_increment",
+    counterAnchorDate: null,
     enabled: true,
     lastFiredAtMs: 0,
     pendingMessageId: 42,
@@ -199,6 +200,66 @@ describe("resolveCheck", () => {
     const saved = await storage.getCheck("c1");
     expect(saved?.counter).toBe(722);
     expect(saved?.pendingMessageId).toBe(42);
+  });
+
+  test("date mode + no: reply uses days since anchor, anchor unchanged", async () => {
+    const storage = new MemoryStorage();
+    const check = makeCheck({
+      counter: 0,
+      counterAnchorDate: "2005-02-10",
+      timezone: "UTC",
+    });
+    await storage.saveCheck(check);
+    const api = new FakeApi();
+
+    const nowMs = Date.UTC(2005, 1, 20, 12, 0); // 10 days later
+    const out = await resolveCheck({
+      storage,
+      api,
+      check,
+      answer: "no",
+      fromUserId: "user-1",
+      nowMs,
+    });
+
+    expect(out).toEqual({
+      kind: "resolved",
+      newCounter: 10,
+      reply: "Nikita. Day 10",
+    });
+    const saved = await storage.getCheck("c1");
+    expect(saved?.counterAnchorDate).toBe("2005-02-10");
+    expect(saved?.counter).toBe(0);
+  });
+
+  test("date mode + reset_on_yes + yes: anchor moves to today in tz", async () => {
+    const storage = new MemoryStorage();
+    const check = makeCheck({
+      counter: 0,
+      counterAnchorDate: "2005-02-10",
+      timezone: "UTC",
+      counterMode: "reset_on_yes",
+    });
+    await storage.saveCheck(check);
+    const api = new FakeApi();
+
+    const nowMs = Date.UTC(2026, 4, 11, 12, 0);
+    const out = await resolveCheck({
+      storage,
+      api,
+      check,
+      answer: "yes",
+      fromUserId: "user-1",
+      nowMs,
+    });
+
+    expect(out).toEqual({
+      kind: "resolved",
+      newCounter: 0,
+      reply: "Nikita, lying. Day 0",
+    });
+    const saved = await storage.getCheck("c1");
+    expect(saved?.counterAnchorDate).toBe("2026-05-11");
   });
 
   test("not_pending: returns not_pending if pendingMessageId is null", async () => {

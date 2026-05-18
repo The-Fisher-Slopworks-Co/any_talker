@@ -8,6 +8,7 @@ import type {
   CheckCounterMode,
   RecurringCheck,
 } from "../../../../checks/types";
+import { localDateString } from "../../../../shared/tz";
 import {
   Card,
   SectionFooter,
@@ -49,6 +50,7 @@ const DEFAULT_DRAFT = {
   timeoutMinutes: 25,
   counter: 0,
   counterMode: "always_increment" as CheckCounterMode,
+  counterAnchorDate: null as string | null,
   enabled: true,
 };
 
@@ -71,6 +73,7 @@ function checkToDraft(c: RecurringCheck): Draft {
     timeoutMinutes: c.timeoutMinutes,
     counter: c.counter,
     counterMode: c.counterMode,
+    counterAnchorDate: c.counterAnchorDate ?? null,
     enabled: c.enabled,
   };
 }
@@ -300,22 +303,68 @@ export function CheckEditView({
       </Card>
       <SectionFooter>{s.ui_check_replies_footer}</SectionFooter>
 
-      <SectionHeader>{s.ui_check_counter}</SectionHeader>
+      <SectionHeader>{s.ui_check_counter_source}</SectionHeader>
       <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_counter}</span>
-          <input
-            type="number"
-            className={INPUT_CLS}
-            min={0}
-            value={draft.counter}
-            onChange={(e) =>
-              set("counter", clampInt(e.target.value, 0, Number.MAX_SAFE_INTEGER))
+        <SelectRow
+          label={s.ui_check_counter_source_manual}
+          selected={draft.counterAnchorDate === null}
+          onSelect={() => set("counterAnchorDate", null)}
+        />
+        <SelectRow
+          label={s.ui_check_counter_source_date}
+          selected={draft.counterAnchorDate !== null}
+          onSelect={() => {
+            if (draft.counterAnchorDate === null) {
+              set("counterAnchorDate", localDateString(Date.now(), draft.timezone));
             }
-          />
-        </label>
+          }}
+        />
       </Card>
-      <SectionFooter>{s.ui_check_counter_footer}</SectionFooter>
+      <SectionFooter>{s.ui_check_counter_source_footer}</SectionFooter>
+
+      {draft.counterAnchorDate === null ? (
+        <>
+          <SectionHeader>{s.ui_check_counter}</SectionHeader>
+          <Card>
+            <label className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>{s.ui_check_counter}</span>
+              <input
+                type="number"
+                className={INPUT_CLS}
+                min={0}
+                value={draft.counter}
+                onChange={(e) =>
+                  set(
+                    "counter",
+                    clampInt(e.target.value, 0, Number.MAX_SAFE_INTEGER),
+                  )
+                }
+              />
+            </label>
+          </Card>
+          <SectionFooter>{s.ui_check_counter_footer}</SectionFooter>
+        </>
+      ) : (
+        <>
+          <SectionHeader>{s.ui_check_counter_anchor_date}</SectionHeader>
+          <Card>
+            <label className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>
+                {s.ui_check_counter_anchor_date}
+              </span>
+              <input
+                type="date"
+                className={INPUT_CLS}
+                value={draft.counterAnchorDate ?? ""}
+                onChange={(e) =>
+                  set("counterAnchorDate", e.target.value || null)
+                }
+              />
+            </label>
+          </Card>
+          <SectionFooter>{s.ui_check_counter_anchor_date_footer}</SectionFooter>
+        </>
+      )}
 
       <SectionHeader>{s.ui_check_counter_mode}</SectionHeader>
       <Card>

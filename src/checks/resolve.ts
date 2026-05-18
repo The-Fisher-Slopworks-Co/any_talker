@@ -4,6 +4,7 @@
 import type { Storage } from "../storage/types";
 import type { RecurringCheck, CheckAnswer } from "./types";
 import { formatReply } from "./format";
+import { applyAnswer } from "./counter";
 
 export type CheckInlineKeyboardButton = {
   text: string;
@@ -43,24 +44,22 @@ export async function resolveCheck(args: {
   check: RecurringCheck;
   answer: CheckAnswer;
   fromUserId: string | null;
+  nowMs?: number;
 }): Promise<ResolveOutcome> {
   const { storage, api, check, answer, fromUserId } = args;
+  const nowMs = args.nowMs ?? Date.now();
 
   if (check.pendingMessageId === null) return { kind: "not_pending" };
   if (fromUserId !== null && fromUserId !== check.targetUserId) {
     return { kind: "wrong_user" };
   }
 
-  const newCounter =
-    answer === "yes" && check.counterMode === "reset_on_yes"
-      ? 0
-      : check.counter + 1;
-
+  const { replyCount, patch } = applyAnswer(check, answer, nowMs);
   const replyTemplate =
     answer === "yes" ? check.yesReply : check.noReply;
   const reply = formatReply(replyTemplate, {
     name: check.targetName,
-    count: newCounter,
+    count: replyCount,
   });
 
   try {
@@ -84,12 +83,12 @@ export async function resolveCheck(args: {
 
   await storage.saveCheck({
     ...check,
-    counter: newCounter,
+    ...patch,
     pendingMessageId: null,
     pendingFiredAtMs: null,
   });
 
-  return { kind: "resolved", newCounter, reply };
+  return { kind: "resolved", newCounter: replyCount, reply };
 }
 
 function isHarmlessEditError(err: unknown): boolean {
