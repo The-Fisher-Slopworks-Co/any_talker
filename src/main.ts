@@ -3,6 +3,7 @@
 
 import { API_CONSTANTS } from "grammy";
 import { loadConfig } from "./config";
+import { getEffectiveProxyForUrl } from "./proxy";
 import { KeyDBStorage } from "./storage/keydb";
 import { TokenBucketLimiter } from "./ratelimit/token-bucket";
 import { OpenRouterAIClient } from "./ai/openrouter";
@@ -25,6 +26,11 @@ const ALLOWED_UPDATES = [
 
 async function main() {
   const config = loadConfig();
+
+  const tgProxy = getEffectiveProxyForUrl("https://api.telegram.org");
+  if (tgProxy) {
+    console.log(`HTTP proxy enabled: api.telegram.org → ${tgProxy}`);
+  }
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
   const rateLimiter = new TokenBucketLimiter(storage);
