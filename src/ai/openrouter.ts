@@ -6,6 +6,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
 import type { ProviderSort } from "../shared/types";
+import { proxiedFetch } from "../proxy";
 import {
   aiRequestDurationSeconds,
   aiRequestsTotal,
@@ -15,7 +16,7 @@ export class OpenRouterAIClient implements AIClient {
   private readonly provider: ReturnType<typeof createOpenRouter>;
 
   constructor(apiKey: string) {
-    this.provider = createOpenRouter({ apiKey });
+    this.provider = createOpenRouter({ apiKey, fetch: proxiedFetch });
   }
 
   async ask(opts: {
