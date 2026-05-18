@@ -11,6 +11,7 @@ import { lastScheduledFireMs } from "./schedule";
 import { formatQuestion } from "./format";
 import { buildCheckCallback } from "./callback-data";
 import { resolveCheck, type CheckApi } from "./resolve";
+import { currentCount } from "./counter";
 import { checksProcessedTotal } from "../metrics";
 
 export async function runChecksTick(deps: {
@@ -48,6 +49,7 @@ async function processCheck(
         check,
         answer: "timeout",
         fromUserId: null,
+        nowMs,
       });
       checksProcessedTotal.inc({ outcome: "timeout" });
     }
@@ -74,7 +76,7 @@ async function fireCheck(
   const text = formatQuestion(check.question, {
     targetUserId: check.targetUserId,
     name: check.targetName,
-    count: check.counter,
+    count: currentCount(check, nowMs),
   });
 
   let messageId: number;

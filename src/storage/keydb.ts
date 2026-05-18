@@ -309,17 +309,24 @@ export class KeyDBStorage implements Storage {
 
   async getCheck(id: string): Promise<RecurringCheck | null> {
     const raw = await this.client.hget(`${PREFIX}checks`, id);
-    return raw ? (JSON.parse(raw) as RecurringCheck) : null;
+    return raw ? parseCheckJson(raw) : null;
   }
 
   async listChecks(): Promise<RecurringCheck[]> {
     const values = await this.client.hvals(`${PREFIX}checks`);
     return values
-      .map((raw) => JSON.parse(raw) as RecurringCheck)
+      .map(parseCheckJson)
       .sort((a, b) => a.createdAtMs - b.createdAtMs);
   }
 
   async deleteCheck(id: string): Promise<void> {
     await this.client.hdel(`${PREFIX}checks`, id);
   }
+}
+
+// Backfill defaults for fields added after the initial schema so legacy
+// records load with runtime types matching the static type.
+function parseCheckJson(raw: string): RecurringCheck {
+  const parsed = JSON.parse(raw) as RecurringCheck;
+  return { ...parsed, counterAnchorDate: parsed.counterAnchorDate ?? null };
 }
