@@ -39,6 +39,7 @@ function makeCheck(over: Partial<RecurringCheck> = {}): RecurringCheck {
     timeoutMinutes: 25,
     counter: 10,
     counterMode: "always_increment",
+    counterAnchorDate: null,
     enabled: true,
     lastFiredAtMs: 0,
     pendingMessageId: 42,

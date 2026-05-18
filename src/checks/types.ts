@@ -29,6 +29,10 @@ export type RecurringCheck = {
   timeoutMinutes: number;
   counter: number;
   counterMode: CheckCounterMode;
+  // ISO YYYY-MM-DD. When set, `{count}` is computed live as days since this
+  // date in the check's timezone and `counter` is ignored. `reset_on_yes`
+  // advances this anchor to today on Yes.
+  counterAnchorDate: string | null;
   enabled: boolean;
   lastFiredAtMs: number;
   pendingMessageId: number | null;
@@ -56,4 +60,5 @@ export type ValidationError =
   | "timezone_invalid"
   | "timeout_minutes_invalid"
   | "counter_invalid"
-  | "counter_mode_invalid";
+  | "counter_mode_invalid"
+  | "counter_anchor_date_invalid";

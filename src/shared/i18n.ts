@@ -248,6 +248,12 @@ type Strings = {
   ui_check_replies_footer: string;
   ui_check_counter: string;
   ui_check_counter_footer: string;
+  ui_check_counter_source: string;
+  ui_check_counter_source_manual: string;
+  ui_check_counter_source_date: string;
+  ui_check_counter_source_footer: string;
+  ui_check_counter_anchor_date: string;
+  ui_check_counter_anchor_date_footer: string;
   ui_check_counter_mode: string;
   ui_check_counter_mode_always: string;
   ui_check_counter_mode_reset: string;
@@ -530,6 +536,14 @@ const en: Strings = {
   ui_check_counter: "Counter",
   ui_check_counter_footer:
     "Current value of {count}. Adjust manually if needed.",
+  ui_check_counter_source: "Counter source",
+  ui_check_counter_source_manual: "Manual number",
+  ui_check_counter_source_date: "Days since a date",
+  ui_check_counter_source_footer:
+    "Manual: counter is stored and adjusted on each answer. Days since a date: {count} is computed live as the number of days from the anchor date to today in the check's timezone.",
+  ui_check_counter_anchor_date: "Anchor date",
+  ui_check_counter_anchor_date_footer:
+    "{count} = days from this date to today. With \"Reset to 0 on Yes\", a Yes answer moves the anchor to today.",
   ui_check_counter_mode: "Counter on Yes",
   ui_check_counter_mode_always: "Always increment (trolling mode)",
   ui_check_counter_mode_reset: "Reset to 0 (real streak)",
@@ -819,6 +833,14 @@ const ru: Strings = {
   ui_check_counter: "Счётчик",
   ui_check_counter_footer:
     "Текущее значение {count}. При необходимости можно поправить вручную.",
+  ui_check_counter_source: "Источник счётчика",
+  ui_check_counter_source_manual: "Ручное число",
+  ui_check_counter_source_date: "Дни с даты",
+  ui_check_counter_source_footer:
+    "«Ручное число» — счётчик хранится и меняется на ответы. «Дни с даты» — {count} вычисляется как число дней от опорной даты до сегодня в часовом поясе чека.",
+  ui_check_counter_anchor_date: "Опорная дата",
+  ui_check_counter_anchor_date_footer:
+    "{count} — количество дней от этой даты до сегодня. При режиме «Сбрасывать в 0 при Да» ответ «Да» переносит опорную дату на сегодня.",
   ui_check_counter_mode: "Счётчик при «Да»",
   ui_check_counter_mode_always:
     "Всегда увеличивать (режим подколки)",

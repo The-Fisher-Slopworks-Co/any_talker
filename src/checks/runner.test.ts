@@ -52,6 +52,7 @@ function makeCheck(over: Partial<RecurringCheck> = {}): RecurringCheck {
     timeoutMinutes: 25,
     counter: 722,
     counterMode: "always_increment",
+    counterAnchorDate: null,
     enabled: true,
     lastFiredAtMs: 0,
     pendingMessageId: null,
@@ -197,6 +198,26 @@ describe("runChecksTick timeout path", () => {
       nowMs: firedAt + 26 * 60_000,
     });
     expect(api.sent).toHaveLength(0);
+  });
+});
+
+describe("runChecksTick date mode", () => {
+  test("fires question with live days-since-anchor count", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveCheck(
+      makeCheck({
+        counter: 0,
+        counterAnchorDate: "2005-02-10",
+        timezone: "UTC",
+      }),
+    );
+    const api = new FakeApi();
+    const now = utcMs(2005, 2, 20, 23, 35); // 10 days after anchor
+
+    await runChecksTick({ storage, api, nowMs: now });
+    expect(api.sent[0]?.text).toBe(
+      `<a href="tg://user?id=user-1">Nikita</a>, sport? day 10`,
+    );
   });
 });
 
