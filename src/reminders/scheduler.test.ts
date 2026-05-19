@@ -50,6 +50,7 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   text: "ping",
   target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
   createdAtMs: 0,
+  contextMessages: [],
   ...over,
 });
 

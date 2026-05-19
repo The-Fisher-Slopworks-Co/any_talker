@@ -119,6 +119,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         lang: input.lang,
         now: input.now,
         effects,
+        contextMessages: messages,
       },
     });
   } catch (err) {

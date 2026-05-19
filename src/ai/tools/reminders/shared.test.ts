@@ -116,6 +116,71 @@ describe("durationToMs", () => {
   });
 });
 
+describe("persistReminder context capture", () => {
+  test("serializes contextMessages from the tool context into storage", async () => {
+    const storage = new MemoryStorage();
+    const fireAtMs = baseCtx.now + 5 * 60_000;
+    const ctx = {
+      ...baseCtx,
+      contextMessages: [
+        { role: "user" as const, content: "remind me about milk" },
+        { role: "assistant" as const, content: "ok" },
+      ],
+    };
+    const out = await persistReminder(storage, ctx, fireAtMs, "milk");
+    if (!out.ok) throw new Error("expected ok");
+    const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
+    expect(stored.contextMessages).toEqual([
+      { role: "user", content: "remind me about milk" },
+      { role: "assistant", content: "ok" },
+    ]);
+  });
+
+  test("serializes image parts to base64", async () => {
+    const storage = new MemoryStorage();
+    const fireAtMs = baseCtx.now + 5 * 60_000;
+    const bytes = new Uint8Array([10, 20, 30]);
+    const ctx = {
+      ...baseCtx,
+      contextMessages: [
+        {
+          role: "user" as const,
+          content: [
+            { type: "text" as const, text: "look:" },
+            {
+              type: "image" as const,
+              image: bytes,
+              mediaType: "image/png",
+            },
+          ],
+        },
+      ],
+    };
+    const out = await persistReminder(storage, ctx, fireAtMs, "x");
+    if (!out.ok) throw new Error("expected ok");
+    const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
+    const parts = stored.contextMessages[0]!.content as Array<{
+      type: string;
+    }>;
+    expect(parts[1]).toMatchObject({
+      type: "image",
+      mediaType: "image/png",
+    });
+    expect(
+      typeof (parts[1] as unknown as { image_base64: string }).image_base64,
+    ).toBe("string");
+  });
+
+  test("stores an empty array when ctx.contextMessages is undefined", async () => {
+    const storage = new MemoryStorage();
+    const fireAtMs = baseCtx.now + 5 * 60_000;
+    const out = await persistReminder(storage, baseCtx, fireAtMs, "x");
+    if (!out.ok) throw new Error("expected ok");
+    const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
+    expect(stored.contextMessages).toEqual([]);
+  });
+});
+
 describe("persistReminder effects", () => {
   test("records a reminder_scheduled effect on success", async () => {
     const storage = new MemoryStorage();

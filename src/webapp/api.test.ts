@@ -1144,6 +1144,7 @@ describe("/api/me/reminders", () => {
       text: "mine-late",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     await d.storage.saveReminder({
       id: "b",
@@ -1154,6 +1155,7 @@ describe("/api/me/reminders", () => {
       text: "mine-early",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     await d.storage.saveReminder({
       id: "c",
@@ -1164,6 +1166,7 @@ describe("/api/me/reminders", () => {
       text: "other",
       target: { kind: "guest_dm", userId: "99" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/me/reminders", body: null },
@@ -1207,6 +1210,7 @@ describe("/api/me/reminders", () => {
       text: "ping",
       target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/me/reminders", body: null },
@@ -1231,6 +1235,7 @@ describe("/api/admin/reminders", () => {
       text: "x",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     await d.storage.saveReminder({
       id: "b",
@@ -1241,6 +1246,7 @@ describe("/api/admin/reminders", () => {
       text: "y",
       target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/reminders", body: null },
@@ -1276,6 +1282,7 @@ describe("/api/admin/reminders", () => {
       text: "x",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/reminders", body: null },
@@ -1297,6 +1304,7 @@ describe("/api/admin/reminders", () => {
       text: "x",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/me/reminders", body: null },

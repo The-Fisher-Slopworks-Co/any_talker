@@ -51,6 +51,7 @@ const reminderAsk = (over: Partial<Reminder> = {}): Reminder => ({
   createdAtMs: Date.UTC(2026, 4, 20, 9, 0),
   text: "купить молоко",
   target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
+  contextMessages: [],
   ...over,
 });
 
@@ -63,6 +64,7 @@ const reminderGuest = (over: Partial<Reminder> = {}): Reminder => ({
   createdAtMs: Date.UTC(2026, 4, 20, 9, 0),
   text: "buy bread",
   target: { kind: "guest_dm", userId: "u42" },
+  contextMessages: [],
   ...over,
 });
 
@@ -260,6 +262,59 @@ describe("deliverReminder (AI-driven)", () => {
     expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
       "transient",
     );
+  });
+
+  test("replays stored contextMessages before the reminder_fired event", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("re-check");
+    const api = new FakeTgApi();
+    const r = reminderAsk({
+      contextMessages: [
+        {
+          role: "user",
+          content: "Context (replied message from Eugene): <media>",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            author: "Eugene",
+            text: "Через минуту напомни посмотреть на этих людей",
+          }),
+        },
+      ],
+    });
+    await deliverReminder(deps(ai, api), r, r.fireAtMs);
+    const sent = ai.calls[0]!.messages;
+    expect(sent).toHaveLength(3);
+    expect(sent[0]!.content).toContain("Eugene");
+    expect(sent[1]!.content).toContain("Через минуту");
+    const envelope = JSON.parse(sent[2]!.content as string);
+    expect(envelope.system_event).toBe("reminder_fired");
+  });
+
+  test("replays image parts from contextMessages as bytes", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("ok");
+    const api = new FakeTgApi();
+    const bytes = new Uint8Array([5, 6, 7, 8]);
+    const b64 = Buffer.from(bytes).toString("base64");
+    const r = reminderAsk({
+      contextMessages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "see this:" },
+            { type: "image", image_base64: b64, mediaType: "image/jpeg" },
+          ],
+        },
+      ],
+    });
+    await deliverReminder(deps(ai, api), r, r.fireAtMs);
+    const first = ai.calls[0]!.messages[0]!;
+    const parts = first.content as Array<{ type: string }>;
+    expect(parts[1]).toMatchObject({ type: "image", mediaType: "image/jpeg" });
+    const img = parts[1] as unknown as { image: Uint8Array };
+    expect(Array.from(img.image)).toEqual([5, 6, 7, 8]);
   });
 
   test("uses chat-scoped system prompt and model overrides", async () => {

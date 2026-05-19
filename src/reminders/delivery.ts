@@ -5,6 +5,7 @@ import { GrammyError } from "grammy";
 import type { Reminder } from "./types";
 import type { Storage } from "../storage/types";
 import type { AIClient, AIMessage } from "../ai/types";
+import { deserializeMessages } from "../ai/serialize";
 import { getAllTools, type ToolEffect } from "../ai/tools/registry";
 import { buildInstruction } from "../ai/instruction";
 import { getEffectiveSettings } from "../settings";
@@ -107,7 +108,11 @@ async function composeReminderMessage(
     gender,
   });
 
-  const messages: AIMessage[] = [{ role: "user", content: envelope }];
+  const prior = deserializeMessages(reminder.contextMessages);
+  const messages: AIMessage[] = [
+    ...prior,
+    { role: "user", content: envelope },
+  ];
 
   const effects: ToolEffect[] = [];
   const toolSource: "ask" | "guest" =

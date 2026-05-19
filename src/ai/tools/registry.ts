@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import type { Lang } from "../../shared/i18n";
+import type { AIMessage } from "../types";
 
 export type ToolCallSource = "ask" | "guest";
 
@@ -21,6 +22,10 @@ export type ToolCallContext = {
   lang: Lang;
   now: number;
   effects?: ToolEffect[];
+  // Snapshot of the messages passed to ai.ask() for the turn this tool
+  // call is running inside. Tools that need to durably capture the
+  // conversation context (e.g. reminders) read this.
+  contextMessages?: AIMessage[];
 };
 
 export type Tool<TInput = unknown, TOutput = unknown> = {
