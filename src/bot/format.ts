@@ -12,6 +12,9 @@ export type DecoratedMessage = {
 };
 
 export const TELEGRAM_TEXT_MAX = 4096;
+export const EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
+const EXPANDABLE_OPEN = "<blockquote expandable>";
+const EXPANDABLE_CLOSE = "</blockquote>";
 const TRUNCATE_MARKER = "\n…";
 const MAX_ENTITY_LENGTH = 10;
 
@@ -24,13 +27,24 @@ export function applyBotNamePrefix(
   const namePart =
     trimmed.length === 0 ? "" : `<b>${escapeHtmlText(trimmed)}</b>\n`;
   const prefix = (topBlock ?? "") + namePart;
-  const fullText = prefix + sanitizedBody;
+  const useExpandable = sanitizedBody.length > EXPANDABLE_BLOCKQUOTE_THRESHOLD;
+  const openTag = useExpandable ? EXPANDABLE_OPEN : "";
+  const closeTag = useExpandable ? EXPANDABLE_CLOSE : "";
+  const fullText = prefix + openTag + sanitizedBody + closeTag;
   if (fullText.length <= TELEGRAM_TEXT_MAX) {
     return { text: fullText, parseMode: "HTML" };
   }
-  const budget = TELEGRAM_TEXT_MAX - prefix.length - TRUNCATE_MARKER.length;
+  const budget =
+    TELEGRAM_TEXT_MAX -
+    prefix.length -
+    openTag.length -
+    closeTag.length -
+    TRUNCATE_MARKER.length;
   const cut = safeSliceHtml(sanitizedBody, Math.max(budget, 0));
-  return { text: prefix + cut + TRUNCATE_MARKER, parseMode: "HTML" };
+  return {
+    text: prefix + openTag + cut + TRUNCATE_MARKER + closeTag,
+    parseMode: "HTML",
+  };
 }
 
 export function buildEffectsTopBlock(

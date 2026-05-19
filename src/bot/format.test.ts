@@ -5,6 +5,7 @@ import { test, expect, describe } from "bun:test";
 import {
   applyBotNamePrefix,
   buildEffectsTopBlock,
+  EXPANDABLE_BLOCKQUOTE_THRESHOLD,
   TELEGRAM_TEXT_MAX,
 } from "./format";
 import type { ToolEffect } from "../ai/tools/registry";
@@ -60,15 +61,15 @@ describe("applyBotNamePrefix", () => {
     const longBody = "a".repeat(TELEGRAM_TEXT_MAX);
     const result = applyBotNamePrefix(longBody, "Helper");
     expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    expect(result.text.startsWith("<b>Helper</b>\n")).toBe(true);
-    expect(result.text.endsWith("…")).toBe(true);
+    expect(result.text.startsWith("<b>Helper</b>\n<blockquote expandable>")).toBe(true);
+    expect(result.text.endsWith("…</blockquote>")).toBe(true);
   });
 
   test("truncates without prefix when body alone exceeds the limit", () => {
     const longBody = "a".repeat(TELEGRAM_TEXT_MAX + 100);
     const result = applyBotNamePrefix(longBody, null);
     expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    expect(result.text.endsWith("…")).toBe(true);
+    expect(result.text.endsWith("…</blockquote>")).toBe(true);
   });
 
   test("does not cut inside an HTML tag during truncation", () => {
@@ -110,8 +111,10 @@ describe("applyBotNamePrefix", () => {
     const top = "<blockquote>reminder</blockquote>\n";
     const result = applyBotNamePrefix(longBody, "Helper", top);
     expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    expect(result.text.startsWith(top + "<b>Helper</b>\n")).toBe(true);
-    expect(result.text.endsWith("…")).toBe(true);
+    expect(
+      result.text.startsWith(top + "<b>Helper</b>\n<blockquote expandable>"),
+    ).toBe(true);
+    expect(result.text.endsWith("…</blockquote>")).toBe(true);
   });
 
   test("top block + no bot name", () => {
@@ -121,6 +124,46 @@ describe("applyBotNamePrefix", () => {
       "<blockquote>x</blockquote>\n",
     );
     expect(result.text).toBe("<blockquote>x</blockquote>\nbody");
+  });
+
+  test("does not wrap short bodies in an expandable blockquote", () => {
+    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD);
+    const result = applyBotNamePrefix(body, null);
+    expect(result.text).toBe(body);
+    expect(result.text).not.toContain("<blockquote");
+  });
+
+  test("wraps long bodies in an expandable blockquote", () => {
+    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1);
+    const result = applyBotNamePrefix(body, null);
+    expect(result.text).toBe(`<blockquote expandable>${body}</blockquote>`);
+  });
+
+  test("wraps body only, leaving bot name and top block outside", () => {
+    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1);
+    const top = "<blockquote>reminder</blockquote>\n";
+    const result = applyBotNamePrefix(body, "Helper", top);
+    expect(result.text).toBe(
+      `${top}<b>Helper</b>\n<blockquote expandable>${body}</blockquote>`,
+    );
+  });
+
+  test("does not wrap when body is exactly at the threshold", () => {
+    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD);
+    const result = applyBotNamePrefix(body, "Helper");
+    expect(result.text).toBe(`<b>Helper</b>\n${body}`);
+    expect(result.text).not.toContain("<blockquote");
+  });
+
+  test("expandable wrap is balanced when body truncation kicks in", () => {
+    const longBody = "a".repeat(TELEGRAM_TEXT_MAX);
+    const result = applyBotNamePrefix(longBody, "Helper");
+    expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
+    const opens = (result.text.match(/<blockquote expandable>/g) ?? []).length;
+    const closes = (result.text.match(/<\/blockquote>/g) ?? []).length;
+    expect(opens).toBe(1);
+    expect(closes).toBe(1);
+    expect(result.text).toContain("…</blockquote>");
   });
 });
 
