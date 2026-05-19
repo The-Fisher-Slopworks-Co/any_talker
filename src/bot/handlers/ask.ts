@@ -8,7 +8,11 @@ import { isAllowed } from "../access";
 import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
 import { getEffectiveSettings } from "../../settings";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
-import { buildInstruction } from "../../ai/instruction";
+import {
+  buildInstruction,
+  detailLevelMultiplier,
+  type DetailLevel,
+} from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { Lang } from "../../shared/i18n";
 
@@ -29,6 +33,7 @@ export type AskInput = {
   replyImageFileIds: string[];
   replyTarget: ReplyTarget | null;
   lang: Lang;
+  detailLevel: DetailLevel;
   onAIStart?: () => void;
   fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
@@ -110,6 +115,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,
+        detailLevel: input.detailLevel,
       }),
       messages,
       tools: getAllTools(),
@@ -131,7 +137,9 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   }
 
   if (!skipRateLimit) {
-    await input.rateLimiter.deduct(input.chatId, input.userId, result.totalTokens);
+    const multiplier = detailLevelMultiplier(input.detailLevel, settings.rateLimit);
+    const deduction = Math.round(result.totalTokens * multiplier);
+    await input.rateLimiter.deduct(input.chatId, input.userId, deduction);
   }
 
   let parentBotMsgId: number | null = null;

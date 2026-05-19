@@ -78,4 +78,29 @@ describe("buildInstruction", () => {
     expect(out).not.toContain("# Response language");
     expect(out).not.toContain("# Язык ответа");
   });
+
+  test("omits detail-level section when not provided", () => {
+    const out = buildInstruction("X");
+    expect(out).not.toContain("# Уровень подробности");
+  });
+
+  test("short detail level asks for a brief ~3-sentence answer", () => {
+    const out = buildInstruction("X", { detailLevel: "short" });
+    expect(out).toContain("# Уровень подробности");
+    expect(out).toContain("кратко");
+    expect(out).toContain("3 предложения");
+  });
+
+  test("detailed detail level lets the model decide the length", () => {
+    const out = buildInstruction("X", { detailLevel: "detailed" });
+    expect(out).toContain("# Уровень подробности");
+    expect(out).toContain("настолько подробно");
+  });
+
+  test("wise detail level asks for an exhaustive answer", () => {
+    const out = buildInstruction("X", { detailLevel: "wise" });
+    expect(out).toContain("# Уровень подробности");
+    expect(out).toContain("исчерпывающе");
+    expect(out).toContain("максимально подробно");
+  });
 });

@@ -6,6 +6,8 @@ export type RateLimitConfig = {
   refillAmount: number;
   refillIntervalMs: number;
   ownerExempt: boolean;
+  detailedMultiplier: number;
+  wiseMultiplier: number;
 };
 
 export type ProviderSort = "price" | "throughput" | "latency";
@@ -103,6 +105,8 @@ export const DEFAULT_SETTINGS: Settings = {
     refillAmount: 3000,
     refillIntervalMs: 40 * 60 * 1000,
     ownerExempt: true,
+    detailedMultiplier: 1.3,
+    wiseMultiplier: 1.8,
   },
   timezone: "UTC",
   providerSort: null,

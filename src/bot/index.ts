@@ -9,6 +9,7 @@ import type { AIClient } from "../ai/types";
 import { formatLog, type LogFields, type LogFormat } from "../log";
 import { proxiedFetch } from "../proxy";
 import { askHandler } from "./handlers/ask";
+import type { DetailLevel } from "../ai/instruction";
 import { contactHandler } from "./handlers/contact";
 import { guestAskHandler } from "./handlers/guest";
 import { makeStartHandler } from "./handlers/start";
@@ -49,7 +50,13 @@ export type BotDeps = {
   logDebug: boolean;
 };
 
-const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+const ASK_CAPTION_RE = /^\/(ask|askmore|askwise)(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+
+const COMMAND_TO_DETAIL: Record<string, DetailLevel> = {
+  ask: "short",
+  askmore: "detailed",
+  askwise: "wise",
+};
 
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.botToken, {
@@ -236,6 +243,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     replyToMessage: Message | undefined;
     quote: string | null;
     forwardOrigin: boolean;
+    detailLevel: DetailLevel;
   };
 
   const fetchPhoto = (fileId: string) =>
@@ -255,6 +263,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       has_quote: args.quote !== null,
       has_reply_target: args.replyToMessage !== undefined,
       forward_origin: args.forwardOrigin,
+      detail_level: args.detailLevel,
     });
 
     if (args.forwardOrigin) return;
@@ -334,6 +343,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           replyImageFileIds,
           replyTarget,
           lang: ctx.lang,
+          detailLevel: args.detailLevel,
           onAIStart: startTyping,
           fetchPhoto,
         });
@@ -408,7 +418,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
 
       const captionMatch = ASK_CAPTION_RE.exec(askItem.caption ?? "");
-      const userText = (captionMatch?.[1] ?? "").trim();
+      const detailLevel =
+        COMMAND_TO_DETAIL[(captionMatch?.[1] ?? "ask").toLowerCase()] ?? "short";
+      const userText = (captionMatch?.[2] ?? "").trim();
       const askMessageId = items[0]!.message_id;
 
       const fileIds: string[] = [];
@@ -436,11 +448,15 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         replyToMessage: askItem.reply_to_message,
         quote: askItem.quote?.text ?? null,
         forwardOrigin: false,
+        detailLevel,
       });
     },
   });
 
-  bot.command("ask", async (ctx) => {
+  const dispatchTextCommand = async (
+    ctx: BotContext,
+    detailLevel: DetailLevel,
+  ) => {
     const msg = ctx.message;
     if (!msg) return;
     await dispatchAsk(ctx, {
@@ -451,8 +467,13 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),
+      detailLevel,
     });
-  });
+  };
+
+  bot.command("ask", (ctx) => dispatchTextCommand(ctx, "short"));
+  bot.command("askmore", (ctx) => dispatchTextCommand(ctx, "detailed"));
+  bot.command("askwise", (ctx) => dispatchTextCommand(ctx, "wise"));
 
   bot.on("message:photo", async (ctx) => {
     const msg = ctx.message;
@@ -497,7 +518,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
     const m = captionRaw.match(ASK_CAPTION_RE);
     if (!m) return;
-    const userText = (m[1] ?? "").trim();
+    const detailLevel = COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short";
+    const userText = (m[2] ?? "").trim();
 
     let image: Uint8Array | null = null;
     let imageFileId: string | null = null;
@@ -521,6 +543,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),
+      detailLevel,
     });
   });
 

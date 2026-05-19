@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Storage } from "./storage/types";
-import type { Settings, ChatSettings } from "./shared/types";
+import type { Settings, ChatSettings, RateLimitConfig } from "./shared/types";
 import { DEFAULT_SETTINGS } from "./shared/types";
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
@@ -10,6 +10,18 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   if (existing) return normalize(existing);
   await storage.saveSettings(DEFAULT_SETTINGS);
   return DEFAULT_SETTINGS;
+}
+
+function normalizeRateLimit(rl: RateLimitConfig): RateLimitConfig {
+  const detailedMultiplier =
+    typeof rl.detailedMultiplier === "number" && rl.detailedMultiplier > 0
+      ? rl.detailedMultiplier
+      : DEFAULT_SETTINGS.rateLimit.detailedMultiplier;
+  const wiseMultiplier =
+    typeof rl.wiseMultiplier === "number" && rl.wiseMultiplier > 0
+      ? rl.wiseMultiplier
+      : DEFAULT_SETTINGS.rateLimit.wiseMultiplier;
+  return { ...rl, detailedMultiplier, wiseMultiplier };
 }
 
 function normalize(s: Settings): Settings {
@@ -31,7 +43,8 @@ function normalize(s: Settings): Settings {
     s.providerSort === "latency"
       ? s.providerSort
       : null;
-  return { ...s, models, timezone, providerSort };
+  const rateLimit = normalizeRateLimit(s.rateLimit);
+  return { ...s, models, timezone, providerSort, rateLimit };
 }
 
 export function applyChatOverrides(
@@ -42,7 +55,7 @@ export function applyChatOverrides(
   return {
     systemPrompt: chat.systemPrompt ?? global.systemPrompt,
     models: chat.models ?? global.models,
-    rateLimit: chat.rateLimit ?? global.rateLimit,
+    rateLimit: chat.rateLimit ? normalizeRateLimit(chat.rateLimit) : global.rateLimit,
     timezone: chat.timezone ?? global.timezone,
     providerSort:
       chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
