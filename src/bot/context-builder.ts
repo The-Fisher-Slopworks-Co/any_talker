@@ -29,6 +29,7 @@ export type BuildContextArgs = {
   images: Uint8Array[];
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
+  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
 
 export function buildUserEnvelope(args: {
@@ -67,7 +68,15 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
     if (node) {
       const chain = await collectChain(storage, chatId, replyTarget.messageId, maxDepth);
       for (const c of chain) {
-        messages.push({ role: "user", content: c.userQuestion });
+        const chainImages = await loadChainImages(c.userImageFileIds, args.fetchPhoto);
+        if (chainImages.length > 0) {
+          messages.push({
+            role: "user",
+            content: withImages(c.userQuestion, chainImages),
+          });
+        } else {
+          messages.push({ role: "user", content: c.userQuestion });
+        }
         messages.push({ role: "assistant", content: c.botAnswer });
       }
     } else {
@@ -97,19 +106,45 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   return messages;
 }
 
+type ChainEntry = {
+  userQuestion: string;
+  botAnswer: string;
+  userImageFileIds: string[] | undefined;
+};
+
 async function collectChain(
   storage: Storage,
   chatId: string,
   startBotMsgId: number,
   maxDepth: number,
-): Promise<Array<{ userQuestion: string; botAnswer: string }>> {
-  const chain: Array<{ userQuestion: string; botAnswer: string }> = [];
+): Promise<ChainEntry[]> {
+  const chain: ChainEntry[] = [];
   let cursor: number | null = startBotMsgId;
   while (cursor !== null && chain.length < maxDepth) {
     const node = await storage.getConversation(chatId, cursor);
     if (!node) break;
-    chain.unshift({ userQuestion: node.userQuestion, botAnswer: node.botAnswer });
+    chain.unshift({
+      userQuestion: node.userQuestion,
+      botAnswer: node.botAnswer,
+      userImageFileIds: node.userImageFileIds,
+    });
     cursor = node.parentBotMsgId;
   }
   return chain;
+}
+
+async function loadChainImages(
+  fileIds: string[] | undefined,
+  fetchPhoto: ((fileId: string) => Promise<Uint8Array | null>) | undefined,
+): Promise<Uint8Array[]> {
+  if (!fileIds || fileIds.length === 0 || !fetchPhoto) return [];
+  const fetched = await Promise.all(
+    fileIds.map((id) =>
+      fetchPhoto(id).catch((err) => {
+        console.error("chain photo fetch failed:", err);
+        return null;
+      }),
+    ),
+  );
+  return fetched.filter((b): b is Uint8Array => b !== null);
 }

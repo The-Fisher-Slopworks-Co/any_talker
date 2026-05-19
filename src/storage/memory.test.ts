@@ -78,4 +78,64 @@ describe("MemoryStorage conversation", () => {
     expect(await s.getConversation("c1", 11)).toBeNull();
     expect(await s.getConversation("c2", 10)).toBeNull();
   });
+
+  test("round-trips userImageFileIds", async () => {
+    const s = new MemoryStorage();
+    await s.saveConversation("c1", 10, {
+      userQuestion: "Q",
+      botAnswer: "A",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["fileA", "fileB"],
+    });
+    expect(await s.getConversation("c1", 10)).toEqual({
+      userQuestion: "Q",
+      botAnswer: "A",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["fileA", "fileB"],
+    });
+  });
+
+  test("returned userImageFileIds array is independent of stored copy", async () => {
+    const s = new MemoryStorage();
+    const ids = ["a", "b"];
+    await s.saveConversation("c1", 10, {
+      userQuestion: "Q",
+      botAnswer: "A",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ids,
+    });
+    ids.push("c");
+    const got = await s.getConversation("c1", 10);
+    expect(got?.userImageFileIds).toEqual(["a", "b"]);
+    got!.userImageFileIds!.push("d");
+    const again = await s.getConversation("c1", 10);
+    expect(again?.userImageFileIds).toEqual(["a", "b"]);
+  });
+});
+
+describe("MemoryStorage photo cache", () => {
+  test("round-trips bytes by file_id", async () => {
+    const s = new MemoryStorage();
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    await s.savePhotoBytes("file42", bytes);
+    const got = await s.getPhotoBytes("file42");
+    expect(got).toEqual(bytes);
+  });
+
+  test("returns null for unknown file_id", async () => {
+    const s = new MemoryStorage();
+    expect(await s.getPhotoBytes("unknown")).toBeNull();
+  });
+
+  test("returned bytes are independent of stored copy", async () => {
+    const s = new MemoryStorage();
+    const bytes = new Uint8Array([1, 2, 3]);
+    await s.savePhotoBytes("f", bytes);
+    bytes[0] = 99;
+    const got = await s.getPhotoBytes("f");
+    expect(got).toEqual(new Uint8Array([1, 2, 3]));
+  });
 });

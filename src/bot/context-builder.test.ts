@@ -471,4 +471,90 @@ describe("buildContext", () => {
       ],
     });
   });
+
+  test("chain walk re-attaches images via fetchPhoto for entries with userImageFileIds", async () => {
+    const storage = new MemoryStorage();
+    const bytes1 = new Uint8Array([0xaa, 0x01]);
+    const bytes2 = new Uint8Array([0xaa, 0x02]);
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q-with-photos",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["f1", "f2"],
+    });
+    const fetched: string[] = [];
+    const fetchPhoto = async (id: string) => {
+      fetched.push(id);
+      if (id === "f1") return bytes1;
+      if (id === "f2") return bytes2;
+      return null;
+    };
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "follow-up",
+      quote: null,
+      images: [],
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      fetchPhoto,
+    });
+    expect(fetched).toEqual(["f1", "f2"]);
+    expect(msgs).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Q-with-photos" },
+          { type: "image", image: bytes1, mediaType: "image/jpeg" },
+          { type: "image", image: bytes2, mediaType: "image/jpeg" },
+        ],
+      },
+      { role: "assistant", content: "A1" },
+      { role: "user", content: envelope({ text: "follow-up" }) },
+    ]);
+  });
+
+  test("chain walk drops images that fetchPhoto returns null for, keeps the text", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["missing"],
+    });
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "x",
+      quote: null,
+      images: [],
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      fetchPhoto: async () => null,
+    });
+    expect(msgs[0]).toEqual({ role: "user", content: "Q" });
+  });
+
+  test("chain walk leaves entries text-only when fetchPhoto is not provided", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["f1"],
+    });
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "x",
+      quote: null,
+      images: [],
+      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+    });
+    expect(msgs[0]).toEqual({ role: "user", content: "Q" });
+  });
 });

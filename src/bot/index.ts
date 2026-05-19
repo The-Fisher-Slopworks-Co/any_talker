@@ -15,7 +15,7 @@ import { makeStartHandler } from "./handlers/start";
 import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
-import { pickPhotoSize, downloadTelegramFile } from "./photo";
+import { pickPhotoSize, fetchTelegramPhoto } from "./photo";
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { applyBotNamePrefix, buildEffectsTopBlock } from "./format";
@@ -231,16 +231,25 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     userText: string;
     askMessageId: number;
     images: Uint8Array[];
+    imageFileIds: string[];
     replyToMessage: Message | undefined;
     quote: string | null;
     forwardOrigin: boolean;
   };
+
+  const fetchPhoto = (fileId: string) =>
+    fetchTelegramPhoto({
+      storage: deps.storage,
+      botToken: deps.botToken,
+      fileId,
+    });
 
   const dispatchAsk = async (ctx: BotContext, args: AskDispatch) => {
     debugLog("ask_dispatch", {
       chat_id: ctx.chat?.id,
       ask_message_id: args.askMessageId,
       images: args.images.length,
+      image_file_ids: args.imageFileIds.length,
       user_text_len: args.userText.length,
       has_quote: args.quote !== null,
       has_reply_target: args.replyToMessage !== undefined,
@@ -263,10 +272,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         const picked = pickPhotoSize(replyPhoto);
         if (picked) {
           try {
-            const replyImage = await downloadTelegramFile(
-              deps.botToken,
-              picked.file_id,
-            );
+            const replyImage = await fetchPhoto(picked.file_id);
             replyTarget.images = [replyImage];
           } catch (err) {
             console.error("reply photo download failed:", err);
@@ -318,9 +324,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           userText: args.userText,
           quote: args.quote,
           images: args.images,
+          imageFileIds: args.imageFileIds,
           replyTarget,
           lang: ctx.lang,
           onAIStart: startTyping,
+          fetchPhoto,
         });
       } finally {
         stopTyping();
@@ -396,13 +404,15 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const userText = (captionMatch?.[1] ?? "").trim();
       const askMessageId = items[0]!.message_id;
 
+      const fileIds: string[] = [];
       let images: Uint8Array[];
       try {
         images = await Promise.all(
           items.map((it) => {
             const picked = it.photo ? pickPhotoSize(it.photo) : null;
             if (!picked) throw new Error("no usable photo size in media group");
-            return downloadTelegramFile(deps.botToken, picked.file_id);
+            fileIds.push(picked.file_id);
+            return fetchPhoto(picked.file_id);
           }),
         );
       } catch (err) {
@@ -415,6 +425,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         userText,
         askMessageId,
         images,
+        imageFileIds: fileIds,
         replyToMessage: askItem.reply_to_message,
         quote: askItem.quote?.text ?? null,
         forwardOrigin: false,
@@ -429,6 +440,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       userText: (ctx.match ?? "").toString().trim(),
       askMessageId: msg.message_id,
       images: [],
+      imageFileIds: [],
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),
@@ -470,10 +482,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const userText = (m[1] ?? "").trim();
 
     let image: Uint8Array | null = null;
+    let imageFileId: string | null = null;
     const picked = pickPhotoSize(msg.photo);
     if (picked) {
       try {
-        image = await downloadTelegramFile(deps.botToken, picked.file_id);
+        image = await fetchPhoto(picked.file_id);
+        imageFileId = picked.file_id;
       } catch (err) {
         console.error("photo download failed:", err);
         await ctx.reply(ctx.t.bot_photo_cant_fetch);
@@ -485,6 +499,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       userText,
       askMessageId: msg.message_id,
       images: image ? [image] : [],
+      imageFileIds: imageFileId ? [imageFileId] : [],
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),

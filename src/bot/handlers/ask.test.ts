@@ -30,6 +30,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   userText: "hello",
   quote: null,
   images: [],
+  imageFileIds: [],
   replyTarget: null,
   lang: "en",
   ...overrides,
@@ -337,5 +338,70 @@ describe("askHandler", () => {
     const out = await askHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.effects).toEqual([]);
+  });
+
+  test("answered: persists userImageFileIds when images were attached", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const bytes = new Uint8Array([0xff, 0xd8]);
+    const out = await askHandler(
+      baseInput({
+        storage,
+        images: [bytes],
+        imageFileIds: ["telegram_file_xyz"],
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistConversation(555);
+    const node = await storage.getConversation("c1", 555);
+    expect(node?.userImageFileIds).toEqual(["telegram_file_xyz"]);
+  });
+
+  test("answered: omits userImageFileIds when no images were attached", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const out = await askHandler(baseInput({ storage }));
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistConversation(555);
+    const node = await storage.getConversation("c1", 555);
+    expect(node?.userImageFileIds).toBeUndefined();
+  });
+
+  test("forwards fetchPhoto to buildContext for chain image replay", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const replayBytes = new Uint8Array([1, 2, 3]);
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q-with-photo",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["file_a"],
+    });
+    const fetched: string[] = [];
+    const fetchPhoto = async (id: string) => {
+      fetched.push(id);
+      return replayBytes;
+    };
+    const ai = new FakeAI();
+    await askHandler(
+      baseInput({
+        storage,
+        ai,
+        fetchPhoto,
+        replyTarget: {
+          messageId: 100,
+          text: "A1",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+    expect(fetched).toEqual(["file_a"]);
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    expect(sent[0]!.content).toEqual([
+      { type: "text", text: "Q-with-photo" },
+      { type: "image", image: replayBytes, mediaType: "image/jpeg" },
+    ]);
   });
 });
