@@ -15,8 +15,8 @@ Telegram bot with AI integration via OpenRouter.
 ## Run
 
 ```bash
-bun run dev      # long polling mode (default)
-bun run start    # production mode (uses WEBHOOK_URL if set)
+bun run dev      # long polling mode with hot reload
+bun run start    # production mode (long polling)
 bun test         # unit tests
 bun run typecheck
 ```
@@ -32,7 +32,7 @@ Vector). On a fresh server with DNS pointed at it:
 ```bash
 cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY, BOT_OWNER_ID,
                               # DOMAIN, LETSENCRYPT_EMAIL, and set
-                              # WEBHOOK_URL=WEBAPP_URL=https://<DOMAIN>
+                              # WEBAPP_URL=https://<DOMAIN>
 cp Caddyfile.example Caddyfile
 docker compose -f docker-compose.prod.yml up -d
 ```
@@ -92,8 +92,8 @@ following metric families:
 | `bot_rate_limit_tokens_deducted_total` | counter | — | Total tokens charged to buckets |
 | `bot_reminders_delivered_total` | counter | `outcome` | Reminder scheduler results |
 | `bot_checks_processed_total` | counter | `outcome` | Recurring-check fires/timeouts/answers |
-| `http_requests_total` | counter | `method`, `route`, `status` | Web/webhook traffic |
-| `http_request_duration_seconds` | histogram | `method`, `route` | Web/webhook latency |
+| `http_requests_total` | counter | `method`, `route`, `status` | Web App / API traffic |
+| `http_request_duration_seconds` | histogram | `method`, `route` | Web App / API latency |
 | `process_uptime_seconds` | gauge | — | Process uptime |
 | `process_resident_memory_bytes` | gauge | — | RSS |
 | `process_heap_used_bytes` | gauge | — | V8 heap in use |
