@@ -64,7 +64,7 @@ export function UserEditView({ userId }: { userId: string }) {
       <Card>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
-          <span className={ROW_VALUE_CLS}>{effectiveName}</span>
+          <span className={ROW_VALUE_CLS}>{fallbackName}</span>
         </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_username}</span>
