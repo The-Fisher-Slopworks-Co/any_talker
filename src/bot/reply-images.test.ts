@@ -40,6 +40,7 @@ describe("resolveReplyImages", () => {
     });
     expect(downloaded).toEqual(["hi"]);
     expect(result.images).toEqual([bytes]);
+    expect(result.fileIds).toEqual(["hi"]);
     expect(result.source).toBe("single");
     expect(result.albumIndexSize).toBe(0);
   });
@@ -75,6 +76,7 @@ describe("resolveReplyImages", () => {
     });
     expect(downloaded).toEqual(["first", "second", "third"]);
     expect(result.images).toHaveLength(3);
+    expect(result.fileIds).toEqual(["first", "second", "third"]);
     expect(result.source).toBe("album");
     expect(result.albumIndexSize).toBe(3);
   });
@@ -112,6 +114,7 @@ describe("resolveReplyImages", () => {
       fetchPhoto: async () => new Uint8Array(),
     });
     expect(result.images).toEqual([]);
+    expect(result.fileIds).toEqual([]);
     expect(result.source).toBe("none");
   });
 
@@ -156,6 +159,7 @@ describe("resolveReplyImages", () => {
       },
     });
     expect(result.images).toEqual([]);
+    expect(result.fileIds).toEqual([]);
     expect(result.source).toBe("album");
     expect(result.albumIndexSize).toBe(2);
   });
