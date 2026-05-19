@@ -18,6 +18,7 @@ import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, fetchTelegramPhoto } from "./photo";
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
+import { resolveReplyImages } from "./reply-images";
 import { applyBotNamePrefix, buildEffectsTopBlock } from "./format";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
@@ -266,19 +267,13 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       ? extractReplyTarget(args.replyToMessage)
       : null;
 
-    if (replyTarget) {
-      const replyPhoto = args.replyToMessage?.photo;
-      if (replyPhoto && replyPhoto.length > 0) {
-        const picked = pickPhotoSize(replyPhoto);
-        if (picked) {
-          try {
-            const replyImage = await fetchPhoto(picked.file_id);
-            replyTarget.images = [replyImage];
-          } catch (err) {
-            console.error("reply photo download failed:", err);
-          }
-        }
-      }
+    if (replyTarget && args.replyToMessage) {
+      replyTarget.images = await resolveReplyImages({
+        chatId: String(chatId),
+        replyToMessage: args.replyToMessage,
+        storage: deps.storage,
+        fetchPhoto,
+      });
     }
 
     const [nameOverride, gender] = await Promise.all([
@@ -463,6 +458,17 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     });
 
     if (msg.media_group_id !== undefined) {
+      const picked = pickPhotoSize(msg.photo);
+      if (picked) {
+        void deps.storage
+          .appendAlbumPhoto(String(chatId), msg.media_group_id, {
+            messageId: msg.message_id,
+            fileId: picked.file_id,
+          })
+          .catch((err) =>
+            console.error("appendAlbumPhoto failed:", err),
+          );
+      }
       const key = `${chatId}:${msg.media_group_id}`;
       mediaGroupBuffer.push({
         key,
