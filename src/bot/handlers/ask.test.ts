@@ -340,6 +340,70 @@ describe("askHandler", () => {
     );
   });
 
+  test("detailed level multiplies deduction by detailedMultiplier", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      rateLimit: {
+        ...DEFAULT_SETTINGS.rateLimit,
+        detailedMultiplier: 1.3,
+      },
+    });
+    const rlStorage = new MemoryStorage();
+    const rl = new TokenBucketLimiter(rlStorage);
+    const ai = new FakeAI({ text: "ok", totalTokens: 1000 });
+    await askHandler(
+      baseInput({ storage, rateLimiter: rl, ai, detailLevel: "detailed" }),
+    );
+    expect((await rlStorage.getBucket("c1", "42"))?.tokens).toBe(
+      DEFAULT_SETTINGS.rateLimit.capacity - 1300,
+    );
+  });
+
+  test("wise level multiplies deduction by wiseMultiplier", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      rateLimit: {
+        ...DEFAULT_SETTINGS.rateLimit,
+        wiseMultiplier: 1.8,
+      },
+    });
+    const rlStorage = new MemoryStorage();
+    const rl = new TokenBucketLimiter(rlStorage);
+    const ai = new FakeAI({ text: "ok", totalTokens: 1000 });
+    await askHandler(
+      baseInput({ storage, rateLimiter: rl, ai, detailLevel: "wise" }),
+    );
+    expect((await rlStorage.getBucket("c1", "42"))?.tokens).toBe(
+      DEFAULT_SETTINGS.rateLimit.capacity - 1800,
+    );
+  });
+
+  test("short level deducts raw tokens (multiplier = 1)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      rateLimit: {
+        ...DEFAULT_SETTINGS.rateLimit,
+        detailedMultiplier: 5,
+        wiseMultiplier: 10,
+      },
+    });
+    const rlStorage = new MemoryStorage();
+    const rl = new TokenBucketLimiter(rlStorage);
+    const ai = new FakeAI({ text: "ok", totalTokens: 1000 });
+    await askHandler(
+      baseInput({ storage, rateLimiter: rl, ai, detailLevel: "short" }),
+    );
+    expect((await rlStorage.getBucket("c1", "42"))?.tokens).toBe(
+      DEFAULT_SETTINGS.rateLimit.capacity - 1000,
+    );
+  });
+
   test("answered: propagates tool effects recorded into ctx.effects", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
