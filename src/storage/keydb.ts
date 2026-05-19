@@ -17,10 +17,11 @@ import type {
 } from "../shared/types";
 import {
   CONVERSATION_TTL_SECONDS,
+  PHOTO_CACHE_TTL_SECONDS,
   isEmptyChatSettings,
   isValidGender,
 } from "../shared/types";
-import { isValidLang, type Lang } from "../shared/i18n";
+import { DEFAULT_LANG, isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 
@@ -186,6 +187,49 @@ export class KeyDBStorage implements Storage {
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
 
+  async getPhotoBytes(fileId: string): Promise<Uint8Array | null> {
+    const key = `${PREFIX}photo_cache:${fileId}`;
+    const raw = await this.client.get(key);
+    if (raw === null) return null;
+    // Renew TTL on access so hot photos stay cached longer than the original
+    // 7-day window if the conversation chain keeps referencing them.
+    await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS).catch((err) => {
+      console.error("photo cache expire renewal failed:", err);
+    });
+    return new Uint8Array(Buffer.from(raw, "base64"));
+  }
+
+  async savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void> {
+    const key = `${PREFIX}photo_cache:${fileId}`;
+    const b64 = Buffer.from(bytes).toString("base64");
+    await this.client.set(key, b64);
+    await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS);
+  }
+
+  async appendAlbumPhoto(
+    chatId: string,
+    mediaGroupId: string,
+    photo: { messageId: number; fileId: string },
+  ): Promise<void> {
+    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    await this.client.hset(key, String(photo.messageId), photo.fileId);
+    await this.client.expire(key, CONVERSATION_TTL_SECONDS);
+  }
+
+  async getAlbumPhotos(
+    chatId: string,
+    mediaGroupId: string,
+  ): Promise<Array<{ messageId: number; fileId: string }>> {
+    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    const all = await this.client.hgetall(key);
+    const out: Array<{ messageId: number; fileId: string }> = [];
+    for (const [field, value] of Object.entries(all)) {
+      const messageId = Number(field);
+      if (Number.isFinite(messageId)) out.push({ messageId, fileId: value });
+    }
+    return out;
+  }
+
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {
     const raw = await this.client.get(`${PREFIX}guest_thread:${chatId}`);
     return raw ? (JSON.parse(raw) as GuestThreadNode) : null;
@@ -237,7 +281,7 @@ export class KeyDBStorage implements Storage {
         orphans.push(ids[i]!);
         continue;
       }
-      out.push(JSON.parse(raw) as Reminder);
+      out.push(parseReminderJson(raw));
     }
     if (orphans.length > 0) {
       await this.client
@@ -258,7 +302,7 @@ export class KeyDBStorage implements Storage {
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) continue;
-      out.push(JSON.parse(raw) as Reminder);
+      out.push(parseReminderJson(raw));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -276,7 +320,7 @@ export class KeyDBStorage implements Storage {
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) continue;
-      out.push(JSON.parse(raw) as Reminder);
+      out.push(parseReminderJson(raw));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -329,4 +373,22 @@ export class KeyDBStorage implements Storage {
 function parseCheckJson(raw: string): RecurringCheck {
   const parsed = JSON.parse(raw) as RecurringCheck;
   return { ...parsed, counterAnchorDate: parsed.counterAnchorDate ?? null };
+}
+
+function parseReminderJson(raw: string): Reminder {
+  const parsed = JSON.parse(raw) as Reminder & {
+    chatId?: string;
+    lang?: string;
+    contextMessages?: unknown;
+  };
+  const chatId =
+    parsed.chatId ??
+    (parsed.target.kind === "ask_reply"
+      ? parsed.target.chatId
+      : parsed.target.userId);
+  const lang: Lang = isValidLang(parsed.lang) ? parsed.lang : DEFAULT_LANG;
+  const contextMessages = Array.isArray(parsed.contextMessages)
+    ? (parsed.contextMessages as Reminder["contextMessages"])
+    : [];
+  return { ...parsed, chatId, lang, contextMessages };
 }

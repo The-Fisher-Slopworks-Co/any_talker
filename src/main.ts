@@ -58,6 +58,7 @@ async function main() {
     ai,
     logFormat: config.logFormat,
     logIncomingUpdates: config.logIncomingUpdates,
+    logDebug: config.logDebug,
   });
 
   await bot.api.deleteWebhook();
@@ -79,7 +80,7 @@ async function main() {
   });
   console.log(`HTTP server listening on :${server.port}`);
 
-  const scheduler = startScheduler({ storage, api: bot.api });
+  const scheduler = startScheduler({ storage, api: bot.api, ai });
   console.log("Reminder scheduler started");
 
   const checksScheduler = startChecksScheduler({ storage, api: bot.api });

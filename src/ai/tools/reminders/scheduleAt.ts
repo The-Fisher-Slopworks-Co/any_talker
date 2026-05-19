@@ -26,7 +26,7 @@ export function createScheduleReminderAtTool(deps: {
       "Schedule a reminder at a specific wall-clock datetime in the user's timezone. " +
       "Use when the user names a date/time (e.g. 'May 20 at 6pm', '2026-08-01 09:00'). " +
       "Format the datetime as YYYY-MM-DDTHH:MM in the user's local timezone. " +
-      "Minimum lead time is 1 minute. The reminder text comes from the 'text' field; phrase it as the model's note to the user.",
+      "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then.",
     parameters: Schema,
     execute: async ({ datetime, text }, ctx) => {
       const parsed = parseAbsoluteDateTimeMs(datetime, ctx.timezone);
