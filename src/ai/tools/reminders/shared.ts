@@ -53,6 +53,8 @@ export async function persistReminder(
   await storage.saveReminder({
     id: reminderId,
     userId: ctx.userId,
+    chatId: ctx.chatId,
+    lang: ctx.lang,
     fireAtMs,
     text,
     target: buildDeliveryTarget(ctx),

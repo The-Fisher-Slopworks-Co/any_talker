@@ -14,6 +14,7 @@ const askCtx: ToolCallContext = {
   userId: "u42",
   replyToMessageId: 100,
   timezone: "UTC",
+  lang: "en",
   now: may20noon,
 };
 

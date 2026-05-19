@@ -22,7 +22,7 @@ export function createScheduleReminderInTool(deps: {
     description:
       "Schedule a reminder a relative duration from now (e.g. 'in 2 hours', 'in 3 days', 'tomorrow' = 24 hours). " +
       "Use when the user names a delay rather than a specific clock time. " +
-      "Minimum lead time is 1 minute. The reminder text comes from the 'text' field; phrase it as the model's note to the user.",
+      "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then.",
     parameters: Schema,
     execute: async ({ amount, unit, text }, ctx) => {
       return persistReminder(

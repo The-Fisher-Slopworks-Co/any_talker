@@ -11,6 +11,7 @@ const ctx: ToolCallContext = {
   userId: "u",
   replyToMessageId: 1,
   timezone: "UTC",
+  lang: "en",
   now: 0,
 };
 
