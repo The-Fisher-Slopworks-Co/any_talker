@@ -17,7 +17,6 @@ test("loadConfig returns required fields when all env vars present", () => {
   expect(cfg.webappUrl).toBe("https://example.com/app");
   expect(cfg.keydbUrl).toBe("redis://localhost:6379");
   expect(cfg.port).toBe(8080);
-  expect(cfg.webhookUrl).toBeUndefined();
   expect(cfg.logFormat).toBe("pretty");
   expect(cfg.logIncomingUpdates).toBe(true);
 });
@@ -70,11 +69,9 @@ test("loadConfig parses optional overrides", () => {
     OPENROUTER_API_KEY: "or",
     BOT_OWNER_ID: "1",
     WEBAPP_URL: "https://example.com",
-    WEBHOOK_URL: "https://example.com/hook",
     KEYDB_URL: "redis://other:6379",
     PORT: "4000",
   });
-  expect(cfg.webhookUrl).toBe("https://example.com/hook");
   expect(cfg.keydbUrl).toBe("redis://other:6379");
   expect(cfg.port).toBe(4000);
 });
