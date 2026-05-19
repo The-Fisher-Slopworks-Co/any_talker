@@ -2,6 +2,25 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { languageSection, type Lang } from "../shared/i18n";
+import type { RateLimitConfig } from "../shared/types";
+
+export type DetailLevel = "short" | "detailed" | "wise";
+
+export const DEFAULT_DETAIL_LEVEL: DetailLevel = "short";
+
+export function detailLevelMultiplier(
+  level: DetailLevel,
+  rl: RateLimitConfig,
+): number {
+  switch (level) {
+    case "short":
+      return 1;
+    case "detailed":
+      return rl.detailedMultiplier;
+    case "wise":
+      return rl.wiseMultiplier;
+  }
+}
 
 const MESSAGE_FORMAT = `# Формат сообщений
 
@@ -60,6 +79,23 @@ function characterSection(description: string): string {
 ${description}`;
 }
 
+function detailLevelSection(level: DetailLevel): string {
+  switch (level) {
+    case "short":
+      return `# Уровень подробности
+
+Отвечай кратко, ориентируйся примерно на 3 предложения. Дай только суть, без лишних деталей и оговорок.`;
+    case "detailed":
+      return `# Уровень подробности
+
+Отвечай настолько подробно, насколько действительно нужно для полного ответа на вопрос. Не урезай искусственно, но и не растягивай без необходимости.`;
+    case "wise":
+      return `# Уровень подробности
+
+Отвечай исчерпывающе и максимально подробно. Разбери контекст, рассмотри разные углы зрения, приведи нюансы, примеры и исключения. Если ответ длинный — структурируй его.`;
+  }
+}
+
 function datetimeSection(timezone: string, now: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -83,7 +119,12 @@ function datetimeSection(timezone: string, now: Date): string {
 
 export function buildInstruction(
   characterDescription: string,
-  opts: { timezone?: string; now?: Date; lang?: Lang } = {},
+  opts: {
+    timezone?: string;
+    now?: Date;
+    lang?: Lang;
+    detailLevel?: DetailLevel;
+  } = {},
 ): string {
   const sections: string[] = [
     MESSAGE_FORMAT,
@@ -95,6 +136,9 @@ export function buildInstruction(
   }
   if (opts.lang) {
     sections.push(languageSection(opts.lang));
+  }
+  if (opts.detailLevel) {
+    sections.push(detailLevelSection(opts.detailLevel));
   }
   return sections.join("\n\n");
 }

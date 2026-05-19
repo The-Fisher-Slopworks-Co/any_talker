@@ -11,6 +11,8 @@ const cfg: RateLimitConfig = {
   refillAmount: 3000,
   refillIntervalMs: 40 * 60 * 1000,
   ownerExempt: true,
+  detailedMultiplier: 1.3,
+  wiseMultiplier: 1.8,
 };
 
 const C = "c1";

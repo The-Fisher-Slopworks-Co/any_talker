@@ -149,6 +149,8 @@ type Strings = {
   ui_ratelimit_refill_every: string;
   ui_ratelimit_min_unit: string;
   ui_ratelimit_owner_exempt: string;
+  ui_ratelimit_detailed_multiplier: string;
+  ui_ratelimit_wise_multiplier: string;
   ui_ratelimit_footer: string;
   ui_ratelimit_my_bucket: string;
   ui_ratelimit_tokens: string;
@@ -287,7 +289,8 @@ const en: Strings = {
     "Admin panel installed. Tap the menu button to the left of the message input.",
   bot_admin_menu_label: "Admin",
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
-  bot_ask_usage: "Usage: /ask <text> or reply to a message with /ask",
+  bot_ask_usage:
+    "Usage: /ask <text> (short), /askmore <text> (detailed), /askwise <text> (exhaustive) — or reply to a message with any of these.",
   bot_rate_limited: (min) =>
     `Rate limit exceeded. Refilled in ~${min} min.`,
   bot_ai_error: "⚠️ AI error. Try again later.",
@@ -416,8 +419,10 @@ const en: Strings = {
   ui_ratelimit_refill_every: "Refill every",
   ui_ratelimit_min_unit: "min",
   ui_ratelimit_owner_exempt: "Owner exempt",
+  ui_ratelimit_detailed_multiplier: "/askmore multiplier",
+  ui_ratelimit_wise_multiplier: "/askwise multiplier",
   ui_ratelimit_footer:
-    "Tokens are deducted from each user's bucket per /ask. The bucket lazily refills based on the interval.",
+    "Tokens are deducted from each user's bucket per /ask. /askmore and /askwise spend the deduction times the multiplier. The bucket lazily refills based on the interval.",
   ui_ratelimit_my_bucket: "My Bucket",
   ui_ratelimit_tokens: "Tokens",
   ui_ratelimit_last_refill: "Last refill",
@@ -584,7 +589,7 @@ const ru: Strings = {
   bot_admin_menu_label: "Админ",
   bot_photo_cant_fetch: "⚠️ Не удалось загрузить прикреплённое фото.",
   bot_ask_usage:
-    "Использование: /ask <текст> или ответь на сообщение командой /ask",
+    "Использование: /ask <текст> (коротко), /askmore <текст> (подробно), /askwise <текст> (исчерпывающе) — или ответь на сообщение любой из этих команд.",
   bot_rate_limited: (min) =>
     `Лимит запросов исчерпан. Восстановится примерно через ${min} мин.`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
@@ -713,8 +718,10 @@ const ru: Strings = {
   ui_ratelimit_refill_every: "Пополнять каждые",
   ui_ratelimit_min_unit: "мин",
   ui_ratelimit_owner_exempt: "Владелец без лимита",
+  ui_ratelimit_detailed_multiplier: "Коэффициент /askmore",
+  ui_ratelimit_wise_multiplier: "Коэффициент /askwise",
   ui_ratelimit_footer:
-    "Токены списываются из бакета каждого пользователя за /ask. Бакет лениво пополняется по интервалу.",
+    "Токены списываются из бакета каждого пользователя за /ask. Для /askmore и /askwise списание умножается на соответствующий коэффициент. Бакет лениво пополняется по интервалу.",
   ui_ratelimit_my_bucket: "Мой бакет",
   ui_ratelimit_tokens: "Токены",
   ui_ratelimit_last_refill: "Последнее пополнение",

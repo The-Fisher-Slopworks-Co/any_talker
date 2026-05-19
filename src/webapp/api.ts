@@ -98,6 +98,11 @@ const BAD_MODELS: ApiResponse = {
   body: { error: "models must be a non-empty array of non-empty strings" },
 };
 
+const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
+  status: 400,
+  body: { error: "rate-limit multipliers must be positive numbers" },
+};
+
 function isValidModelsList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
@@ -203,13 +208,19 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
       typeof r.capacity === "number" &&
       typeof r.refillAmount === "number" &&
       typeof r.refillIntervalMs === "number" &&
-      typeof r.ownerExempt === "boolean"
+      typeof r.ownerExempt === "boolean" &&
+      typeof r.detailedMultiplier === "number" &&
+      r.detailedMultiplier > 0 &&
+      typeof r.wiseMultiplier === "number" &&
+      r.wiseMultiplier > 0
     ) {
       out.rateLimit = {
         capacity: r.capacity,
         refillAmount: r.refillAmount,
         refillIntervalMs: r.refillIntervalMs,
         ownerExempt: r.ownerExempt,
+        detailedMultiplier: r.detailedMultiplier,
+        wiseMultiplier: r.wiseMultiplier,
       };
     }
   }
@@ -361,6 +372,19 @@ export async function handleApi(
       }
       if (patch.models !== undefined && !isValidModelsList(patch.models)) {
         return BAD_MODELS;
+      }
+      if (patch.rateLimit !== undefined) {
+        const rl = patch.rateLimit as Partial<RateLimitConfig>;
+        if (
+          (rl.detailedMultiplier !== undefined &&
+            (typeof rl.detailedMultiplier !== "number" ||
+              !(rl.detailedMultiplier > 0))) ||
+          (rl.wiseMultiplier !== undefined &&
+            (typeof rl.wiseMultiplier !== "number" ||
+              !(rl.wiseMultiplier > 0)))
+        ) {
+          return BAD_RATE_LIMIT_MULTIPLIER;
+        }
       }
       const next: Settings = {
         ...current,

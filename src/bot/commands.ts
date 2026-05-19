@@ -11,11 +11,15 @@ export type SyncCommandsApi = {
 };
 
 export const BOT_COMMANDS_EN: readonly BotCommand[] = [
-  { command: "ask", description: "Ask wise man" },
+  { command: "ask", description: "Ask (short answer)" },
+  { command: "askmore", description: "Ask (detailed answer)" },
+  { command: "askwise", description: "Ask wise man (exhaustive answer)" },
 ];
 
 export const BOT_COMMANDS_RU: readonly BotCommand[] = [
-  { command: "ask", description: "Спросить мудреца" },
+  { command: "ask", description: "Спросить (коротко)" },
+  { command: "askmore", description: "Спросить (подробно)" },
+  { command: "askwise", description: "Спросить мудреца (исчерпывающе)" },
 ];
 
 export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {

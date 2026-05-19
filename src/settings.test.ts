@@ -53,6 +53,8 @@ describe("applyChatOverrides", () => {
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
+        detailedMultiplier: 1.5,
+        wiseMultiplier: 2,
       },
     });
     expect(r).toEqual({
@@ -63,10 +65,50 @@ describe("applyChatOverrides", () => {
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
+        detailedMultiplier: 1.5,
+        wiseMultiplier: 2,
       },
       timezone: DEFAULT_SETTINGS.timezone,
       providerSort: DEFAULT_SETTINGS.providerSort,
     });
+  });
+
+  test("normalizes chat rateLimit override when multipliers are missing", () => {
+    const r = applyChatOverrides(DEFAULT_SETTINGS, {
+      rateLimit: {
+        capacity: 1,
+        refillAmount: 1,
+        refillIntervalMs: 1000,
+        ownerExempt: false,
+      } as never,
+    });
+    expect(r.rateLimit.detailedMultiplier).toBe(
+      DEFAULT_SETTINGS.rateLimit.detailedMultiplier,
+    );
+    expect(r.rateLimit.wiseMultiplier).toBe(
+      DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
+    );
+  });
+
+  test("normalize fills defaults for missing multipliers in stored settings", async () => {
+    const storage = new MemoryStorage();
+    const legacy = {
+      ...DEFAULT_SETTINGS,
+      rateLimit: {
+        capacity: 1,
+        refillAmount: 1,
+        refillIntervalMs: 1000,
+        ownerExempt: false,
+      } as never,
+    };
+    await storage.saveSettings(legacy);
+    const s = await getOrInitSettings(storage);
+    expect(s.rateLimit.detailedMultiplier).toBe(
+      DEFAULT_SETTINGS.rateLimit.detailedMultiplier,
+    );
+    expect(s.rateLimit.wiseMultiplier).toBe(
+      DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
+    );
   });
 
   test("provider sort: chat null overrides global value", () => {
