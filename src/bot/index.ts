@@ -9,6 +9,7 @@ import type { AIClient } from "../ai/types";
 import type { LogFormat } from "../log";
 import { proxiedFetch } from "../proxy";
 import { askHandler } from "./handlers/ask";
+import type { DetailLevel } from "../ai/instruction";
 import { contactHandler } from "./handlers/contact";
 import { guestAskHandler } from "./handlers/guest";
 import { makeStartHandler } from "./handlers/start";
@@ -46,7 +47,13 @@ export type BotDeps = {
   logIncomingUpdates: boolean;
 };
 
-const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+const ASK_CAPTION_RE = /^\/(ask|askmore|askwise)(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+
+const COMMAND_TO_DETAIL: Record<string, DetailLevel> = {
+  ask: "short",
+  askmore: "detailed",
+  askwise: "wise",
+};
 
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.botToken, {
@@ -220,7 +227,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
-  const dispatchAsk = async (ctx: BotContext, userText: string) => {
+  const dispatchAsk = async (
+    ctx: BotContext,
+    userText: string,
+    detailLevel: DetailLevel,
+  ) => {
     if (ctx.message?.forward_origin) return;
 
     const userId = String(ctx.from?.id ?? "");
@@ -304,6 +315,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           image,
           replyTarget,
           lang: ctx.lang,
+          detailLevel,
           onAIStart: startTyping,
         });
       } finally {
@@ -355,14 +367,23 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   };
 
   bot.command("ask", async (ctx) => {
-    await dispatchAsk(ctx, (ctx.match ?? "").toString().trim());
+    await dispatchAsk(ctx, (ctx.match ?? "").toString().trim(), "short");
+  });
+
+  bot.command("askmore", async (ctx) => {
+    await dispatchAsk(ctx, (ctx.match ?? "").toString().trim(), "detailed");
+  });
+
+  bot.command("askwise", async (ctx) => {
+    await dispatchAsk(ctx, (ctx.match ?? "").toString().trim(), "wise");
   });
 
   bot.on("message:photo", async (ctx) => {
     const caption = ctx.message.caption ?? "";
     const m = caption.match(ASK_CAPTION_RE);
     if (!m) return;
-    await dispatchAsk(ctx, (m[1] ?? "").trim());
+    const detailLevel = COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short";
+    await dispatchAsk(ctx, (m[2] ?? "").trim(), detailLevel);
   });
 
   bot.on("message:contact", async (ctx) => {

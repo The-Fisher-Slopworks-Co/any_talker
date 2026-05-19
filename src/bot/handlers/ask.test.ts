@@ -32,6 +32,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   image: null,
   replyTarget: null,
   lang: "en",
+  detailLevel: "short",
   ...overrides,
 });
 
@@ -191,6 +192,36 @@ describe("askHandler", () => {
     expect(sys).toContain("# Формат сообщений");
     expect(sys).toContain("# Формат ответа");
     expect(sys).toContain("Grumpy pirate.");
+  });
+
+  test("detail level short: instruction asks for a brief answer", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai, detailLevel: "short" }));
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("# Уровень подробности");
+    expect(sys).toContain("3 предложения");
+  });
+
+  test("detail level detailed: instruction lets the model decide length", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai, detailLevel: "detailed" }));
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("# Уровень подробности");
+    expect(sys).toContain("настолько подробно");
+  });
+
+  test("detail level wise: instruction asks for an exhaustive answer", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai, detailLevel: "wise" }));
+    const sys = (ai.calls[0] as { system: string }).system;
+    expect(sys).toContain("# Уровень подробности");
+    expect(sys).toContain("исчерпывающе");
   });
 
   test("timezone resolution: user > chat > global", async () => {

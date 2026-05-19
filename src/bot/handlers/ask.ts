@@ -8,7 +8,7 @@ import { isAllowed } from "../access";
 import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
 import { getEffectiveSettings } from "../../settings";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
-import { buildInstruction } from "../../ai/instruction";
+import { buildInstruction, type DetailLevel } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { Lang } from "../../shared/i18n";
 
@@ -27,6 +27,7 @@ export type AskInput = {
   image: Uint8Array | null;
   replyTarget: ReplyTarget | null;
   lang: Lang;
+  detailLevel: DetailLevel;
   onAIStart?: () => void;
 };
 
@@ -106,6 +107,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,
+        detailLevel: input.detailLevel,
       }),
       messages,
       tools: getAllTools(),
