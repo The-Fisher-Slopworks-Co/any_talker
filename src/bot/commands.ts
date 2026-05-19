@@ -10,11 +10,15 @@ export type SyncCommandsApi = {
   ): Promise<unknown>;
 };
 
+export const BOT_COMMANDS_EN: readonly BotCommand[] = [
+  { command: "ask", description: "Ask wise man" },
+];
+
 export const BOT_COMMANDS_RU: readonly BotCommand[] = [
   { command: "ask", description: "Спросить мудреца" },
 ];
 
 export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {
-  await api.setMyCommands(BOT_COMMANDS_RU);
+  await api.setMyCommands(BOT_COMMANDS_EN);
   await api.setMyCommands(BOT_COMMANDS_RU, { language_code: "ru" });
 }
