@@ -149,6 +149,8 @@ type Strings = {
   ui_ratelimit_refill_every: string;
   ui_ratelimit_min_unit: string;
   ui_ratelimit_owner_exempt: string;
+  ui_ratelimit_detailed_multiplier: string;
+  ui_ratelimit_wise_multiplier: string;
   ui_ratelimit_footer: string;
   ui_ratelimit_my_bucket: string;
   ui_ratelimit_tokens: string;
@@ -417,8 +419,10 @@ const en: Strings = {
   ui_ratelimit_refill_every: "Refill every",
   ui_ratelimit_min_unit: "min",
   ui_ratelimit_owner_exempt: "Owner exempt",
+  ui_ratelimit_detailed_multiplier: "/askmore multiplier",
+  ui_ratelimit_wise_multiplier: "/askwise multiplier",
   ui_ratelimit_footer:
-    "Tokens are deducted from each user's bucket per /ask. The bucket lazily refills based on the interval.",
+    "Tokens are deducted from each user's bucket per /ask. /askmore and /askwise spend the deduction times the multiplier. The bucket lazily refills based on the interval.",
   ui_ratelimit_my_bucket: "My Bucket",
   ui_ratelimit_tokens: "Tokens",
   ui_ratelimit_last_refill: "Last refill",
@@ -714,8 +718,10 @@ const ru: Strings = {
   ui_ratelimit_refill_every: "Пополнять каждые",
   ui_ratelimit_min_unit: "мин",
   ui_ratelimit_owner_exempt: "Владелец без лимита",
+  ui_ratelimit_detailed_multiplier: "Коэффициент /askmore",
+  ui_ratelimit_wise_multiplier: "Коэффициент /askwise",
   ui_ratelimit_footer:
-    "Токены списываются из бакета каждого пользователя за /ask. Бакет лениво пополняется по интервалу.",
+    "Токены списываются из бакета каждого пользователя за /ask. Для /askmore и /askwise списание умножается на соответствующий коэффициент. Бакет лениво пополняется по интервалу.",
   ui_ratelimit_my_bucket: "Мой бакет",
   ui_ratelimit_tokens: "Токены",
   ui_ratelimit_last_refill: "Последнее пополнение",

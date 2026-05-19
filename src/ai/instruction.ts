@@ -2,10 +2,25 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { languageSection, type Lang } from "../shared/i18n";
+import type { RateLimitConfig } from "../shared/types";
 
 export type DetailLevel = "short" | "detailed" | "wise";
 
 export const DEFAULT_DETAIL_LEVEL: DetailLevel = "short";
+
+export function detailLevelMultiplier(
+  level: DetailLevel,
+  rl: RateLimitConfig,
+): number {
+  switch (level) {
+    case "short":
+      return 1;
+    case "detailed":
+      return rl.detailedMultiplier;
+    case "wise":
+      return rl.wiseMultiplier;
+  }
+}
 
 const MESSAGE_FORMAT = `# Формат сообщений
 
