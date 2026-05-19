@@ -308,4 +308,34 @@ describe("askHandler", () => {
       DEFAULT_SETTINGS.rateLimit.capacity - 1234,
     );
   });
+
+  test("answered: propagates tool effects recorded into ctx.effects", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+
+    class EffectfulAI implements AIClient {
+      async ask(opts: Parameters<AIClient["ask"]>[0]): Promise<AskResult> {
+        opts.toolCallContext.effects?.push({
+          type: "reminder_scheduled",
+          fireAtMs: 123_456_789,
+          timezone: "Europe/Moscow",
+        });
+        return { text: "done", totalTokens: 10 };
+      }
+    }
+
+    const out = await askHandler(baseInput({ storage, ai: new EffectfulAI() }));
+    if (out.kind !== "answered") throw new Error("expected answered");
+    expect(out.effects).toEqual([
+      { type: "reminder_scheduled", fireAtMs: 123_456_789, timezone: "Europe/Moscow" },
+    ]);
+  });
+
+  test("answered: effects defaults to an empty array when no tools fire", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const out = await askHandler(baseInput({ storage }));
+    if (out.kind !== "answered") throw new Error("expected answered");
+    expect(out.effects).toEqual([]);
+  });
 });

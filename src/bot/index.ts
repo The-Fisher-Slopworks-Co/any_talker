@@ -17,7 +17,7 @@ import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, downloadTelegramFile } from "./photo";
 import { resolveReplyAuthor } from "./reply";
-import { applyBotNamePrefix } from "./format";
+import { applyBotNamePrefix, buildEffectsTopBlock } from "./format";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
@@ -147,8 +147,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const answerGuestQuery = (
         ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
       ).answerGuestQuery;
-      const answer = (text: string, botName: string | null) => {
-        const decorated = applyBotNamePrefix(text, botName);
+      const answer = (
+        text: string,
+        botName: string | null,
+        topBlock?: string,
+      ) => {
+        const decorated = applyBotNamePrefix(text, botName, topBlock);
         return answerGuestQuery({
           guest_query_id: guestQueryId,
           result: {
@@ -181,7 +185,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           return;
         case "answered": {
           try {
-            await answer(outcome.text, outcome.botName);
+            const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
+            await answer(outcome.text, outcome.botName, topBlock);
             await outcome.persistThread();
             if (outcome.totalTokens > 0) {
               askTokensTotal.inc({ source: "guest" }, outcome.totalTokens);
@@ -322,7 +327,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           await ctx.reply(ctx.t.bot_ai_error);
           return;
         case "answered": {
-          const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
+          const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
+          const decorated = applyBotNamePrefix(
+            outcome.text,
+            outcome.botName,
+            topBlock,
+          );
           const sent = await ctx.reply(decorated.text, {
             parse_mode: decorated.parseMode,
             reply_parameters: ctx.message ? { message_id: ctx.message.message_id } : undefined,
