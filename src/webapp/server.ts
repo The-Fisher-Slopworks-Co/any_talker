@@ -7,6 +7,7 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import { fetchOpenRouterStats } from "./openrouter-proxy";
 import indexHtml from "./ui/index.html";
+import { getBuildInfo } from "../build-info";
 import {
   CONTENT_TYPE as METRICS_CONTENT_TYPE,
   httpRequestDurationSeconds,
@@ -37,6 +38,10 @@ export function startServer(deps: ServerDeps) {
       return new Response(registry.render(), {
         headers: { "content-type": METRICS_CONTENT_TYPE },
       });
+    }
+
+    if (url.pathname === "/api/build-info" && req.method === "GET") {
+      return Response.json(await getBuildInfo());
     }
 
     if (url.pathname.startsWith("/api/")) {
