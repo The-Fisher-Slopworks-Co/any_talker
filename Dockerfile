@@ -12,7 +12,9 @@ RUN bun install --frozen-lockfile --production
 # Final runtime image: production deps + source. Bun runs TypeScript
 # directly, so there is no separate build step.
 FROM base AS release
+ARG GIT_COMMIT=""
 ENV NODE_ENV=production
+ENV GIT_COMMIT=${GIT_COMMIT}
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY . .
 

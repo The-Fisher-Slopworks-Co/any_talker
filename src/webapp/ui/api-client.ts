@@ -52,6 +52,10 @@ export type MeResponse = {
   gender: Gender | null;
   language: Lang | null;
 };
+export type BuildInfoResponse = {
+  commit: string | null;
+  shortCommit: string | null;
+};
 export type UserSettingsResponse = {
   user: User;
   displayName: string | null;
@@ -145,6 +149,11 @@ export const api = {
     req<{ check: RecurringCheck }>("PUT", `/api/admin/checks/${id}`, input),
   deleteCheck: (id: string) =>
     req<{ ok: true }>("DELETE", `/api/admin/checks/${id}`),
+  getBuildInfo: async (): Promise<BuildInfoResponse> => {
+    const res = await fetch("/api/build-info", { method: "GET" });
+    if (!res.ok) return { commit: null, shortCommit: null };
+    return (await res.json()) as BuildInfoResponse;
+  },
 };
 
 export type RemindersResponse = {
