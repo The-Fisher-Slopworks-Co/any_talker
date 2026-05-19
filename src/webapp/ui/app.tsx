@@ -9,6 +9,7 @@ import { api, type MeResponse } from "./api-client";
 import { resolveLang, type Lang } from "../../shared/i18n";
 import { I18nProvider, useI18n } from "./i18n-context";
 import { LoadingState } from "./components/states";
+import { BuildInfoFooter } from "./components/build-info-footer";
 import { adminSection, type Route } from "./lib/routes";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
@@ -144,6 +145,7 @@ function AppShell({
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
       <div className="px-1 pt-2 pb-4 text-xl font-semibold">{title}</div>
       {renderRoute()}
+      <BuildInfoFooter />
     </div>
   );
 }
