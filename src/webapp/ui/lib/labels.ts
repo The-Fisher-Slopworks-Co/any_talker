@@ -17,7 +17,8 @@ export function chatSubtitle(c: Chat): string {
   return c.username && c.title ? `${c.type} · @${c.username}` : c.type;
 }
 
-export function userDisplayName(u: User): string {
+export function userDisplayName(u: User, displayName?: string | null): string {
+  if (displayName && displayName.length > 0) return displayName;
   return composeFullName(u.firstName, u.lastName) || `id:${u.id}`;
 }
 
@@ -35,11 +36,12 @@ export function reminderTargetLabel(
 export function reminderUserLabel(
   r: Reminder,
   users: Record<string, User> | undefined,
+  displayNames?: Record<string, string | null>,
 ): { primary: string; secondary: string | null } {
   const u = users?.[r.userId];
   if (!u) return { primary: `id ${r.userId}`, secondary: null };
   return {
-    primary: userDisplayName(u),
+    primary: userDisplayName(u, displayNames?.[r.userId]),
     secondary: u.username ? `@${u.username}` : `id ${u.id}`,
   };
 }
