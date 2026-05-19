@@ -116,6 +116,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         userId: input.userId,
         replyToMessageId: input.askMessageId,
         timezone,
+        lang: input.lang,
         now: input.now,
         effects,
       },

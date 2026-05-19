@@ -108,6 +108,7 @@ export async function guestAskHandler(
         userId: input.userId,
         replyToMessageId: null,
         timezone,
+        lang: input.lang,
         now: input.now,
         effects,
       },

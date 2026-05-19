@@ -20,7 +20,7 @@ import {
   isEmptyChatSettings,
   isValidGender,
 } from "../shared/types";
-import { isValidLang, type Lang } from "../shared/i18n";
+import { DEFAULT_LANG, isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 
@@ -237,7 +237,7 @@ export class KeyDBStorage implements Storage {
         orphans.push(ids[i]!);
         continue;
       }
-      out.push(JSON.parse(raw) as Reminder);
+      out.push(parseReminderJson(raw));
     }
     if (orphans.length > 0) {
       await this.client
@@ -258,7 +258,7 @@ export class KeyDBStorage implements Storage {
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) continue;
-      out.push(JSON.parse(raw) as Reminder);
+      out.push(parseReminderJson(raw));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -276,7 +276,7 @@ export class KeyDBStorage implements Storage {
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) continue;
-      out.push(JSON.parse(raw) as Reminder);
+      out.push(parseReminderJson(raw));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -329,4 +329,18 @@ export class KeyDBStorage implements Storage {
 function parseCheckJson(raw: string): RecurringCheck {
   const parsed = JSON.parse(raw) as RecurringCheck;
   return { ...parsed, counterAnchorDate: parsed.counterAnchorDate ?? null };
+}
+
+function parseReminderJson(raw: string): Reminder {
+  const parsed = JSON.parse(raw) as Reminder & {
+    chatId?: string;
+    lang?: string;
+  };
+  const chatId =
+    parsed.chatId ??
+    (parsed.target.kind === "ask_reply"
+      ? parsed.target.chatId
+      : parsed.target.userId);
+  const lang: Lang = isValidLang(parsed.lang) ? parsed.lang : DEFAULT_LANG;
+  return { ...parsed, chatId, lang };
 }

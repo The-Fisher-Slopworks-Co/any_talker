@@ -8,6 +8,8 @@ import type { Reminder } from "../reminders/types";
 const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   id: "r1",
   userId: "u1",
+  chatId: "c1",
+  lang: "en",
   fireAtMs: 1_000,
   text: "ping",
   target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },

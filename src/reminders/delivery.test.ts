@@ -3,35 +3,67 @@
 
 import { test, expect, describe } from "bun:test";
 import { GrammyError } from "grammy";
+import { MemoryStorage } from "../storage/memory";
 import { deliverReminder, type ReminderApi } from "./delivery";
 import type { Reminder } from "./types";
+import type { AIClient, AIMessage, AskResult } from "../ai/types";
+import type { Tool, ToolCallContext } from "../ai/tools/registry";
+import { _resetRegistryForTest } from "../ai/tools/registry";
 
-class FakeApi implements ReminderApi {
+type AskArgs = {
+  models: string[];
+  system: string;
+  messages: AIMessage[];
+  tools: Tool[];
+  toolCallContext: ToolCallContext;
+};
+
+class FakeAI implements AIClient {
+  calls: AskArgs[] = [];
+  constructor(private readonly impl: () => Promise<AskResult>) {}
+  async ask(opts: AskArgs): Promise<AskResult> {
+    this.calls.push(opts);
+    return this.impl();
+  }
+}
+
+class FakeTgApi implements ReminderApi {
   calls: { chat_id: string | number; text: string; other?: unknown }[] = [];
-  constructor(private readonly impl: (...args: unknown[]) => Promise<unknown>) {}
+  constructor(
+    private readonly impl: (...args: unknown[]) => Promise<unknown> = async () =>
+      ({}),
+  ) {}
   async sendMessage(chat_id: string | number, text: string, other?: unknown) {
     this.calls.push({ chat_id, text, other });
     return this.impl(chat_id, text, other);
   }
 }
 
-const okImpl = async () => ({});
+const okAI = (text = "<i>пора пить чай</i>"): FakeAI =>
+  new FakeAI(async () => ({ text, totalTokens: 10 }));
 
-const reminderAsk = (): Reminder => ({
+const reminderAsk = (over: Partial<Reminder> = {}): Reminder => ({
   id: "r1",
   userId: "u1",
-  fireAtMs: 1,
-  text: "hello",
+  chatId: "c1",
+  lang: "ru",
+  fireAtMs: Date.UTC(2026, 4, 20, 15, 0),
+  createdAtMs: Date.UTC(2026, 4, 20, 9, 0),
+  text: "купить молоко",
   target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
-  createdAtMs: 0,
+  ...over,
 });
-const reminderGuest = (): Reminder => ({
+
+const reminderGuest = (over: Partial<Reminder> = {}): Reminder => ({
   id: "r2",
   userId: "u42",
-  fireAtMs: 1,
-  text: "dm",
+  chatId: "u42",
+  lang: "en",
+  fireAtMs: Date.UTC(2026, 4, 20, 15, 0),
+  createdAtMs: Date.UTC(2026, 4, 20, 9, 0),
+  text: "buy bread",
   target: { kind: "guest_dm", userId: "u42" },
-  createdAtMs: 0,
+  ...over,
 });
 
 const grammyErr = (code: number) =>
@@ -42,59 +74,206 @@ const grammyErr = (code: number) =>
     {},
   );
 
-describe("deliverReminder", () => {
-  test("ask_reply -> sendMessage with reply_parameters", async () => {
-    const api = new FakeApi(okImpl);
-    const out = await deliverReminder(api, reminderAsk());
+const deps = (ai: AIClient, api: ReminderApi, storage = new MemoryStorage()) =>
+  ({ storage, api, ai });
+
+describe("deliverReminder (AI-driven)", () => {
+  test("ask_reply: builds reminder_fired envelope and sends AI output with reply_parameters", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("hello <b>friend</b>");
+    const api = new FakeTgApi();
+    const storage = new MemoryStorage();
+
+    const r = reminderAsk();
+    const out = await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
     expect(out).toBe("delivered");
+
+    // AI was asked exactly once with a reminder envelope
+    expect(ai.calls).toHaveLength(1);
+    const askMsg = ai.calls[0]!.messages[0]!;
+    expect(askMsg.role).toBe("user");
+    const envelope = JSON.parse(askMsg.content as string);
+    expect(envelope.system_event).toBe("reminder_fired");
+    expect(envelope.note).toBe("купить молоко");
+    expect(envelope.scheduled_for).toMatch(/^2026-05-20 /);
+    expect(envelope.scheduled_at).toMatch(/^2026-05-20 /);
+
+    // Tool context carries chat/user/source from the reminder
+    expect(ai.calls[0]!.toolCallContext).toMatchObject({
+      source: "ask",
+      chatId: "c1",
+      userId: "u1",
+      replyToMessageId: 7,
+      lang: "ru",
+    });
+
+    // Telegram was called with the AI output and reply_parameters
     expect(api.calls).toHaveLength(1);
-    expect(api.calls[0]?.chat_id).toBe("c1");
-    expect(api.calls[0]?.text).toBe("hello");
-    expect(api.calls[0]?.other).toEqual({
+    expect(api.calls[0]!.chat_id).toBe("c1");
+    expect(api.calls[0]!.text).toContain("hello <b>friend</b>");
+    expect(api.calls[0]!.other).toEqual({
+      parse_mode: "HTML",
       reply_parameters: { message_id: 7, allow_sending_without_reply: true },
     });
   });
 
-  test("guest_dm -> sendMessage to userId, no reply_parameters", async () => {
-    const api = new FakeApi(okImpl);
-    const out = await deliverReminder(api, reminderGuest());
+  test("guest_dm: sends AI output to userId DM without reply_parameters", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("howdy");
+    const api = new FakeTgApi();
+    const r = reminderGuest();
+    const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
     expect(out).toBe("delivered");
-    expect(api.calls[0]?.chat_id).toBe("u42");
-    expect(api.calls[0]?.other).toBeUndefined();
+    expect(api.calls[0]!.chat_id).toBe("u42");
+    expect(api.calls[0]!.other).toEqual({ parse_mode: "HTML" });
+    expect(ai.calls[0]!.toolCallContext).toMatchObject({
+      source: "guest",
+      chatId: "u42",
+      userId: "u42",
+      replyToMessageId: null,
+      lang: "en",
+    });
   });
 
-  test("403 -> permanent", async () => {
-    const api = new FakeApi(async () => {
+  test("applies bot name prefix from chat settings", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("body");
+    const api = new FakeTgApi();
+    const storage = new MemoryStorage();
+    await storage.saveChatSettings("c1", { botName: "Capybara" });
+
+    const r = reminderAsk();
+    await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
+    expect(api.calls[0]!.text).toContain("<b>Capybara</b>");
+    expect(api.calls[0]!.text).toContain("body");
+  });
+
+  test("envelope embeds user_name and user_gender when known", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi();
+    const storage = new MemoryStorage();
+    await storage.setUserName("u1", "Alice");
+    await storage.setUserGender("u1", "female");
+    const r = reminderAsk();
+    await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
+    const envelope = JSON.parse(ai.calls[0]!.messages[0]!.content as string);
+    expect(envelope.user_name).toBe("Alice");
+    expect(envelope.user_gender).toBe("female");
+  });
+
+  test("envelope falls back to user record name when no override", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi();
+    const storage = new MemoryStorage();
+    await storage.upsertUser({
+      id: "u1",
+      firstName: "Bob",
+      lastName: "Smith",
+      username: null,
+      lastSeenAt: 0,
+    });
+    const r = reminderAsk();
+    await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
+    const envelope = JSON.parse(ai.calls[0]!.messages[0]!.content as string);
+    expect(envelope.user_name).toBe("Bob Smith");
+  });
+
+  test("falls back to note text when AI returns an empty string", async () => {
+    _resetRegistryForTest();
+    const ai = new FakeAI(async () => ({ text: "   ", totalTokens: 0 }));
+    const api = new FakeTgApi();
+    const r = reminderAsk();
+    const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
+    expect(out).toBe("delivered");
+    expect(api.calls[0]!.text).toContain("купить молоко");
+  });
+
+  test("AI throw -> transient (reminder not sent)", async () => {
+    _resetRegistryForTest();
+    const ai = new FakeAI(async () => {
+      throw new Error("boom");
+    });
+    const api = new FakeTgApi();
+    const r = reminderAsk();
+    const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
+    expect(out).toBe("transient");
+    expect(api.calls).toEqual([]);
+  });
+
+  test("Telegram 403 -> permanent", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
       throw grammyErr(403);
     });
-    expect(await deliverReminder(api, reminderGuest())).toBe("permanent");
+    const r = reminderGuest();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "permanent",
+    );
   });
 
-  test("400 -> permanent", async () => {
-    const api = new FakeApi(async () => {
+  test("Telegram 400 -> permanent", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
       throw grammyErr(400);
     });
-    expect(await deliverReminder(api, reminderAsk())).toBe("permanent");
+    const r = reminderAsk();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "permanent",
+    );
   });
 
-  test("429 -> transient", async () => {
-    const api = new FakeApi(async () => {
+  test("Telegram 429 -> transient", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
       throw grammyErr(429);
     });
-    expect(await deliverReminder(api, reminderAsk())).toBe("transient");
+    const r = reminderAsk();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "transient",
+    );
   });
 
-  test("500 -> transient", async () => {
-    const api = new FakeApi(async () => {
+  test("Telegram 500 -> transient", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
       throw grammyErr(500);
     });
-    expect(await deliverReminder(api, reminderAsk())).toBe("transient");
+    const r = reminderAsk();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "transient",
+    );
   });
 
-  test("non-grammy error -> transient", async () => {
-    const api = new FakeApi(async () => {
+  test("non-grammy Telegram error -> transient", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
       throw new Error("network blip");
     });
-    expect(await deliverReminder(api, reminderAsk())).toBe("transient");
+    const r = reminderAsk();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "transient",
+    );
+  });
+
+  test("uses chat-scoped system prompt and model overrides", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi();
+    const storage = new MemoryStorage();
+    await storage.saveChatSettings("c1", {
+      systemPrompt: "Be a pirate.",
+      models: ["custom/model"],
+    });
+    const r = reminderAsk();
+    await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
+    expect(ai.calls[0]!.models).toEqual(["custom/model"]);
+    expect(ai.calls[0]!.system).toContain("Be a pirate.");
   });
 });

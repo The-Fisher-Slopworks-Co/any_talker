@@ -12,6 +12,7 @@ const askCtx: ToolCallContext = {
   userId: "u42",
   replyToMessageId: 100,
   timezone: "UTC",
+  lang: "en",
   now: 1_000_000,
 };
 
@@ -21,6 +22,7 @@ const guestCtx: ToolCallContext = {
   userId: "u42",
   replyToMessageId: null,
   timezone: "UTC",
+  lang: "en",
   now: 1_000_000,
 };
 

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { z } from "zod";
+import type { Lang } from "../../shared/i18n";
 
 export type ToolCallSource = "ask" | "guest";
 
@@ -17,6 +18,7 @@ export type ToolCallContext = {
   userId: string;
   replyToMessageId: number | null;
   timezone: string;
+  lang: Lang;
   now: number;
   effects?: ToolEffect[];
 };
