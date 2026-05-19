@@ -17,12 +17,10 @@ import { useLoadable } from "../../lib/use-loadable";
 
 export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { t: s } = useI18n();
-  const { data: users } = useLoadable(
-    () => api.listAdminUsers().then((r) => r.users),
-    [],
-  );
+  const { data } = useLoadable(() => api.listAdminUsers(), []);
 
-  if (users === null) return <LoadingState />;
+  if (data === null) return <LoadingState />;
+  const { users, displayNames } = data;
 
   return (
     <Stack>
@@ -34,7 +32,9 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
           users.map((u) => (
             <div key={u.id} className={ROW_CLS}>
               <div className="flex-1 min-w-0">
-                <div className="truncate">{userDisplayName(u)}</div>
+                <div className="truncate">
+                  {userDisplayName(u, displayNames[u.id])}
+                </div>
                 <div className="text-[13px] text-tg-hint truncate">
                   {u.username ? `@${u.username}` : `id ${u.id}`}
                 </div>
