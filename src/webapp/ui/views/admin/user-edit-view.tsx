@@ -44,6 +44,7 @@ export function UserEditView({ userId }: { userId: string }) {
 
   const { user } = data;
   const fallbackName = userDisplayName(user);
+  const effectiveName = userDisplayName(user, data.displayName);
   const dirty = name.trim() !== (data.displayName ?? "");
 
   const save = async () => {
@@ -87,7 +88,7 @@ export function UserEditView({ userId }: { userId: string }) {
         <WhitelistToggleButton
           kind="users"
           id={user.id}
-          label={fallbackName}
+          label={effectiveName}
           initial={data.whitelisted}
         />
       </Card>

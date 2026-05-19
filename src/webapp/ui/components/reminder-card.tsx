@@ -12,6 +12,7 @@ export function ReminderCard({
   reminders,
   chats,
   users,
+  displayNames,
   showUserId,
   onUserClick,
   emptyText,
@@ -19,6 +20,7 @@ export function ReminderCard({
   reminders: Reminder[];
   chats: Record<string, Chat>;
   users?: Record<string, User>;
+  displayNames?: Record<string, string | null>;
   showUserId: boolean;
   onUserClick?: (userId: string) => void;
   emptyText: string;
@@ -30,7 +32,9 @@ export function ReminderCard({
         <EmptyState>{emptyText}</EmptyState>
       ) : (
         reminders.map((r) => {
-          const userLabel = showUserId ? reminderUserLabel(r, users) : null;
+          const userLabel = showUserId
+            ? reminderUserLabel(r, users, displayNames)
+            : null;
           const userText = userLabel
             ? `${userLabel.primary}${userLabel.secondary ? ` · ${userLabel.secondary}` : ""}`
             : null;

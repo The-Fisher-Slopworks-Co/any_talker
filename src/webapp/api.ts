@@ -128,17 +128,29 @@ async function collectReminderChats(
 async function collectReminderUsers(
   storage: Storage,
   reminders: Reminder[],
-): Promise<Record<string, User>> {
+): Promise<{
+  users: Record<string, User>;
+  displayNames: Record<string, string | null>;
+}> {
   const ids = new Set<string>(reminders.map((r) => r.userId));
-  if (ids.size === 0) return {};
+  if (ids.size === 0) return { users: {}, displayNames: {} };
   const entries = await Promise.all(
-    [...ids].map(async (id) => [id, await storage.getUser(id)] as const),
+    [...ids].map(
+      async (id) =>
+        [
+          id,
+          await storage.getUser(id),
+          await storage.getUserName(id),
+        ] as const,
+    ),
   );
-  const out: Record<string, User> = {};
-  for (const [id, user] of entries) {
-    if (user) out[id] = user;
+  const users: Record<string, User> = {};
+  const displayNames: Record<string, string | null> = {};
+  for (const [id, user, displayName] of entries) {
+    if (user) users[id] = user;
+    displayNames[id] = displayName;
   }
-  return out;
+  return { users, displayNames };
 }
 
 async function respondMyReminders(
@@ -153,11 +165,11 @@ async function respondAdminReminders(
   storage: Storage,
   reminders: Reminder[],
 ): Promise<ApiResponse> {
-  const [chats, users] = await Promise.all([
+  const [chats, { users, displayNames }] = await Promise.all([
     collectReminderChats(storage, reminders),
     collectReminderUsers(storage, reminders),
   ]);
-  return { status: 200, body: { reminders, chats, users } };
+  return { status: 200, body: { reminders, chats, users, displayNames } };
 }
 
 function normalizeChatSettings(raw: unknown): ChatSettings {
@@ -408,7 +420,14 @@ export async function handleApi(
 
   if (req.path === "/api/admin/users" && req.method === "GET") {
     const users = await deps.storage.listUsers();
-    return { status: 200, body: { users } };
+    const namePairs = await Promise.all(
+      users.map(
+        async (u) => [u.id, await deps.storage.getUserName(u.id)] as const,
+      ),
+    );
+    const displayNames: Record<string, string | null> = {};
+    for (const [id, name] of namePairs) displayNames[id] = name;
+    return { status: 200, body: { users, displayNames } };
   }
 
   if (req.path === "/api/admin/reminders" && req.method === "GET") {

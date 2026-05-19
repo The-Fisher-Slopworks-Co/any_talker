@@ -117,7 +117,11 @@ export const api = {
     gender?: Gender | null;
     language?: Lang | null;
   }) => req<MeResponse>("PUT", "/api/me", patch),
-  listAdminUsers: () => req<{ users: User[] }>("GET", "/api/admin/users"),
+  listAdminUsers: () =>
+    req<{ users: User[]; displayNames: Record<string, string | null> }>(
+      "GET",
+      "/api/admin/users",
+    ),
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
   putAdminUser: (id: string, displayName: string | null) =>
@@ -160,4 +164,5 @@ export type RemindersResponse = {
   reminders: Reminder[];
   chats: Record<string, Chat>;
   users?: Record<string, User>;
+  displayNames?: Record<string, string | null>;
 };

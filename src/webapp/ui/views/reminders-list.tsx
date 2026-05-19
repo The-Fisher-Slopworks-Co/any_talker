@@ -34,6 +34,7 @@ export function RemindersList({
         reminders={data.reminders}
         chats={data.chats}
         users={data.users}
+        displayNames={data.displayNames}
         showUserId={showUserId}
         onUserClick={onUserClick}
         emptyText={emptyText}
