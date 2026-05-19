@@ -1138,26 +1138,35 @@ describe("/api/me/reminders", () => {
     await d.storage.saveReminder({
       id: "a",
       userId: "42",
+      chatId: "42",
+      lang: "en",
       fireAtMs: 200,
       text: "mine-late",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     await d.storage.saveReminder({
       id: "b",
       userId: "42",
+      chatId: "42",
+      lang: "en",
       fireAtMs: 100,
       text: "mine-early",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     await d.storage.saveReminder({
       id: "c",
       userId: "99",
+      chatId: "99",
+      lang: "en",
       fireAtMs: 50,
       text: "other",
       target: { kind: "guest_dm", userId: "99" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/me/reminders", body: null },
@@ -1195,10 +1204,13 @@ describe("/api/me/reminders", () => {
     await d.storage.saveReminder({
       id: "r1",
       userId: "42",
+      chatId: "c1",
+      lang: "en",
       fireAtMs: 100,
       text: "ping",
       target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/me/reminders", body: null },
@@ -1217,18 +1229,24 @@ describe("/api/admin/reminders", () => {
     await d.storage.saveReminder({
       id: "a",
       userId: "42",
+      chatId: "42",
+      lang: "en",
       fireAtMs: 200,
       text: "x",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     await d.storage.saveReminder({
       id: "b",
       userId: "99",
+      chatId: "c1",
+      lang: "en",
       fireAtMs: 100,
       text: "y",
       target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/reminders", body: null },
@@ -1258,10 +1276,13 @@ describe("/api/admin/reminders", () => {
     await d.storage.saveReminder({
       id: "r1",
       userId: "42",
+      chatId: "42",
+      lang: "en",
       fireAtMs: 100,
       text: "x",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/reminders", body: null },
@@ -1277,10 +1298,13 @@ describe("/api/admin/reminders", () => {
     await d.storage.saveReminder({
       id: "r",
       userId: "42",
+      chatId: "42",
+      lang: "en",
       fireAtMs: 100,
       text: "x",
       target: { kind: "guest_dm", userId: "42" },
       createdAtMs: 0,
+      contextMessages: [],
     });
     const r = await handleApi(
       { method: "GET", path: "/api/me/reminders", body: null },

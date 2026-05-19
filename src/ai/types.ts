@@ -12,6 +12,14 @@ export type AIMessage =
   | { role: "user"; content: string | AIUserContentPart[] }
   | { role: "assistant"; content: string };
 
+export type SerializedAIUserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; image_base64: string; mediaType: string };
+
+export type SerializedAIMessage =
+  | { role: "user"; content: string | SerializedAIUserContentPart[] }
+  | { role: "assistant"; content: string };
+
 export type AskResult = {
   text: string;
   totalTokens: number;
