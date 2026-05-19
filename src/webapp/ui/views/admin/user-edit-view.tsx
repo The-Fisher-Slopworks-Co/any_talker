@@ -44,6 +44,7 @@ export function UserEditView({ userId }: { userId: string }) {
 
   const { user } = data;
   const fallbackName = userDisplayName(user);
+  const effectiveName = userDisplayName(user, data.displayName);
   const dirty = name.trim() !== (data.displayName ?? "");
 
   const save = async () => {
@@ -63,7 +64,7 @@ export function UserEditView({ userId }: { userId: string }) {
       <Card>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
-          <span className={ROW_VALUE_CLS}>{fallbackName}</span>
+          <span className={ROW_VALUE_CLS}>{effectiveName}</span>
         </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_username}</span>
@@ -87,7 +88,7 @@ export function UserEditView({ userId }: { userId: string }) {
         <WhitelistToggleButton
           kind="users"
           id={user.id}
-          label={fallbackName}
+          label={effectiveName}
           initial={data.whitelisted}
         />
       </Card>
