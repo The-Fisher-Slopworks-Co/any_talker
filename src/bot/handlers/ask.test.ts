@@ -29,7 +29,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   sender: { firstName: "John", lastName: "Doe", nameOverride: null, gender: null },
   userText: "hello",
   quote: null,
-  image: null,
+  images: [],
   replyTarget: null,
   lang: "en",
   ...overrides,
@@ -119,7 +119,7 @@ describe("askHandler", () => {
     const out = await askHandler(
       baseInput({
         storage,
-        replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", image: null },
+        replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
       }),
     );
     if (out.kind === "answered") {
