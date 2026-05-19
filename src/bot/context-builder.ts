@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Storage } from "../storage/types";
-import type { AIMessage } from "../ai/types";
+import type { AIMessage, AIUserContentPart } from "../ai/types";
 import type { Gender } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 
@@ -10,7 +10,7 @@ export type ReplyTarget = {
   messageId: number;
   text: string | null;
   authorFirstName: string | null;
-  image: Uint8Array | null;
+  images: Uint8Array[];
 };
 
 export type Sender = {
@@ -26,9 +26,10 @@ export type BuildContextArgs = {
   sender: Sender;
   userText: string;
   quote: string | null;
-  image: Uint8Array | null;
+  images: Uint8Array[];
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
+  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
 
 export function buildUserEnvelope(args: {
@@ -49,8 +50,16 @@ export function buildUserEnvelope(args: {
   return JSON.stringify(obj);
 }
 
+function withImages(text: string, images: Uint8Array[]): AIUserContentPart[] {
+  const parts: AIUserContentPart[] = [{ type: "text", text }];
+  for (const image of images) {
+    parts.push({ type: "image", image, mediaType: "image/jpeg" });
+  }
+  return parts;
+}
+
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, sender, userText, quote, image, replyTarget } = args;
+  const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   const messages: AIMessage[] = [];
 
@@ -59,20 +68,25 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
     if (node) {
       const chain = await collectChain(storage, chatId, replyTarget.messageId, maxDepth);
       for (const c of chain) {
-        messages.push({ role: "user", content: c.userQuestion });
+        const chainImages = await loadChainImages(c.userImageFileIds, args.fetchPhoto);
+        if (chainImages.length > 0) {
+          messages.push({
+            role: "user",
+            content: withImages(c.userQuestion, chainImages),
+          });
+        } else {
+          messages.push({ role: "user", content: c.userQuestion });
+        }
         messages.push({ role: "assistant", content: c.botAnswer });
       }
     } else {
       const author = replyTarget.authorFirstName ?? "unknown";
       const text = replyTarget.text ?? "<media>";
       const header = `Context (replied message from ${author}): ${text}`;
-      if (replyTarget.image !== null) {
+      if (replyTarget.images.length > 0) {
         messages.push({
           role: "user",
-          content: [
-            { type: "text", text: header },
-            { type: "image", image: replyTarget.image, mediaType: "image/jpeg" },
-          ],
+          content: withImages(header, replyTarget.images),
         });
       } else {
         messages.push({ role: "user", content: header });
@@ -81,16 +95,10 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   }
 
   const hasQuote = quote !== null && quote.trim() !== "";
-  if (userText.trim() !== "" || hasQuote || image !== null) {
+  if (userText.trim() !== "" || hasQuote || images.length > 0) {
     const envelope = buildUserEnvelope({ sender, quote, text: userText });
-    if (image !== null) {
-      messages.push({
-        role: "user",
-        content: [
-          { type: "text", text: envelope },
-          { type: "image", image, mediaType: "image/jpeg" },
-        ],
-      });
+    if (images.length > 0) {
+      messages.push({ role: "user", content: withImages(envelope, images) });
     } else {
       messages.push({ role: "user", content: envelope });
     }
@@ -98,19 +106,45 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   return messages;
 }
 
+type ChainEntry = {
+  userQuestion: string;
+  botAnswer: string;
+  userImageFileIds: string[] | undefined;
+};
+
 async function collectChain(
   storage: Storage,
   chatId: string,
   startBotMsgId: number,
   maxDepth: number,
-): Promise<Array<{ userQuestion: string; botAnswer: string }>> {
-  const chain: Array<{ userQuestion: string; botAnswer: string }> = [];
+): Promise<ChainEntry[]> {
+  const chain: ChainEntry[] = [];
   let cursor: number | null = startBotMsgId;
   while (cursor !== null && chain.length < maxDepth) {
     const node = await storage.getConversation(chatId, cursor);
     if (!node) break;
-    chain.unshift({ userQuestion: node.userQuestion, botAnswer: node.botAnswer });
+    chain.unshift({
+      userQuestion: node.userQuestion,
+      botAnswer: node.botAnswer,
+      userImageFileIds: node.userImageFileIds,
+    });
     cursor = node.parentBotMsgId;
   }
   return chain;
+}
+
+async function loadChainImages(
+  fileIds: string[] | undefined,
+  fetchPhoto: ((fileId: string) => Promise<Uint8Array | null>) | undefined,
+): Promise<Uint8Array[]> {
+  if (!fileIds || fileIds.length === 0 || !fetchPhoto) return [];
+  const fetched = await Promise.all(
+    fileIds.map((id) =>
+      fetchPhoto(id).catch((err) => {
+        console.error("chain photo fetch failed:", err);
+        return null;
+      }),
+    ),
+  );
+  return fetched.filter((b): b is Uint8Array => b !== null);
 }

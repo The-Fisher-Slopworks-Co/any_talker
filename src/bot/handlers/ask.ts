@@ -28,11 +28,14 @@ export type AskInput = {
   sender: Sender;
   userText: string;
   quote: string | null;
-  image: Uint8Array | null;
+  images: Uint8Array[];
+  imageFileIds: string[];
+  replyImageFileIds: string[];
   replyTarget: ReplyTarget | null;
   lang: Lang;
   detailLevel: DetailLevel;
   onAIStart?: () => void;
+  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
 
 export type AskOutcome =
@@ -61,7 +64,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   if (
     input.userText.trim() === "" &&
     input.replyTarget === null &&
-    input.image === null
+    input.images.length === 0
   ) {
     return { kind: "usage" };
   }
@@ -97,8 +100,9 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     sender: input.sender,
     userText: input.userText,
     quote: input.quote,
-    image: input.image,
+    images: input.images,
     replyTarget: input.replyTarget,
+    fetchPhoto: input.fetchPhoto,
   });
 
   input.onAIStart?.();
@@ -122,8 +126,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         userId: input.userId,
         replyToMessageId: input.askMessageId,
         timezone,
+        lang: input.lang,
         now: input.now,
         effects,
+        contextMessages: messages,
       },
     });
   } catch (err) {
@@ -160,11 +166,17 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     totalTokens: result.totalTokens,
     effects,
     persistConversation: async (botMsgId) => {
+      const allImageFileIds = [
+        ...input.imageFileIds,
+        ...input.replyImageFileIds,
+      ];
       await input.storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
         botAnswer: sanitized,
         parentBotMsgId,
         ts: input.now,
+        userImageFileIds:
+          allImageFileIds.length > 0 ? allImageFileIds : undefined,
       });
     },
   };

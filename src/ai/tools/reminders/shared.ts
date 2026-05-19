@@ -6,6 +6,7 @@ import type { DeliveryTarget } from "../../../reminders/types";
 import { MIN_LEAD_MS } from "../../../reminders/types";
 import type { Storage } from "../../../storage/types";
 import { parseAbsoluteDateTimeMs as parseAbsoluteDateTimeMsShared } from "../../../shared/tz";
+import { serializeMessages } from "../../serialize";
 
 export function buildDeliveryTarget(ctx: ToolCallContext): DeliveryTarget {
   if (ctx.source === "ask") {
@@ -53,10 +54,15 @@ export async function persistReminder(
   await storage.saveReminder({
     id: reminderId,
     userId: ctx.userId,
+    chatId: ctx.chatId,
+    lang: ctx.lang,
     fireAtMs,
     text,
     target: buildDeliveryTarget(ctx),
     createdAtMs: ctx.now,
+    contextMessages: ctx.contextMessages
+      ? serializeMessages(ctx.contextMessages)
+      : [],
   });
 
   ctx.effects?.push({

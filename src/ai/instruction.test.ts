@@ -13,6 +13,14 @@ describe("buildInstruction", () => {
     expect(out).toContain("`quote`");
   });
 
+  test("documents the reminder_fired system event", () => {
+    const out = buildInstruction("Be helpful.");
+    expect(out).toContain("`system_event`");
+    expect(out).toContain('`"reminder_fired"`');
+    expect(out).toContain("`scheduled_for`");
+    expect(out).toContain("`note`");
+  });
+
   test("includes response constraints (Telegram HTML, no JSON, no leak)", () => {
     const out = buildInstruction("Be helpful.");
     expect(out).toContain("# Формат ответа");
