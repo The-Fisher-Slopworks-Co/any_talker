@@ -59,6 +59,12 @@ export async function persistReminder(
     createdAtMs: ctx.now,
   });
 
+  ctx.effects?.push({
+    type: "reminder_scheduled",
+    fireAtMs,
+    timezone: ctx.timezone,
+  });
+
   return {
     ok: true,
     fireAt: new Date(fireAtMs).toISOString(),
