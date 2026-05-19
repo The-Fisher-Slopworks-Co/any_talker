@@ -268,11 +268,20 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       : null;
 
     if (replyTarget && args.replyToMessage) {
-      replyTarget.images = await resolveReplyImages({
+      const reply = await resolveReplyImages({
         chatId: String(chatId),
         replyToMessage: args.replyToMessage,
         storage: deps.storage,
         fetchPhoto,
+      });
+      replyTarget.images = reply.images;
+      debugLog("reply_images_resolved", {
+        chat_id: chatId,
+        reply_message_id: args.replyToMessage.message_id,
+        reply_media_group_id: args.replyToMessage.media_group_id ?? null,
+        source: reply.source,
+        album_index_size: reply.albumIndexSize,
+        images: reply.images.length,
       });
     }
 

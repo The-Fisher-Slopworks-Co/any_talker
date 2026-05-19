@@ -39,7 +39,9 @@ describe("resolveReplyImages", () => {
       },
     });
     expect(downloaded).toEqual(["hi"]);
-    expect(result).toEqual([bytes]);
+    expect(result.images).toEqual([bytes]);
+    expect(result.source).toBe("single");
+    expect(result.albumIndexSize).toBe(0);
   });
 
   test("album reply: pulls all photos from storage index, sorted by message_id", async () => {
@@ -72,7 +74,9 @@ describe("resolveReplyImages", () => {
       },
     });
     expect(downloaded).toEqual(["first", "second", "third"]);
-    expect(result).toHaveLength(3);
+    expect(result.images).toHaveLength(3);
+    expect(result.source).toBe("album");
+    expect(result.albumIndexSize).toBe(3);
   });
 
   test("album reply with empty index falls back to single-photo from reply_to_message", async () => {
@@ -93,10 +97,12 @@ describe("resolveReplyImages", () => {
       },
     });
     expect(downloaded).toEqual(["only"]);
-    expect(result).toHaveLength(1);
+    expect(result.images).toHaveLength(1);
+    expect(result.source).toBe("single");
+    expect(result.albumIndexSize).toBe(0);
   });
 
-  test("returns empty array when reply has no photo and no album", async () => {
+  test("returns empty result when reply has no photo and no album", async () => {
     const storage = new MemoryStorage();
     const replyToMessage = makeMessage({ message_id: 1, text: "hello" });
     const result = await resolveReplyImages({
@@ -105,7 +111,8 @@ describe("resolveReplyImages", () => {
       storage,
       fetchPhoto: async () => new Uint8Array(),
     });
-    expect(result).toEqual([]);
+    expect(result.images).toEqual([]);
+    expect(result.source).toBe("none");
   });
 
   test("album indexed in a different chat is not visible", async () => {
@@ -125,10 +132,12 @@ describe("resolveReplyImages", () => {
       storage,
       fetchPhoto: async (id) => new Uint8Array([id.charCodeAt(0)]),
     });
-    expect(result).toEqual([new Uint8Array(["f".charCodeAt(0)])]);
+    expect(result.images).toEqual([new Uint8Array(["f".charCodeAt(0)])]);
+    expect(result.source).toBe("single");
+    expect(result.albumIndexSize).toBe(0);
   });
 
-  test("album fetch failure returns empty array (no partial image)", async () => {
+  test("album fetch failure returns empty images but source stays 'album'", async () => {
     const storage = new MemoryStorage();
     await storage.appendAlbumPhoto("c1", "g", { messageId: 1, fileId: "a" });
     await storage.appendAlbumPhoto("c1", "g", { messageId: 2, fileId: "b" });
@@ -146,7 +155,9 @@ describe("resolveReplyImages", () => {
         return new Uint8Array([1]);
       },
     });
-    expect(result).toEqual([]);
+    expect(result.images).toEqual([]);
+    expect(result.source).toBe("album");
+    expect(result.albumIndexSize).toBe(2);
   });
 
   test("duplicate appends for the same message_id keep one entry", async () => {
@@ -159,7 +170,7 @@ describe("resolveReplyImages", () => {
       photo: [photoSize("ignored")],
     });
     const seen: string[] = [];
-    await resolveReplyImages({
+    const result = await resolveReplyImages({
       chatId: "c1",
       replyToMessage,
       storage,
@@ -169,5 +180,6 @@ describe("resolveReplyImages", () => {
       },
     });
     expect(seen).toEqual(["new"]);
+    expect(result.albumIndexSize).toBe(1);
   });
 });
