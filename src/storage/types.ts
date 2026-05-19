@@ -59,6 +59,9 @@ export interface Storage {
     node: ConversationNode,
   ): Promise<void>;
 
+  getPhotoBytes(fileId: string): Promise<Uint8Array | null>;
+  savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void>;
+
   getGuestThread(chatId: string): Promise<GuestThreadNode | null>;
   saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void>;
 

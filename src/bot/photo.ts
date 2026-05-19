@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { fetchWithTimeout } from "../ai/tools/http";
+import type { Storage } from "../storage/types";
 
 const TELEGRAM_TIMEOUT_MS = 10_000;
 
@@ -55,4 +56,21 @@ export async function downloadTelegramFile(
     throw new Error(`file download failed: HTTP ${dlRes.status}`);
   }
   return new Uint8Array(await dlRes.arrayBuffer());
+}
+
+export async function fetchTelegramPhoto(args: {
+  storage: Storage;
+  botToken: string;
+  fileId: string;
+}): Promise<Uint8Array> {
+  const cached = await args.storage.getPhotoBytes(args.fileId).catch((err) => {
+    console.error("photo cache read failed:", err);
+    return null;
+  });
+  if (cached) return cached;
+  const bytes = await downloadTelegramFile(args.botToken, args.fileId);
+  args.storage.savePhotoBytes(args.fileId, bytes).catch((err) => {
+    console.error("photo cache write failed:", err);
+  });
+  return bytes;
 }

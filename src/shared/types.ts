@@ -81,6 +81,7 @@ export type ConversationNode = {
   botAnswer: string;
   parentBotMsgId: number | null;
   ts: number;
+  userImageFileIds?: string[];
 };
 
 export type GuestThreadTurn = {
@@ -109,6 +110,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const MAX_REPLY_CHAIN_DEPTH = 20;
 export const CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+export const PHOTO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export function composeFullName(
   firstName: string | null | undefined,

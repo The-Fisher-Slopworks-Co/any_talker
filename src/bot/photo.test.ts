@@ -2,7 +2,8 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { pickPhotoSize, type PhotoSizeLike } from "./photo";
+import { pickPhotoSize, fetchTelegramPhoto, type PhotoSizeLike } from "./photo";
+import { MemoryStorage } from "../storage/memory";
 
 const size = (id: string, w: number, h: number): PhotoSizeLike => ({
   file_id: id,
@@ -64,5 +65,19 @@ describe("pickPhotoSize", () => {
     const sizes = [size("only", 4000, 4000)];
     const picked = pickPhotoSize(sizes);
     expect(picked?.file_id).toBe("only");
+  });
+});
+
+describe("fetchTelegramPhoto", () => {
+  test("returns cached bytes without hitting Telegram on cache hit", async () => {
+    const storage = new MemoryStorage();
+    const cached = new Uint8Array([0xff, 0xd8, 0x42]);
+    await storage.savePhotoBytes("fid", cached);
+    const got = await fetchTelegramPhoto({
+      storage,
+      botToken: "INVALID",
+      fileId: "fid",
+    });
+    expect(got).toEqual(cached);
   });
 });

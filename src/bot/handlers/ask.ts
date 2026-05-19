@@ -25,9 +25,11 @@ export type AskInput = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
+  imageFileIds: string[];
   replyTarget: ReplyTarget | null;
   lang: Lang;
   onAIStart?: () => void;
+  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
 
 export type AskOutcome =
@@ -94,6 +96,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     quote: input.quote,
     images: input.images,
     replyTarget: input.replyTarget,
+    fetchPhoto: input.fetchPhoto,
   });
 
   input.onAIStart?.();
@@ -157,6 +160,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         botAnswer: sanitized,
         parentBotMsgId,
         ts: input.now,
+        userImageFileIds:
+          input.imageFileIds.length > 0 ? input.imageFileIds : undefined,
       });
     },
   };
