@@ -240,6 +240,23 @@ describe("prettyFields", () => {
     expect(prettyFields(meta).flags).toBe("caption,photo");
   });
 
+  test("album item exposes media_group_id in flags", () => {
+    const meta = extractUpdateMeta({
+      update_id: 1,
+      message: {
+        message_id: 1,
+        date: 1,
+        chat: baseChat,
+        from: baseUser,
+        photo: [{ file_id: "x", file_unique_id: "y", width: 1, height: 1 }],
+        media_group_id: "1234567890",
+      },
+    } as unknown as Update);
+
+    expect(meta.flags.media_group_id).toBe("1234567890");
+    expect(prettyFields(meta).flags).toBe("photo,group:1234567890");
+  });
+
   test("omits flags field when no signal", () => {
     const meta = extractUpdateMeta({
       update_id: 1,
