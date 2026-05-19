@@ -23,6 +23,15 @@ export function resolveLang(
   return storedPref ?? normalizeLang(telegramCode) ?? DEFAULT_LANG;
 }
 
+export type ReminderTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  offset: string;
+};
+
 type Strings = {
   bot_private: string;
   bot_admin_installed: string;
@@ -36,6 +45,7 @@ type Strings = {
   bot_contact_already_whitelisted: (label: string) => string;
   bot_contact_added: (label: string) => string;
   bot_check_wrong_user: string;
+  bot_reminder_scheduled: (parts: ReminderTimeParts) => string;
 
   ui_loading: string;
   ui_saving: string;
@@ -289,6 +299,10 @@ const en: Strings = {
     `${label} is already whitelisted.`,
   bot_contact_added: (label) => `Added ${label} to the whitelist.`,
   bot_check_wrong_user: "This check isn't addressed to you.",
+  bot_reminder_scheduled: (p) => {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `Reminder set for ${p.year}-${pad(p.month)}-${pad(p.day)} at ${pad(p.hour)}:${pad(p.minute)} (${p.offset})`;
+  },
 
   ui_loading: "Loading…",
   ui_saving: "Saving…",
@@ -582,6 +596,10 @@ const ru: Strings = {
     `${label} уже в белом списке.`,
   bot_contact_added: (label) => `${label} добавлен(а) в белый список.`,
   bot_check_wrong_user: "Этот вопрос адресован не тебе.",
+  bot_reminder_scheduled: (p) => {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `Было создано напоминание на ${pad(p.day)}.${pad(p.month)}.${p.year} в ${pad(p.hour)}:${pad(p.minute)} (${p.offset})`;
+  },
 
   ui_loading: "Загрузка…",
   ui_saving: "Сохранение…",

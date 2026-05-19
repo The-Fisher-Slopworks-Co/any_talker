@@ -249,6 +249,30 @@ describe("guestAskHandler", () => {
     expect(call.system).toContain("Pirate.");
   });
 
+  test("answered: propagates tool effects recorded into ctx.effects", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+
+    class EffectfulAI implements AIClient {
+      async ask(opts: Parameters<AIClient["ask"]>[0]): Promise<AskResult> {
+        opts.toolCallContext.effects?.push({
+          type: "reminder_scheduled",
+          fireAtMs: 999_000,
+          timezone: "UTC",
+        });
+        return { text: "done", totalTokens: 1 };
+      }
+    }
+
+    const out = await guestAskHandler(
+      baseInput({ storage, ai: new EffectfulAI() }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    expect(out.effects).toEqual([
+      { type: "reminder_scheduled", fireAtMs: 999_000, timezone: "UTC" },
+    ]);
+  });
+
   test("onAIStart fires before AI call, but not when denied or rate-limited", async () => {
     const events: string[] = [];
 

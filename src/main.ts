@@ -17,6 +17,7 @@ import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
 import { startChecksScheduler } from "./checks/runner";
 import { createBot } from "./bot";
+import { syncBotCommands } from "./bot/commands";
 import { startServer } from "./webapp/server";
 
 const ALLOWED_UPDATES = [
@@ -60,6 +61,9 @@ async function main() {
   });
 
   await bot.api.deleteWebhook();
+  await syncBotCommands(bot.api).catch((err) => {
+    console.error("syncBotCommands failed:", err);
+  });
   bot.start({
     drop_pending_updates: true,
     allowed_updates: [...ALLOWED_UPDATES],
