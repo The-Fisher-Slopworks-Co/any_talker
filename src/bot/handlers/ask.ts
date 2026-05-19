@@ -24,10 +24,12 @@ export type AskInput = {
   sender: Sender;
   userText: string;
   quote: string | null;
-  image: Uint8Array | null;
+  images: Uint8Array[];
+  imageFileIds: string[];
   replyTarget: ReplyTarget | null;
   lang: Lang;
   onAIStart?: () => void;
+  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
 
 export type AskOutcome =
@@ -56,7 +58,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   if (
     input.userText.trim() === "" &&
     input.replyTarget === null &&
-    input.image === null
+    input.images.length === 0
   ) {
     return { kind: "usage" };
   }
@@ -92,8 +94,9 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     sender: input.sender,
     userText: input.userText,
     quote: input.quote,
-    image: input.image,
+    images: input.images,
     replyTarget: input.replyTarget,
+    fetchPhoto: input.fetchPhoto,
   });
 
   input.onAIStart?.();
@@ -157,6 +160,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         botAnswer: sanitized,
         parentBotMsgId,
         ts: input.now,
+        userImageFileIds:
+          input.imageFileIds.length > 0 ? input.imageFileIds : undefined,
       });
     },
   };

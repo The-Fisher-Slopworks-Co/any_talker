@@ -17,6 +17,7 @@ import type {
 } from "../shared/types";
 import {
   CONVERSATION_TTL_SECONDS,
+  PHOTO_CACHE_TTL_SECONDS,
   isEmptyChatSettings,
   isValidGender,
 } from "../shared/types";
@@ -184,6 +185,49 @@ export class KeyDBStorage implements Storage {
     const key = `${PREFIX}msg:${chatId}:${botMsgId}`;
     await this.client.set(key, JSON.stringify(node));
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
+  }
+
+  async getPhotoBytes(fileId: string): Promise<Uint8Array | null> {
+    const key = `${PREFIX}photo_cache:${fileId}`;
+    const raw = await this.client.get(key);
+    if (raw === null) return null;
+    // Renew TTL on access so hot photos stay cached longer than the original
+    // 7-day window if the conversation chain keeps referencing them.
+    await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS).catch((err) => {
+      console.error("photo cache expire renewal failed:", err);
+    });
+    return new Uint8Array(Buffer.from(raw, "base64"));
+  }
+
+  async savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void> {
+    const key = `${PREFIX}photo_cache:${fileId}`;
+    const b64 = Buffer.from(bytes).toString("base64");
+    await this.client.set(key, b64);
+    await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS);
+  }
+
+  async appendAlbumPhoto(
+    chatId: string,
+    mediaGroupId: string,
+    photo: { messageId: number; fileId: string },
+  ): Promise<void> {
+    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    await this.client.hset(key, String(photo.messageId), photo.fileId);
+    await this.client.expire(key, CONVERSATION_TTL_SECONDS);
+  }
+
+  async getAlbumPhotos(
+    chatId: string,
+    mediaGroupId: string,
+  ): Promise<Array<{ messageId: number; fileId: string }>> {
+    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    const all = await this.client.hgetall(key);
+    const out: Array<{ messageId: number; fileId: string }> = [];
+    for (const [field, value] of Object.entries(all)) {
+      const messageId = Number(field);
+      if (Number.isFinite(messageId)) out.push({ messageId, fileId: value });
+    }
+    return out;
   }
 
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {

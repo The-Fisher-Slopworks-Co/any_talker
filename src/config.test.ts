@@ -19,9 +19,10 @@ test("loadConfig returns required fields when all env vars present", () => {
   expect(cfg.port).toBe(8080);
   expect(cfg.logFormat).toBe("pretty");
   expect(cfg.logIncomingUpdates).toBe(true);
+  expect(cfg.logDebug).toBe(false);
 });
 
-test("loadConfig honours LOG_FORMAT and LOG_INCOMING_UPDATES", () => {
+test("loadConfig honours LOG_FORMAT, LOG_INCOMING_UPDATES and LOG_DEBUG", () => {
   const cfg = loadConfig({
     BOT_TOKEN: "tok",
     OPENROUTER_API_KEY: "or",
@@ -29,9 +30,11 @@ test("loadConfig honours LOG_FORMAT and LOG_INCOMING_UPDATES", () => {
     WEBAPP_URL: "https://example.com",
     LOG_FORMAT: "json",
     LOG_INCOMING_UPDATES: "false",
+    LOG_DEBUG: "true",
   });
   expect(cfg.logFormat).toBe("json");
   expect(cfg.logIncomingUpdates).toBe(false);
+  expect(cfg.logDebug).toBe(true);
 });
 
 test("loadConfig defaults logFormat to json when NODE_ENV=production", () => {

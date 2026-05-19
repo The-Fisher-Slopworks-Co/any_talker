@@ -38,6 +38,8 @@ export class MemoryStorage implements Storage {
   private reminders = new Map<string, Reminder>();
   private privateChats = new Set<string>();
   private checks = new Map<string, RecurringCheck>();
+  private photoCache = new Map<string, Uint8Array>();
+  private albums = new Map<string, Map<number, string>>();
 
   private bucketKey(chatId: string, userId: string): string {
     return `${chatId}:${userId}`;
@@ -165,7 +167,11 @@ export class MemoryStorage implements Storage {
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {
     const v = this.conversations.get(this.convKey(chatId, botMsgId));
-    return v ? { ...v } : null;
+    if (!v) return null;
+    return {
+      ...v,
+      userImageFileIds: v.userImageFileIds ? [...v.userImageFileIds] : undefined,
+    };
   }
 
   async saveConversation(
@@ -173,7 +179,51 @@ export class MemoryStorage implements Storage {
     botMsgId: number,
     node: ConversationNode,
   ): Promise<void> {
-    this.conversations.set(this.convKey(chatId, botMsgId), { ...node });
+    this.conversations.set(this.convKey(chatId, botMsgId), {
+      ...node,
+      userImageFileIds: node.userImageFileIds
+        ? [...node.userImageFileIds]
+        : undefined,
+    });
+  }
+
+  async getPhotoBytes(fileId: string): Promise<Uint8Array | null> {
+    const b = this.photoCache.get(fileId);
+    return b ? new Uint8Array(b) : null;
+  }
+
+  async savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void> {
+    this.photoCache.set(fileId, new Uint8Array(bytes));
+  }
+
+  private albumKey(chatId: string, mediaGroupId: string): string {
+    return `${chatId}:${mediaGroupId}`;
+  }
+
+  async appendAlbumPhoto(
+    chatId: string,
+    mediaGroupId: string,
+    photo: { messageId: number; fileId: string },
+  ): Promise<void> {
+    const key = this.albumKey(chatId, mediaGroupId);
+    let m = this.albums.get(key);
+    if (!m) {
+      m = new Map();
+      this.albums.set(key, m);
+    }
+    m.set(photo.messageId, photo.fileId);
+  }
+
+  async getAlbumPhotos(
+    chatId: string,
+    mediaGroupId: string,
+  ): Promise<Array<{ messageId: number; fileId: string }>> {
+    const m = this.albums.get(this.albumKey(chatId, mediaGroupId));
+    if (!m) return [];
+    return [...m.entries()].map(([messageId, fileId]) => ({
+      messageId,
+      fileId,
+    }));
   }
 
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {
