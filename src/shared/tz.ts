@@ -64,6 +64,15 @@ export function localDateString(utcMs: number, tz: string): string {
   return `${year.toString().padStart(4, "0")}-${pad(month)}-${pad(day)}`;
 }
 
+export function formatGmtOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absMins = Math.abs(offsetMinutes);
+  const hours = Math.floor(absMins / 60);
+  const minutes = absMins % 60;
+  if (minutes === 0) return `GMT${sign}${hours}`;
+  return `GMT${sign}${hours}:${minutes.toString().padStart(2, "0")}`;
+}
+
 export function tzOffsetMinutesAt(utcMs: number, tz: string): number {
   const parts = offsetFormatter(tz).formatToParts(new Date(utcMs));
   const off =
