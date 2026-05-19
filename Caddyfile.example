@@ -15,6 +15,6 @@
 	@internal path /metrics /metrics/*
 	respond @internal 404
 
-	# Everything else (webhook + webapp + api) goes to the bot.
+	# Everything else (webapp + api) goes to the bot.
 	reverse_proxy bot:8080
 }
