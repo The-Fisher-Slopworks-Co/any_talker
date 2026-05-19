@@ -111,6 +111,7 @@ export async function guestAskHandler(
         lang: input.lang,
         now: input.now,
         effects,
+        contextMessages: messages,
       },
     });
   } catch (err) {
