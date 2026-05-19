@@ -10,10 +10,10 @@ import {
 } from "./commands";
 
 describe("BOT_COMMANDS_RU", () => {
-  test("includes start and ask", () => {
-    const names = BOT_COMMANDS_RU.map((c) => c.command);
-    expect(names).toContain("start");
-    expect(names).toContain("ask");
+  test("includes ask with the expected description", () => {
+    expect(BOT_COMMANDS_RU).toEqual([
+      { command: "ask", description: "Спросить мудреца" },
+    ]);
   });
 
   test("each command name matches Telegram's allowed shape", () => {

@@ -11,8 +11,7 @@ export type SyncCommandsApi = {
 };
 
 export const BOT_COMMANDS_RU: readonly BotCommand[] = [
-  { command: "start", description: "Запустить бота" },
-  { command: "ask", description: "Задать вопрос ИИ" },
+  { command: "ask", description: "Спросить мудреца" },
 ];
 
 export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {
