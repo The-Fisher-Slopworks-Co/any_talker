@@ -26,6 +26,7 @@ export type AskInput = {
   quote: string | null;
   images: Uint8Array[];
   imageFileIds: string[];
+  replyImageFileIds: string[];
   replyTarget: ReplyTarget | null;
   lang: Lang;
   onAIStart?: () => void;
@@ -155,13 +156,17 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     totalTokens: result.totalTokens,
     effects,
     persistConversation: async (botMsgId) => {
+      const allImageFileIds = [
+        ...input.imageFileIds,
+        ...input.replyImageFileIds,
+      ];
       await input.storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
         botAnswer: sanitized,
         parentBotMsgId,
         ts: input.now,
         userImageFileIds:
-          input.imageFileIds.length > 0 ? input.imageFileIds : undefined,
+          allImageFileIds.length > 0 ? allImageFileIds : undefined,
       });
     },
   };

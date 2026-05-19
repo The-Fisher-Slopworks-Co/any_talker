@@ -267,6 +267,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       ? extractReplyTarget(args.replyToMessage)
       : null;
 
+    let replyImageFileIds: string[] = [];
     if (replyTarget && args.replyToMessage) {
       const reply = await resolveReplyImages({
         chatId: String(chatId),
@@ -275,6 +276,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         fetchPhoto,
       });
       replyTarget.images = reply.images;
+      replyImageFileIds = reply.fileIds;
       debugLog("reply_images_resolved", {
         chat_id: chatId,
         reply_message_id: args.replyToMessage.message_id,
@@ -329,6 +331,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           quote: args.quote,
           images: args.images,
           imageFileIds: args.imageFileIds,
+          replyImageFileIds,
           replyTarget,
           lang: ctx.lang,
           onAIStart: startTyping,
