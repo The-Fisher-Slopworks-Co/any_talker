@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { webhookCallback, type Bot } from "grammy";
 import { handleApi, type ApiRequest } from "./api";
 import { verifyInitData } from "./auth";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import { fetchOpenRouterStats } from "./openrouter-proxy";
 import indexHtml from "./ui/index.html";
-import type { BotContext } from "../bot/middleware/lang";
 import {
   CONTENT_TYPE as METRICS_CONTENT_TYPE,
   httpRequestDurationSeconds,
@@ -18,10 +16,8 @@ import {
 
 export type ServerDeps = {
   port: number;
-  bot: Bot<BotContext>;
   botToken: string;
   ownerId: string;
-  webhookUrl: string | undefined;
   storage: Storage;
   rateLimiter: RateLimiter;
 };
@@ -34,10 +30,6 @@ export function startServer(deps: ServerDeps) {
     fetchOpenRouterStats,
   };
 
-  const grammyHandler = deps.webhookUrl
-    ? webhookCallback(deps.bot, "std/http")
-    : null;
-
   const handleDynamic = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
 
@@ -45,10 +37,6 @@ export function startServer(deps: ServerDeps) {
       return new Response(registry.render(), {
         headers: { "content-type": METRICS_CONTENT_TYPE },
       });
-    }
-
-    if (url.pathname === "/telegram-webhook" && grammyHandler) {
-      return grammyHandler(req);
     }
 
     if (url.pathname.startsWith("/api/")) {
@@ -117,7 +105,6 @@ export function startServer(deps: ServerDeps) {
 
 function normalizeRoute(pathname: string): string {
   if (pathname === "/metrics") return "/metrics";
-  if (pathname === "/telegram-webhook") return "/telegram-webhook";
   if (pathname.startsWith("/api/")) {
     const rest = pathname.slice("/api/".length);
     const head = rest.split("/")[0] ?? "";

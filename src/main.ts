@@ -59,26 +59,17 @@ async function main() {
     logIncomingUpdates: config.logIncomingUpdates,
   });
 
-  if (config.webhookUrl) {
-    await bot.api.setWebhook(`${config.webhookUrl}/telegram-webhook`, {
-      allowed_updates: [...ALLOWED_UPDATES],
-    });
-    console.log("Webhook set:", config.webhookUrl);
-  } else {
-    await bot.api.deleteWebhook();
-    bot.start({
-      drop_pending_updates: true,
-      allowed_updates: [...ALLOWED_UPDATES],
-    });
-    console.log("Bot started in long-polling mode");
-  }
+  await bot.api.deleteWebhook();
+  bot.start({
+    drop_pending_updates: true,
+    allowed_updates: [...ALLOWED_UPDATES],
+  });
+  console.log("Bot started in long-polling mode");
 
   const server = startServer({
     port: config.port,
-    bot,
     botToken: config.botToken,
     ownerId: config.botOwnerId,
-    webhookUrl: config.webhookUrl,
     storage,
     rateLimiter,
   });

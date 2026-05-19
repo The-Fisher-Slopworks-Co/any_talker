@@ -9,8 +9,8 @@
 #   4. docker compose -f docker-compose.prod.yml up -d
 #
 # What you get:
-#   - Bot pulled from GHCR (pre-built by CI), running in webhook mode and
-#     exposing Prometheus metrics on :8080/metrics.
+#   - Bot pulled from GHCR (pre-built by CI), running in long-polling mode
+#     and exposing Prometheus metrics on :8080/metrics.
 #   - KeyDB with AOF + RDB persistence on a named volume.
 #   - Caddy as a reverse proxy, auto-issuing Let's Encrypt certs for ${DOMAIN}.
 #   - VictoriaMetrics (single-node) scrapes the bot's /metrics endpoint.
@@ -20,8 +20,8 @@
 #     them with `docker compose -f docker-compose.prod.yml exec ...` or
 #     by adding a tunnel.
 #
-# WEBHOOK_URL and WEBAPP_URL in .env should both be https://${DOMAIN}
-# (Telegram requires HTTPS for webhooks and Web Apps).
+# WEBAPP_URL in .env should be https://${DOMAIN}
+# (Telegram requires HTTPS for Web Apps).
 
 services:
   bot:
