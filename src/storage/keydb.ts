@@ -206,6 +206,30 @@ export class KeyDBStorage implements Storage {
     await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS);
   }
 
+  async appendAlbumPhoto(
+    chatId: string,
+    mediaGroupId: string,
+    photo: { messageId: number; fileId: string },
+  ): Promise<void> {
+    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    await this.client.hset(key, String(photo.messageId), photo.fileId);
+    await this.client.expire(key, CONVERSATION_TTL_SECONDS);
+  }
+
+  async getAlbumPhotos(
+    chatId: string,
+    mediaGroupId: string,
+  ): Promise<Array<{ messageId: number; fileId: string }>> {
+    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    const all = await this.client.hgetall(key);
+    const out: Array<{ messageId: number; fileId: string }> = [];
+    for (const [field, value] of Object.entries(all)) {
+      const messageId = Number(field);
+      if (Number.isFinite(messageId)) out.push({ messageId, fileId: value });
+    }
+    return out;
+  }
+
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {
     const raw = await this.client.get(`${PREFIX}guest_thread:${chatId}`);
     return raw ? (JSON.parse(raw) as GuestThreadNode) : null;

@@ -39,6 +39,7 @@ export class MemoryStorage implements Storage {
   private privateChats = new Set<string>();
   private checks = new Map<string, RecurringCheck>();
   private photoCache = new Map<string, Uint8Array>();
+  private albums = new Map<string, Map<number, string>>();
 
   private bucketKey(chatId: string, userId: string): string {
     return `${chatId}:${userId}`;
@@ -193,6 +194,36 @@ export class MemoryStorage implements Storage {
 
   async savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void> {
     this.photoCache.set(fileId, new Uint8Array(bytes));
+  }
+
+  private albumKey(chatId: string, mediaGroupId: string): string {
+    return `${chatId}:${mediaGroupId}`;
+  }
+
+  async appendAlbumPhoto(
+    chatId: string,
+    mediaGroupId: string,
+    photo: { messageId: number; fileId: string },
+  ): Promise<void> {
+    const key = this.albumKey(chatId, mediaGroupId);
+    let m = this.albums.get(key);
+    if (!m) {
+      m = new Map();
+      this.albums.set(key, m);
+    }
+    m.set(photo.messageId, photo.fileId);
+  }
+
+  async getAlbumPhotos(
+    chatId: string,
+    mediaGroupId: string,
+  ): Promise<Array<{ messageId: number; fileId: string }>> {
+    const m = this.albums.get(this.albumKey(chatId, mediaGroupId));
+    if (!m) return [];
+    return [...m.entries()].map(([messageId, fileId]) => ({
+      messageId,
+      fileId,
+    }));
   }
 
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {

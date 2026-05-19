@@ -139,3 +139,45 @@ describe("MemoryStorage photo cache", () => {
     expect(got).toEqual(new Uint8Array([1, 2, 3]));
   });
 });
+
+describe("MemoryStorage album index", () => {
+  test("returns empty array for unknown album", async () => {
+    const s = new MemoryStorage();
+    expect(await s.getAlbumPhotos("c1", "g1")).toEqual([]);
+  });
+
+  test("appends multiple photos and returns them all", async () => {
+    const s = new MemoryStorage();
+    await s.appendAlbumPhoto("c1", "g1", { messageId: 10, fileId: "a" });
+    await s.appendAlbumPhoto("c1", "g1", { messageId: 11, fileId: "b" });
+    await s.appendAlbumPhoto("c1", "g1", { messageId: 12, fileId: "c" });
+    const all = await s.getAlbumPhotos("c1", "g1");
+    expect(all).toHaveLength(3);
+    expect(all.sort((x, y) => x.messageId - y.messageId)).toEqual([
+      { messageId: 10, fileId: "a" },
+      { messageId: 11, fileId: "b" },
+      { messageId: 12, fileId: "c" },
+    ]);
+  });
+
+  test("re-append for same message_id overwrites file_id, keeps single entry", async () => {
+    const s = new MemoryStorage();
+    await s.appendAlbumPhoto("c1", "g1", { messageId: 1, fileId: "old" });
+    await s.appendAlbumPhoto("c1", "g1", { messageId: 1, fileId: "new" });
+    expect(await s.getAlbumPhotos("c1", "g1")).toEqual([
+      { messageId: 1, fileId: "new" },
+    ]);
+  });
+
+  test("scopes by chat: same media_group_id in different chats is isolated", async () => {
+    const s = new MemoryStorage();
+    await s.appendAlbumPhoto("c1", "g", { messageId: 1, fileId: "x" });
+    await s.appendAlbumPhoto("c2", "g", { messageId: 2, fileId: "y" });
+    expect(await s.getAlbumPhotos("c1", "g")).toEqual([
+      { messageId: 1, fileId: "x" },
+    ]);
+    expect(await s.getAlbumPhotos("c2", "g")).toEqual([
+      { messageId: 2, fileId: "y" },
+    ]);
+  });
+});

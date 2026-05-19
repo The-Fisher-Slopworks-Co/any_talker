@@ -62,6 +62,16 @@ export interface Storage {
   getPhotoBytes(fileId: string): Promise<Uint8Array | null>;
   savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void>;
 
+  appendAlbumPhoto(
+    chatId: string,
+    mediaGroupId: string,
+    photo: { messageId: number; fileId: string },
+  ): Promise<void>;
+  getAlbumPhotos(
+    chatId: string,
+    mediaGroupId: string,
+  ): Promise<Array<{ messageId: number; fileId: string }>>;
+
   getGuestThread(chatId: string): Promise<GuestThreadNode | null>;
   saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void>;
 
