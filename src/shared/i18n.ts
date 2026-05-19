@@ -287,7 +287,8 @@ const en: Strings = {
     "Admin panel installed. Tap the menu button to the left of the message input.",
   bot_admin_menu_label: "Admin",
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
-  bot_ask_usage: "Usage: /ask <text> or reply to a message with /ask",
+  bot_ask_usage:
+    "Usage: /ask <text> (short), /askmore <text> (detailed), /askwise <text> (exhaustive) — or reply to a message with any of these.",
   bot_rate_limited: (min) =>
     `Rate limit exceeded. Refilled in ~${min} min.`,
   bot_ai_error: "⚠️ AI error. Try again later.",
@@ -584,7 +585,7 @@ const ru: Strings = {
   bot_admin_menu_label: "Админ",
   bot_photo_cant_fetch: "⚠️ Не удалось загрузить прикреплённое фото.",
   bot_ask_usage:
-    "Использование: /ask <текст> или ответь на сообщение командой /ask",
+    "Использование: /ask <текст> (коротко), /askmore <текст> (подробно), /askwise <текст> (исчерпывающе) — или ответь на сообщение любой из этих команд.",
   bot_rate_limited: (min) =>
     `Лимит запросов исчерпан. Восстановится примерно через ${min} мин.`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
