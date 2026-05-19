@@ -93,6 +93,8 @@ function messageFlags(msg: Message): UpdateMeta["flags"] {
   if (Array.isArray(photos) && photos.length > 0) flags.has_photo = true;
   if (typeof caption === "string" && caption.length > 0)
     flags.has_caption = true;
+  const mediaGroupId = (msg as { media_group_id?: string }).media_group_id;
+  if (typeof mediaGroupId === "string") flags.media_group_id = mediaGroupId;
   if (msg.reply_to_message !== undefined) flags.is_reply = true;
   if ((msg as { forward_origin?: unknown }).forward_origin !== undefined)
     flags.is_forward = true;
@@ -135,6 +137,8 @@ function renderFlagSummary(flags: UpdateMeta["flags"]): string | undefined {
     parts.push(`text(${flags.text_len})`);
   if (flags.has_caption) parts.push("caption");
   if (flags.has_photo) parts.push("photo");
+  if (typeof flags.media_group_id === "string")
+    parts.push(`group:${flags.media_group_id}`);
   if (flags.is_reply) parts.push("reply");
   if (flags.is_forward) parts.push("fwd");
   if (flags.is_guest) parts.push("guest");
