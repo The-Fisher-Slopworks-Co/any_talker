@@ -2,12 +2,14 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
+import { MemoryStorage } from "../../../storage/memory";
 import {
   buildDeliveryTarget,
   durationToMs,
   parseAbsoluteDateTimeMs,
+  persistReminder,
 } from "./shared";
-import type { ToolCallContext } from "../registry";
+import type { ToolCallContext, ToolEffect } from "../registry";
 
 const baseCtx: ToolCallContext = {
   source: "ask",
@@ -110,5 +112,48 @@ describe("durationToMs", () => {
   });
   test("days", () => {
     expect(durationToMs(3, "days")).toBe(3 * 24 * 60 * 60_000);
+  });
+});
+
+describe("persistReminder effects", () => {
+  test("records a reminder_scheduled effect on success", async () => {
+    const storage = new MemoryStorage();
+    const effects: ToolEffect[] = [];
+    const fireAtMs = baseCtx.now + 5 * 60_000;
+    const out = await persistReminder(
+      storage,
+      { ...baseCtx, timezone: "Europe/Moscow", effects },
+      fireAtMs,
+      "ping",
+    );
+    expect(out.ok).toBe(true);
+    expect(effects).toEqual([
+      { type: "reminder_scheduled", fireAtMs, timezone: "Europe/Moscow" },
+    ]);
+  });
+
+  test("does not record an effect when persistence is rejected", async () => {
+    const storage = new MemoryStorage();
+    const effects: ToolEffect[] = [];
+    const tooSoon = baseCtx.now + 30_000;
+    const out = await persistReminder(
+      storage,
+      { ...baseCtx, effects },
+      tooSoon,
+      "ping",
+    );
+    expect(out.ok).toBe(false);
+    expect(effects).toEqual([]);
+  });
+
+  test("works without an effects collector (backwards compatible)", async () => {
+    const storage = new MemoryStorage();
+    const out = await persistReminder(
+      storage,
+      baseCtx,
+      baseCtx.now + 5 * 60_000,
+      "ping",
+    );
+    expect(out.ok).toBe(true);
   });
 });

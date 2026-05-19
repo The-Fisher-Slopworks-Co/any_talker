@@ -5,6 +5,12 @@ import { z } from "zod";
 
 export type ToolCallSource = "ask" | "guest";
 
+export type ToolEffect = {
+  type: "reminder_scheduled";
+  fireAtMs: number;
+  timezone: string;
+};
+
 export type ToolCallContext = {
   source: ToolCallSource;
   chatId: string;
@@ -12,6 +18,7 @@ export type ToolCallContext = {
   replyToMessageId: number | null;
   timezone: string;
   now: number;
+  effects?: ToolEffect[];
 };
 
 export type Tool<TInput = unknown, TOutput = unknown> = {

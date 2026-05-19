@@ -6,7 +6,7 @@ import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
 import { buildUserEnvelope, type Sender } from "../context-builder";
 import { getEffectiveSettings } from "../../settings";
-import { getAllTools } from "../../ai/tools/registry";
+import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { AIMessage } from "../../ai/types";
@@ -36,6 +36,7 @@ export type GuestAskOutcome =
       text: string;
       botName: string | null;
       totalTokens: number;
+      effects: ToolEffect[];
       persistThread: () => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -89,6 +90,7 @@ export async function guestAskHandler(
 
   input.onAIStart?.();
 
+  const effects: ToolEffect[] = [];
   let result;
   try {
     result = await input.ai.ask({
@@ -107,6 +109,7 @@ export async function guestAskHandler(
         replyToMessageId: null,
         timezone,
         now: input.now,
+        effects,
       },
     });
   } catch (err) {
@@ -131,6 +134,7 @@ export async function guestAskHandler(
     text: sanitized,
     botName,
     totalTokens: result.totalTokens,
+    effects,
     persistThread: async () => {
       const turns = [
         ...priorTurns,

@@ -7,7 +7,7 @@ import type { AIClient } from "../../ai/types";
 import { isAllowed } from "../access";
 import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
 import { getEffectiveSettings } from "../../settings";
-import { getAllTools } from "../../ai/tools/registry";
+import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
 import type { Lang } from "../../shared/i18n";
@@ -39,6 +39,7 @@ export type AskOutcome =
       text: string;
       botName: string | null;
       totalTokens: number;
+      effects: ToolEffect[];
       persistConversation: (botMsgId: number) => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -97,6 +98,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
 
   input.onAIStart?.();
 
+  const effects: ToolEffect[] = [];
   let result;
   try {
     result = await input.ai.ask({
@@ -115,6 +117,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         replyToMessageId: input.askMessageId,
         timezone,
         now: input.now,
+        effects,
       },
     });
   } catch (err) {
@@ -147,6 +150,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     text: sanitized,
     botName,
     totalTokens: result.totalTokens,
+    effects,
     persistConversation: async (botMsgId) => {
       await input.storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
