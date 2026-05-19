@@ -58,6 +58,7 @@ async function main() {
     ai,
     logFormat: config.logFormat,
     logIncomingUpdates: config.logIncomingUpdates,
+    logDebug: config.logDebug,
   });
 
   await bot.api.deleteWebhook();

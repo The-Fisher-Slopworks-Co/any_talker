@@ -14,6 +14,7 @@ export type Config = {
   port: number;
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
+  logDebug: boolean;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -37,6 +38,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     port,
     logFormat: resolveLogFormat(env),
     logIncomingUpdates: parseBool("LOG_INCOMING_UPDATES", env.LOG_INCOMING_UPDATES, true),
+    logDebug: parseBool("LOG_DEBUG", env.LOG_DEBUG, false),
   };
 }
 

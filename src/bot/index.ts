@@ -6,7 +6,7 @@ import type { InlineQueryResult, Message } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
-import type { LogFormat } from "../log";
+import { formatLog, type LogFields, type LogFormat } from "../log";
 import { proxiedFetch } from "../proxy";
 import { askHandler } from "./handlers/ask";
 import { contactHandler } from "./handlers/contact";
@@ -45,6 +45,7 @@ export type BotDeps = {
   ai: AIClient;
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
+  logDebug: boolean;
 };
 
 const ASK_CAPTION_RE = /^\/ask(?:@\w+)?(?:\s+([\s\S]*))?$/i;
@@ -53,6 +54,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.botToken, {
     client: { fetch: proxiedFetch as unknown as typeof fetch },
   });
+
+  const debugLog = (msg: string, fields: LogFields = {}) => {
+    if (!deps.logDebug) return;
+    console.log(formatLog({ level: "debug", msg, fields }, deps.logFormat));
+  };
 
   bot.use(
     makeIncomingUpdateLogger({
@@ -231,6 +237,16 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   };
 
   const dispatchAsk = async (ctx: BotContext, args: AskDispatch) => {
+    debugLog("ask_dispatch", {
+      chat_id: ctx.chat?.id,
+      ask_message_id: args.askMessageId,
+      images: args.images.length,
+      user_text_len: args.userText.length,
+      has_quote: args.quote !== null,
+      has_reply_target: args.replyToMessage !== undefined,
+      forward_origin: args.forwardOrigin,
+    });
+
     if (args.forwardOrigin) return;
 
     const userId = String(ctx.from?.id ?? "");
@@ -355,13 +371,26 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   };
 
   const mediaGroupBuffer = createMediaGroupBuffer<Message, BotContext>({
-    onFlush: async ({ context: ctx, items }) => {
+    onFlush: async ({ key, context: ctx, items }) => {
+      debugLog("media_group_flush", {
+        key,
+        items: items.length,
+        message_ids: items.map((it) => it.message_id),
+        captions: items.filter((it) => (it.caption ?? "").length > 0).length,
+      });
+
       const askItem = items.find((it) => {
         const caption = it.caption ?? "";
         return ASK_CAPTION_RE.test(caption);
       });
-      if (!askItem) return;
-      if (askItem.forward_origin) return;
+      if (!askItem) {
+        debugLog("media_group_dropped", { key, reason: "no_ask_caption" });
+        return;
+      }
+      if (askItem.forward_origin) {
+        debugLog("media_group_dropped", { key, reason: "forward_origin" });
+        return;
+      }
 
       const captionMatch = ASK_CAPTION_RE.exec(askItem.caption ?? "");
       const userText = (captionMatch?.[1] ?? "").trim();
@@ -411,17 +440,32 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return;
 
+    const captionRaw = msg.caption ?? "";
+    debugLog("photo_received", {
+      chat_id: chatId,
+      message_id: msg.message_id,
+      media_group_id: msg.media_group_id ?? null,
+      caption_len: captionRaw.length,
+      ask_caption: ASK_CAPTION_RE.test(captionRaw),
+      photo_sizes: msg.photo.length,
+    });
+
     if (msg.media_group_id !== undefined) {
+      const key = `${chatId}:${msg.media_group_id}`;
       mediaGroupBuffer.push({
-        key: `${chatId}:${msg.media_group_id}`,
+        key,
         context: ctx,
         item: msg,
+      });
+      debugLog("media_group_push", {
+        key,
+        message_id: msg.message_id,
+        pending_groups: mediaGroupBuffer.pendingCount(),
       });
       return;
     }
 
-    const caption = msg.caption ?? "";
-    const m = caption.match(ASK_CAPTION_RE);
+    const m = captionRaw.match(ASK_CAPTION_RE);
     if (!m) return;
     const userText = (m[1] ?? "").trim();
 
