@@ -14,6 +14,7 @@ export type ResolveReplyImagesArgs = {
 
 export type ResolveReplyImagesResult = {
   images: Uint8Array[];
+  fileIds: string[];
   source: "album" | "single" | "none";
   albumIndexSize: number;
 };
@@ -33,14 +34,15 @@ export async function resolveReplyImages(
     albumIndexSize = album.length;
     if (album.length > 0) {
       const sorted = [...album].sort((a, b) => a.messageId - b.messageId);
+      const fileIds = sorted.map((a) => a.fileId);
       try {
         const images = await Promise.all(
-          sorted.map((a) => args.fetchPhoto(a.fileId)),
+          fileIds.map((id) => args.fetchPhoto(id)),
         );
-        return { images, source: "album", albumIndexSize };
+        return { images, fileIds, source: "album", albumIndexSize };
       } catch (err) {
         console.error("reply album photo download failed:", err);
-        return { images: [], source: "album", albumIndexSize };
+        return { images: [], fileIds: [], source: "album", albumIndexSize };
       }
     }
   }
@@ -51,13 +53,18 @@ export async function resolveReplyImages(
     if (picked) {
       try {
         const image = await args.fetchPhoto(picked.file_id);
-        return { images: [image], source: "single", albumIndexSize };
+        return {
+          images: [image],
+          fileIds: [picked.file_id],
+          source: "single",
+          albumIndexSize,
+        };
       } catch (err) {
         console.error("reply photo download failed:", err);
-        return { images: [], source: "single", albumIndexSize };
+        return { images: [], fileIds: [], source: "single", albumIndexSize };
       }
     }
   }
 
-  return { images: [], source: "none", albumIndexSize };
+  return { images: [], fileIds: [], source: "none", albumIndexSize };
 }

@@ -31,6 +31,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
   quote: null,
   images: [],
   imageFileIds: [],
+  replyImageFileIds: [],
   replyTarget: null,
   lang: "en",
   ...overrides,
@@ -355,6 +356,105 @@ describe("askHandler", () => {
     await out.persistConversation(555);
     const node = await storage.getConversation("c1", 555);
     expect(node?.userImageFileIds).toEqual(["telegram_file_xyz"]);
+  });
+
+  test("answered: persists replyImageFileIds when images came from a reply target", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        replyTarget: {
+          messageId: 0,
+          text: null,
+          authorFirstName: "Someone",
+          images: [new Uint8Array([1])],
+        },
+        replyImageFileIds: ["album_file_1", "album_file_2"],
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistConversation(556);
+    const node = await storage.getConversation("c1", 556);
+    expect(node?.userImageFileIds).toEqual(["album_file_1", "album_file_2"]);
+  });
+
+  test("answered: merges direct and reply image file IDs (direct first)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        images: [new Uint8Array([9])],
+        imageFileIds: ["direct_file"],
+        replyTarget: {
+          messageId: 0,
+          text: null,
+          authorFirstName: "Someone",
+          images: [new Uint8Array([1])],
+        },
+        replyImageFileIds: ["album_file_1"],
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistConversation(557);
+    const node = await storage.getConversation("c1", 557);
+    expect(node?.userImageFileIds).toEqual(["direct_file", "album_file_1"]);
+  });
+
+  test("follow-up /ask replaying the chain still surfaces reply-target images", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const replayBytes = new Uint8Array([7, 7, 7]);
+
+    const first = await askHandler(
+      baseInput({
+        storage,
+        userText: "what's on these",
+        replyTarget: {
+          messageId: 0,
+          text: null,
+          authorFirstName: "Someone",
+          images: [new Uint8Array([1]), new Uint8Array([2])],
+        },
+        replyImageFileIds: ["album_a", "album_b"],
+      }),
+    );
+    if (first.kind !== "answered") throw new Error("expected answered");
+    await first.persistConversation(1000);
+
+    const fetched: string[] = [];
+    const ai = new FakeAI();
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai,
+        askMessageId: 2,
+        userText: "and again?",
+        replyTarget: {
+          messageId: 1000,
+          text: first.text,
+          authorFirstName: "Bot",
+          images: [],
+        },
+        fetchPhoto: async (id) => {
+          fetched.push(id);
+          return replayBytes;
+        },
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    expect(fetched).toEqual(["album_a", "album_b"]);
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    const firstTurnEnvelope = JSON.stringify({
+      author: "John Doe",
+      text: "what's on these",
+    });
+    expect(sent[0]!.content).toEqual([
+      { type: "text", text: firstTurnEnvelope },
+      { type: "image", image: replayBytes, mediaType: "image/jpeg" },
+      { type: "image", image: replayBytes, mediaType: "image/jpeg" },
+    ]);
   });
 
   test("answered: omits userImageFileIds when no images were attached", async () => {
