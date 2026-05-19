@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Storage } from "../storage/types";
-import type { AIMessage } from "../ai/types";
+import type { AIMessage, AIUserContentPart } from "../ai/types";
 import type { Gender } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 
@@ -10,7 +10,7 @@ export type ReplyTarget = {
   messageId: number;
   text: string | null;
   authorFirstName: string | null;
-  image: Uint8Array | null;
+  images: Uint8Array[];
 };
 
 export type Sender = {
@@ -26,7 +26,7 @@ export type BuildContextArgs = {
   sender: Sender;
   userText: string;
   quote: string | null;
-  image: Uint8Array | null;
+  images: Uint8Array[];
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
 };
@@ -49,8 +49,16 @@ export function buildUserEnvelope(args: {
   return JSON.stringify(obj);
 }
 
+function withImages(text: string, images: Uint8Array[]): AIUserContentPart[] {
+  const parts: AIUserContentPart[] = [{ type: "text", text }];
+  for (const image of images) {
+    parts.push({ type: "image", image, mediaType: "image/jpeg" });
+  }
+  return parts;
+}
+
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, sender, userText, quote, image, replyTarget } = args;
+  const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   const messages: AIMessage[] = [];
 
@@ -66,13 +74,10 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
       const author = replyTarget.authorFirstName ?? "unknown";
       const text = replyTarget.text ?? "<media>";
       const header = `Context (replied message from ${author}): ${text}`;
-      if (replyTarget.image !== null) {
+      if (replyTarget.images.length > 0) {
         messages.push({
           role: "user",
-          content: [
-            { type: "text", text: header },
-            { type: "image", image: replyTarget.image, mediaType: "image/jpeg" },
-          ],
+          content: withImages(header, replyTarget.images),
         });
       } else {
         messages.push({ role: "user", content: header });
@@ -81,16 +86,10 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   }
 
   const hasQuote = quote !== null && quote.trim() !== "";
-  if (userText.trim() !== "" || hasQuote || image !== null) {
+  if (userText.trim() !== "" || hasQuote || images.length > 0) {
     const envelope = buildUserEnvelope({ sender, quote, text: userText });
-    if (image !== null) {
-      messages.push({
-        role: "user",
-        content: [
-          { type: "text", text: envelope },
-          { type: "image", image, mediaType: "image/jpeg" },
-        ],
-      });
+    if (images.length > 0) {
+      messages.push({ role: "user", content: withImages(envelope, images) });
     } else {
       messages.push({ role: "user", content: envelope });
     }

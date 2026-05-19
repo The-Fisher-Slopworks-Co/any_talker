@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { Bot, type Context } from "grammy";
-import type { InlineQueryResult } from "grammy/types";
+import type { InlineQueryResult, Message } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
@@ -16,6 +16,7 @@ import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, downloadTelegramFile } from "./photo";
+import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { applyBotNamePrefix } from "./format";
 import type { SentGuestMessage } from "../types/telegram-guest";
@@ -215,15 +216,44 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
   bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
-  const dispatchAsk = async (ctx: BotContext, userText: string) => {
-    if (ctx.message?.forward_origin) return;
+  type AskDispatch = {
+    userText: string;
+    askMessageId: number;
+    images: Uint8Array[];
+    replyToMessage: Message | undefined;
+    quote: string | null;
+    forwardOrigin: boolean;
+  };
+
+  const dispatchAsk = async (ctx: BotContext, args: AskDispatch) => {
+    if (args.forwardOrigin) return;
 
     const userId = String(ctx.from?.id ?? "");
     const chatId = ctx.chat?.id;
-    const askMessageId = ctx.message?.message_id;
-    if (!userId || chatId === undefined || askMessageId === undefined) return;
+    if (!userId || chatId === undefined) return;
 
-    const replyTarget = extractReplyTarget(ctx);
+    const replyTarget = args.replyToMessage
+      ? extractReplyTarget(args.replyToMessage)
+      : null;
+
+    if (replyTarget) {
+      const replyPhoto = args.replyToMessage?.photo;
+      if (replyPhoto && replyPhoto.length > 0) {
+        const picked = pickPhotoSize(replyPhoto);
+        if (picked) {
+          try {
+            const replyImage = await downloadTelegramFile(
+              deps.botToken,
+              picked.file_id,
+            );
+            replyTarget.images = [replyImage];
+          } catch (err) {
+            console.error("reply photo download failed:", err);
+          }
+        }
+      }
+    }
+
     const [nameOverride, gender] = await Promise.all([
       deps.storage.getUserName(userId),
       deps.storage.getUserGender(userId),
@@ -234,36 +264,6 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       nameOverride,
       gender,
     };
-    const quote = ctx.message?.quote?.text ?? null;
-
-    let image: Uint8Array | null = null;
-    const photo = ctx.message?.photo;
-    if (photo && photo.length > 0) {
-      const picked = pickPhotoSize(photo);
-      if (picked) {
-        try {
-          image = await downloadTelegramFile(deps.botToken, picked.file_id);
-        } catch (err) {
-          console.error("photo download failed:", err);
-          await ctx.reply(ctx.t.bot_photo_cant_fetch);
-          return;
-        }
-      }
-    }
-
-    if (replyTarget) {
-      const replyPhoto = ctx.message?.reply_to_message?.photo;
-      if (replyPhoto && replyPhoto.length > 0) {
-        const picked = pickPhotoSize(replyPhoto);
-        if (picked) {
-          try {
-            replyTarget.image = await downloadTelegramFile(deps.botToken, picked.file_id);
-          } catch (err) {
-            console.error("reply photo download failed:", err);
-          }
-        }
-      }
-    }
 
     let typingTimer: ReturnType<typeof setInterval> | null = null;
     const stopTyping = () => {
@@ -292,11 +292,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           now: Date.now(),
           chatId: String(chatId),
           userId,
-          askMessageId,
+          askMessageId: args.askMessageId,
           sender,
-          userText,
-          quote,
-          image,
+          userText: args.userText,
+          quote: args.quote,
+          images: args.images,
           replyTarget,
           lang: ctx.lang,
           onAIStart: startTyping,
@@ -323,9 +323,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           return;
         case "answered": {
           const decorated = applyBotNamePrefix(outcome.text, outcome.botName);
-          const sent = await ctx.reply(decorated.text, {
+          const sent = await ctx.api.sendMessage(chatId, decorated.text, {
             parse_mode: decorated.parseMode,
-            reply_parameters: ctx.message ? { message_id: ctx.message.message_id } : undefined,
+            reply_parameters: { message_id: args.askMessageId },
           });
           await outcome.persistConversation(sent.message_id);
           if (outcome.totalTokens > 0) {
@@ -344,15 +344,97 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
   };
 
+  const mediaGroupBuffer = createMediaGroupBuffer<Message, BotContext>({
+    onFlush: async ({ context: ctx, items }) => {
+      const askItem = items.find((it) => {
+        const caption = it.caption ?? "";
+        return ASK_CAPTION_RE.test(caption);
+      });
+      if (!askItem) return;
+      if (askItem.forward_origin) return;
+
+      const captionMatch = ASK_CAPTION_RE.exec(askItem.caption ?? "");
+      const userText = (captionMatch?.[1] ?? "").trim();
+      const askMessageId = items[0]!.message_id;
+
+      let images: Uint8Array[];
+      try {
+        images = await Promise.all(
+          items.map((it) => {
+            const picked = it.photo ? pickPhotoSize(it.photo) : null;
+            if (!picked) throw new Error("no usable photo size in media group");
+            return downloadTelegramFile(deps.botToken, picked.file_id);
+          }),
+        );
+      } catch (err) {
+        console.error("media group photo download failed:", err);
+        await ctx.reply(ctx.t.bot_photo_cant_fetch).catch(() => {});
+        return;
+      }
+
+      await dispatchAsk(ctx, {
+        userText,
+        askMessageId,
+        images,
+        replyToMessage: askItem.reply_to_message,
+        quote: askItem.quote?.text ?? null,
+        forwardOrigin: false,
+      });
+    },
+  });
+
   bot.command("ask", async (ctx) => {
-    await dispatchAsk(ctx, (ctx.match ?? "").toString().trim());
+    const msg = ctx.message;
+    if (!msg) return;
+    await dispatchAsk(ctx, {
+      userText: (ctx.match ?? "").toString().trim(),
+      askMessageId: msg.message_id,
+      images: [],
+      replyToMessage: msg.reply_to_message,
+      quote: msg.quote?.text ?? null,
+      forwardOrigin: Boolean(msg.forward_origin),
+    });
   });
 
   bot.on("message:photo", async (ctx) => {
-    const caption = ctx.message.caption ?? "";
+    const msg = ctx.message;
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+
+    if (msg.media_group_id !== undefined) {
+      mediaGroupBuffer.push({
+        key: `${chatId}:${msg.media_group_id}`,
+        context: ctx,
+        item: msg,
+      });
+      return;
+    }
+
+    const caption = msg.caption ?? "";
     const m = caption.match(ASK_CAPTION_RE);
     if (!m) return;
-    await dispatchAsk(ctx, (m[1] ?? "").trim());
+    const userText = (m[1] ?? "").trim();
+
+    let image: Uint8Array | null = null;
+    const picked = pickPhotoSize(msg.photo);
+    if (picked) {
+      try {
+        image = await downloadTelegramFile(deps.botToken, picked.file_id);
+      } catch (err) {
+        console.error("photo download failed:", err);
+        await ctx.reply(ctx.t.bot_photo_cant_fetch);
+        return;
+      }
+    }
+
+    await dispatchAsk(ctx, {
+      userText,
+      askMessageId: msg.message_id,
+      images: image ? [image] : [],
+      replyToMessage: msg.reply_to_message,
+      quote: msg.quote?.text ?? null,
+      forwardOrigin: Boolean(msg.forward_origin),
+    });
   });
 
   bot.on("message:contact", async (ctx) => {
@@ -427,15 +509,13 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   return bot;
 }
 
-function extractReplyTarget(ctx: Context): ReplyTarget | null {
-  const reply = ctx.message?.reply_to_message;
-  if (!reply) return null;
+function extractReplyTarget(reply: Message): ReplyTarget {
   const text = reply.text ?? reply.caption ?? null;
   return {
     messageId: reply.message_id,
     text,
     authorFirstName: resolveReplyAuthor(reply),
-    image: null,
+    images: [],
   };
 }
 
