@@ -2,6 +2,9 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { escapeHtmlText } from "./html";
+import type { ToolEffect } from "../ai/tools/registry";
+import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
+import { t, type Lang } from "../shared/i18n";
 
 export type DecoratedMessage = {
   text: string;
@@ -15,9 +18,12 @@ const MAX_ENTITY_LENGTH = 10;
 export function applyBotNamePrefix(
   sanitizedBody: string,
   botName: string | null,
+  topBlock?: string,
 ): DecoratedMessage {
   const trimmed = botName?.trim() ?? "";
-  const prefix = trimmed.length === 0 ? "" : `<b>${escapeHtmlText(trimmed)}</b>\n`;
+  const namePart =
+    trimmed.length === 0 ? "" : `<b>${escapeHtmlText(trimmed)}</b>\n`;
+  const prefix = (topBlock ?? "") + namePart;
   const fullText = prefix + sanitizedBody;
   if (fullText.length <= TELEGRAM_TEXT_MAX) {
     return { text: fullText, parseMode: "HTML" };
@@ -25,6 +31,38 @@ export function applyBotNamePrefix(
   const budget = TELEGRAM_TEXT_MAX - prefix.length - TRUNCATE_MARKER.length;
   const cut = safeSliceHtml(sanitizedBody, Math.max(budget, 0));
   return { text: prefix + cut + TRUNCATE_MARKER, parseMode: "HTML" };
+}
+
+export function buildEffectsTopBlock(
+  effects: ToolEffect[],
+  lang: Lang,
+): string {
+  const lines: string[] = [];
+  for (const effect of effects) {
+    if (effect.type === "reminder_scheduled") {
+      lines.push(renderReminderBlockquote(effect, lang));
+    }
+  }
+  return lines.length === 0 ? "" : lines.join("") + "\n";
+}
+
+function renderReminderBlockquote(
+  effect: Extract<ToolEffect, { type: "reminder_scheduled" }>,
+  lang: Lang,
+): string {
+  const local = formatLocalParts(effect.fireAtMs, effect.timezone);
+  const offset = formatGmtOffset(
+    tzOffsetMinutesAt(effect.fireAtMs, effect.timezone),
+  );
+  const line = t(lang).bot_reminder_scheduled({
+    year: local.year,
+    month: local.month,
+    day: local.day,
+    hour: local.hour,
+    minute: local.minute,
+    offset,
+  });
+  return `<blockquote>${escapeHtmlText(line)}</blockquote>`;
 }
 
 function safeSliceHtml(html: string, max: number): string {
