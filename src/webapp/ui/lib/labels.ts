@@ -5,6 +5,7 @@ import type { Strings } from "./routes";
 import { composeFullName, type Chat, type User } from "../../../shared/types";
 import type { Reminder } from "../../../reminders/types";
 import type { Lang } from "../../../shared/i18n";
+import type { DisplayNameError } from "../../../shared/display-name";
 
 export function chatTitle(s: Strings, c: Chat): string {
   if (c.title && c.title.length > 0) return c.title;
@@ -50,3 +51,12 @@ export const LANG_LABEL_KEY = {
   en: "ui_main_lang_english",
   ru: "ui_main_lang_russian",
 } as const satisfies Record<Lang, keyof Strings>;
+
+export const DISPLAY_NAME_ERR_KEY = {
+  too_long: "ui_main_name_err_too_long",
+  multiline: "ui_main_name_err_multiline",
+  control_char: "ui_main_name_err_control_char",
+  charset: "ui_main_name_err_charset",
+  blocked_token: "ui_main_name_err_blocked_token",
+  no_letter: "ui_main_name_err_no_letter",
+} as const satisfies Record<DisplayNameError, keyof Strings>;

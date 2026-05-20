@@ -13,6 +13,7 @@ import { sanitizeHtml } from "../bot/html";
 import { applyBotNamePrefix, buildEffectsTopBlock } from "../bot/format";
 import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
 import { composeFullName } from "../shared/types";
+import { readValidDisplayName } from "../shared/display-name";
 
 export type DeliveryOutcome = "delivered" | "permanent" | "transient";
 
@@ -95,7 +96,7 @@ async function composeReminderMessage(
     getEffectiveSettings(deps.storage, reminder.chatId),
     deps.storage.getChatSettings(reminder.chatId),
     deps.storage.getUserTimezone(reminder.userId),
-    deps.storage.getUserName(reminder.userId),
+    readValidDisplayName(deps.storage, reminder.userId),
     deps.storage.getUser(reminder.userId),
     deps.storage.getUserGender(reminder.userId),
     deps.storage.getUserOpenrouterKey(reminder.userId),

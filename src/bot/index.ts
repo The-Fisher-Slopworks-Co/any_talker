@@ -20,6 +20,7 @@ import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
 import { applyBotNamePrefix, buildEffectsTopBlock } from "./format";
+import { readValidDisplayName } from "../shared/display-name";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
@@ -123,7 +124,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const userText = (msg.text ?? msg.caption ?? "").trim();
 
     const [nameOverride, gender] = await Promise.all([
-      deps.storage.getUserName(userId),
+      readValidDisplayName(deps.storage, userId),
       deps.storage.getUserGender(userId),
     ]);
     const sender = {
@@ -304,7 +305,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
 
     const [nameOverride, gender] = await Promise.all([
-      deps.storage.getUserName(userId),
+      readValidDisplayName(deps.storage, userId),
       deps.storage.getUserGender(userId),
     ]);
     const sender = {
