@@ -63,6 +63,8 @@ export type BuildInfoResponse = {
 export type UserSettingsResponse = {
   user: User;
   displayName: string | null;
+  timezone: string | null;
+  gender: Gender | null;
   whitelisted: boolean;
 };
 export type ChatSettingsResponse = {
@@ -132,12 +134,20 @@ export const api = {
     ),
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
-  putAdminUser: (id: string, displayName: string | null) =>
-    req<{ user: User; displayName: string | null }>(
-      "PUT",
-      `/api/admin/users/${id}`,
-      { displayName },
-    ),
+  putAdminUser: (
+    id: string,
+    patch: {
+      displayName?: string | null;
+      timezone?: string | null;
+      gender?: Gender | null;
+    },
+  ) =>
+    req<{
+      user: User;
+      displayName: string | null;
+      timezone: string | null;
+      gender: Gender | null;
+    }>("PUT", `/api/admin/users/${id}`, patch),
   listAdminChats: () => req<{ chats: Chat[] }>("GET", "/api/admin/chats"),
   getAdminChat: (id: string) =>
     req<ChatSettingsResponse>("GET", `/api/admin/chats/${id}`),

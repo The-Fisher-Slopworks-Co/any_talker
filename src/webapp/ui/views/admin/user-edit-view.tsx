@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api, type UserSettingsResponse } from "../../api-client";
+import type { Gender } from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
@@ -11,7 +12,9 @@ import {
   Stack,
 } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { RowButton, SaveButton } from "../../components/controls";
+import { RowButton, SaveButton, Toggle } from "../../components/controls";
+import { SelectRow } from "../../components/select-row";
+import { TimezoneSelect } from "../../components/timezone-select";
 import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
 import {
   INPUT_CLS,
@@ -26,6 +29,10 @@ export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [name, setName] = useState("");
+  const [tzOverride, setTzOverride] = useState(false);
+  const [tzValue, setTzValue] = useState("UTC");
+  const [genderOn, setGenderOn] = useState(false);
+  const [genderValue, setGenderValue] = useState<Gender>("male");
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
@@ -35,6 +42,10 @@ export function UserEditView({ userId }: { userId: string }) {
       .then((d) => {
         setData(d);
         setName(d.displayName ?? "");
+        setTzOverride(d.timezone !== null);
+        setTzValue(d.timezone ?? "UTC");
+        setGenderOn(d.gender !== null);
+        setGenderValue(d.gender ?? "male");
       })
       .catch(() => setNotFound(true));
   }, [userId]);
@@ -45,14 +56,27 @@ export function UserEditView({ userId }: { userId: string }) {
   const { user } = data;
   const fallbackName = userDisplayName(user);
   const effectiveName = userDisplayName(user, data.displayName);
-  const dirty = name.trim() !== (data.displayName ?? "");
+  const desiredTz = tzOverride ? tzValue : null;
+  const desiredGender: Gender | null = genderOn ? genderValue : null;
+  const dirty =
+    name.trim() !== (data.displayName ?? "") ||
+    desiredTz !== data.timezone ||
+    desiredGender !== data.gender;
 
   const save = async () => {
     setSaving(true);
     try {
-      const next = await api.putAdminUser(userId, name.trim() || null);
+      const next = await api.putAdminUser(userId, {
+        displayName: name.trim() || null,
+        timezone: desiredTz,
+        gender: desiredGender,
+      });
       setData((prev) => (prev ? { ...prev, ...next } : null));
       setName(next.displayName ?? "");
+      setTzOverride(next.timezone !== null);
+      setTzValue(next.timezone ?? "UTC");
+      setGenderOn(next.gender !== null);
+      setGenderValue(next.gender ?? "male");
     } finally {
       setSaving(false);
     }
@@ -106,6 +130,43 @@ export function UserEditView({ userId }: { userId: string }) {
         </label>
       </Card>
       <SectionFooter>{s.ui_user_display_name_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_main_gender}</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_main_tell_ai}</span>
+          <span className="flex-1" />
+          <Toggle value={genderOn} onChange={setGenderOn} />
+        </div>
+      </Card>
+      {genderOn ? (
+        <Card>
+          <SelectRow
+            label={s.ui_main_male}
+            selected={genderValue === "male"}
+            onSelect={() => setGenderValue("male")}
+          />
+          <SelectRow
+            label={s.ui_main_female}
+            selected={genderValue === "female"}
+            onSelect={() => setGenderValue("female")}
+          />
+        </Card>
+      ) : null}
+      <SectionFooter>{s.ui_main_gender_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_main_timezone}</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_main_use_my_tz}</span>
+          <span className="flex-1" />
+          <Toggle value={tzOverride} onChange={setTzOverride} />
+        </div>
+      </Card>
+      {tzOverride ? (
+        <TimezoneSelect value={tzValue} onChange={setTzValue} />
+      ) : null}
+      <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
 
       <SaveButton saving={saving} dirty={dirty} onClick={save} />
     </Stack>
