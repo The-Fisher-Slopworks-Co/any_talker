@@ -6,6 +6,8 @@ import { useI18n } from "../i18n-context";
 import { api, type MeResponse } from "../api-client";
 import { composeFullName, type Gender } from "../../../shared/types";
 import { SUPPORTED_LANGS, type Lang } from "../../../shared/i18n";
+import { validateDisplayName } from "../../../shared/display-name";
+import { DISPLAY_NAME_ERR_KEY } from "../lib/labels";
 import { Card, SectionFooter, SectionHeader, Stack } from "../components/layout";
 import { RowButton, SaveButton, Toggle } from "../components/controls";
 import { SelectRow } from "../components/select-row";
@@ -43,6 +45,8 @@ export function MainView({
 
   const desiredTz = tzOverride ? tzValue : null;
   const desiredGender: Gender | null = genderOn ? genderValue : null;
+  const nameValidation = validateDisplayName(name);
+  const nameError = !nameValidation.ok ? nameValidation.reason : null;
   const dirty =
     name.trim() !== (me.displayName ?? "") ||
     desiredTz !== me.timezone ||
@@ -84,7 +88,15 @@ export function MainView({
           />
         </label>
       </Card>
-      <SectionFooter>{s.ui_main_name_footer}</SectionFooter>
+      <SectionFooter>
+        {nameError ? (
+          <span className="text-tg-destructive">
+            {s[DISPLAY_NAME_ERR_KEY[nameError]]}
+          </span>
+        ) : (
+          s.ui_main_name_footer
+        )}
+      </SectionFooter>
 
       <SectionHeader>{s.ui_main_gender}</SectionHeader>
       <Card>
@@ -136,7 +148,12 @@ export function MainView({
       </Card>
       <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
 
-      <SaveButton saving={saving} dirty={dirty} onClick={save} />
+      <SaveButton
+        saving={saving}
+        dirty={dirty}
+        disabled={saving || !dirty || nameError !== null}
+        onClick={save}
+      />
 
       <SectionHeader>{s.ui_main_byok}</SectionHeader>
       <Card>

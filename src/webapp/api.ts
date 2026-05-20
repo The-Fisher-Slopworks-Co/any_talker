@@ -18,6 +18,11 @@ import {
   isValidGender,
 } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
+import {
+  validateDisplayName,
+  readValidDisplayName,
+  type DisplayNameError,
+} from "../shared/display-name";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 import { normalizeCheckInput } from "../checks/validate";
@@ -49,10 +54,11 @@ export type ApiDeps = {
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
 
-function normalizeDisplayName(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  const trimmed = input.trim();
-  return trimmed.length > 0 ? trimmed : null;
+function badDisplayName(reason: DisplayNameError): ApiResponse {
+  return {
+    status: 400,
+    body: { error: "invalid display name", reason },
+  };
 }
 
 function normalizeTimezoneOrNull(input: unknown): string | null {
@@ -190,7 +196,7 @@ async function collectReminderUsers(
         [
           id,
           await storage.getUser(id),
-          await storage.getUserName(id),
+          await readValidDisplayName(storage, id),
         ] as const,
     ),
   );
@@ -322,7 +328,7 @@ export async function handleApi(
   if (req.path === "/api/me") {
     if (req.method === "GET") {
       const [displayName, timezone, gender, language] = await Promise.all([
-        deps.storage.getUserName(actor.userId),
+        readValidDisplayName(deps.storage, actor.userId),
         deps.storage.getUserTimezone(actor.userId),
         deps.storage.getUserGender(actor.userId),
         deps.storage.getUserLang(actor.userId),
@@ -342,7 +348,7 @@ export async function handleApi(
       const body = (req.body ?? {}) as Record<string, unknown>;
       const [currentName, currentTz, currentGender, currentLang] =
         await Promise.all([
-          deps.storage.getUserName(actor.userId),
+          readValidDisplayName(deps.storage, actor.userId),
           deps.storage.getUserTimezone(actor.userId),
           deps.storage.getUserGender(actor.userId),
           deps.storage.getUserLang(actor.userId),
@@ -354,7 +360,9 @@ export async function handleApi(
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
-        displayName = normalizeDisplayName(body.displayName);
+        const r = validateDisplayName(body.displayName);
+        if (!r.ok) return badDisplayName(r.reason);
+        displayName = r.value;
         writes.push(deps.storage.setUserName(actor.userId, displayName));
       }
       if ("timezone" in body) {
@@ -543,7 +551,8 @@ export async function handleApi(
     const users = await deps.storage.listUsers();
     const namePairs = await Promise.all(
       users.map(
-        async (u) => [u.id, await deps.storage.getUserName(u.id)] as const,
+        async (u) =>
+          [u.id, await readValidDisplayName(deps.storage, u.id)] as const,
       ),
     );
     const displayNames: Record<string, string | null> = {};
@@ -565,7 +574,7 @@ export async function handleApi(
       const [user, displayName, timezone, gender, whitelisted] =
         await Promise.all([
           deps.storage.getUser(id),
-          deps.storage.getUserName(id),
+          readValidDisplayName(deps.storage, id),
           deps.storage.getUserTimezone(id),
           deps.storage.getUserGender(id),
           deps.storage.isWhitelisted("users", id),
@@ -581,7 +590,7 @@ export async function handleApi(
       if (!user) return { status: 404, body: { error: "user not found" } };
       const body = (req.body ?? {}) as Record<string, unknown>;
       const [currentName, currentTz, currentGender] = await Promise.all([
-        deps.storage.getUserName(id),
+        readValidDisplayName(deps.storage, id),
         deps.storage.getUserTimezone(id),
         deps.storage.getUserGender(id),
       ]);
@@ -591,7 +600,9 @@ export async function handleApi(
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
-        displayName = normalizeDisplayName(body.displayName);
+        const r = validateDisplayName(body.displayName);
+        if (!r.ok) return badDisplayName(r.reason);
+        displayName = r.value;
         writes.push(deps.storage.setUserName(id, displayName));
       }
       if ("timezone" in body) {
