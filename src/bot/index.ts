@@ -164,8 +164,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         text: string,
         botName: string | null,
         topBlock?: string,
+        expandableThreshold?: number,
       ) => {
-        const decorated = applyBotNamePrefix(text, botName, topBlock);
+        const decorated = applyBotNamePrefix(
+          text,
+          botName,
+          topBlock,
+          expandableThreshold,
+        );
         return answerGuestQuery({
           guest_query_id: guestQueryId,
           result: {
@@ -199,7 +205,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         case "answered": {
           try {
             const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
-            await answer(outcome.text, outcome.botName, topBlock);
+            await answer(
+              outcome.text,
+              outcome.botName,
+              topBlock,
+              outcome.expandableThreshold,
+            );
             await outcome.persistThread();
             if (outcome.totalTokens > 0) {
               askTokensTotal.inc({ source: "guest" }, outcome.totalTokens);
@@ -369,6 +380,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
             outcome.text,
             outcome.botName,
             topBlock,
+            outcome.expandableThreshold,
           );
           const sent = await ctx.api.sendMessage(chatId, decorated.text, {
             parse_mode: decorated.parseMode,

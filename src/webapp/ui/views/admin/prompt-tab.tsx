@@ -15,6 +15,7 @@ import { SaveButton } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { ProviderSortField } from "../../components/provider-sort-field";
 import { TimezoneSelect } from "../../components/timezone-select";
+import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 
 export function PromptTab({
   settings,
@@ -30,18 +31,30 @@ export function PromptTab({
   const [providerSort, setProviderSort] = useState<ProviderSort | null>(
     settings.providerSort,
   );
+  const [thresholdInput, setThresholdInput] = useState(
+    String(settings.expandableBlockquoteThreshold),
+  );
   const [saving, setSaving] = useState(false);
 
   const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
   const modelsDirty =
     trimmed.length !== settings.models.length ||
     trimmed.some((m, i) => m !== settings.models[i]);
+  const parsedThreshold = Number(thresholdInput);
+  const thresholdValid =
+    thresholdInput.trim() !== "" &&
+    Number.isInteger(parsedThreshold) &&
+    parsedThreshold >= 0;
+  const thresholdDirty =
+    thresholdValid &&
+    parsedThreshold !== settings.expandableBlockquoteThreshold;
   const dirty =
     modelsDirty ||
     prompt !== settings.systemPrompt ||
     timezone !== settings.timezone ||
-    providerSort !== settings.providerSort;
-  const canSave = dirty && trimmed.length > 0;
+    providerSort !== settings.providerSort ||
+    thresholdDirty;
+  const canSave = dirty && trimmed.length > 0 && thresholdValid;
 
   const save = async () => {
     setSaving(true);
@@ -50,11 +63,13 @@ export function PromptTab({
       systemPrompt: prompt,
       timezone,
       providerSort,
+      expandableBlockquoteThreshold: parsedThreshold,
     });
     onSaved(next);
     setModels(next.models);
     setTimezone(next.timezone);
     setProviderSort(next.providerSort);
+    setThresholdInput(String(next.expandableBlockquoteThreshold));
     setSaving(false);
   };
 
@@ -86,6 +101,24 @@ export function PromptTab({
       <SectionHeader>{s.ui_prompt_timezone}</SectionHeader>
       <TimezoneSelect value={timezone} onChange={setTimezone} />
       <SectionFooter>{s.ui_prompt_timezone_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_prompt_expandable_threshold}</SectionHeader>
+      <Card>
+        <label className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>
+            {s.ui_prompt_expandable_threshold}
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            className={INPUT_CLS}
+            value={thresholdInput}
+            onChange={(e) => setThresholdInput(e.target.value)}
+          />
+        </label>
+      </Card>
+      <SectionFooter>{s.ui_prompt_expandable_threshold_footer}</SectionFooter>
 
       <SaveButton
         saving={saving}

@@ -44,7 +44,20 @@ function normalize(s: Settings): Settings {
       ? s.providerSort
       : null;
   const rateLimit = normalizeRateLimit(s.rateLimit);
-  return { ...s, models, timezone, providerSort, rateLimit };
+  const expandableBlockquoteThreshold =
+    typeof s.expandableBlockquoteThreshold === "number" &&
+    Number.isFinite(s.expandableBlockquoteThreshold) &&
+    s.expandableBlockquoteThreshold >= 0
+      ? Math.floor(s.expandableBlockquoteThreshold)
+      : DEFAULT_SETTINGS.expandableBlockquoteThreshold;
+  return {
+    ...s,
+    models,
+    timezone,
+    providerSort,
+    rateLimit,
+    expandableBlockquoteThreshold,
+  };
 }
 
 export function applyChatOverrides(
@@ -59,6 +72,7 @@ export function applyChatOverrides(
     timezone: chat.timezone ?? global.timezone,
     providerSort:
       chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
+    expandableBlockquoteThreshold: global.expandableBlockquoteThreshold,
   };
 }
 

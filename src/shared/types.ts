@@ -26,7 +26,10 @@ export type Settings = {
   rateLimit: RateLimitConfig;
   timezone: string;
   providerSort: ProviderSort | null;
+  expandableBlockquoteThreshold: number;
 };
+
+export const DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
 
 export type WhitelistKind = "users" | "chats";
 
@@ -110,6 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   timezone: "UTC",
   providerSort: null,
+  expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
 };
 
 export const MAX_REPLY_CHAIN_DEPTH = 20;
