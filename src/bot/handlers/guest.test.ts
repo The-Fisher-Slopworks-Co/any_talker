@@ -130,6 +130,28 @@ describe("guestAskHandler", () => {
     expect(out.kind).toBe("answered");
   });
 
+  test("user with BYOK key + custom models passes the custom models", async () => {
+    const storage = new MemoryStorage();
+    await storage.setUserOpenrouterKey("42", "sk-or-byok");
+    await storage.setUserOpenrouterModels("42", ["openai/gpt-4o-mini"]);
+    const ai = new FakeAI();
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    const call = ai.calls[0] as { models: string[] };
+    expect(call.models).toEqual(["openai/gpt-4o-mini"]);
+  });
+
+  test("custom models without a BYOK key fall back to the bot's models", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.setUserOpenrouterModels("42", ["openai/gpt-4o-mini"]);
+    const ai = new FakeAI();
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    const call = ai.calls[0] as { models: string[] };
+    expect(call.models).toEqual(DEFAULT_SETTINGS.models);
+  });
+
   test("answered: persistThread stores a fresh thread keyed by chatId", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

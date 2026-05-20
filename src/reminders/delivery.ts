@@ -90,6 +90,7 @@ async function composeReminderMessage(
     user,
     gender,
     byokKey,
+    byokModels,
   ] = await Promise.all([
     getEffectiveSettings(deps.storage, reminder.chatId),
     deps.storage.getChatSettings(reminder.chatId),
@@ -98,6 +99,7 @@ async function composeReminderMessage(
     deps.storage.getUser(reminder.userId),
     deps.storage.getUserGender(reminder.userId),
     deps.storage.getUserOpenrouterKey(reminder.userId),
+    deps.storage.getUserOpenrouterModels(reminder.userId),
   ]);
 
   const botName = chatSettings?.botName?.trim() || null;
@@ -126,7 +128,10 @@ async function composeReminderMessage(
   const toolSource: "ask" | "guest" =
     reminder.target.kind === "ask_reply" ? "ask" : "guest";
   const result = await deps.ai.ask({
-    models: settings.models,
+    models:
+      byokKey !== null && byokModels !== null && byokModels.length > 0
+        ? byokModels
+        : settings.models,
     system: buildInstruction(settings.systemPrompt, { timezone, lang }),
     messages,
     tools: getAllTools(),

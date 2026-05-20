@@ -13,6 +13,7 @@ import { BuildInfoFooter } from "./components/build-info-footer";
 import { adminSection, type Route } from "./lib/routes";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
+import { ByokView } from "./views/byok-view";
 import { AdminView } from "./views/admin/admin-view";
 import { AdminSectionView } from "./views/admin/admin-section-view";
 import { UserEditView } from "./views/admin/user-edit-view";
@@ -48,6 +49,7 @@ function AppShell({
             return { kind: "admin" };
           case "admin":
           case "my-reminders":
+          case "byok":
           case "main":
             return { kind: "main" };
         }
@@ -79,6 +81,8 @@ function AppShell({
           : s.ui_route_check_edit;
       case "my-reminders":
         return s.ui_route_my_reminders;
+      case "byok":
+        return s.ui_route_byok;
     }
   })();
 
@@ -92,6 +96,7 @@ function AppShell({
             onMe={onMe}
             onOpenAdmin={() => setRoute({ kind: "admin" })}
             onOpenMyReminders={() => setRoute({ kind: "my-reminders" })}
+            onOpenByok={() => setRoute({ kind: "byok" })}
           />
         );
       case "admin":
@@ -138,6 +143,8 @@ function AppShell({
             showUserId={false}
           />
         );
+      case "byok":
+        return <ByokView />;
     }
   };
 
