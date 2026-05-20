@@ -5,6 +5,7 @@ import { escapeHtmlText } from "./html";
 import type { ToolEffect } from "../ai/tools/registry";
 import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
 import { t, type Lang } from "../shared/i18n";
+import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
 
 export type DecoratedMessage = {
   text: string;
@@ -12,7 +13,6 @@ export type DecoratedMessage = {
 };
 
 export const TELEGRAM_TEXT_MAX = 4096;
-export const EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
 const EXPANDABLE_OPEN = "<blockquote expandable>";
 const EXPANDABLE_CLOSE = "</blockquote>";
 const TRUNCATE_MARKER = "\n…";
@@ -22,12 +22,13 @@ export function applyBotNamePrefix(
   sanitizedBody: string,
   botName: string | null,
   topBlock?: string,
+  expandableThreshold: number = DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
 ): DecoratedMessage {
   const trimmed = botName?.trim() ?? "";
   const namePart =
     trimmed.length === 0 ? "" : `<b>${escapeHtmlText(trimmed)}</b>\n`;
   const prefix = (topBlock ?? "") + namePart;
-  const useExpandable = sanitizedBody.length > EXPANDABLE_BLOCKQUOTE_THRESHOLD;
+  const useExpandable = sanitizedBody.length > expandableThreshold;
   const openTag = useExpandable ? EXPANDABLE_OPEN : "";
   const closeTag = useExpandable ? EXPANDABLE_CLOSE : "";
   const fullText = prefix + openTag + sanitizedBody + closeTag;

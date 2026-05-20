@@ -141,6 +141,13 @@ const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
   body: { error: "rate-limit multipliers must be positive numbers" },
 };
 
+const BAD_EXPANDABLE_THRESHOLD: ApiResponse = {
+  status: 400,
+  body: {
+    error: "expandableBlockquoteThreshold must be a non-negative integer",
+  },
+};
+
 function isValidModelsList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
@@ -483,6 +490,17 @@ export async function handleApi(
               !(rl.wiseMultiplier > 0)))
         ) {
           return BAD_RATE_LIMIT_MULTIPLIER;
+        }
+      }
+      if (patch.expandableBlockquoteThreshold !== undefined) {
+        const v = patch.expandableBlockquoteThreshold;
+        if (
+          typeof v !== "number" ||
+          !Number.isFinite(v) ||
+          !Number.isInteger(v) ||
+          v < 0
+        ) {
+          return BAD_EXPANDABLE_THRESHOLD;
         }
       }
       const next: Settings = {

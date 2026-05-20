@@ -48,6 +48,7 @@ export type AskOutcome =
       botName: string | null;
       totalTokens: number;
       effects: ToolEffect[];
+      expandableThreshold: number;
       persistConversation: (botMsgId: number) => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -174,6 +175,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     botName,
     totalTokens: result.totalTokens,
     effects,
+    expandableThreshold: settings.expandableBlockquoteThreshold,
     persistConversation: async (botMsgId) => {
       const allImageFileIds = [
         ...input.imageFileIds,
