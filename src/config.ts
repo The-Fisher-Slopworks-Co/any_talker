@@ -6,6 +6,8 @@ import { resolveLogFormat, type LogFormat } from "./log";
 export type Config = {
   botToken: string;
   openrouterApiKey: string;
+  openrouterAppUrl: string | undefined;
+  openrouterAppTitle: string | undefined;
   firecrawlApiKey: string | undefined;
   firecrawlConcurrency: number;
   botOwnerId: string;
@@ -29,6 +31,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   return {
     botToken: required("BOT_TOKEN"),
     openrouterApiKey: required("OPENROUTER_API_KEY"),
+    openrouterAppUrl: env.OPENROUTER_APP_URL || undefined,
+    openrouterAppTitle: env.OPENROUTER_APP_TITLE || undefined,
     firecrawlApiKey: env.FIRECRAWL_API_KEY || undefined,
     firecrawlConcurrency: parsePositiveInt("FIRECRAWL_CONCURRENCY", env.FIRECRAWL_CONCURRENCY, 2),
     botOwnerId: required("BOT_OWNER_ID"),
