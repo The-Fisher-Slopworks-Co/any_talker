@@ -22,8 +22,9 @@ import {
   ROW_LABEL_CLS,
   ROW_VALUE_CLS,
 } from "../../components/row";
-import { userDisplayName } from "../../lib/labels";
+import { DISPLAY_NAME_ERR_KEY, userDisplayName } from "../../lib/labels";
 import { openTelegramProfile } from "../../lib/telegram";
+import { validateDisplayName } from "../../../../shared/display-name";
 
 export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
@@ -58,6 +59,8 @@ export function UserEditView({ userId }: { userId: string }) {
   const effectiveName = userDisplayName(user, data.displayName);
   const desiredTz = tzOverride ? tzValue : null;
   const desiredGender: Gender | null = genderOn ? genderValue : null;
+  const nameValidation = validateDisplayName(name);
+  const nameError = !nameValidation.ok ? nameValidation.reason : null;
   const dirty =
     name.trim() !== (data.displayName ?? "") ||
     desiredTz !== data.timezone ||
@@ -129,7 +132,15 @@ export function UserEditView({ userId }: { userId: string }) {
           />
         </label>
       </Card>
-      <SectionFooter>{s.ui_user_display_name_footer}</SectionFooter>
+      <SectionFooter>
+        {nameError ? (
+          <span className="text-tg-destructive">
+            {s[DISPLAY_NAME_ERR_KEY[nameError]]}
+          </span>
+        ) : (
+          s.ui_user_display_name_footer
+        )}
+      </SectionFooter>
 
       <SectionHeader>{s.ui_main_gender}</SectionHeader>
       <Card>
@@ -168,7 +179,12 @@ export function UserEditView({ userId }: { userId: string }) {
       ) : null}
       <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
 
-      <SaveButton saving={saving} dirty={dirty} onClick={save} />
+      <SaveButton
+        saving={saving}
+        dirty={dirty}
+        disabled={saving || !dirty || nameError !== null}
+        onClick={save}
+      />
     </Stack>
   );
 }

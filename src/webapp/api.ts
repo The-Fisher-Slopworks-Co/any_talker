@@ -18,6 +18,10 @@ import {
   isValidGender,
 } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
+import {
+  validateDisplayName,
+  type DisplayNameError,
+} from "../shared/display-name";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 import { normalizeCheckInput } from "../checks/validate";
@@ -49,10 +53,11 @@ export type ApiDeps = {
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
 
-function normalizeDisplayName(input: unknown): string | null {
-  if (typeof input !== "string") return null;
-  const trimmed = input.trim();
-  return trimmed.length > 0 ? trimmed : null;
+function badDisplayName(reason: DisplayNameError): ApiResponse {
+  return {
+    status: 400,
+    body: { error: "invalid display name", reason },
+  };
 }
 
 function normalizeTimezoneOrNull(input: unknown): string | null {
@@ -347,7 +352,9 @@ export async function handleApi(
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
-        displayName = normalizeDisplayName(body.displayName);
+        const r = validateDisplayName(body.displayName);
+        if (!r.ok) return badDisplayName(r.reason);
+        displayName = r.value;
         writes.push(deps.storage.setUserName(actor.userId, displayName));
       }
       if ("timezone" in body) {
@@ -573,7 +580,9 @@ export async function handleApi(
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
-        displayName = normalizeDisplayName(body.displayName);
+        const r = validateDisplayName(body.displayName);
+        if (!r.ok) return badDisplayName(r.reason);
+        displayName = r.value;
         writes.push(deps.storage.setUserName(id, displayName));
       }
       if ("timezone" in body) {
