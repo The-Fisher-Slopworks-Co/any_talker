@@ -834,6 +834,147 @@ describe("/api/admin/users", () => {
     expect(await d.storage.getUserName("42")).toBeNull();
   });
 
+  test("GET /api/admin/users/:id returns timezone and gender", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.setUserGender("42", "female");
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({
+      displayName: null,
+      timezone: "Europe/Moscow",
+      gender: "female",
+      whitelisted: false,
+    });
+  });
+
+  test("PUT /api/admin/users/:id sets timezone and gender", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { timezone: "Europe/Moscow", gender: "female" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.getUserGender("42")).toBe("female");
+  });
+
+  test("PUT null/empty clears timezone and gender", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.setUserGender("42", "female");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { timezone: null, gender: null },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserTimezone("42")).toBeNull();
+    expect(await d.storage.getUserGender("42")).toBeNull();
+  });
+
+  test("PUT with only displayName preserves timezone and gender", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.setUserGender("42", "female");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { displayName: "NewName" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserName("42")).toBe("NewName");
+    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.getUserGender("42")).toBe("female");
+  });
+
+  test("PUT rejects invalid timezone with 400", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { timezone: "Not/Real" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT rejects invalid gender with 400", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { gender: "other" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
   test("non-owner gets 403", async () => {
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users", body: null },
