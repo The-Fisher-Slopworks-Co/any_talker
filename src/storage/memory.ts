@@ -32,6 +32,7 @@ export class MemoryStorage implements Storage {
   private userTimezones = new Map<string, string>();
   private userGenders = new Map<string, Gender>();
   private userLangs = new Map<string, Lang>();
+  private userOpenrouterKeys = new Map<string, string>();
   private users = new Map<string, User>();
   private chats = new Map<string, Chat>();
   private chatSettings = new Map<string, ChatSettings>();
@@ -120,6 +121,15 @@ export class MemoryStorage implements Storage {
   async setUserLang(userId: string, lang: Lang | null): Promise<void> {
     if (lang === null) this.userLangs.delete(userId);
     else this.userLangs.set(userId, lang);
+  }
+
+  async getUserOpenrouterKey(userId: string): Promise<string | null> {
+    return this.userOpenrouterKeys.get(userId) ?? null;
+  }
+
+  async setUserOpenrouterKey(userId: string, key: string | null): Promise<void> {
+    if (key === null) this.userOpenrouterKeys.delete(userId);
+    else this.userOpenrouterKeys.set(userId, key);
   }
 
   async listUsers(): Promise<User[]> {

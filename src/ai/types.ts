@@ -33,5 +33,6 @@ export interface AIClient {
     tools: Tool[];
     providerSort?: ProviderSort | null;
     toolCallContext: ToolCallContext;
+    apiKey?: string | null;
   }): Promise<AskResult>;
 }

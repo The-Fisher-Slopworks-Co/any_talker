@@ -45,9 +45,13 @@ export async function guestAskHandler(
   input: GuestAskInput,
 ): Promise<GuestAskOutcome> {
   const isOwner = input.userId === input.ownerId;
-  const isWhitelisted =
-    isOwner || (await input.storage.isWhitelisted("users", input.userId));
-  if (!isWhitelisted) return { kind: "denied" };
+  const [isWhitelisted, byokKey] = await Promise.all([
+    isOwner
+      ? Promise.resolve(true)
+      : input.storage.isWhitelisted("users", input.userId),
+    input.storage.getUserOpenrouterKey(input.userId),
+  ]);
+  if (!isWhitelisted && byokKey === null) return { kind: "denied" };
 
   if (input.userText.trim() === "") return { kind: "denied" };
 
@@ -59,7 +63,8 @@ export async function guestAskHandler(
   const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;
 
-  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
+  const skipRateLimit =
+    byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
       input.chatId,
@@ -102,6 +107,7 @@ export async function guestAskHandler(
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      apiKey: byokKey,
       toolCallContext: {
         source: "guest",
         chatId: input.chatId,

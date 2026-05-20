@@ -631,6 +631,119 @@ describe("/api/me", () => {
   });
 });
 
+describe("/api/me/openrouter-key", () => {
+  test("GET returns hasKey=false when no key is stored", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/openrouter-key", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ hasKey: false, last4: null });
+  });
+
+  test("PUT stores the key and exposes only its last 4 chars", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-key",
+        body: { key: "sk-or-secret1234" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ hasKey: true, last4: "1234" });
+    expect(await d.storage.getUserOpenrouterKey("42")).toBe(
+      "sk-or-secret1234",
+    );
+  });
+
+  test("GET after PUT returns hasKey=true with last 4", async () => {
+    const d = deps();
+    await d.storage.setUserOpenrouterKey("42", "sk-or-abcdef9999");
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/openrouter-key", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ hasKey: true, last4: "9999" });
+  });
+
+  test("PUT with key=null clears the stored key", async () => {
+    const d = deps();
+    await d.storage.setUserOpenrouterKey("42", "sk-or-stored");
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me/openrouter-key", body: { key: null } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ hasKey: false, last4: null });
+    expect(await d.storage.getUserOpenrouterKey("42")).toBeNull();
+  });
+
+  test("PUT with empty / whitespace string clears the stored key", async () => {
+    const d = deps();
+    await d.storage.setUserOpenrouterKey("42", "sk-or-stored");
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me/openrouter-key", body: { key: "  " } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ hasKey: false, last4: null });
+    expect(await d.storage.getUserOpenrouterKey("42")).toBeNull();
+  });
+
+  test("PUT rejects a non-string key with 400", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-key",
+        body: { key: 12345 },
+      },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT rejects an excessively long key with 400", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-key",
+        body: { key: "x".repeat(1024) },
+      },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("keys are stored per-user (not shared)", async () => {
+    const d = deps();
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-key",
+        body: { key: "key-of-42" },
+      },
+      d,
+      guest("42"),
+    );
+    const otherGet = await handleApi(
+      { method: "GET", path: "/api/me/openrouter-key", body: null },
+      d,
+      guest("99"),
+    );
+    expect(otherGet.body).toEqual({ hasKey: false, last4: null });
+  });
+});
+
 describe("/api/admin/users", () => {
   test("GET list returns empty initially", async () => {
     const r = await handleApi(
