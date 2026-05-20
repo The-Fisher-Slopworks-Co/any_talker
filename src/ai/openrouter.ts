@@ -12,13 +12,24 @@ import {
   aiRequestsTotal,
 } from "../metrics";
 
+export type OpenRouterAppAttribution = {
+  url?: string | undefined;
+  title?: string | undefined;
+};
+
 export class OpenRouterAIClient implements AIClient {
   private readonly defaultApiKey: string;
   private readonly defaultProvider: ReturnType<typeof createOpenRouter>;
+  private readonly attributionHeaders: Record<string, string>;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, attribution: OpenRouterAppAttribution = {}) {
     this.defaultApiKey = apiKey;
-    this.defaultProvider = createOpenRouter({ apiKey, fetch: proxiedFetch });
+    this.attributionHeaders = buildAttributionHeaders(attribution);
+    this.defaultProvider = createOpenRouter({
+      apiKey,
+      fetch: proxiedFetch,
+      headers: this.attributionHeaders,
+    });
   }
 
   async ask(opts: {
@@ -35,7 +46,11 @@ export class OpenRouterAIClient implements AIClient {
 
     const provider =
       opts.apiKey && opts.apiKey !== this.defaultApiKey
-        ? createOpenRouter({ apiKey: opts.apiKey, fetch: proxiedFetch })
+        ? createOpenRouter({
+            apiKey: opts.apiKey,
+            fetch: proxiedFetch,
+            headers: this.attributionHeaders,
+          })
         : this.defaultProvider;
 
     const toolMap: ToolSet = {};
@@ -85,4 +100,13 @@ export class OpenRouterAIClient implements AIClient {
       aiRequestDurationSeconds.observe({ outcome }, seconds);
     }
   }
+}
+
+function buildAttributionHeaders(
+  attr: OpenRouterAppAttribution,
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (attr.url) headers["HTTP-Referer"] = attr.url;
+  if (attr.title) headers["X-Title"] = attr.title;
+  return headers;
 }
