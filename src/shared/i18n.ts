@@ -61,6 +61,7 @@ type Strings = {
   ui_route_user_settings: string;
   ui_route_chat_settings: string;
   ui_route_my_reminders: string;
+  ui_route_byok: string;
 
   ui_admin_prompt: string;
   ui_admin_prompt_desc: string;
@@ -106,6 +107,15 @@ type Strings = {
   ui_main_byok_clear: string;
   ui_main_byok_replace: string;
   ui_main_byok_cancel: string;
+  ui_main_byok_open: string;
+
+  ui_byok_key_section: string;
+  ui_byok_key_footer: string;
+  ui_byok_models_section: string;
+  ui_byok_models_footer_inactive: string;
+  ui_byok_models_override: string;
+  ui_byok_models_on_footer: string;
+  ui_byok_models_off_footer: string;
 
   ui_whitelist_remove: string;
   ui_whitelist_add: string;
@@ -326,6 +336,7 @@ const en: Strings = {
   ui_route_user_settings: "User Settings",
   ui_route_chat_settings: "Chat Settings",
   ui_route_my_reminders: "My Reminders",
+  ui_route_byok: "OpenRouter",
 
   ui_admin_prompt: "Prompt",
   ui_admin_prompt_desc: "Models, character, timezone, provider routing",
@@ -375,6 +386,19 @@ const en: Strings = {
   ui_main_byok_clear: "Remove",
   ui_main_byok_replace: "Replace",
   ui_main_byok_cancel: "Cancel",
+  ui_main_byok_open: "OpenRouter (BYOK)",
+
+  ui_byok_key_section: "API Key",
+  ui_byok_key_footer:
+    "Use your own OpenRouter key for AI calls. When set, the bot's rate limit doesn't apply to you. The key is stored on the server and used only for your /ask requests.",
+  ui_byok_models_section: "Models",
+  ui_byok_models_footer_inactive:
+    "Add an API key above to choose your own models.",
+  ui_byok_models_override: "Use my models",
+  ui_byok_models_on_footer:
+    "Primary OpenRouter model first; fallbacks are tried in order if it fails. Applied only to your own requests.",
+  ui_byok_models_off_footer:
+    "Using the bot's default models.",
 
   ui_whitelist_remove: "Remove from whitelist",
   ui_whitelist_add: "Add to whitelist",
@@ -631,6 +655,7 @@ const ru: Strings = {
   ui_route_user_settings: "Настройки пользователя",
   ui_route_chat_settings: "Настройки чата",
   ui_route_my_reminders: "Мои напоминания",
+  ui_route_byok: "OpenRouter",
 
   ui_admin_prompt: "Промпт",
   ui_admin_prompt_desc: "Модели, персонаж, часовой пояс, провайдеры",
@@ -680,6 +705,19 @@ const ru: Strings = {
   ui_main_byok_clear: "Удалить",
   ui_main_byok_replace: "Заменить",
   ui_main_byok_cancel: "Отмена",
+  ui_main_byok_open: "OpenRouter (BYOK)",
+
+  ui_byok_key_section: "API-ключ",
+  ui_byok_key_footer:
+    "Используйте свой ключ OpenRouter для вызовов ИИ. Когда ключ задан, лимит запросов бота на вас не действует. Ключ хранится на сервере и применяется только к вашим запросам /ask.",
+  ui_byok_models_section: "Модели",
+  ui_byok_models_footer_inactive:
+    "Чтобы выбрать свои модели, сначала добавьте API-ключ выше.",
+  ui_byok_models_override: "Использовать свои модели",
+  ui_byok_models_on_footer:
+    "Сначала основная модель OpenRouter; запасные пробуются по очереди при ошибке. Применяется только к вашим запросам.",
+  ui_byok_models_off_footer:
+    "Используются модели бота по умолчанию.",
 
   ui_whitelist_remove: "Убрать из белого списка",
   ui_whitelist_add: "Добавить в белый список",

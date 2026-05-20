@@ -44,6 +44,9 @@ export interface Storage {
   getUserOpenrouterKey(userId: string): Promise<string | null>;
   setUserOpenrouterKey(userId: string, key: string | null): Promise<void>;
 
+  getUserOpenrouterModels(userId: string): Promise<string[] | null>;
+  setUserOpenrouterModels(userId: string, models: string[] | null): Promise<void>;
+
   listUsers(): Promise<User[]>;
   upsertUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;

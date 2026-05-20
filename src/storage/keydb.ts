@@ -136,6 +136,32 @@ export class KeyDBStorage implements Storage {
     else await this.client.set(k, key);
   }
 
+  async getUserOpenrouterModels(userId: string): Promise<string[] | null> {
+    const raw = await this.client.get(`${PREFIX}user_or_models:${userId}`);
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (
+        !Array.isArray(parsed) ||
+        !parsed.every((m): m is string => typeof m === "string")
+      ) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  async setUserOpenrouterModels(
+    userId: string,
+    models: string[] | null,
+  ): Promise<void> {
+    const k = `${PREFIX}user_or_models:${userId}`;
+    if (models === null) await this.client.del(k);
+    else await this.client.set(k, JSON.stringify(models));
+  }
+
   async listUsers(): Promise<User[]> {
     const values = await this.client.hvals(`${PREFIX}users`);
     return values

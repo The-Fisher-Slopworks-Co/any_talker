@@ -55,17 +55,18 @@ describe("GET /api/openrouter/endpoints/:permaslug", () => {
     });
   });
 
-  test("rejects non-owner with 403", async () => {
+  test("non-owner can call the endpoint (needed for BYOK model picker)", async () => {
+    const fetchOpenRouterStats = async () => ({ endpoints: [] });
     const r = await handleApi(
       {
         method: "GET",
         path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
         body: null,
       },
-      deps(),
+      { ...deps(), fetchOpenRouterStats },
       guest("99"),
     );
-    expect(r.status).toBe(403);
+    expect(r.status).toBe(200);
   });
 
   test("rejects an invalid permaslug with 400", async () => {
@@ -741,6 +742,118 @@ describe("/api/me/openrouter-key", () => {
       guest("99"),
     );
     expect(otherGet.body).toEqual({ hasKey: false, last4: null });
+  });
+});
+
+describe("/api/me/openrouter-models", () => {
+  test("GET returns models=null when none stored", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/openrouter-models", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ models: null });
+  });
+
+  test("PUT stores a trimmed list and drops empties", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-models",
+        body: { models: ["  openai/gpt-4o  ", "", "anthropic/claude-sonnet-4-5"] },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      models: ["openai/gpt-4o", "anthropic/claude-sonnet-4-5"],
+    });
+    expect(await d.storage.getUserOpenrouterModels("42")).toEqual([
+      "openai/gpt-4o",
+      "anthropic/claude-sonnet-4-5",
+    ]);
+  });
+
+  test("PUT with null clears the stored models", async () => {
+    const d = deps();
+    await d.storage.setUserOpenrouterModels("42", ["openai/gpt-4o"]);
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-models",
+        body: { models: null },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ models: null });
+    expect(await d.storage.getUserOpenrouterModels("42")).toBeNull();
+  });
+
+  test("PUT with an empty array clears the stored models", async () => {
+    const d = deps();
+    await d.storage.setUserOpenrouterModels("42", ["openai/gpt-4o"]);
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-models",
+        body: { models: [] },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ models: null });
+    expect(await d.storage.getUserOpenrouterModels("42")).toBeNull();
+  });
+
+  test("PUT rejects a non-array with 400", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-models",
+        body: { models: "openai/gpt-4o" },
+      },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT rejects entries that are not strings with 400", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-models",
+        body: { models: ["openai/gpt-4o", 42] },
+      },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("models are stored per-user (not shared)", async () => {
+    const d = deps();
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/openrouter-models",
+        body: { models: ["openai/gpt-4o"] },
+      },
+      d,
+      guest("42"),
+    );
+    const otherGet = await handleApi(
+      { method: "GET", path: "/api/me/openrouter-models", body: null },
+      d,
+      guest("99"),
+    );
+    expect(otherGet.body).toEqual({ models: null });
   });
 });
 
