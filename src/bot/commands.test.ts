@@ -48,7 +48,7 @@ describe("command lists", () => {
 });
 
 describe("syncBotCommands", () => {
-  test("uploads English as default and Russian under language_code ru", async () => {
+  test("uploads English as default and under language_code en, Russian under language_code ru", async () => {
     const calls: Array<{
       commands: readonly BotCommand[];
       other?: { language_code?: string };
@@ -61,11 +61,13 @@ describe("syncBotCommands", () => {
 
     await syncBotCommands(api);
 
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[0]!.commands).toEqual(BOT_COMMANDS_EN);
     expect(calls[0]!.other).toBeUndefined();
-    expect(calls[1]!.commands).toEqual(BOT_COMMANDS_RU);
-    expect(calls[1]!.other).toEqual({ language_code: "ru" });
+    expect(calls[1]!.commands).toEqual(BOT_COMMANDS_EN);
+    expect(calls[1]!.other).toEqual({ language_code: "en" });
+    expect(calls[2]!.commands).toEqual(BOT_COMMANDS_RU);
+    expect(calls[2]!.other).toEqual({ language_code: "ru" });
   });
 
   test("propagates errors from the API", async () => {
