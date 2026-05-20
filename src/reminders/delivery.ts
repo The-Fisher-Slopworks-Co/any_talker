@@ -82,15 +82,23 @@ async function composeReminderMessage(
   reminder: Reminder,
   nowMs: number,
 ): Promise<string> {
-  const [settings, chatSettings, userTimezone, displayName, user, gender] =
-    await Promise.all([
-      getEffectiveSettings(deps.storage, reminder.chatId),
-      deps.storage.getChatSettings(reminder.chatId),
-      deps.storage.getUserTimezone(reminder.userId),
-      deps.storage.getUserName(reminder.userId),
-      deps.storage.getUser(reminder.userId),
-      deps.storage.getUserGender(reminder.userId),
-    ]);
+  const [
+    settings,
+    chatSettings,
+    userTimezone,
+    displayName,
+    user,
+    gender,
+    byokKey,
+  ] = await Promise.all([
+    getEffectiveSettings(deps.storage, reminder.chatId),
+    deps.storage.getChatSettings(reminder.chatId),
+    deps.storage.getUserTimezone(reminder.userId),
+    deps.storage.getUserName(reminder.userId),
+    deps.storage.getUser(reminder.userId),
+    deps.storage.getUserGender(reminder.userId),
+    deps.storage.getUserOpenrouterKey(reminder.userId),
+  ]);
 
   const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;
@@ -123,6 +131,7 @@ async function composeReminderMessage(
     messages,
     tools: getAllTools(),
     providerSort: settings.providerSort,
+    apiKey: byokKey,
     toolCallContext: {
       source: toolSource,
       chatId: reminder.chatId,

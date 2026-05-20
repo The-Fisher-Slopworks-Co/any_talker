@@ -41,6 +41,9 @@ export interface Storage {
   getUserLang(userId: string): Promise<Lang | null>;
   setUserLang(userId: string, lang: Lang | null): Promise<void>;
 
+  getUserOpenrouterKey(userId: string): Promise<string | null>;
+  setUserOpenrouterKey(userId: string, key: string | null): Promise<void>;
+
   listUsers(): Promise<User[]>;
   upsertUser(user: User): Promise<void>;
   getUser(id: string): Promise<User | null>;

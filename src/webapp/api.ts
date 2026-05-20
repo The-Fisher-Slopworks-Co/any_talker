@@ -77,6 +77,20 @@ const BAD_LANG: ApiResponse = {
   body: { error: "invalid language" },
 };
 
+const BAD_OPENROUTER_KEY: ApiResponse = {
+  status: 400,
+  body: { error: "invalid openrouter key" },
+};
+
+const MAX_OPENROUTER_KEY_LENGTH = 256;
+
+function openrouterKeyResponse(
+  key: string | null,
+): { hasKey: boolean; last4: string | null } {
+  if (key === null) return { hasKey: false, last4: null };
+  return { hasKey: true, last4: key.slice(-4) };
+}
+
 function normalizeEnumInput<T extends string>(
   input: unknown,
   isValid: (v: string) => v is T,
@@ -346,6 +360,33 @@ export async function handleApi(
           language,
         },
       };
+    }
+  }
+
+  if (req.path === "/api/me/openrouter-key") {
+    if (req.method === "GET") {
+      const key = await deps.storage.getUserOpenrouterKey(actor.userId);
+      return { status: 200, body: openrouterKeyResponse(key) };
+    }
+    if (req.method === "PUT") {
+      const body = (req.body ?? {}) as { key?: unknown };
+      let next: string | null;
+      if (body.key === null || body.key === undefined) {
+        next = null;
+      } else if (typeof body.key === "string") {
+        const trimmed = body.key.trim();
+        if (trimmed === "") {
+          next = null;
+        } else if (trimmed.length > MAX_OPENROUTER_KEY_LENGTH) {
+          return BAD_OPENROUTER_KEY;
+        } else {
+          next = trimmed;
+        }
+      } else {
+        return BAD_OPENROUTER_KEY;
+      }
+      await deps.storage.setUserOpenrouterKey(actor.userId, next);
+      return { status: 200, body: openrouterKeyResponse(next) };
     }
   }
 

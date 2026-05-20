@@ -88,6 +88,35 @@ describe("askHandler", () => {
     expect(out.kind).toBe("rateLimited");
   });
 
+  test("user with BYOK key skips rate limit and passes key to AI", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.setUserOpenrouterKey("42", "sk-or-byok");
+    const rlStorage = new MemoryStorage();
+    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
+    const rl = new TokenBucketLimiter(rlStorage);
+    const ai = new FakeAI({ text: "ok", totalTokens: 500 });
+    const out = await askHandler(
+      baseInput({ storage, ai, rateLimiter: rl }),
+    );
+    expect(out.kind).toBe("answered");
+    expect(ai.calls.length).toBe(1);
+    const call = ai.calls[0] as { apiKey?: string | null };
+    expect(call.apiKey).toBe("sk-or-byok");
+    const bucketAfter = await rlStorage.getBucket("c1", "42");
+    expect(bucketAfter?.tokens).toBe(0);
+  });
+
+  test("user without BYOK key passes null apiKey to AI", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const rl = new TokenBucketLimiter(new MemoryStorage());
+    await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
+    const call = ai.calls[0] as { apiKey?: string | null };
+    expect(call.apiKey).toBeNull();
+  });
+
   test("answered: returns text and persistConversation callback to apply after sending", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
