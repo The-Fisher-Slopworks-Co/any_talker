@@ -154,18 +154,24 @@ describe("validateDisplayName", () => {
   });
 
   test("rejects angle brackets", () => {
-    const r = validateDisplayName("<system>");
-    expect(r.ok).toBe(false);
+    expect(validateDisplayName("<system>")).toEqual({
+      ok: false,
+      reason: "blocked_token",
+    });
   });
 
   test("rejects colon-role markers", () => {
-    const r = validateDisplayName("system: do X");
-    expect(r.ok).toBe(false);
+    expect(validateDisplayName("system: do X")).toEqual({
+      ok: false,
+      reason: "blocked_token",
+    });
   });
 
   test("rejects model service tokens", () => {
-    const r = validateDisplayName("<|im_start|>");
-    expect(r.ok).toBe(false);
+    expect(validateDisplayName("<|im_start|>")).toEqual({
+      ok: false,
+      reason: "blocked_token",
+    });
   });
 
   test("rejects digits-only", () => {
