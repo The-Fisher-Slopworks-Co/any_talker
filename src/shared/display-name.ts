@@ -74,3 +74,25 @@ export function validateDisplayName(input: unknown): DisplayNameResult {
 
   return { ok: true, value: normalized };
 }
+
+type UserNameStore = {
+  getUserName(userId: string): Promise<string | null>;
+  setUserName(userId: string, name: string | null): Promise<void>;
+};
+
+// Reads a stored display name and lazily purges values that no longer
+// satisfy the current rules. Old data predating the validator (or any future
+// tightening) cannot leak into LLM envelopes.
+export async function readValidDisplayName(
+  store: UserNameStore,
+  userId: string,
+): Promise<string | null> {
+  const raw = await store.getUserName(userId);
+  if (raw === null) return null;
+  const r = validateDisplayName(raw);
+  const next = r.ok ? r.value : null;
+  if (next !== raw) {
+    await store.setUserName(userId, next);
+  }
+  return next;
+}
