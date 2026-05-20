@@ -52,7 +52,6 @@ async function main() {
   const bot = createBot({
     botToken: config.botToken,
     ownerId: config.botOwnerId,
-    webappUrl: config.webappUrl,
     storage,
     rateLimiter,
     ai,
