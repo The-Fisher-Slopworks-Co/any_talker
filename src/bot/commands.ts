@@ -24,5 +24,6 @@ export const BOT_COMMANDS_RU: readonly BotCommand[] = [
 
 export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {
   await api.setMyCommands(BOT_COMMANDS_EN);
+  await api.setMyCommands(BOT_COMMANDS_EN, { language_code: "en" });
   await api.setMyCommands(BOT_COMMANDS_RU, { language_code: "ru" });
 }
