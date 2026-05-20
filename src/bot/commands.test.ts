@@ -2,8 +2,9 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import type { BotCommand } from "grammy/types";
+import type { BotCommand, BotCommandScope } from "grammy/types";
 import {
+  BOT_COMMAND_SCOPES,
   BOT_COMMANDS_EN,
   BOT_COMMANDS_RU,
   syncBotCommands,
@@ -47,11 +48,20 @@ describe("command lists", () => {
   });
 });
 
+describe("BOT_COMMAND_SCOPES", () => {
+  test("includes all_private_chats and all_group_chats", () => {
+    expect(BOT_COMMAND_SCOPES).toEqual([
+      { type: "all_private_chats" },
+      { type: "all_group_chats" },
+    ]);
+  });
+});
+
 describe("syncBotCommands", () => {
-  test("uploads English as default and under language_code en, Russian under language_code ru", async () => {
+  test("uploads default + en + ru, and repeats each combo under every scope", async () => {
     const calls: Array<{
       commands: readonly BotCommand[];
-      other?: { language_code?: string };
+      other?: { language_code?: string; scope?: BotCommandScope };
     }> = [];
     const api: SyncCommandsApi = {
       async setMyCommands(commands, other) {
@@ -61,13 +71,75 @@ describe("syncBotCommands", () => {
 
     await syncBotCommands(api);
 
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(3 + BOT_COMMAND_SCOPES.length * 3);
+
     expect(calls[0]!.commands).toEqual(BOT_COMMANDS_EN);
     expect(calls[0]!.other).toBeUndefined();
     expect(calls[1]!.commands).toEqual(BOT_COMMANDS_EN);
     expect(calls[1]!.other).toEqual({ language_code: "en" });
     expect(calls[2]!.commands).toEqual(BOT_COMMANDS_RU);
     expect(calls[2]!.other).toEqual({ language_code: "ru" });
+
+    let i = 3;
+    for (const scope of BOT_COMMAND_SCOPES) {
+      expect(calls[i]!.commands).toEqual(BOT_COMMANDS_EN);
+      expect(calls[i]!.other).toEqual({ scope });
+      i++;
+      expect(calls[i]!.commands).toEqual(BOT_COMMANDS_EN);
+      expect(calls[i]!.other).toEqual({ scope, language_code: "en" });
+      i++;
+      expect(calls[i]!.commands).toEqual(BOT_COMMANDS_RU);
+      expect(calls[i]!.other).toEqual({ scope, language_code: "ru" });
+      i++;
+    }
+  });
+
+  test("registers commands under BotCommandScopeAllPrivateChats", async () => {
+    const calls: Array<{
+      commands: readonly BotCommand[];
+      other?: { language_code?: string; scope?: BotCommandScope };
+    }> = [];
+    const api: SyncCommandsApi = {
+      async setMyCommands(commands, other) {
+        calls.push({ commands, other });
+      },
+    };
+
+    await syncBotCommands(api);
+
+    const privateScopeCalls = calls.filter(
+      (c) => c.other?.scope?.type === "all_private_chats",
+    );
+    expect(privateScopeCalls).toHaveLength(3);
+    expect(privateScopeCalls.map((c) => c.commands)).toEqual([
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_RU,
+    ]);
+  });
+
+  test("registers commands under BotCommandScopeAllGroupChats", async () => {
+    const calls: Array<{
+      commands: readonly BotCommand[];
+      other?: { language_code?: string; scope?: BotCommandScope };
+    }> = [];
+    const api: SyncCommandsApi = {
+      async setMyCommands(commands, other) {
+        calls.push({ commands, other });
+      },
+    };
+
+    await syncBotCommands(api);
+
+    const groupScopeCalls = calls.filter(
+      (c) => c.other?.scope?.type === "all_group_chats",
+    );
+    expect(groupScopeCalls).toHaveLength(3);
+    expect(groupScopeCalls.map((c) => c.commands)).toEqual([
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_RU,
+    ]);
   });
 
   test("propagates errors from the API", async () => {
