@@ -82,6 +82,12 @@ type Strings = {
   ui_main_name: string;
   ui_main_your_name: string;
   ui_main_name_footer: string;
+  ui_main_name_err_too_long: string;
+  ui_main_name_err_multiline: string;
+  ui_main_name_err_control_char: string;
+  ui_main_name_err_charset: string;
+  ui_main_name_err_blocked_token: string;
+  ui_main_name_err_no_letter: string;
   ui_main_gender: string;
   ui_main_tell_ai: string;
   ui_main_male: string;
@@ -357,6 +363,13 @@ const en: Strings = {
   ui_main_name: "Name",
   ui_main_your_name: "Your name",
   ui_main_name_footer: "Name shown to the AI.",
+  ui_main_name_err_too_long: "Too long (max 32 characters).",
+  ui_main_name_err_multiline: "Line breaks are not allowed.",
+  ui_main_name_err_control_char: "Contains hidden or invisible characters.",
+  ui_main_name_err_charset:
+    "Only letters, digits, spaces and . ' - are allowed.",
+  ui_main_name_err_blocked_token: "Contains a reserved keyword.",
+  ui_main_name_err_no_letter: "Must contain at least one letter.",
   ui_main_gender: "Gender",
   ui_main_tell_ai: "Tell the AI",
   ui_main_male: "Male",
@@ -676,6 +689,13 @@ const ru: Strings = {
   ui_main_name: "Имя",
   ui_main_your_name: "Ваше имя",
   ui_main_name_footer: "Имя, которое видит ИИ.",
+  ui_main_name_err_too_long: "Слишком длинное (макс. 32 символа).",
+  ui_main_name_err_multiline: "Переносы строк недопустимы.",
+  ui_main_name_err_control_char: "Содержит скрытые или невидимые символы.",
+  ui_main_name_err_charset:
+    "Допустимы только буквы, цифры, пробел и . ' -",
+  ui_main_name_err_blocked_token: "Содержит зарезервированное ключевое слово.",
+  ui_main_name_err_no_letter: "Должно содержать хотя бы одну букву.",
   ui_main_gender: "Пол",
   ui_main_tell_ai: "Сообщить ИИ",
   ui_main_male: "Мужской",

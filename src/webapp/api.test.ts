@@ -408,6 +408,68 @@ describe("/api/me", () => {
     expect(await d.storage.getUserName("42")).toBeNull();
   });
 
+  test("PUT rejects displayName with newline", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { displayName: "Alice\nBob" } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+    expect(r.body).toEqual({
+      error: "invalid display name",
+      reason: "multiline",
+    });
+    expect(await d.storage.getUserName("42")).toBeNull();
+  });
+
+  test("PUT rejects displayName over 32 chars", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { displayName: "A".repeat(33) },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+    expect(r.body).toEqual({
+      error: "invalid display name",
+      reason: "too_long",
+    });
+  });
+
+  test("PUT rejects displayName with prompt-injection token", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me",
+        body: { displayName: "<|im_start|>" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+    expect((r.body as { error: string }).error).toBe("invalid display name");
+  });
+
+  test("PUT rejects displayName with bidi override", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { displayName: "Alice‮Bob" } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+    expect(r.body).toEqual({
+      error: "invalid display name",
+      reason: "control_char",
+    });
+  });
+
   test("name is stored per-user (not shared)", async () => {
     const d = deps();
     await handleApi(
