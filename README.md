@@ -8,6 +8,11 @@ Telegram bot with AI integration via OpenRouter.
    - `BOT_TOKEN` — from @BotFather
    - `OPENROUTER_API_KEY` — from openrouter.ai
    - `BOT_OWNER_ID` — your Telegram user ID
+   - `OPENROUTER_APP_URL` / `OPENROUTER_APP_TITLE` (optional) — sent as
+     `HTTP-Referer` / `X-Title` headers so the bot shows up on
+     [openrouter.ai/rankings](https://openrouter.ai/rankings) and in your
+     OpenRouter dashboard. See
+     [App Attribution](https://openrouter.ai/docs/app-attribution).
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 

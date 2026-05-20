@@ -35,7 +35,10 @@ async function main() {
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
   const rateLimiter = new TokenBucketLimiter(storage);
-  const ai = new OpenRouterAIClient(config.openrouterApiKey);
+  const ai = new OpenRouterAIClient(config.openrouterApiKey, {
+    url: config.openrouterAppUrl,
+    title: config.openrouterAppTitle,
+  });
 
   const logged = <TIn, TOut>(t: Tool<TIn, TOut>) =>
     withLogging(t, config.logFormat);
