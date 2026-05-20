@@ -20,8 +20,7 @@
 #     them with `docker compose -f docker-compose.prod.yml exec ...` or
 #     by adding a tunnel.
 #
-# WEBAPP_URL in .env should be https://${DOMAIN}
-# (Telegram requires HTTPS for Web Apps).
+# Telegram requires HTTPS for Web Apps, which Caddy provides at https://${DOMAIN}.
 
 services:
   bot:
