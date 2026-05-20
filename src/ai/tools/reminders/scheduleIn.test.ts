@@ -71,7 +71,7 @@ describe("schedule_reminder_in", () => {
       { amount: 5, unit: "minutes", text: "ping" },
       guestCtx,
     );
-    expect(out).toEqual({ ok: false, reason: expect.stringContaining("/start") });
+    expect(out).toEqual({ ok: false, reason: expect.stringContaining("DM") });
     expect(await storage.fetchDueReminders(askCtx.now + 60 * 60_000)).toEqual([]);
   });
 

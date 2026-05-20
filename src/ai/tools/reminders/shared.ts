@@ -45,7 +45,7 @@ export async function persistReminder(
       return {
         ok: false,
         reason:
-          "user has not started a private chat with the bot yet; ask them to send /start to the bot in DM first, then retry",
+          "user has not started a private chat with the bot yet; ask them to send any message to the bot in DM first, then retry",
       };
     }
   }

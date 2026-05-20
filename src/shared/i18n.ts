@@ -33,9 +33,6 @@ export type ReminderTimeParts = {
 };
 
 type Strings = {
-  bot_private: string;
-  bot_admin_installed: string;
-  bot_admin_menu_label: string;
   bot_photo_cant_fetch: string;
   bot_ask_usage: string;
   bot_rate_limited: (min: number) => string;
@@ -293,10 +290,6 @@ type Strings = {
 };
 
 const en: Strings = {
-  bot_private: "Hi! This bot is private.",
-  bot_admin_installed:
-    "Admin panel installed. Tap the menu button to the left of the message input.",
-  bot_admin_menu_label: "Admin",
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
   bot_ask_usage:
     "Usage: /ask <text> (short), /askmore <text> (detailed), /askwise <text> (exhaustive) — or reply to a message with any of these.",
@@ -602,10 +595,6 @@ const en: Strings = {
 };
 
 const ru: Strings = {
-  bot_private: "Привет! Этот бот приватный.",
-  bot_admin_installed:
-    "Панель администратора установлена. Нажми кнопку меню слева от поля ввода.",
-  bot_admin_menu_label: "Админ",
   bot_photo_cant_fetch: "⚠️ Не удалось загрузить прикреплённое фото.",
   bot_ask_usage:
     "Использование: /ask <текст> (коротко), /askmore <текст> (подробно), /askwise <текст> (исчерпывающе) — или ответь на сообщение любой из этих команд.",

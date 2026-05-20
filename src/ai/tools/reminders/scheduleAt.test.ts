@@ -83,7 +83,7 @@ describe("schedule_reminder_at", () => {
         timezone: "UTC",
       },
     );
-    expect(out).toEqual({ ok: false, reason: expect.stringContaining("/start") });
+    expect(out).toEqual({ ok: false, reason: expect.stringContaining("DM") });
   });
 
   test("guest path succeeds after recordPrivateChat", async () => {
