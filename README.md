@@ -114,6 +114,8 @@ are supported as `host:port`).
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
 - Tool calling — built-in `random_number` tool; add new tools via `registerTool()`.
 - Per-user token-bucket rate limit (defaults: 30k capacity, +3k every 40 min). Configurable in admin UI.
+- BYOK — each user can store their own OpenRouter API key in the Web App. When set, the user's
+  AI calls go through their key and the bot's rate limit no longer applies to them.
 - Whitelist (chats and users). Owner bypasses whitelist.
 - Admin Web App opens via the chat menu button after `/start`.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.

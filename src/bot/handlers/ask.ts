@@ -69,16 +69,18 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     return { kind: "usage" };
   }
 
-  const [settings, chatSettings, userTimezone] = await Promise.all([
+  const [settings, chatSettings, userTimezone, byokKey] = await Promise.all([
     getEffectiveSettings(input.storage, input.chatId),
     input.storage.getChatSettings(input.chatId),
     input.storage.getUserTimezone(input.userId),
+    input.storage.getUserOpenrouterKey(input.userId),
   ]);
   const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;
 
   const isOwner = input.userId === input.ownerId;
-  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
+  const skipRateLimit =
+    byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
       input.chatId,
@@ -120,6 +122,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      apiKey: byokKey,
       toolCallContext: {
         source: "ask",
         chatId: input.chatId,

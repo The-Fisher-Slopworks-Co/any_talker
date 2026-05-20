@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../i18n-context";
-import { api, type MeResponse } from "../api-client";
+import { api, type MeResponse, type OpenrouterKeyResponse } from "../api-client";
 import { composeFullName, type Gender } from "../../../shared/types";
 import { SUPPORTED_LANGS, type Lang } from "../../../shared/i18n";
 import { Card, SectionFooter, SectionHeader, Stack } from "../components/layout";
-import { RowButton, SaveButton, Toggle } from "../components/controls";
+import { PrimaryButton, RowButton, SaveButton, Toggle } from "../components/controls";
 import { SelectRow } from "../components/select-row";
 import { TimezoneSelect } from "../components/timezone-select";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../components/row";
@@ -136,6 +136,8 @@ export function MainView({
 
       <SaveButton saving={saving} dirty={dirty} onClick={save} />
 
+      <OpenrouterKeySection />
+
       <SectionHeader>{s.ui_main_reminders}</SectionHeader>
       <Card>
         <RowButton onClick={onOpenMyReminders}>
@@ -154,5 +156,121 @@ export function MainView({
         </>
       )}
     </Stack>
+  );
+}
+
+function OpenrouterKeySection() {
+  const { t: s } = useI18n();
+  const [state, setState] = useState<OpenrouterKeyResponse | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.getMyOpenrouterKey().then(setState).catch(() => setState(null));
+  }, []);
+
+  const save = async () => {
+    const trimmed = input.trim();
+    if (trimmed.length === 0) return;
+    setBusy(true);
+    try {
+      const next = await api.putMyOpenrouterKey(trimmed);
+      setState(next);
+      setInput("");
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clear = async () => {
+    setBusy(true);
+    try {
+      const next = await api.putMyOpenrouterKey(null);
+      setState(next);
+      setInput("");
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const showInput = state !== null && (!state.hasKey || editing);
+
+  return (
+    <>
+      <SectionHeader>{s.ui_main_byok}</SectionHeader>
+      {state === null ? (
+        <Card>
+          <div className={ROW_CLS}>
+            <span className={ROW_LABEL_CLS}>{s.ui_loading}</span>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {state.hasKey && !editing ? (
+            <Card>
+              <div className={ROW_CLS}>
+                <span className={ROW_LABEL_CLS}>
+                  {s.ui_main_byok_stored(state.last4 ?? "")}
+                </span>
+              </div>
+            </Card>
+          ) : null}
+          {showInput ? (
+            <Card>
+              <label className={ROW_CLS}>
+                <span className={ROW_LABEL_CLS}>
+                  {s.ui_main_byok_key_label}
+                </span>
+                <input
+                  className={INPUT_CLS}
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={s.ui_main_byok_placeholder}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                />
+              </label>
+            </Card>
+          ) : null}
+          {state.hasKey && !editing ? (
+            <Card>
+              <RowButton onClick={() => setEditing(true)} disabled={busy}>
+                {s.ui_main_byok_replace}
+              </RowButton>
+              <RowButton onClick={clear} disabled={busy}>
+                {s.ui_main_byok_clear}
+              </RowButton>
+            </Card>
+          ) : (
+            <>
+              <PrimaryButton
+                disabled={busy || input.trim().length === 0}
+                onClick={save}
+              >
+                {busy ? s.ui_saving : s.ui_main_byok_save}
+              </PrimaryButton>
+              {state.hasKey ? (
+                <Card>
+                  <RowButton
+                    onClick={() => {
+                      setEditing(false);
+                      setInput("");
+                    }}
+                    disabled={busy}
+                  >
+                    {s.ui_main_byok_cancel}
+                  </RowButton>
+                </Card>
+              ) : null}
+            </>
+          )}
+        </>
+      )}
+      <SectionFooter>{s.ui_main_byok_footer}</SectionFooter>
+    </>
   );
 }

@@ -101,6 +101,16 @@ type Strings = {
   ui_main_bot_config: string;
   ui_main_admin_panel: string;
 
+  ui_main_byok: string;
+  ui_main_byok_footer: string;
+  ui_main_byok_key_label: string;
+  ui_main_byok_placeholder: string;
+  ui_main_byok_stored: (last4: string) => string;
+  ui_main_byok_save: string;
+  ui_main_byok_clear: string;
+  ui_main_byok_replace: string;
+  ui_main_byok_cancel: string;
+
   ui_whitelist_remove: string;
   ui_whitelist_add: string;
   ui_whitelist_allowed_users: string;
@@ -363,6 +373,17 @@ const en: Strings = {
   ui_main_my_reminders: "My reminders",
   ui_main_bot_config: "Bot Configuration",
   ui_main_admin_panel: "Admin panel",
+
+  ui_main_byok: "OpenRouter API Key",
+  ui_main_byok_footer:
+    "Use your own OpenRouter key for AI calls. When set, the bot's rate limit doesn't apply to you. The key is stored on the server and used only for your /ask requests.",
+  ui_main_byok_key_label: "Key",
+  ui_main_byok_placeholder: "sk-or-…",
+  ui_main_byok_stored: (last4) => `Stored key ending in …${last4}`,
+  ui_main_byok_save: "Save key",
+  ui_main_byok_clear: "Remove key",
+  ui_main_byok_replace: "Replace key",
+  ui_main_byok_cancel: "Cancel",
 
   ui_whitelist_remove: "Remove from whitelist",
   ui_whitelist_add: "Add to whitelist",
@@ -662,6 +683,17 @@ const ru: Strings = {
   ui_main_my_reminders: "Мои напоминания",
   ui_main_bot_config: "Настройки бота",
   ui_main_admin_panel: "Админ-панель",
+
+  ui_main_byok: "Ключ OpenRouter API",
+  ui_main_byok_footer:
+    "Используйте свой ключ OpenRouter для вызовов ИИ. Когда ключ задан, лимит запросов бота на вас не действует. Ключ хранится на сервере и применяется только к вашим запросам /ask.",
+  ui_main_byok_key_label: "Ключ",
+  ui_main_byok_placeholder: "sk-or-…",
+  ui_main_byok_stored: (last4) => `Сохранён ключ, оканчивающийся на …${last4}`,
+  ui_main_byok_save: "Сохранить ключ",
+  ui_main_byok_clear: "Удалить ключ",
+  ui_main_byok_replace: "Заменить ключ",
+  ui_main_byok_cancel: "Отмена",
 
   ui_whitelist_remove: "Убрать из белого списка",
   ui_whitelist_add: "Добавить в белый список",
