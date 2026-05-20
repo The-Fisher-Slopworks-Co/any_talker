@@ -53,7 +53,7 @@ export type AskOutcome =
   | { kind: "error"; message: string };
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
-  const [allowed, byokKey] = await Promise.all([
+  const [allowed, byokKey, byokModels] = await Promise.all([
     isAllowed({
       storage: input.storage,
       ownerId: input.ownerId,
@@ -61,6 +61,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       chatId: input.chatId,
     }),
     input.storage.getUserOpenrouterKey(input.userId),
+    input.storage.getUserOpenrouterModels(input.userId),
   ]);
   if (!allowed && byokKey === null) return { kind: "denied" };
 
@@ -115,7 +116,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   let result;
   try {
     result = await input.ai.ask({
-      models: settings.models,
+      models:
+        byokKey !== null && byokModels !== null && byokModels.length > 0
+          ? byokModels
+          : settings.models,
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,

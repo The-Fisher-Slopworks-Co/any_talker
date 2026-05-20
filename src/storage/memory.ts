@@ -33,6 +33,7 @@ export class MemoryStorage implements Storage {
   private userGenders = new Map<string, Gender>();
   private userLangs = new Map<string, Lang>();
   private userOpenrouterKeys = new Map<string, string>();
+  private userOpenrouterModels = new Map<string, string[]>();
   private users = new Map<string, User>();
   private chats = new Map<string, Chat>();
   private chatSettings = new Map<string, ChatSettings>();
@@ -130,6 +131,19 @@ export class MemoryStorage implements Storage {
   async setUserOpenrouterKey(userId: string, key: string | null): Promise<void> {
     if (key === null) this.userOpenrouterKeys.delete(userId);
     else this.userOpenrouterKeys.set(userId, key);
+  }
+
+  async getUserOpenrouterModels(userId: string): Promise<string[] | null> {
+    const v = this.userOpenrouterModels.get(userId);
+    return v ? [...v] : null;
+  }
+
+  async setUserOpenrouterModels(
+    userId: string,
+    models: string[] | null,
+  ): Promise<void> {
+    if (models === null) this.userOpenrouterModels.delete(userId);
+    else this.userOpenrouterModels.set(userId, [...models]);
   }
 
   async listUsers(): Promise<User[]> {
