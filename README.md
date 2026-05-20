@@ -8,7 +8,6 @@ Telegram bot with AI integration via OpenRouter.
    - `BOT_TOKEN` — from @BotFather
    - `OPENROUTER_API_KEY` — from openrouter.ai
    - `BOT_OWNER_ID` — your Telegram user ID
-   - `WEBAPP_URL` — public HTTPS URL where the admin Web App is served (e.g. https://bot.example.com/)
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 
@@ -31,8 +30,7 @@ Vector). On a fresh server with DNS pointed at it:
 
 ```bash
 cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY, BOT_OWNER_ID,
-                              # DOMAIN, LETSENCRYPT_EMAIL, and set
-                              # WEBAPP_URL=https://<DOMAIN>
+                              # DOMAIN, LETSENCRYPT_EMAIL
 cp Caddyfile.example Caddyfile
 docker compose -f docker-compose.prod.yml up -d
 ```
@@ -117,7 +115,7 @@ are supported as `host:port`).
 - BYOK — each user can store their own OpenRouter API key in the Web App. When set, the user's
   AI calls go through their key and the bot's rate limit no longer applies to them.
 - Whitelist (chats and users). Owner bypasses whitelist.
-- Admin Web App opens via the chat menu button after `/start`.
+- Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
   guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest
