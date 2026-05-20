@@ -53,13 +53,16 @@ export type AskOutcome =
   | { kind: "error"; message: string };
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
-  const allowed = await isAllowed({
-    storage: input.storage,
-    ownerId: input.ownerId,
-    userId: input.userId,
-    chatId: input.chatId,
-  });
-  if (!allowed) return { kind: "denied" };
+  const [allowed, byokKey] = await Promise.all([
+    isAllowed({
+      storage: input.storage,
+      ownerId: input.ownerId,
+      userId: input.userId,
+      chatId: input.chatId,
+    }),
+    input.storage.getUserOpenrouterKey(input.userId),
+  ]);
+  if (!allowed && byokKey === null) return { kind: "denied" };
 
   if (
     input.userText.trim() === "" &&
@@ -69,11 +72,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     return { kind: "usage" };
   }
 
-  const [settings, chatSettings, userTimezone, byokKey] = await Promise.all([
+  const [settings, chatSettings, userTimezone] = await Promise.all([
     getEffectiveSettings(input.storage, input.chatId),
     input.storage.getChatSettings(input.chatId),
     input.storage.getUserTimezone(input.userId),
-    input.storage.getUserOpenrouterKey(input.userId),
   ]);
   const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;

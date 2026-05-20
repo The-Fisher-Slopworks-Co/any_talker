@@ -123,6 +123,13 @@ describe("guestAskHandler", () => {
     expect(bucketAfter?.tokens).toBe(0);
   });
 
+  test("user with BYOK key bypasses the whitelist", async () => {
+    const storage = new MemoryStorage();
+    await storage.setUserOpenrouterKey("42", "sk-or-byok");
+    const out = await guestAskHandler(baseInput({ storage }));
+    expect(out.kind).toBe("answered");
+  });
+
   test("answered: persistThread stores a fresh thread keyed by chatId", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

@@ -107,6 +107,19 @@ describe("askHandler", () => {
     expect(bucketAfter?.tokens).toBe(0);
   });
 
+  test("user with BYOK key bypasses the whitelist", async () => {
+    const storage = new MemoryStorage();
+    await storage.setUserOpenrouterKey("42", "sk-or-byok");
+    const out = await askHandler(baseInput({ storage }));
+    expect(out.kind).toBe("answered");
+  });
+
+  test("user without BYOK key and not whitelisted is denied", async () => {
+    const storage = new MemoryStorage();
+    const out = await askHandler(baseInput({ storage }));
+    expect(out.kind).toBe("denied");
+  });
+
   test("user without BYOK key passes null apiKey to AI", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
