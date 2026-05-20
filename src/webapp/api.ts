@@ -82,13 +82,37 @@ const BAD_OPENROUTER_KEY: ApiResponse = {
   body: { error: "invalid openrouter key" },
 };
 
+const BAD_OPENROUTER_MODELS: ApiResponse = {
+  status: 400,
+  body: {
+    error: "models must be null or an array of non-empty strings",
+  },
+};
+
 const MAX_OPENROUTER_KEY_LENGTH = 256;
+const MAX_OPENROUTER_USER_MODELS = 10;
 
 function openrouterKeyResponse(
   key: string | null,
 ): { hasKey: boolean; last4: string | null } {
   if (key === null) return { hasKey: false, last4: null };
   return { hasKey: true, last4: key.slice(-4) };
+}
+
+function normalizeUserModelsPatch(
+  input: unknown,
+): { ok: true; value: string[] | null } | { ok: false } {
+  if (input === null || input === undefined) return { ok: true, value: null };
+  if (!Array.isArray(input)) return { ok: false };
+  if (input.length > MAX_OPENROUTER_USER_MODELS) return { ok: false };
+  const trimmed: string[] = [];
+  for (const m of input) {
+    if (typeof m !== "string") return { ok: false };
+    const t = m.trim();
+    if (t.length === 0) continue;
+    trimmed.push(t);
+  }
+  return { ok: true, value: trimmed.length > 0 ? trimmed : null };
 }
 
 function normalizeEnumInput<T extends string>(
@@ -390,6 +414,40 @@ export async function handleApi(
     }
   }
 
+  if (req.path === "/api/me/openrouter-models") {
+    if (req.method === "GET") {
+      const models = await deps.storage.getUserOpenrouterModels(actor.userId);
+      return { status: 200, body: { models } };
+    }
+    if (req.method === "PUT") {
+      const body = (req.body ?? {}) as { models?: unknown };
+      const parsed = normalizeUserModelsPatch(body.models);
+      if (!parsed.ok) return BAD_OPENROUTER_MODELS;
+      await deps.storage.setUserOpenrouterModels(actor.userId, parsed.value);
+      return { status: 200, body: { models: parsed.value } };
+    }
+  }
+
+  const orMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);
+  if (orMatch && req.method === "GET") {
+    const permaslug = decodeURIComponent(orMatch[1]!);
+    if (!isValidPermaslug(permaslug)) {
+      return { status: 400, body: { error: "invalid permaslug" } };
+    }
+    if (!deps.fetchOpenRouterStats) {
+      return { status: 503, body: { error: "stats fetcher not configured" } };
+    }
+    try {
+      const data = await deps.fetchOpenRouterStats(permaslug);
+      return { status: 200, body: data };
+    } catch (err) {
+      return {
+        status: 502,
+        body: { error: err instanceof Error ? err.message : String(err) },
+      };
+    }
+  }
+
   // Everything below this line is admin-only.
   if (!actor.isOwner) return FORBIDDEN;
 
@@ -434,26 +492,6 @@ export async function handleApi(
       };
       await deps.storage.saveSettings(next);
       return { status: 200, body: next };
-    }
-  }
-
-  const orMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);
-  if (orMatch && req.method === "GET") {
-    const permaslug = decodeURIComponent(orMatch[1]!);
-    if (!isValidPermaslug(permaslug)) {
-      return { status: 400, body: { error: "invalid permaslug" } };
-    }
-    if (!deps.fetchOpenRouterStats) {
-      return { status: 503, body: { error: "stats fetcher not configured" } };
-    }
-    try {
-      const data = await deps.fetchOpenRouterStats(permaslug);
-      return { status: 200, body: data };
-    } catch (err) {
-      return {
-        status: 502,
-        body: { error: err instanceof Error ? err.message : String(err) },
-      };
     }
   }
 

@@ -45,11 +45,12 @@ export async function guestAskHandler(
   input: GuestAskInput,
 ): Promise<GuestAskOutcome> {
   const isOwner = input.userId === input.ownerId;
-  const [isWhitelisted, byokKey] = await Promise.all([
+  const [isWhitelisted, byokKey, byokModels] = await Promise.all([
     isOwner
       ? Promise.resolve(true)
       : input.storage.isWhitelisted("users", input.userId),
     input.storage.getUserOpenrouterKey(input.userId),
+    input.storage.getUserOpenrouterModels(input.userId),
   ]);
   if (!isWhitelisted && byokKey === null) return { kind: "denied" };
 
@@ -99,7 +100,10 @@ export async function guestAskHandler(
   let result;
   try {
     result = await input.ai.ask({
-      models: settings.models,
+      models:
+        byokKey !== null && byokModels !== null && byokModels.length > 0
+          ? byokModels
+          : settings.models,
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,
