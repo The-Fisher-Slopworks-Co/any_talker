@@ -105,7 +105,6 @@ type Strings = {
   ui_main_byok_footer: string;
   ui_main_byok_key_label: string;
   ui_main_byok_placeholder: string;
-  ui_main_byok_stored: (last4: string) => string;
   ui_main_byok_save: string;
   ui_main_byok_clear: string;
   ui_main_byok_replace: string;
@@ -379,10 +378,9 @@ const en: Strings = {
     "Use your own OpenRouter key for AI calls. When set, the bot's rate limit doesn't apply to you. The key is stored on the server and used only for your /ask requests.",
   ui_main_byok_key_label: "Key",
   ui_main_byok_placeholder: "sk-or-…",
-  ui_main_byok_stored: (last4) => `Stored key ending in …${last4}`,
-  ui_main_byok_save: "Save key",
-  ui_main_byok_clear: "Remove key",
-  ui_main_byok_replace: "Replace key",
+  ui_main_byok_save: "Save",
+  ui_main_byok_clear: "Remove",
+  ui_main_byok_replace: "Replace",
   ui_main_byok_cancel: "Cancel",
 
   ui_whitelist_remove: "Remove from whitelist",
@@ -689,10 +687,9 @@ const ru: Strings = {
     "Используйте свой ключ OpenRouter для вызовов ИИ. Когда ключ задан, лимит запросов бота на вас не действует. Ключ хранится на сервере и применяется только к вашим запросам /ask.",
   ui_main_byok_key_label: "Ключ",
   ui_main_byok_placeholder: "sk-or-…",
-  ui_main_byok_stored: (last4) => `Сохранён ключ, оканчивающийся на …${last4}`,
-  ui_main_byok_save: "Сохранить ключ",
-  ui_main_byok_clear: "Удалить ключ",
-  ui_main_byok_replace: "Заменить ключ",
+  ui_main_byok_save: "Сохранить",
+  ui_main_byok_clear: "Удалить",
+  ui_main_byok_replace: "Заменить",
   ui_main_byok_cancel: "Отмена",
 
   ui_whitelist_remove: "Убрать из белого списка",
