@@ -269,6 +269,82 @@ describe("PUT /api/settings", () => {
     expect(saved?.rateLimit.wiseMultiplier).toBe(2.2);
   });
 
+  test("accepts a valid expandableBlockquoteThreshold", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { expandableBlockquoteThreshold: 800 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect(
+      (await d.storage.getSettings())?.expandableBlockquoteThreshold,
+    ).toBe(800);
+  });
+
+  test("accepts expandableBlockquoteThreshold of 0", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { expandableBlockquoteThreshold: 0 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect(
+      (await d.storage.getSettings())?.expandableBlockquoteThreshold,
+    ).toBe(0);
+  });
+
+  test("rejects a negative expandableBlockquoteThreshold", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { expandableBlockquoteThreshold: -1 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a non-integer expandableBlockquoteThreshold", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { expandableBlockquoteThreshold: 12.5 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a non-numeric expandableBlockquoteThreshold", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { expandableBlockquoteThreshold: "800" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("rejects non-positive multipliers", async () => {
     const d = deps();
     const res = await handleApi(

@@ -158,7 +158,12 @@ async function composeReminderMessage(
   // the reminder still surfaces something rather than a silent no-op delivery.
   const body = trimmed.length === 0 ? sanitizeHtml(reminder.text) : sanitized;
   const topBlock = buildEffectsTopBlock(effects, lang);
-  return applyBotNamePrefix(body, botName, topBlock).text;
+  return applyBotNamePrefix(
+    body,
+    botName,
+    topBlock,
+    settings.expandableBlockquoteThreshold,
+  ).text;
 }
 
 type EnvelopeArgs = {
