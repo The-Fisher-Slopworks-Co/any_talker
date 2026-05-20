@@ -212,8 +212,8 @@ function OpenrouterKeySection() {
           {state.hasKey && !editing ? (
             <Card>
               <div className={ROW_CLS}>
-                <span className={ROW_LABEL_CLS}>
-                  {s.ui_main_byok_stored(state.last4 ?? "")}
+                <span className="text-base tracking-widest">
+                  ••••&nbsp;{state.last4}
                 </span>
               </div>
             </Card>
