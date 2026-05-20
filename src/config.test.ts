@@ -9,12 +9,10 @@ test("loadConfig returns required fields when all env vars present", () => {
     BOT_TOKEN: "tok",
     OPENROUTER_API_KEY: "or",
     BOT_OWNER_ID: "12345",
-    WEBAPP_URL: "https://example.com/app",
   });
   expect(cfg.botToken).toBe("tok");
   expect(cfg.openrouterApiKey).toBe("or");
   expect(cfg.botOwnerId).toBe("12345");
-  expect(cfg.webappUrl).toBe("https://example.com/app");
   expect(cfg.keydbUrl).toBe("redis://localhost:6379");
   expect(cfg.port).toBe(8080);
   expect(cfg.logFormat).toBe("pretty");
@@ -27,7 +25,6 @@ test("loadConfig honours LOG_FORMAT, LOG_INCOMING_UPDATES and LOG_DEBUG", () => 
     BOT_TOKEN: "tok",
     OPENROUTER_API_KEY: "or",
     BOT_OWNER_ID: "1",
-    WEBAPP_URL: "https://example.com",
     LOG_FORMAT: "json",
     LOG_INCOMING_UPDATES: "false",
     LOG_DEBUG: "true",
@@ -42,7 +39,6 @@ test("loadConfig defaults logFormat to json when NODE_ENV=production", () => {
     BOT_TOKEN: "tok",
     OPENROUTER_API_KEY: "or",
     BOT_OWNER_ID: "1",
-    WEBAPP_URL: "https://example.com",
     NODE_ENV: "production",
   });
   expect(cfg.logFormat).toBe("json");
@@ -54,7 +50,6 @@ test("loadConfig rejects unparseable LOG_INCOMING_UPDATES", () => {
       BOT_TOKEN: "tok",
       OPENROUTER_API_KEY: "or",
       BOT_OWNER_ID: "1",
-      WEBAPP_URL: "https://example.com",
       LOG_INCOMING_UPDATES: "maybe",
     }),
   ).toThrow(/LOG_INCOMING_UPDATES/);
@@ -71,7 +66,6 @@ test("loadConfig parses optional overrides", () => {
     BOT_TOKEN: "tok",
     OPENROUTER_API_KEY: "or",
     BOT_OWNER_ID: "1",
-    WEBAPP_URL: "https://example.com",
     KEYDB_URL: "redis://other:6379",
     PORT: "4000",
   });

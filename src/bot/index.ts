@@ -12,7 +12,6 @@ import { askHandler } from "./handlers/ask";
 import type { DetailLevel } from "../ai/instruction";
 import { contactHandler } from "./handlers/contact";
 import { guestAskHandler } from "./handlers/guest";
-import { makeStartHandler } from "./handlers/start";
 import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
@@ -41,7 +40,6 @@ type AnswerGuestQuery = (args: {
 export type BotDeps = {
   botToken: string;
   ownerId: string;
-  webappUrl: string;
   storage: Storage;
   rateLimiter: RateLimiter;
   ai: AIClient;
@@ -232,8 +230,6 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   });
 
   bot.use(makeKeywordFilterMiddleware(deps.storage));
-
-  bot.command("start", makeStartHandler({ ownerId: deps.ownerId, webappUrl: deps.webappUrl }));
 
   type AskDispatch = {
     userText: string;

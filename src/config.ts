@@ -9,7 +9,6 @@ export type Config = {
   firecrawlApiKey: string | undefined;
   firecrawlConcurrency: number;
   botOwnerId: string;
-  webappUrl: string;
   keydbUrl: string;
   port: number;
   logFormat: LogFormat;
@@ -33,7 +32,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     firecrawlApiKey: env.FIRECRAWL_API_KEY || undefined,
     firecrawlConcurrency: parsePositiveInt("FIRECRAWL_CONCURRENCY", env.FIRECRAWL_CONCURRENCY, 2),
     botOwnerId: required("BOT_OWNER_ID"),
-    webappUrl: required("WEBAPP_URL"),
     keydbUrl: env.KEYDB_URL ?? "redis://localhost:6379",
     port,
     logFormat: resolveLogFormat(env),
