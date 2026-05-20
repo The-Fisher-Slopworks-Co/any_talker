@@ -13,10 +13,12 @@ import {
 } from "../metrics";
 
 export class OpenRouterAIClient implements AIClient {
-  private readonly provider: ReturnType<typeof createOpenRouter>;
+  private readonly defaultApiKey: string;
+  private readonly defaultProvider: ReturnType<typeof createOpenRouter>;
 
   constructor(apiKey: string) {
-    this.provider = createOpenRouter({ apiKey, fetch: proxiedFetch });
+    this.defaultApiKey = apiKey;
+    this.defaultProvider = createOpenRouter({ apiKey, fetch: proxiedFetch });
   }
 
   async ask(opts: {
@@ -26,9 +28,15 @@ export class OpenRouterAIClient implements AIClient {
     tools: Tool[];
     providerSort?: ProviderSort | null;
     toolCallContext: ToolCallContext;
+    apiKey?: string | null;
   }): Promise<AskResult> {
     const [primary, ...fallbacks] = opts.models;
     if (!primary) throw new Error("at least one model id is required");
+
+    const provider =
+      opts.apiKey && opts.apiKey !== this.defaultApiKey
+        ? createOpenRouter({ apiKey: opts.apiKey, fetch: proxiedFetch })
+        : this.defaultProvider;
 
     const toolMap: ToolSet = {};
     for (const t of opts.tools) {
@@ -53,7 +61,7 @@ export class OpenRouterAIClient implements AIClient {
     let outcome: "success" | "error" = "success";
     try {
       const result = await generateText({
-        model: this.provider(primary),
+        model: provider(primary),
         system: opts.system,
         messages: opts.messages,
         tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,

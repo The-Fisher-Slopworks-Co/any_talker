@@ -53,13 +53,16 @@ export type AskOutcome =
   | { kind: "error"; message: string };
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
-  const allowed = await isAllowed({
-    storage: input.storage,
-    ownerId: input.ownerId,
-    userId: input.userId,
-    chatId: input.chatId,
-  });
-  if (!allowed) return { kind: "denied" };
+  const [allowed, byokKey] = await Promise.all([
+    isAllowed({
+      storage: input.storage,
+      ownerId: input.ownerId,
+      userId: input.userId,
+      chatId: input.chatId,
+    }),
+    input.storage.getUserOpenrouterKey(input.userId),
+  ]);
+  if (!allowed && byokKey === null) return { kind: "denied" };
 
   if (
     input.userText.trim() === "" &&
@@ -78,7 +81,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   const timezone = userTimezone ?? settings.timezone;
 
   const isOwner = input.userId === input.ownerId;
-  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
+  const skipRateLimit =
+    byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
       input.chatId,
@@ -120,6 +124,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      apiKey: byokKey,
       toolCallContext: {
         source: "ask",
         chatId: input.chatId,
