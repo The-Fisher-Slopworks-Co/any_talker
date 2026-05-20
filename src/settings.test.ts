@@ -70,6 +70,8 @@ describe("applyChatOverrides", () => {
       },
       timezone: DEFAULT_SETTINGS.timezone,
       providerSort: DEFAULT_SETTINGS.providerSort,
+      expandableBlockquoteThreshold:
+        DEFAULT_SETTINGS.expandableBlockquoteThreshold,
     });
   });
 
@@ -87,6 +89,31 @@ describe("applyChatOverrides", () => {
     );
     expect(r.rateLimit.wiseMultiplier).toBe(
       DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
+    );
+  });
+
+  test("normalize fills default expandableBlockquoteThreshold when missing", async () => {
+    const storage = new MemoryStorage();
+    const legacy = {
+      ...DEFAULT_SETTINGS,
+      expandableBlockquoteThreshold: undefined,
+    } as never;
+    await storage.saveSettings(legacy);
+    const s = await getOrInitSettings(storage);
+    expect(s.expandableBlockquoteThreshold).toBe(
+      DEFAULT_SETTINGS.expandableBlockquoteThreshold,
+    );
+  });
+
+  test("normalize rejects negative stored expandableBlockquoteThreshold", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      expandableBlockquoteThreshold: -50,
+    });
+    const s = await getOrInitSettings(storage);
+    expect(s.expandableBlockquoteThreshold).toBe(
+      DEFAULT_SETTINGS.expandableBlockquoteThreshold,
     );
   });
 

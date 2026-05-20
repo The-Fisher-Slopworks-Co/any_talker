@@ -37,6 +37,7 @@ export type GuestAskOutcome =
       botName: string | null;
       totalTokens: number;
       effects: ToolEffect[];
+      expandableThreshold: number;
       persistThread: () => Promise<void>;
     }
   | { kind: "error"; message: string };
@@ -147,6 +148,7 @@ export async function guestAskHandler(
     botName,
     totalTokens: result.totalTokens,
     effects,
+    expandableThreshold: settings.expandableBlockquoteThreshold,
     persistThread: async () => {
       const turns = [
         ...priorTurns,

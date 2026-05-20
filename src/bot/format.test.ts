@@ -5,10 +5,12 @@ import { test, expect, describe } from "bun:test";
 import {
   applyBotNamePrefix,
   buildEffectsTopBlock,
-  EXPANDABLE_BLOCKQUOTE_THRESHOLD,
   TELEGRAM_TEXT_MAX,
 } from "./format";
+import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
 import type { ToolEffect } from "../ai/tools/registry";
+
+const EXPANDABLE_BLOCKQUOTE_THRESHOLD = DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD;
 
 describe("applyBotNamePrefix", () => {
   test("returns body unchanged when bot name is null (HTML mode)", () => {
@@ -153,6 +155,29 @@ describe("applyBotNamePrefix", () => {
     const result = applyBotNamePrefix(body, "Helper");
     expect(result.text).toBe(`<b>Helper</b>\n${body}`);
     expect(result.text).not.toContain("<blockquote");
+  });
+
+  test("respects a custom expandable threshold below the default", () => {
+    const body = "a".repeat(11);
+    const result = applyBotNamePrefix(body, null, undefined, 10);
+    expect(result.text).toBe(`<blockquote expandable>${body}</blockquote>`);
+  });
+
+  test("respects a custom expandable threshold above the default", () => {
+    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD + 100);
+    const result = applyBotNamePrefix(
+      body,
+      null,
+      undefined,
+      EXPANDABLE_BLOCKQUOTE_THRESHOLD + 200,
+    );
+    expect(result.text).toBe(body);
+    expect(result.text).not.toContain("<blockquote");
+  });
+
+  test("threshold of 0 wraps every non-empty body", () => {
+    const result = applyBotNamePrefix("hi", null, undefined, 0);
+    expect(result.text).toBe("<blockquote expandable>hi</blockquote>");
   });
 
   test("expandable wrap is balanced when body truncation kicks in", () => {

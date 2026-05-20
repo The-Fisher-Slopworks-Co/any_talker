@@ -134,6 +134,8 @@ type Strings = {
   ui_prompt_placeholder: string;
   ui_prompt_timezone: string;
   ui_prompt_timezone_footer: string;
+  ui_prompt_expandable_threshold: string;
+  ui_prompt_expandable_threshold_footer: string;
 
   ui_sort_default: string;
   ui_sort_price: string;
@@ -423,6 +425,9 @@ const en: Strings = {
   ui_prompt_timezone: "Timezone",
   ui_prompt_timezone_footer:
     "Default timezone used when the chat or user has no override.",
+  ui_prompt_expandable_threshold: "Collapse threshold",
+  ui_prompt_expandable_threshold_footer:
+    "Replies longer than this many characters are hidden under an expandable quote. Set to 0 to collapse everything.",
 
   ui_sort_default: "Auto",
   ui_sort_price: "Price",
@@ -742,6 +747,9 @@ const ru: Strings = {
   ui_prompt_timezone: "Часовой пояс",
   ui_prompt_timezone_footer:
     "Часовой пояс по умолчанию, когда у чата или пользователя нет своего.",
+  ui_prompt_expandable_threshold: "Порог сворачивания",
+  ui_prompt_expandable_threshold_footer:
+    "Ответы длиннее указанного числа символов прячутся под раскрывающуюся цитату. 0 — сворачивать всегда.",
 
   ui_sort_default: "Авто",
   ui_sort_price: "Цена",
