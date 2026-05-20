@@ -506,21 +506,60 @@ export async function handleApi(
   if (userMatch) {
     const id = userMatch[1]!;
     if (req.method === "GET") {
-      const [user, displayName, whitelisted] = await Promise.all([
-        deps.storage.getUser(id),
-        deps.storage.getUserName(id),
-        deps.storage.isWhitelisted("users", id),
-      ]);
+      const [user, displayName, timezone, gender, whitelisted] =
+        await Promise.all([
+          deps.storage.getUser(id),
+          deps.storage.getUserName(id),
+          deps.storage.getUserTimezone(id),
+          deps.storage.getUserGender(id),
+          deps.storage.isWhitelisted("users", id),
+        ]);
       if (!user) return { status: 404, body: { error: "user not found" } };
-      return { status: 200, body: { user, displayName, whitelisted } };
+      return {
+        status: 200,
+        body: { user, displayName, timezone, gender, whitelisted },
+      };
     }
     if (req.method === "PUT") {
       const user = await deps.storage.getUser(id);
       if (!user) return { status: 404, body: { error: "user not found" } };
-      const body = (req.body ?? {}) as { displayName?: string | null };
-      const displayName = normalizeDisplayName(body.displayName);
-      await deps.storage.setUserName(id, displayName);
-      return { status: 200, body: { user, displayName } };
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const [currentName, currentTz, currentGender] = await Promise.all([
+        deps.storage.getUserName(id),
+        deps.storage.getUserTimezone(id),
+        deps.storage.getUserGender(id),
+      ]);
+      let displayName = currentName;
+      let timezone = currentTz;
+      let gender: Gender | null = currentGender;
+      const writes: Promise<void>[] = [];
+
+      if ("displayName" in body) {
+        displayName = normalizeDisplayName(body.displayName);
+        writes.push(deps.storage.setUserName(id, displayName));
+      }
+      if ("timezone" in body) {
+        if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
+          const next = normalizeTimezoneOrNull(body.timezone);
+          if (next === null) return BAD_TIMEZONE;
+          timezone = next;
+        } else {
+          timezone = null;
+        }
+        writes.push(deps.storage.setUserTimezone(id, timezone));
+      }
+      if ("gender" in body) {
+        const nextGender = normalizeEnumInput(body.gender, isValidGender);
+        if (nextGender === "invalid") return BAD_GENDER;
+        gender = nextGender;
+        writes.push(deps.storage.setUserGender(id, gender));
+      }
+
+      await Promise.all(writes);
+      return {
+        status: 200,
+        body: { user, displayName, timezone, gender },
+      };
     }
   }
 
