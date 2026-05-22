@@ -12,6 +12,12 @@ class FakeApi implements CheckApi {
     text: string;
     other?: unknown;
   }> = [];
+  editedText: Array<{
+    chat_id: string | number;
+    message_id: number;
+    text: string;
+    other?: unknown;
+  }> = [];
   editedMarkup: Array<{
     chat_id: string | number;
     message_id: number;
@@ -27,6 +33,16 @@ class FakeApi implements CheckApi {
   ): Promise<{ message_id: number }> {
     this.sent.push({ chat_id, text, other });
     return this.sendImpl();
+  }
+
+  async editMessageText(
+    chat_id: string | number,
+    message_id: number,
+    text: string,
+    other?: unknown,
+  ): Promise<unknown> {
+    this.editedText.push({ chat_id, message_id, text, other });
+    return {};
   }
 
   async editMessageReplyMarkup(
@@ -92,6 +108,14 @@ describe("resolveCheck", () => {
       reply_parameters: { message_id: 42, allow_sending_without_reply: true },
     });
     expect(api.editedMarkup).toEqual([{ chat_id: "chat-1", message_id: 42 }]);
+    expect(api.editedText).toEqual([
+      {
+        chat_id: "chat-1",
+        message_id: 42,
+        text: `<a href="tg://user?id=user-1">Nikita</a>, did you do sport?\n\nОтвет дан`,
+        other: { parse_mode: "HTML" },
+      },
+    ]);
     const saved = await storage.getCheck("c1");
     expect(saved?.counter).toBe(723);
     expect(saved?.pendingMessageId).toBeNull();
@@ -179,6 +203,14 @@ describe("resolveCheck", () => {
       newCounter: 723,
       reply: "Nikita. Day 723",
     });
+    expect(api.editedText).toEqual([
+      {
+        chat_id: "chat-1",
+        message_id: 42,
+        text: `<a href="tg://user?id=user-1">Nikita</a>, did you do sport?\n\nВремя на ответ истекло`,
+        other: { parse_mode: "HTML" },
+      },
+    ]);
   });
 
   test("wrong_user: doesn't change state or send", async () => {
