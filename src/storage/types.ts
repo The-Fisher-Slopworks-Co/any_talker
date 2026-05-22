@@ -12,6 +12,7 @@ import type {
   Chat,
   ChatSettings,
   Gender,
+  RateLimitConfig,
 } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
@@ -28,6 +29,18 @@ export interface Storage {
 
   getBucket(chatId: string, userId: string): Promise<BucketState | null>;
   saveBucket(chatId: string, userId: string, state: BucketState): Promise<void>;
+  refillBucket(
+    chatId: string,
+    userId: string,
+    config: RateLimitConfig,
+    now: number,
+  ): Promise<BucketState>;
+  deductBucket(
+    chatId: string,
+    userId: string,
+    tokens: number,
+    nowMs: number,
+  ): Promise<BucketState>;
 
   getUserName(userId: string): Promise<string | null>;
   setUserName(userId: string, name: string | null): Promise<void>;
