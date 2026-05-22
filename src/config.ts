@@ -31,9 +31,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   return {
     botToken: required("BOT_TOKEN"),
     openrouterApiKey: required("OPENROUTER_API_KEY"),
-    openrouterAppUrl: env.OPENROUTER_APP_URL || undefined,
-    openrouterAppTitle: env.OPENROUTER_APP_TITLE || undefined,
-    firecrawlApiKey: env.FIRECRAWL_API_KEY || undefined,
+    openrouterAppUrl: nonEmptyOrUndefined(env.OPENROUTER_APP_URL),
+    openrouterAppTitle: nonEmptyOrUndefined(env.OPENROUTER_APP_TITLE),
+    firecrawlApiKey: nonEmptyOrUndefined(env.FIRECRAWL_API_KEY),
     firecrawlConcurrency: parsePositiveInt("FIRECRAWL_CONCURRENCY", env.FIRECRAWL_CONCURRENCY, 2),
     botOwnerId: required("BOT_OWNER_ID"),
     keydbUrl: env.KEYDB_URL ?? "redis://localhost:6379",
@@ -42,6 +42,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     logIncomingUpdates: parseBool("LOG_INCOMING_UPDATES", env.LOG_INCOMING_UPDATES, true),
     logDebug: parseBool("LOG_DEBUG", env.LOG_DEBUG, false),
   };
+}
+
+// Treat empty env strings as "unset". Spelled out as a helper so the intent
+// reads at the call site instead of relying on the `|| undefined` falsy-coerce
+// idiom (which would also collapse "0" / "false" if those were valid values).
+function nonEmptyOrUndefined(v: string | undefined): string | undefined {
+  return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 function parsePositiveInt(name: string, raw: string | undefined, defaultValue: number): number {
