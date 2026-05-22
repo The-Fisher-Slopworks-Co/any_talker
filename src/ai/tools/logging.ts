@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import {
-  formatLog,
+  emitLog,
   type LogFields,
   type LogFormat,
   type LogLevel,
@@ -60,7 +60,5 @@ function emit(
   msg: string,
   fields: LogFields,
 ): void {
-  const line = formatLog({ level, msg, fields }, format);
-  if (level === "error") console.error(line);
-  else console.log(line);
+  emitLog({ level, msg, fields }, format);
 }

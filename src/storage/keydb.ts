@@ -415,7 +415,6 @@ function parseReminderJson(raw: string): Reminder {
   const parsed = JSON.parse(raw) as Reminder & {
     chatId?: string;
     lang?: string;
-    contextMessages?: unknown;
   };
   const chatId =
     parsed.chatId ??
@@ -424,7 +423,7 @@ function parseReminderJson(raw: string): Reminder {
       : parsed.target.userId);
   const lang: Lang = isValidLang(parsed.lang) ? parsed.lang : DEFAULT_LANG;
   const contextMessages = Array.isArray(parsed.contextMessages)
-    ? (parsed.contextMessages as Reminder["contextMessages"])
+    ? parsed.contextMessages
     : [];
   return { ...parsed, chatId, lang, contextMessages };
 }
