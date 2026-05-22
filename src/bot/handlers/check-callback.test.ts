@@ -15,6 +15,13 @@ class FakeApi implements CheckApi {
     this.sent.push({ chat_id, text });
     return { message_id: 1 };
   }
+  async editMessageText(
+    _chat_id: string | number,
+    _message_id: number,
+    _text: string,
+  ) {
+    return {};
+  }
   async editMessageReplyMarkup(chat_id: string | number, message_id: number) {
     this.edited.push({ chat_id, message_id });
     return {};
