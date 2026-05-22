@@ -4,7 +4,7 @@
 import { useI18n } from "../i18n-context";
 import type { RateLimitConfig } from "../../../shared/types";
 import { Card } from "./layout";
-import { Toggle } from "./controls";
+import { NumberInput, Toggle } from "./controls";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
 
 export function RateLimitFields({
@@ -20,37 +20,33 @@ export function RateLimitFields({
     <Card>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_capacity}</span>
-        <input
-          type="number"
+        <NumberInput
           className={INPUT_CLS}
+          integer
+          min={0}
           value={value.capacity}
-          onChange={(e) =>
-            onChange({ ...value, capacity: Number(e.target.value) })
-          }
+          onChange={(n) => onChange({ ...value, capacity: n })}
         />
       </label>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_refill_amount}</span>
-        <input
-          type="number"
+        <NumberInput
           className={INPUT_CLS}
+          integer
+          min={0}
           value={value.refillAmount}
-          onChange={(e) =>
-            onChange({ ...value, refillAmount: Number(e.target.value) })
-          }
+          onChange={(n) => onChange({ ...value, refillAmount: n })}
         />
       </label>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_refill_every}</span>
-        <input
-          type="number"
+        <NumberInput
           className={INPUT_CLS}
+          integer
+          min={0}
           value={intervalMin}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              refillIntervalMs: Number(e.target.value) * 60_000,
-            })
+          onChange={(n) =>
+            onChange({ ...value, refillIntervalMs: n * 60_000 })
           }
         />
         <span className="shrink-0 text-tg-hint text-[15px]">
@@ -69,30 +65,24 @@ export function RateLimitFields({
         <span className={ROW_LABEL_CLS}>
           {s.ui_ratelimit_detailed_multiplier}
         </span>
-        <input
-          type="number"
-          step="0.1"
-          min="0"
+        <NumberInput
           className={INPUT_CLS}
+          step="0.1"
+          min={0}
           value={value.detailedMultiplier}
-          onChange={(e) =>
-            onChange({ ...value, detailedMultiplier: Number(e.target.value) })
-          }
+          onChange={(n) => onChange({ ...value, detailedMultiplier: n })}
         />
       </label>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>
           {s.ui_ratelimit_wise_multiplier}
         </span>
-        <input
-          type="number"
-          step="0.1"
-          min="0"
+        <NumberInput
           className={INPUT_CLS}
+          step="0.1"
+          min={0}
           value={value.wiseMultiplier}
-          onChange={(e) =>
-            onChange({ ...value, wiseMultiplier: Number(e.target.value) })
-          }
+          onChange={(n) => onChange({ ...value, wiseMultiplier: n })}
         />
       </label>
     </Card>

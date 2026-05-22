@@ -16,7 +16,7 @@ import {
   Stack,
 } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { SaveButton, Toggle } from "../../components/controls";
+import { NumberInput, SaveButton, Toggle } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { TimezoneSelect } from "../../components/timezone-select";
 import {
@@ -28,11 +28,6 @@ import {
 
 const TEXTAREA_CLS =
   "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[100px]";
-
-function clampInt(raw: string, min: number, max: number): number {
-  const n = Math.floor(Number(raw) || min);
-  return Math.max(min, Math.min(max, n));
-}
 
 const DEFAULT_DRAFT = {
   title: "",
@@ -204,39 +199,33 @@ export function CheckEditView({
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_check_schedule}</span>
           <span className="flex-1" />
-          <input
-            type="number"
+          <NumberInput
             className="w-12 bg-transparent border-0 p-0 text-base text-tg-text text-right"
+            integer
             min={0}
             max={23}
             value={draft.scheduleHour}
-            onChange={(e) =>
-              set("scheduleHour", clampInt(e.target.value, 0, 23))
-            }
+            onChange={(n) => set("scheduleHour", n)}
           />
           <span className="text-tg-hint">:</span>
-          <input
-            type="number"
+          <NumberInput
             className="w-12 bg-transparent border-0 p-0 text-base text-tg-text text-right"
+            integer
             min={0}
             max={59}
             value={draft.scheduleMinute}
-            onChange={(e) =>
-              set("scheduleMinute", clampInt(e.target.value, 0, 59))
-            }
+            onChange={(n) => set("scheduleMinute", n)}
           />
         </div>
         <label className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_check_timeout}</span>
-          <input
-            type="number"
+          <NumberInput
             className={INPUT_CLS}
+            integer
             min={1}
             max={24 * 60}
             value={draft.timeoutMinutes}
-            onChange={(e) =>
-              set("timeoutMinutes", clampInt(e.target.value, 1, 24 * 60))
-            }
+            onChange={(n) => set("timeoutMinutes", n)}
           />
         </label>
       </Card>
@@ -328,17 +317,12 @@ export function CheckEditView({
           <Card>
             <label className={ROW_CLS}>
               <span className={ROW_LABEL_CLS}>{s.ui_check_counter}</span>
-              <input
-                type="number"
+              <NumberInput
                 className={INPUT_CLS}
+                integer
                 min={0}
                 value={draft.counter}
-                onChange={(e) =>
-                  set(
-                    "counter",
-                    clampInt(e.target.value, 0, Number.MAX_SAFE_INTEGER),
-                  )
-                }
+                onChange={(n) => set("counter", n)}
               />
             </label>
           </Card>
