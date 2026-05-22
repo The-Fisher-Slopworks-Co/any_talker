@@ -89,8 +89,8 @@ export async function resolveCheck(args: {
     count: currentCount(check, fireMs),
   });
   const statusLine =
-    answer === "timeout" ? "Время на ответ истекло" : "Ответ дан";
-  const editedText = `${originalQuestion}\n\n${escapeHtmlText(statusLine)}`;
+    answer === "timeout" ? "Время на ответ истекло." : "Ответ дан.";
+  const editedText = `${originalQuestion}\n${escapeHtmlText(statusLine)}`;
 
   try {
     await api.editMessageText(

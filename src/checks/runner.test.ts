@@ -176,7 +176,7 @@ describe("runChecksTick timeout path", () => {
       {
         chat_id: "chat-1",
         message_id: 42,
-        text: `<a href="tg://user?id=user-1">Nikita</a>, sport? day 722\n\nВремя на ответ истекло`,
+        text: `<a href="tg://user?id=user-1">Nikita</a>, sport? day 722\nВремя на ответ истекло.`,
         other: { parse_mode: "HTML" },
       },
     ]);
