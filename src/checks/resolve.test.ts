@@ -112,7 +112,7 @@ describe("resolveCheck", () => {
       {
         chat_id: "chat-1",
         message_id: 42,
-        text: `<a href="tg://user?id=user-1">Nikita</a>, did you do sport?\n\nОтвет дан`,
+        text: `<a href="tg://user?id=user-1">Nikita</a>, did you do sport?\nОтвет дан.`,
         other: { parse_mode: "HTML" },
       },
     ]);
@@ -207,7 +207,7 @@ describe("resolveCheck", () => {
       {
         chat_id: "chat-1",
         message_id: 42,
-        text: `<a href="tg://user?id=user-1">Nikita</a>, did you do sport?\n\nВремя на ответ истекло`,
+        text: `<a href="tg://user?id=user-1">Nikita</a>, did you do sport?\nВремя на ответ истекло.`,
         other: { parse_mode: "HTML" },
       },
     ]);
