@@ -114,6 +114,9 @@ export async function safeFetch(url: string, opts: SafeFetchOptions): Promise<Re
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       throw new Error(`Blocked: protocol ${parsed.protocol} is not allowed`);
     }
+    if (parsed.port !== "" && parsed.port !== "80" && parsed.port !== "443") {
+      throw new Error(`Blocked: port ${parsed.port} is not allowed`);
+    }
     await assertPublicHost(parsed.hostname);
 
     const response = await fetchWithTimeout(
