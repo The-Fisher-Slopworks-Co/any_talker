@@ -3,8 +3,9 @@
 
 import type { Storage } from "../storage/types";
 import type { RecurringCheck, CheckAnswer } from "./types";
-import { formatReply } from "./format";
-import { applyAnswer } from "./counter";
+import { formatQuestion, formatReply } from "./format";
+import { applyAnswer, currentCount } from "./counter";
+import { escapeHtmlText } from "../bot/html";
 
 export type CheckInlineKeyboardButton = {
   text: string;
@@ -26,6 +27,14 @@ export type CheckApi = {
       };
     },
   ): Promise<{ message_id: number }>;
+  editMessageText(
+    chat_id: string | number,
+    message_id: number,
+    text: string,
+    other?: {
+      parse_mode?: "HTML";
+    },
+  ): Promise<unknown>;
   editMessageReplyMarkup(
     chat_id: string | number,
     message_id: number,
@@ -71,6 +80,29 @@ export async function resolveCheck(args: {
     });
   } catch (err) {
     console.error(`[checks] reply send failed id=${check.id}:`, err);
+  }
+
+  const fireMs = check.pendingFiredAtMs ?? nowMs;
+  const originalQuestion = formatQuestion(check.question, {
+    targetUserId: check.targetUserId,
+    name: check.targetName,
+    count: currentCount(check, fireMs),
+  });
+  const statusLine =
+    answer === "timeout" ? "Время на ответ истекло" : "Ответ дан";
+  const editedText = `${originalQuestion}\n\n${escapeHtmlText(statusLine)}`;
+
+  try {
+    await api.editMessageText(
+      check.chatId,
+      check.pendingMessageId,
+      editedText,
+      { parse_mode: "HTML" },
+    );
+  } catch (err) {
+    if (!isHarmlessEditError(err)) {
+      console.error(`[checks] edit message text failed id=${check.id}:`, err);
+    }
   }
 
   try {
