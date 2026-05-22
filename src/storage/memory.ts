@@ -13,6 +13,7 @@ import type {
   Chat,
   ChatSettings,
   Gender,
+  RateLimitConfig,
 } from "../shared/types";
 import { isEmptyChatSettings } from "../shared/types";
 import type { Lang } from "../shared/i18n";
@@ -86,6 +87,54 @@ export class MemoryStorage implements Storage {
     state: BucketState,
   ): Promise<void> {
     this.buckets.set(this.bucketKey(chatId, userId), { ...state });
+  }
+
+  // Atomic by JS event-loop construction: there is no `await` between the
+  // read and write of `this.buckets`, so concurrent callers cannot interleave.
+  async refillBucket(
+    chatId: string,
+    userId: string,
+    config: RateLimitConfig,
+    now: number,
+  ): Promise<BucketState> {
+    const key = this.bucketKey(chatId, userId);
+    const current = this.buckets.get(key);
+    let next: BucketState;
+    if (!current) {
+      next = { tokens: config.capacity, lastRefillTs: now };
+    } else {
+      const elapsed = now - current.lastRefillTs;
+      if (elapsed < config.refillIntervalMs) {
+        next = { ...current };
+      } else {
+        const periods = Math.floor(elapsed / config.refillIntervalMs);
+        next = {
+          tokens: Math.min(
+            config.capacity,
+            current.tokens + periods * config.refillAmount,
+          ),
+          lastRefillTs:
+            current.lastRefillTs + periods * config.refillIntervalMs,
+        };
+      }
+    }
+    this.buckets.set(key, { ...next });
+    return next;
+  }
+
+  async deductBucket(
+    chatId: string,
+    userId: string,
+    tokens: number,
+    nowMs: number,
+  ): Promise<BucketState> {
+    const key = this.bucketKey(chatId, userId);
+    const current = this.buckets.get(key);
+    const next: BucketState = current
+      ? { tokens: current.tokens - tokens, lastRefillTs: current.lastRefillTs }
+      : { tokens: -tokens, lastRefillTs: nowMs };
+    this.buckets.set(key, { ...next });
+    return next;
   }
 
   async getUserName(userId: string): Promise<string | null> {
