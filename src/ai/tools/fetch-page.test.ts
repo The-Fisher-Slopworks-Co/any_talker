@@ -80,6 +80,42 @@ describe("fetch_page tool", () => {
       ).rejects.toThrow();
     });
 
+    test.each([
+      "http://example.com:22/",
+      "http://example.com:8080/",
+      "https://example.com:8443/",
+      "http://example.com:6379/",
+    ])("blocks non-standard destination port: %s", async (url) => {
+      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow(
+        "port",
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    test("blocks redirect to a non-standard port on a public host", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(
+          new Response(null, {
+            status: 302,
+            headers: { location: "http://example.org:8080/internal" },
+          }),
+        ),
+      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/redir" }, ctx),
+      ).rejects.toThrow("port");
+    });
+
+    test("allows explicit standard ports (:80 on http, :443 on https)", async () => {
+      mockFetch.mockImplementation(() => Promise.resolve(htmlResponse("<p>ok</p>")));
+      await expect(
+        fetchPageTool.execute({ url: "http://example.com:80/" }, ctx),
+      ).resolves.toBeDefined();
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com:443/" }, ctx),
+      ).resolves.toBeDefined();
+    });
+
     test("blocks redirect to a private address", async () => {
       mockFetch.mockImplementation(() =>
         Promise.resolve(
