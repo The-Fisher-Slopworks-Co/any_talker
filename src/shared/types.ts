@@ -171,3 +171,12 @@ export function isValidTimezone(tz: string): boolean {
     return false;
   }
 }
+
+// Returns the canonical IANA tz name (e.g. "Europe/Moscow") for an input that
+// may differ in case ("europe/moscow") or be a deprecated alias. Returns null
+// if the input is not a valid timezone.
+export function canonicalizeTimezone(tz: string): string | null {
+  if (!isValidTimezone(tz)) return null;
+  return new Intl.DateTimeFormat("en-US", { timeZone: tz }).resolvedOptions()
+    .timeZone;
+}
