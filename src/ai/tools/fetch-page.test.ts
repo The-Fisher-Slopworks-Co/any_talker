@@ -17,14 +17,20 @@ const ctx: ToolCallContext = {
 
 const mockFetch = mock(() => Promise.resolve(new Response("", { status: 200 })));
 const originalFetch = globalThis.fetch;
+const originalDnsLookup = Bun.dns.lookup;
 
 beforeEach(() => {
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockReset();
+  // Stub Bun.dns.lookup so safeFetch's IP-pinning resolves to a deterministic
+  // public address without hitting real DNS in tests.
+  (Bun.dns as { lookup: typeof Bun.dns.lookup }).lookup = (async () =>
+    [{ address: "203.0.113.10", family: 4, ttl: 60 }]) as typeof Bun.dns.lookup;
 });
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  (Bun.dns as { lookup: typeof Bun.dns.lookup }).lookup = originalDnsLookup;
 });
 
 function htmlResponse(html: string, contentType = "text/html; charset=utf-8") {
