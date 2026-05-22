@@ -53,17 +53,37 @@ function pickEnv(...candidates: Array<string | undefined>): string | null {
 function matchesNoProxy(host: string, port: string, raw: string): boolean {
   const hostLower = host.toLowerCase();
   for (const piece of raw.split(",")) {
-    const s = piece.trim();
-    if (s.length === 0) continue;
-    if (s === "*") return true;
-    const stripped = s.startsWith(".") ? s.slice(1) : s;
-    const colon = stripped.lastIndexOf(":");
-    const onlyOneColon =
-      colon !== -1 && stripped.indexOf(":") === colon && !stripped.startsWith("[");
-    const entryHost = (onlyOneColon ? stripped.slice(0, colon) : stripped).toLowerCase();
-    const entryPort = onlyOneColon ? stripped.slice(colon + 1) : null;
-    if (entryPort !== null && entryPort !== port) continue;
-    if (hostLower === entryHost) return true;
+    const trimmed = piece.trim();
+    if (trimmed.length === 0) continue;
+    if (trimmed === "*") return true;
+    const entry = parseNoProxyEntry(trimmed);
+    if (entry.port !== null && entry.port !== port) continue;
+    if (hostLower === entry.host) return true;
   }
   return false;
+}
+
+// Parse a single NO_PROXY entry into a lowercased host and optional port.
+// Accepts a leading "." (the conventional "any subdomain of" prefix; we only
+// honour it as a host alias today). IPv6 hosts wrapped in `[...]` are never
+// split on `:`. Everything else is split only if the entry contains exactly
+// one `:`, so `host:port` is recognised but bare IPv6 addresses are not
+// mistaken for it.
+function parseNoProxyEntry(entry: string): {
+  host: string;
+  port: string | null;
+} {
+  const body = entry.startsWith(".") ? entry.slice(1) : entry;
+  if (body.startsWith("[")) {
+    return { host: body.toLowerCase(), port: null };
+  }
+  const firstColon = body.indexOf(":");
+  const lastColon = body.lastIndexOf(":");
+  if (firstColon !== -1 && firstColon === lastColon) {
+    return {
+      host: body.slice(0, firstColon).toLowerCase(),
+      port: body.slice(firstColon + 1),
+    };
+  }
+  return { host: body.toLowerCase(), port: null };
 }
