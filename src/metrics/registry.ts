@@ -280,6 +280,7 @@ export class Histogram implements Metric {
 export class Registry {
   private readonly metrics: Metric[] = [];
   private readonly collectors: Array<() => void> = [];
+  private onCollectorError?: (err: unknown) => void;
 
   register<T extends Metric>(metric: T): T {
     if (this.metrics.some((m) => m.name === metric.name)) {
@@ -293,12 +294,20 @@ export class Registry {
     this.collectors.push(fn);
   }
 
+  // Hook for the call site to surface collector failures via its own
+  // counter, so a silent throw inside an onCollect callback shows up in
+  // operator-visible metrics instead of only stderr.
+  setOnCollectorError(fn: (err: unknown) => void): void {
+    this.onCollectorError = fn;
+  }
+
   render(): string {
     for (const c of this.collectors) {
       try {
         c();
       } catch (err) {
         console.error("metrics collector failed:", err);
+        this.onCollectorError?.(err);
       }
     }
     return this.metrics.map((m) => m.collect()).join("\n") + "\n";
@@ -307,6 +316,7 @@ export class Registry {
   clear(): void {
     this.metrics.length = 0;
     this.collectors.length = 0;
+    this.onCollectorError = undefined;
   }
 }
 
