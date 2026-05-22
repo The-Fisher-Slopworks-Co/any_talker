@@ -13,6 +13,12 @@ class FakeApi implements CheckApi {
     text: string;
     other?: unknown;
   }> = [];
+  editedText: Array<{
+    chat_id: string | number;
+    message_id: number;
+    text: string;
+    other?: unknown;
+  }> = [];
   editedMarkup: Array<{ chat_id: string | number; message_id: number }> = [];
   nextMessageId = 100;
 
@@ -23,6 +29,16 @@ class FakeApi implements CheckApi {
   ): Promise<{ message_id: number }> {
     this.sent.push({ chat_id, text, other });
     return { message_id: this.nextMessageId++ };
+  }
+
+  async editMessageText(
+    chat_id: string | number,
+    message_id: number,
+    text: string,
+    other?: unknown,
+  ): Promise<unknown> {
+    this.editedText.push({ chat_id, message_id, text, other });
+    return {};
   }
 
   async editMessageReplyMarkup(
@@ -156,6 +172,14 @@ describe("runChecksTick timeout path", () => {
     expect(api.sent[0]?.other).toEqual({
       reply_parameters: { message_id: 42, allow_sending_without_reply: true },
     });
+    expect(api.editedText).toEqual([
+      {
+        chat_id: "chat-1",
+        message_id: 42,
+        text: `<a href="tg://user?id=user-1">Nikita</a>, sport? day 722\nВремя на ответ истекло.`,
+        other: { parse_mode: "HTML" },
+      },
+    ]);
     const saved = await storage.getCheck("c1");
     expect(saved?.counter).toBe(723);
     expect(saved?.pendingMessageId).toBeNull();
