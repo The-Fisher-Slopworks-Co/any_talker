@@ -116,9 +116,18 @@ export const DEFAULT_SETTINGS: Settings = {
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
 };
 
+// Cap on how far back the conversation graph is walked when building LLM
+// context. Longer chains burn tokens disproportionately and yield diminishing
+// returns; 20 turns is enough to cover virtually all real reply threads.
 export const MAX_REPLY_CHAIN_DEPTH = 20;
-export const CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
-export const PHOTO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+// Stored conversation nodes expire after this many seconds of inactivity.
+// 30 days lets a user resume a long-running thread weeks later, while
+// bounding the storage footprint of abandoned threads.
+export const CONVERSATION_TTL_SECONDS = 30 * 24 * 60 * 60;
+// Telegram file_id payloads decoded into bytes are cached for this many
+// seconds. 7 days covers typical conversation reuse without keeping
+// every photo the bot has ever seen pinned in storage indefinitely.
+export const PHOTO_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export function composeFullName(
   firstName: string | null | undefined,
@@ -147,9 +156,11 @@ export function messageMatchesKeyword(
   keywords: string[],
 ): boolean {
   if (text.length === 0 || keywords.length === 0) return false;
-  const haystack = text.toLowerCase();
+  // Normalize to NFC so that visually identical strings written with
+  // different Unicode decompositions (e.g. "café" NFC vs NFD) compare equal.
+  const haystack = text.normalize("NFC").toLowerCase();
   return keywords.some((kw) => {
-    const needle = kw.toLowerCase();
+    const needle = kw.normalize("NFC").toLowerCase();
     return needle.length > 0 && haystack.includes(needle);
   });
 }
