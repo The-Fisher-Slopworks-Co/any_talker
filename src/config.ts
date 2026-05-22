@@ -56,5 +56,5 @@ function parseBool(name: string, raw: string | undefined, defaultValue: boolean)
   const v = raw.toLowerCase();
   if (v === "1" || v === "true" || v === "yes" || v === "on") return true;
   if (v === "0" || v === "false" || v === "no" || v === "off") return false;
-  throw new Error(`${name} must be true/false/1/0, got: ${raw}`);
+  throw new Error(`${name} must be one of true/false/1/0/yes/no/on/off, got: ${raw}`);
 }

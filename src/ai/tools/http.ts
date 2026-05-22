@@ -22,7 +22,7 @@ export async function fetchWithTimeout(
 
 const PRIVATE_BLOCK_MESSAGE = "Blocked: private and local addresses are not allowed";
 
-function isPrivateIPv4(ip: string): boolean {
+function isBlockedIPv4(ip: string): boolean {
   const parts = ip.split(".").map((p) => Number(p));
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
     return true;
@@ -38,12 +38,12 @@ function isPrivateIPv4(ip: string): boolean {
   return false;
 }
 
-function isPrivateIPv6(ip: string): boolean {
+function isBlockedIPv6(ip: string): boolean {
   const noZone = ip.split("%")[0]?.toLowerCase() ?? "";
   if (noZone === "::1" || noZone === "::") return true;
 
   const dotted = noZone.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  if (dotted && isIP(dotted[1]!) === 4) return isPrivateIPv4(dotted[1]!);
+  if (dotted && isIP(dotted[1]!) === 4) return isBlockedIPv4(dotted[1]!);
 
   const hex = noZone.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
   if (hex) {
@@ -51,7 +51,7 @@ function isPrivateIPv6(ip: string): boolean {
     const lo = Number.parseInt(hex[2]!, 16);
     if (hi >= 0 && hi <= 0xffff && lo >= 0 && lo <= 0xffff) {
       const v4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-      return isPrivateIPv4(v4);
+      return isBlockedIPv4(v4);
     }
   }
 
@@ -61,10 +61,10 @@ function isPrivateIPv6(ip: string): boolean {
   return false;
 }
 
-export function isPrivateAddress(ip: string): boolean {
+export function isBlockedAddress(ip: string): boolean {
   const v = isIP(ip);
-  if (v === 4) return isPrivateIPv4(ip);
-  if (v === 6) return isPrivateIPv6(ip);
+  if (v === 4) return isBlockedIPv4(ip);
+  if (v === 6) return isBlockedIPv6(ip);
   return true;
 }
 
@@ -78,7 +78,7 @@ export async function assertPublicHost(hostname: string): Promise<void> {
     throw new Error(PRIVATE_BLOCK_MESSAGE);
   }
   if (isIP(bare)) {
-    if (isPrivateAddress(bare)) {
+    if (isBlockedAddress(bare)) {
       throw new Error(PRIVATE_BLOCK_MESSAGE);
     }
     return;
@@ -93,7 +93,7 @@ export async function assertPublicHost(hostname: string): Promise<void> {
     throw new Error(PRIVATE_BLOCK_MESSAGE);
   }
   for (const { address } of addresses) {
-    if (isPrivateAddress(address)) {
+    if (isBlockedAddress(address)) {
       throw new Error(PRIVATE_BLOCK_MESSAGE);
     }
   }
