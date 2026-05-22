@@ -92,8 +92,9 @@ function parseTag(input: string, start: number): TagToken | null {
     i++;
   }
   const nameStart = i;
+  if (i >= input.length || !/[a-zA-Z]/.test(input[i]!)) return null;
+  i++;
   while (i < input.length && /[a-zA-Z0-9]/.test(input[i]!)) i++;
-  if (i === nameStart) return null;
   const name = input.slice(nameStart, i).toLowerCase();
 
   let attrsEnd = i;
