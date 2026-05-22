@@ -53,15 +53,17 @@ export class OpenRouterAIClient implements AIClient {
           })
         : this.defaultProvider;
 
-    const toolMap: ToolSet = {};
-    for (const t of opts.tools) {
-      toolMap[t.name] = aiTool({
-        description: t.description,
-        inputSchema: t.parameters,
-        execute: async (input: unknown) =>
-          t.execute(input, opts.toolCallContext),
-      });
-    }
+    const toolMap: ToolSet = Object.fromEntries(
+      opts.tools.map((t) => [
+        t.name,
+        aiTool({
+          description: t.description,
+          inputSchema: t.parameters,
+          execute: async (input: unknown) =>
+            t.execute(input, opts.toolCallContext),
+        }),
+      ]),
+    );
 
     const openrouterOpts: {
       models?: string[];

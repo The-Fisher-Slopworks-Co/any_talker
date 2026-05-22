@@ -616,7 +616,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       return;
     }
     if (outcome.kind === "resolved") {
-      checksProcessedTotal.inc({ outcome: `answered_${answer}` });
+      checksProcessedTotal.inc({
+        outcome: answer === "yes" ? "answered_yes" : "answered_no",
+      });
     }
     await ctx.answerCallbackQuery().catch(() => {});
   });
@@ -638,17 +640,21 @@ function extractReplyTarget(reply: Message): ReplyTarget {
   };
 }
 
-function askOutcomeLabel(kind: string): AskOutcomeLabel {
-  switch (kind) {
-    case "answered":
-      return "answered";
-    case "denied":
-      return "denied";
-    case "usage":
-      return "usage";
-    case "rateLimited":
-      return "rate_limited";
-    default:
-      return "error";
-  }
+type AskOutcomeKind =
+  | "answered"
+  | "denied"
+  | "usage"
+  | "rateLimited"
+  | "error";
+
+const ASK_OUTCOME_LABEL: Record<AskOutcomeKind, AskOutcomeLabel> = {
+  answered: "answered",
+  denied: "denied",
+  usage: "usage",
+  rateLimited: "rate_limited",
+  error: "error",
+};
+
+function askOutcomeLabel(kind: AskOutcomeKind): AskOutcomeLabel {
+  return ASK_OUTCOME_LABEL[kind];
 }

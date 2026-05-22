@@ -6,9 +6,9 @@ import { MemoryStorage } from "../../../storage/memory";
 import {
   buildDeliveryTarget,
   durationToMs,
-  parseAbsoluteDateTimeMs,
   persistReminder,
 } from "./shared";
+import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import type { ToolCallContext, ToolEffect } from "../registry";
 
 const baseCtx: ToolCallContext = {
