@@ -48,6 +48,10 @@ export async function deliverReminder(
   try {
     body = await composeReminderMessage(deps, reminder, nowMs);
   } catch (err) {
+    // Corruption of stored reminders is gated at the storage boundary
+    // (parseStoredReminder quarantines bad records before they reach this
+    // path), so remaining throws here are AI/storage/network failures —
+    // transient retry on the next tick is correct.
     console.error(
       `[reminders] AI composition failed id=${reminder.id}:`,
       err,
