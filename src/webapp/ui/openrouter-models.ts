@@ -80,10 +80,13 @@ export function fetchOpenRouterEndpoints(
 
 
 function priceSum(e: OpenRouterEndpoint): number {
+  // Treat any non-finite or negative price as "missing": never rank such
+  // endpoints best by price. Falls back to Infinity so a sort by price
+  // pushes them to the end.
   const parse = (p: string | undefined): number => {
     if (p === undefined) return Infinity;
     const n = Number(p);
-    return Number.isFinite(n) ? n : Infinity;
+    return Number.isFinite(n) && n >= 0 ? n : Infinity;
   };
   return parse(e.pricing.prompt) + parse(e.pricing.completion);
 }

@@ -443,6 +443,10 @@ export async function handleApi(
     }
   }
 
+  // OpenRouter endpoint metadata is read by the BYOK model picker (non-admin
+  // users) as well as the admin views, so this handler intentionally sits
+  // above the owner gate below. Anything added here must stay safe to expose
+  // to any authenticated Telegram Mini App user.
   const orMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);
   if (orMatch && req.method === "GET") {
     const permaslug = decodeURIComponent(orMatch[1]!);
@@ -456,10 +460,11 @@ export async function handleApi(
       const data = await deps.fetchOpenRouterStats(permaslug);
       return { status: 200, body: data };
     } catch (err) {
-      return {
-        status: 502,
-        body: { error: err instanceof Error ? err.message : String(err) },
-      };
+      // Log the upstream error but return a generic code: the message can
+      // contain internal paths / stack fragments that we shouldn't expose
+      // through the Mini App to non-admin users.
+      console.error("openrouter stats fetch failed:", err);
+      return { status: 502, body: { error: "openrouter_stats_failed" } };
     }
   }
 
