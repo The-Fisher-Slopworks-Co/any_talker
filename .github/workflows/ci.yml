@@ -61,6 +61,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Validate commit SHA
+        run: |
+          if [ -z "${{ github.sha }}" ]; then
+            echo "github.sha is empty; refusing to build with an empty GIT_COMMIT label" >&2
+            exit 1
+          fi
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
