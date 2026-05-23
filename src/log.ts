@@ -22,10 +22,8 @@ export function formatLog(record: LogRecord, format: LogFormat): string {
       ts,
       level: record.level,
       msg: record.msg,
+      ...fields,
     };
-    for (const [k, v] of Object.entries(fields)) {
-      if (v !== undefined) obj[k] = v;
-    }
     return JSON.stringify(obj);
   }
 
@@ -44,6 +42,15 @@ function renderPrettyValue(v: unknown): string {
   }
   if (typeof v === "number" || typeof v === "boolean") return String(v);
   return JSON.stringify(v);
+}
+
+export function emitLog(record: LogRecord, format: LogFormat): void {
+  const line = formatLog(record, format);
+  if (record.level === "error" || record.level === "warn") {
+    console.error(line);
+  } else {
+    console.log(line);
+  }
 }
 
 export function resolveLogFormat(
