@@ -72,10 +72,20 @@ export async function verifyInitData(
   return { ok: true, user };
 }
 
+// SHA-256 HMAC digests are always 32 bytes / 64 hex chars. Decode both into
+// fixed-size buffers and compare in constant time without any length-based
+// early return — the early return would leak one bit (length mismatch) and
+// is the textbook anti-pattern for constant-time comparison.
+const DIGEST_BYTES = 32;
+
 function hexDigestsEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  const ab = Buffer.from(a, "hex");
-  const bb = Buffer.from(b, "hex");
-  if (ab.length !== bb.length) return false;
-  return timingSafeEqual(ab, bb);
+  const ab = Buffer.alloc(DIGEST_BYTES);
+  const bb = Buffer.alloc(DIGEST_BYTES);
+  const aDecoded = Buffer.from(a, "hex");
+  const bDecoded = Buffer.from(b, "hex");
+  aDecoded.copy(ab, 0, 0, Math.min(aDecoded.length, DIGEST_BYTES));
+  bDecoded.copy(bb, 0, 0, Math.min(bDecoded.length, DIGEST_BYTES));
+  const lengthsMatch =
+    aDecoded.length === DIGEST_BYTES && bDecoded.length === DIGEST_BYTES;
+  return timingSafeEqual(ab, bb) && lengthsMatch;
 }

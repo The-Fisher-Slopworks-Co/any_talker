@@ -43,7 +43,10 @@ services:
       # Picked up by Vector's docker_logs source filter.
       observability.collect: "true"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:8080/"]
+      # wget --spider returns non-zero on any non-2xx response, so hitting a
+      # dedicated /health endpoint (instead of /) gives us a real liveness
+      # signal rather than "the static-asset handler answered".
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -104,7 +107,9 @@ services:
       - --storageDataPath=/storage
       - --retentionPeriod=${VM_RETENTION:-90d}
       - --promscrape.config=/etc/vm/scrape.yml
-      - --promscrape.config.strictParse=false
+      # strictParse=true makes a malformed scrape config fail the container
+      # at startup, so misconfigured targets don't silently disappear.
+      - --promscrape.config.strictParse=true
       - --httpListenAddr=:8428
     volumes:
       - ./vmagent.yml:/etc/vm/scrape.yml:ro

@@ -54,6 +54,10 @@ function renderPrettyValue(v: unknown): string {
   return rendered.slice(0, PRETTY_VALUE_MAX) + "…";
 }
 
+// Routes `error`/`warn` to stderr (console.error) and the rest to stdout
+// (console.log). Downstream Vector reads both as JSON lines, but anyone
+// routing stderr separately (or running `bun run … 2>/dev/null` locally)
+// will lose warnings — keep that in mind before changing this split.
 export function emitLog(record: LogRecord, format: LogFormat): void {
   const line = formatLog(record, format);
   if (record.level === "error" || record.level === "warn") {

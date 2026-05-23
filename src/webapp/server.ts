@@ -40,6 +40,13 @@ export function startServer(deps: ServerDeps) {
       });
     }
 
+    if (url.pathname === "/health") {
+      return new Response("ok", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      });
+    }
+
     if (url.pathname === "/api/build-info" && req.method === "GET") {
       return Response.json(await getBuildInfo());
     }
@@ -110,6 +117,7 @@ export function startServer(deps: ServerDeps) {
 
 function normalizeRoute(pathname: string): string {
   if (pathname === "/metrics") return "/metrics";
+  if (pathname === "/health") return "/health";
   if (pathname.startsWith("/api/")) {
     const rest = pathname.slice("/api/".length);
     const head = rest.split("/")[0] ?? "";
