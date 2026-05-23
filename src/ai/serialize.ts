@@ -3,6 +3,7 @@
 
 import type {
   AIMessage,
+  AIUserContentPart,
   SerializedAIMessage,
   SerializedAIUserContentPart,
 } from "./types";
@@ -34,15 +35,20 @@ export function deserializeMessages(
     if (typeof m.content === "string") {
       return { role: "user", content: m.content };
     }
-    const parts = m.content.map((p) =>
-      p.type === "text"
-        ? { type: "text" as const, text: p.text }
-        : {
-            type: "image" as const,
-            image: new Uint8Array(Buffer.from(p.image_base64, "base64")),
-            mediaType: p.mediaType,
-          },
-    );
+    const parts: AIUserContentPart[] = m.content.map((p) => {
+      if (p.type === "text") {
+        return { type: "text", text: p.text };
+      }
+      if (p.type === "image") {
+        return {
+          type: "image",
+          image: new Uint8Array(Buffer.from(p.image_base64, "base64")),
+          mediaType: p.mediaType,
+        };
+      }
+      const _exhaustive: never = p;
+      throw new Error(`unknown serialized part: ${JSON.stringify(_exhaustive)}`);
+    });
     return { role: "user", content: parts };
   });
 }

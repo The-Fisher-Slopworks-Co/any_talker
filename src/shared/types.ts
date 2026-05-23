@@ -173,12 +173,22 @@ export function isValidGender(v: unknown): v is Gender {
   return v === "male" || v === "female";
 }
 
+// Cache results so hot paths don't pay for an Intl.DateTimeFormat allocation
+// per call. The IANA tz database is closed under runtime updates we care
+// about, and an unbounded set keyed by tz string is still tiny.
+const TZ_VALID = new Set<string>();
+const TZ_INVALID = new Set<string>();
+
 export function isValidTimezone(tz: string): boolean {
   if (typeof tz !== "string" || tz.length === 0) return false;
+  if (TZ_VALID.has(tz)) return true;
+  if (TZ_INVALID.has(tz)) return false;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    TZ_VALID.add(tz);
     return true;
   } catch {
+    TZ_INVALID.add(tz);
     return false;
   }
 }

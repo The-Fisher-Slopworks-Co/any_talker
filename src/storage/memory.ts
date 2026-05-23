@@ -91,6 +91,10 @@ export class MemoryStorage implements Storage {
 
   // Atomic by JS event-loop construction: there is no `await` between the
   // read and write of `this.buckets`, so concurrent callers cannot interleave.
+  // WARNING: do not introduce an `await` between the `.get(key)` and the
+  // `.set(key, ...)` below — doing so silently breaks the atomicity invariant
+  // and there is no test that catches it. If you need async work, do it
+  // before the read or after the write.
   async refillBucket(
     chatId: string,
     userId: string,
