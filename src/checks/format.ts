@@ -3,6 +3,11 @@
 
 import { escapeAttrValue, escapeHtmlText } from "../bot/html";
 
+// Per-process counter is enough for sentinel uniqueness here: the sentinel
+// just has to not collide with the literal template text within a single
+// call, and templates come from admins (not arbitrary user input).
+let sentinelCounter = 0;
+
 // `{name}` becomes a clickable tg://user mention so the user gets pinged;
 // the rest of the template is HTML-escaped so plain-text input from the
 // owner survives parse_mode=HTML.
@@ -10,7 +15,8 @@ export function formatQuestion(
   template: string,
   vars: { targetUserId: string; name: string; count: number },
 ): string {
-  const nonce = crypto.randomUUID();
+  sentinelCounter = (sentinelCounter + 1) >>> 0;
+  const nonce = sentinelCounter.toString(36);
   const nameSentinel = `xN${nonce}x`;
   const countSentinel = `xC${nonce}x`;
 
