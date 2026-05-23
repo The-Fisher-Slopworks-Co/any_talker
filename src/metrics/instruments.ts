@@ -156,6 +156,14 @@ export const remindersDeliveredTotal = registry.register(
   ),
 );
 
+export const remindersParseFailuresTotal = registry.register(
+  new Counter(
+    "bot_reminders_parse_failures_total",
+    "Stored reminders that failed JSON/schema validation and were quarantined or skipped, by reason.",
+    ["reason"],
+  ),
+);
+
 export const checksProcessedTotal = registry.register(
   new Counter(
     "bot_checks_processed_total",
