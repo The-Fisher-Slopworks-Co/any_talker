@@ -127,6 +127,25 @@ export const rateLimitTokensDeductedTotal = registry.register(
   ),
 );
 
+// --- Cache metrics ---------------------------------------------------------
+
+export const photoCacheErrorsTotal = registry.register(
+  new Counter(
+    "bot_photo_cache_errors_total",
+    "Telegram photo cache failures by operation (read / write / ttl).",
+    ["op"],
+  ),
+);
+
+// --- Self-instrumentation --------------------------------------------------
+
+export const metricsCollectorErrorsTotal = registry.register(
+  new Counter(
+    "bot_metrics_collector_errors_total",
+    "Times a registry.onCollect() callback threw during scrape (process gauges, etc.).",
+  ),
+);
+
 // --- Scheduler metrics -----------------------------------------------------
 
 export const remindersDeliveredTotal = registry.register(
@@ -220,4 +239,8 @@ registry.onCollect(() => {
   const mu = process.memoryUsage();
   processResidentMemoryBytes.set(mu.rss);
   processHeapUsedBytes.set(mu.heapUsed);
+});
+
+registry.setOnCollectorError(() => {
+  metricsCollectorErrorsTotal.inc();
 });

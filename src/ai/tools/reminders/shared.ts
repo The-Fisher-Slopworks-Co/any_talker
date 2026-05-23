@@ -12,11 +12,17 @@ export function buildDeliveryTarget(ctx: ToolCallContext): DeliveryTarget {
     if (ctx.replyToMessageId === null) {
       throw new Error("ask context must carry replyToMessageId");
     }
+    if (ctx.chatId === "") {
+      throw new Error("ask context must carry a non-empty chatId");
+    }
     return {
       kind: "ask_reply",
       chatId: ctx.chatId,
       replyToMessageId: ctx.replyToMessageId,
     };
+  }
+  if (ctx.userId === "") {
+    throw new Error("guest context must carry a non-empty userId");
   }
   return { kind: "guest_dm", userId: ctx.userId };
 }

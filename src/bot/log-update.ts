@@ -119,6 +119,10 @@ function firstBotCommand(msg: Message): string | null {
   if (!entities) return null;
   const cmd = entities.find((e) => e.type === "bot_command" && e.offset === 0);
   if (!cmd) return null;
+  // Forwarded / edited updates can carry entity metadata that no longer
+  // matches the message text. Bail rather than slicing past the end (would
+  // produce an empty / partial token logged as the command).
+  if (cmd.offset + cmd.length > source.length || cmd.length <= 1) return null;
   const raw = source.slice(cmd.offset + 1, cmd.offset + cmd.length);
   const at = raw.indexOf("@");
   return at >= 0 ? raw.slice(0, at) : raw;

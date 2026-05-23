@@ -212,12 +212,17 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
               topBlock,
               outcome.expandableThreshold,
             );
+          } catch (err) {
+            console.error("answerGuestQuery failed:", err);
+            return;
+          }
+          try {
             await outcome.persistThread();
             if (outcome.totalTokens > 0) {
               askTokensTotal.inc({ source: "guest" }, outcome.totalTokens);
             }
           } catch (err) {
-            console.error("answerGuestQuery failed:", err);
+            console.error("guest thread persistence failed:", err);
           }
           return;
         }

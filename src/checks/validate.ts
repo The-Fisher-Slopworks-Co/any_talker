@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { isValidTimezone } from "../shared/types";
+import { canonicalizeTimezone } from "../shared/types";
 import {
   MAX_TIMEOUT_MINUTES,
   MIN_TIMEOUT_MINUTES,
@@ -109,7 +109,8 @@ export function normalizeCheckInput(raw: unknown): NormalizedCheckInput {
   if (!scheduleMinute.ok) return scheduleMinute;
 
   const tzRaw = typeof b.timezone === "string" ? b.timezone.trim() : "";
-  if (!isValidTimezone(tzRaw)) {
+  const tzCanonical = canonicalizeTimezone(tzRaw);
+  if (tzCanonical === null) {
     return { ok: false, error: "timezone_invalid" };
   }
 
@@ -155,7 +156,7 @@ export function normalizeCheckInput(raw: unknown): NormalizedCheckInput {
       targetName: targetName.value,
       scheduleHour: scheduleHour.value,
       scheduleMinute: scheduleMinute.value,
-      timezone: tzRaw,
+      timezone: tzCanonical,
       question: question.value,
       yesButton: yesButton.value,
       noButton: noButton.value,

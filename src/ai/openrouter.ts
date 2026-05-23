@@ -42,7 +42,11 @@ export class OpenRouterAIClient implements AIClient {
     apiKey?: string | null;
   }): Promise<AskResult> {
     const [primary, ...fallbacks] = opts.models;
-    if (!primary) throw new Error("at least one model id is required");
+    if (!primary) {
+      throw new Error(
+        `at least one model id is required (got ${opts.models.length})`,
+      );
+    }
 
     const provider =
       opts.apiKey && opts.apiKey !== this.defaultApiKey
