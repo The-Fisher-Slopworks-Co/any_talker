@@ -30,7 +30,7 @@ import {
   type ReminderParseFailureReason,
 } from "../reminders/parse";
 import type { RecurringCheck } from "../checks/types";
-import { remindersParseFailuresTotal } from "../metrics";
+import { photoCacheErrorsTotal, remindersParseFailuresTotal } from "../metrics";
 
 const PREFIX = "at:";
 const FETCH_DUE_LIMIT = 100;
@@ -337,9 +337,12 @@ export class KeyDBStorage implements Storage {
     const raw = await this.client.get(key);
     if (raw === null) return null;
     // Renew TTL on access so hot photos stay cached longer than the original
-    // 7-day window if the conversation chain keeps referencing them.
+    // 7-day window if the conversation chain keeps referencing them. A
+    // renewal failure is logged and counted, not raised: the photo bytes
+    // are already in hand, premature eviction is the worst case.
     await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS).catch((err) => {
       console.error("photo cache expire renewal failed:", err);
+      photoCacheErrorsTotal.inc({ op: "ttl" });
     });
     return new Uint8Array(Buffer.from(raw, "base64"));
   }

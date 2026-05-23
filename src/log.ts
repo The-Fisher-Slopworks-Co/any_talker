@@ -35,13 +35,23 @@ export function formatLog(record: LogRecord, format: LogFormat): string {
   return parts.join(" ");
 }
 
+// Cap pretty-rendered field values so a single large object can't produce a
+// log line long enough to break downstream log-shipping. JSON mode is left
+// uncapped — the JSON envelope is consumed by tools that handle long lines.
+const PRETTY_VALUE_MAX = 2048;
+
 function renderPrettyValue(v: unknown): string {
   if (v === null) return "null";
+  let rendered: string;
   if (typeof v === "string") {
-    return /\s|"/.test(v) ? JSON.stringify(v) : v;
+    rendered = /\s|"/.test(v) ? JSON.stringify(v) : v;
+  } else if (typeof v === "number" || typeof v === "boolean") {
+    rendered = String(v);
+  } else {
+    rendered = JSON.stringify(v);
   }
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
-  return JSON.stringify(v);
+  if (rendered.length <= PRETTY_VALUE_MAX) return rendered;
+  return rendered.slice(0, PRETTY_VALUE_MAX) + "…";
 }
 
 export function emitLog(record: LogRecord, format: LogFormat): void {

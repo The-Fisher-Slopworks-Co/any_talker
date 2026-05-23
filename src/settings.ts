@@ -3,7 +3,7 @@
 
 import type { Storage } from "./storage/types";
 import type { Settings, ChatSettings, RateLimitConfig } from "./shared/types";
-import { DEFAULT_SETTINGS } from "./shared/types";
+import { DEFAULT_SETTINGS, isValidProviderSort } from "./shared/types";
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   const existing = await storage.getSettings();
@@ -37,12 +37,7 @@ function normalize(s: Settings): Settings {
     typeof s.timezone === "string" && s.timezone.length > 0
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
-  const providerSort =
-    s.providerSort === "price" ||
-    s.providerSort === "throughput" ||
-    s.providerSort === "latency"
-      ? s.providerSort
-      : null;
+  const providerSort = isValidProviderSort(s.providerSort) ? s.providerSort : null;
   const rateLimit = normalizeRateLimit(s.rateLimit);
   const expandableBlockquoteThreshold =
     typeof s.expandableBlockquoteThreshold === "number" &&
