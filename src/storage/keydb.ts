@@ -22,10 +22,15 @@ import {
   isEmptyChatSettings,
   isValidGender,
 } from "../shared/types";
-import { DEFAULT_LANG, isValidLang, type Lang } from "../shared/i18n";
-import { photoCacheErrorsTotal } from "../metrics";
+import { isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
+import {
+  parseStoredReminder,
+  ReminderParseError,
+  type ReminderParseFailureReason,
+} from "../reminders/parse";
 import type { RecurringCheck } from "../checks/types";
+import { photoCacheErrorsTotal, remindersParseFailuresTotal } from "../metrics";
 
 const PREFIX = "at:";
 const FETCH_DUE_LIMIT = 100;
@@ -418,13 +423,39 @@ export class KeyDBStorage implements Storage {
     const raws = await this.client.mget(...keys);
     const out: Reminder[] = [];
     const orphans: string[] = [];
+    const corrupted: Array<{ id: string; reason: ReminderParseFailureReason }> = [];
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) {
         orphans.push(ids[i]!);
         continue;
       }
-      out.push(parseReminderJson(raw));
+      try {
+        out.push(parseStoredReminder(raw));
+      } catch (err) {
+        if (err instanceof ReminderParseError) {
+          corrupted.push({ id: ids[i]!, reason: err.reason });
+          console.error(
+            `[reminders] quarantining corrupted reminder id=${ids[i]} reason=${err.reason}:`,
+            err.cause,
+          );
+        } else {
+          throw err;
+        }
+      }
+    }
+    // Quarantine corrupted records on the due path: deleting the payload +
+    // zrem from the due set prevents the next tick from picking them up and
+    // looping forever. user_reminders may briefly hold a dangling id;
+    // listRemindersForUser tolerates that (MGET nulls are skipped).
+    for (const { id, reason } of corrupted) {
+      remindersParseFailuresTotal.inc({ reason });
+      await this.client
+        .del(`${PREFIX}reminder:${id}`)
+        .catch((err) =>
+          console.error("quarantine del payload failed:", err),
+        );
+      orphans.push(id);
     }
     if (orphans.length > 0) {
       await this.client
@@ -445,7 +476,19 @@ export class KeyDBStorage implements Storage {
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) continue;
-      out.push(parseReminderJson(raw));
+      try {
+        out.push(parseStoredReminder(raw));
+      } catch (err) {
+        if (err instanceof ReminderParseError) {
+          remindersParseFailuresTotal.inc({ reason: err.reason });
+          console.error(
+            `[reminders] skipping corrupted reminder id=${ids[i]} reason=${err.reason}:`,
+            err.cause,
+          );
+          continue;
+        }
+        throw err;
+      }
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -463,7 +506,19 @@ export class KeyDBStorage implements Storage {
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) continue;
-      out.push(parseReminderJson(raw));
+      try {
+        out.push(parseStoredReminder(raw));
+      } catch (err) {
+        if (err instanceof ReminderParseError) {
+          remindersParseFailuresTotal.inc({ reason: err.reason });
+          console.error(
+            `[reminders] skipping corrupted reminder id=${ids[i]} reason=${err.reason}:`,
+            err.cause,
+          );
+          continue;
+        }
+        throw err;
+      }
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -516,21 +571,4 @@ export class KeyDBStorage implements Storage {
 function parseCheckJson(raw: string): RecurringCheck {
   const parsed = JSON.parse(raw) as RecurringCheck;
   return { ...parsed, counterAnchorDate: parsed.counterAnchorDate ?? null };
-}
-
-function parseReminderJson(raw: string): Reminder {
-  const parsed = JSON.parse(raw) as Reminder & {
-    chatId?: string;
-    lang?: string;
-  };
-  const chatId =
-    parsed.chatId ??
-    (parsed.target.kind === "ask_reply"
-      ? parsed.target.chatId
-      : parsed.target.userId);
-  const lang: Lang = isValidLang(parsed.lang) ? parsed.lang : DEFAULT_LANG;
-  const contextMessages = Array.isArray(parsed.contextMessages)
-    ? parsed.contextMessages
-    : [];
-  return { ...parsed, chatId, lang, contextMessages };
 }
