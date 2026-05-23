@@ -118,4 +118,16 @@ describe("TokenBucketLimiter", () => {
     expect(a?.tokens).toBe(29500);
     expect(b).toBeNull();
   });
+
+  test("concurrent deducts sum correctly", async () => {
+    const storage = new MemoryStorage();
+    const lim = new TokenBucketLimiter(storage);
+    await storage.saveBucket(C, "u1", { tokens: 10000, lastRefillTs: 1 });
+    await Promise.all([
+      lim.deduct(C, "u1", 3000),
+      lim.deduct(C, "u1", 3000),
+      lim.deduct(C, "u1", 3000),
+    ]);
+    expect((await storage.getBucket(C, "u1"))?.tokens).toBe(1000);
+  });
 });

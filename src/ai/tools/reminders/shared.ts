@@ -5,7 +5,6 @@ import type { ToolCallContext } from "../registry";
 import type { DeliveryTarget } from "../../../reminders/types";
 import { MIN_LEAD_MS } from "../../../reminders/types";
 import type { Storage } from "../../../storage/types";
-import { parseAbsoluteDateTimeMs as parseAbsoluteDateTimeMsShared } from "../../../shared/tz";
 import { serializeMessages } from "../../serialize";
 
 export function buildDeliveryTarget(ctx: ToolCallContext): DeliveryTarget {
@@ -77,8 +76,6 @@ export async function persistReminder(
     reminderId,
   };
 }
-
-export const parseAbsoluteDateTimeMs = parseAbsoluteDateTimeMsShared;
 
 export type DurationUnit = "minutes" | "hours" | "days";
 

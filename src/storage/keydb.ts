@@ -14,6 +14,7 @@ import type {
   Chat,
   ChatSettings,
   Gender,
+  RateLimitConfig,
 } from "../shared/types";
 import {
   CONVERSATION_TTL_SECONDS,
@@ -33,6 +34,74 @@ import { remindersParseFailuresTotal } from "../metrics";
 
 const PREFIX = "at:";
 const FETCH_DUE_LIMIT = 100;
+
+// Atomic refill: lazy refill identical to the in-process algorithm, but
+// executed server-side so concurrent callers cannot interleave the
+// read-modify-write cycle. Returns [tokens, lastRefillTs] as strings.
+const REFILL_BUCKET_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local capacity = tonumber(ARGV[1])
+local refillAmount = tonumber(ARGV[2])
+local refillIntervalMs = tonumber(ARGV[3])
+local now = tonumber(ARGV[4])
+local tokens
+local lastRefillTs
+if raw then
+  local s = cjson.decode(raw)
+  tokens = s.tokens
+  lastRefillTs = s.lastRefillTs
+  local elapsed = now - lastRefillTs
+  if elapsed >= refillIntervalMs then
+    local periods = math.floor(elapsed / refillIntervalMs)
+    local refilled = tokens + periods * refillAmount
+    if refilled > capacity then refilled = capacity end
+    tokens = refilled
+    lastRefillTs = lastRefillTs + periods * refillIntervalMs
+  end
+else
+  tokens = capacity
+  lastRefillTs = now
+end
+redis.call('SET', KEYS[1], cjson.encode({tokens = tokens, lastRefillTs = lastRefillTs}))
+return {tostring(tokens), tostring(lastRefillTs)}
+`;
+
+// Atomic deduction: subtract `delta` tokens from the bucket in a single
+// server-side step. Seeds a deficit bucket if no key exists, matching the
+// behavior of the previous in-process implementation.
+const DEDUCT_BUCKET_LUA = `
+local raw = redis.call('GET', KEYS[1])
+local delta = tonumber(ARGV[1])
+local nowMs = tonumber(ARGV[2])
+local tokens
+local lastRefillTs
+if raw then
+  local s = cjson.decode(raw)
+  tokens = s.tokens - delta
+  lastRefillTs = s.lastRefillTs
+else
+  tokens = -delta
+  lastRefillTs = nowMs
+end
+redis.call('SET', KEYS[1], cjson.encode({tokens = tokens, lastRefillTs = lastRefillTs}))
+return {tostring(tokens), tostring(lastRefillTs)}
+`;
+
+function parseBucketEvalReply(reply: unknown): BucketState {
+  if (!Array.isArray(reply) || reply.length !== 2) {
+    throw new Error(
+      `bucket EVAL returned unexpected shape: ${JSON.stringify(reply)}`,
+    );
+  }
+  const tokens = Number(reply[0]);
+  const lastRefillTs = Number(reply[1]);
+  if (!Number.isFinite(tokens) || !Number.isFinite(lastRefillTs)) {
+    throw new Error(
+      `bucket EVAL returned non-numeric values: ${JSON.stringify(reply)}`,
+    );
+  }
+  return { tokens, lastRefillTs };
+}
 
 export class KeyDBStorage implements Storage {
   constructor(private readonly client: RedisClient) {}
@@ -88,6 +157,40 @@ export class KeyDBStorage implements Storage {
       `${PREFIX}bucket:${chatId}:${userId}`,
       JSON.stringify(state),
     );
+  }
+
+  async refillBucket(
+    chatId: string,
+    userId: string,
+    config: RateLimitConfig,
+    now: number,
+  ): Promise<BucketState> {
+    const reply = await this.client.send("EVAL", [
+      REFILL_BUCKET_LUA,
+      "1",
+      `${PREFIX}bucket:${chatId}:${userId}`,
+      String(config.capacity),
+      String(config.refillAmount),
+      String(config.refillIntervalMs),
+      String(now),
+    ]);
+    return parseBucketEvalReply(reply);
+  }
+
+  async deductBucket(
+    chatId: string,
+    userId: string,
+    tokens: number,
+    nowMs: number,
+  ): Promise<BucketState> {
+    const reply = await this.client.send("EVAL", [
+      DEDUCT_BUCKET_LUA,
+      "1",
+      `${PREFIX}bucket:${chatId}:${userId}`,
+      String(tokens),
+      String(nowMs),
+    ]);
+    return parseBucketEvalReply(reply);
   }
 
   async getUserName(userId: string): Promise<string | null> {
@@ -466,4 +569,3 @@ function parseCheckJson(raw: string): RecurringCheck {
   const parsed = JSON.parse(raw) as RecurringCheck;
   return { ...parsed, counterAnchorDate: parsed.counterAnchorDate ?? null };
 }
-

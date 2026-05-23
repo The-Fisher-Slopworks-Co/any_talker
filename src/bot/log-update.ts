@@ -60,10 +60,9 @@ export function extractUpdateMeta(update: Update): UpdateMeta {
 
   if (type === "unknown") return meta;
 
-  const payload = update[type as keyof Update] as unknown as Record<
-    string,
-    unknown
-  >;
+  const payload = unsafeReinterpret<Record<string, unknown>>(
+    update[type as keyof Update],
+  );
 
   const from = payload.from as { id: number; username?: string } | undefined;
   if (from) {
@@ -75,11 +74,19 @@ export function extractUpdateMeta(update: Update): UpdateMeta {
   if (chat) meta.chat = { id: chat.id, type: chat.type };
 
   if ((MESSAGE_LIKE_KEYS as readonly string[]).includes(type)) {
-    Object.assign(meta.flags, messageFlags(payload as unknown as Message));
+    Object.assign(meta.flags, messageFlags(unsafeReinterpret<Message>(payload)));
     if (type === "guest_message") meta.flags.is_guest = true;
   }
 
   return meta;
+}
+
+// Telegram Update payload fields form a heterogeneous union (one per update
+// type) that the type checker cannot narrow through keyof-indexing or partial
+// structural shapes. Localize the double-cast intent here so call sites read
+// as a deliberate reinterpretation rather than ad-hoc `as unknown as` chains.
+function unsafeReinterpret<T>(value: unknown): T {
+  return value as T;
 }
 
 function messageFlags(msg: Message): UpdateMeta["flags"] {

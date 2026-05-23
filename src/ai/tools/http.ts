@@ -2,11 +2,12 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { isIP } from "node:net";
+import { checkServerIdentity } from "node:tls";
 import { proxiedFetch } from "../../proxy";
 
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
-  init: RequestInit,
+  init: BunFetchRequestInit,
   timeoutMs: number,
   timeoutLabel: string,
 ): Promise<Response> {
@@ -22,7 +23,7 @@ export async function fetchWithTimeout(
 
 const PRIVATE_BLOCK_MESSAGE = "Blocked: private and local addresses are not allowed";
 
-function isPrivateIPv4(ip: string): boolean {
+function isBlockedIPv4(ip: string): boolean {
   const parts = ip.split(".").map((p) => Number(p));
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
     return true;
@@ -38,12 +39,12 @@ function isPrivateIPv4(ip: string): boolean {
   return false;
 }
 
-function isPrivateIPv6(ip: string): boolean {
+function isBlockedIPv6(ip: string): boolean {
   const noZone = ip.split("%")[0]?.toLowerCase() ?? "";
   if (noZone === "::1" || noZone === "::") return true;
 
   const dotted = noZone.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  if (dotted && isIP(dotted[1]!) === 4) return isPrivateIPv4(dotted[1]!);
+  if (dotted && isIP(dotted[1]!) === 4) return isBlockedIPv4(dotted[1]!);
 
   const hex = noZone.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
   if (hex) {
@@ -51,7 +52,7 @@ function isPrivateIPv6(ip: string): boolean {
     const lo = Number.parseInt(hex[2]!, 16);
     if (hi >= 0 && hi <= 0xffff && lo >= 0 && lo <= 0xffff) {
       const v4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-      return isPrivateIPv4(v4);
+      return isBlockedIPv4(v4);
     }
   }
 
@@ -61,10 +62,10 @@ function isPrivateIPv6(ip: string): boolean {
   return false;
 }
 
-export function isPrivateAddress(ip: string): boolean {
+export function isBlockedAddress(ip: string): boolean {
   const v = isIP(ip);
-  if (v === 4) return isPrivateIPv4(ip);
-  if (v === 6) return isPrivateIPv6(ip);
+  if (v === 4) return isBlockedIPv4(ip);
+  if (v === 6) return isBlockedIPv6(ip);
   return true;
 }
 
@@ -72,16 +73,21 @@ function stripIPv6Brackets(host: string): string {
   return host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
 }
 
-export async function assertPublicHost(hostname: string): Promise<void> {
+// Resolve `hostname` to a single public IP literal. Throws if any DNS answer
+// points at a private/local address, so a rebinding response (mixing one public
+// and one private answer) is still rejected. Callers should pin subsequent I/O
+// to the returned literal so Bun's HTTP client cannot perform a second,
+// independent lookup that a malicious authoritative server could rebind.
+export async function resolvePublicHost(hostname: string): Promise<string> {
   const bare = stripIPv6Brackets(hostname);
   if (bare === "" || bare.toLowerCase() === "localhost") {
     throw new Error(PRIVATE_BLOCK_MESSAGE);
   }
   if (isIP(bare)) {
-    if (isPrivateAddress(bare)) {
+    if (isBlockedAddress(bare)) {
       throw new Error(PRIVATE_BLOCK_MESSAGE);
     }
-    return;
+    return bare;
   }
   let addresses: Array<{ address: string }>;
   try {
@@ -93,14 +99,19 @@ export async function assertPublicHost(hostname: string): Promise<void> {
     throw new Error(PRIVATE_BLOCK_MESSAGE);
   }
   for (const { address } of addresses) {
-    if (isPrivateAddress(address)) {
+    if (isBlockedAddress(address)) {
       throw new Error(PRIVATE_BLOCK_MESSAGE);
     }
   }
+  return addresses[0]!.address;
+}
+
+export async function assertPublicHost(hostname: string): Promise<void> {
+  await resolvePublicHost(hostname);
 }
 
 export type SafeFetchOptions = {
-  init: RequestInit;
+  init: BunFetchRequestInit;
   timeoutMs: number;
   timeoutLabel: string;
   maxRedirects?: number;
@@ -117,11 +128,38 @@ export async function safeFetch(url: string, opts: SafeFetchOptions): Promise<Re
     if (parsed.port !== "" && parsed.port !== "80" && parsed.port !== "443") {
       throw new Error(`Blocked: port ${parsed.port} is not allowed`);
     }
-    await assertPublicHost(parsed.hostname);
+    const ip = await resolvePublicHost(parsed.hostname);
+    const hostnameWasIp = isIP(stripIPv6Brackets(parsed.hostname)) !== 0;
+
+    const pinnedUrl = new URL(currentUrl);
+    pinnedUrl.hostname = isIP(ip) === 6 ? `[${ip}]` : ip;
+
+    const headers = new Headers(opts.init.headers ?? {});
+    const pinnedInit: BunFetchRequestInit = {
+      ...opts.init,
+      headers,
+      redirect: "manual",
+    };
+
+    if (!hostnameWasIp) {
+      // Pin the upstream to the IP we just validated. Override Host so virtual-
+      // hosted servers route correctly, and override TLS serverName +
+      // checkServerIdentity so SNI and cert validation still use the original
+      // hostname (the URL host is now an IP).
+      headers.set("host", parsed.host);
+      if (parsed.protocol === "https:") {
+        const sni = stripIPv6Brackets(parsed.hostname);
+        pinnedInit.tls = {
+          ...opts.init.tls,
+          serverName: sni,
+          checkServerIdentity: (_host, cert) => checkServerIdentity(sni, cert),
+        };
+      }
+    }
 
     const response = await fetchWithTimeout(
-      currentUrl,
-      { ...opts.init, redirect: "manual" },
+      pinnedUrl.toString(),
+      pinnedInit,
       opts.timeoutMs,
       opts.timeoutLabel,
     );

@@ -4,7 +4,8 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
-import { parseAbsoluteDateTimeMs, persistReminder, type PersistResult } from "./shared";
+import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
+import { persistReminder, type PersistResult } from "./shared";
 
 const Schema = z.object({
   datetime: z
