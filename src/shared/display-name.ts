@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+// Maximum length of a user-chosen display-name override, counted in Unicode
+// code points (Array.from(...).length, not .length). Set well under
+// Telegram's own 64-char limit on first_name so the name still fits inside
+// any LLM envelope or message header we render around it.
 export const DISPLAY_NAME_MAX_LEN = 32;
 
 export type DisplayNameError =

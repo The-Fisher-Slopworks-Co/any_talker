@@ -30,6 +30,12 @@ export async function contactHandler(input: ContactInput): Promise<ContactOutcom
 
   const targetUserId = input.contact.user_id;
   if (targetUserId === undefined) return { kind: "noUserId" };
+  // Defend against malformed ingress: a non-finite / non-integer / negative
+  // user_id would stringify to "NaN" / "Infinity" / etc. and poison the
+  // whitelist with an entry that no real user can match.
+  if (!Number.isSafeInteger(targetUserId) || targetUserId <= 0) {
+    return { kind: "noUserId" };
+  }
 
   const targetId = String(targetUserId);
   if (targetId === input.ownerId) return { kind: "isOwner" };
