@@ -11,9 +11,13 @@ import { registerTool, type Tool } from "./ai/tools/registry";
 import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
 import { randomChoiceTool } from "./ai/tools/random-choice";
+import { currencyConvertTool } from "./ai/tools/currency-convert";
+import { calculatorTool } from "./ai/tools/calculator";
 import { fetchPageTool } from "./ai/tools/fetch-page";
+import { createYoutubeTranscriptTool } from "./ai/tools/youtube-transcript";
 import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
+import { createUserFactsTools } from "./ai/tools/user-facts";
 import { startScheduler } from "./reminders/scheduler";
 import { startChecksScheduler } from "./checks/runner";
 import { createBot } from "./bot";
@@ -44,13 +48,17 @@ async function main() {
     withLogging(t, config.logFormat);
   registerTool(logged(randomNumberTool));
   registerTool(logged(randomChoiceTool));
+  registerTool(logged(currencyConvertTool));
+  registerTool(logged(calculatorTool));
   registerTool(logged(fetchPageTool));
   if (config.firecrawlApiKey) {
     registerTool(logged(createSearchWebTool(config.firecrawlApiKey, config.firecrawlConcurrency)));
+    registerTool(logged(createYoutubeTranscriptTool(config.firecrawlApiKey)));
   } else {
-    console.warn("FIRECRAWL_API_KEY not set, search_web tool disabled");
+    console.warn("FIRECRAWL_API_KEY not set, search_web and youtube_transcript tools disabled");
   }
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
+  for (const t of createUserFactsTools({ storage })) registerTool(logged(t));
 
   const bot = createBot({
     botToken: config.botToken,

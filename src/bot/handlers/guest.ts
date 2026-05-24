@@ -97,6 +97,8 @@ export async function guestAskHandler(
 
   input.onAIStart?.();
 
+  const facts = await input.storage.listUserFacts(input.userId);
+
   const effects: ToolEffect[] = [];
   let result;
   try {
@@ -108,6 +110,7 @@ export async function guestAskHandler(
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,
+        facts,
       }),
       messages,
       tools: getAllTools(),
