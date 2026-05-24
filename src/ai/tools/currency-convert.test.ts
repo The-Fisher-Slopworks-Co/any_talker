@@ -68,6 +68,31 @@ describe("currency_convert tool", () => {
         currencyConvertTool.parameters.safeParse({ amount: 1, from: "usd", to: "eu" }).success,
       ).toBe(false);
     });
+
+    test("accepts common crypto codes", () => {
+      for (const code of ["btc", "eth", "usdt"]) {
+        expect(
+          currencyConvertTool.parameters.safeParse({ amount: 1, from: "usd", to: code }).success,
+        ).toBe(true);
+      }
+    });
+
+    test("rejects codes with URL-corrupting characters", () => {
+      for (const code of ["usd?x=y", "usd/../eur", "usd.eur", "us d", "eur "]) {
+        expect(
+          currencyConvertTool.parameters.safeParse({ amount: 1, from: code, to: "eur" }).success,
+        ).toBe(false);
+        expect(
+          currencyConvertTool.parameters.safeParse({ amount: 1, from: "usd", to: code }).success,
+        ).toBe(false);
+      }
+    });
+
+    test("rejects an absurdly large amount", () => {
+      expect(
+        currencyConvertTool.parameters.safeParse({ amount: 1e308, from: "usd", to: "eur" }).success,
+      ).toBe(false);
+    });
   });
 
   describe("happy path", () => {
@@ -251,6 +276,44 @@ describe("currency_convert tool", () => {
         ctx,
       );
       expect(result).toContain("as of unknown date");
+    });
+
+    test("keeps non-zero digits for a tiny rate and converted amount", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(jsonResponse({ date: "2026-05-23", usd: { btc: 0.00001304 } })),
+      );
+      const result = await currencyConvertTool.execute(
+        { amount: 100, from: "usd", to: "btc" },
+        ctx,
+      );
+      // Neither the converted amount nor the rate should collapse to "0".
+      expect(result).not.toContain("= 0 BTC");
+      expect(result).not.toContain("rate 0,");
+      expect(result).toContain("0.001304");
+      expect(result).toContain("rate 0.00001304");
+    });
+
+    test("throws instead of leaking a non-finite/exponential converted amount", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(jsonResponse({ date: "2026-05-23", usd: { eur: 1e300 } })),
+      );
+      await expect(
+        currencyConvertTool.execute({ amount: 1e15, from: "usd", to: "eur" }, ctx),
+      ).rejects.toThrow("non-finite");
+    });
+
+    test("renders a very large finite converted amount in full digits, not exponential", async () => {
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(jsonResponse({ date: "2026-05-23", usd: { eur: 1e9 } })),
+      );
+      const result = await currencyConvertTool.execute(
+        { amount: 1e15, from: "usd", to: "eur" },
+        ctx,
+      );
+      // converted = 1e24 — must render in full digits, not exponent form
+      // like "1e+24" (exact trailing digits vary with float representation).
+      expect(result).not.toContain("e+");
+      expect(result).toMatch(/= \d{20,} EUR/);
     });
   });
 });

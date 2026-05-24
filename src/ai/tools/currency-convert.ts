@@ -10,18 +10,21 @@ const FALLBACK_CDN = "https://latest.currency-api.pages.dev/v1/currencies";
 const TIMEOUT_MS = 10_000;
 const MAX_BODY_BYTES = 1_000_000;
 
+const CODE_RE = /^[a-z]{3,10}$/i;
+
 const Schema = z.object({
   amount: z
     .number()
     .positive()
+    .lte(1e15)
     .describe("Amount to convert (must be positive)."),
   from: z
     .string()
-    .min(3)
+    .regex(CODE_RE)
     .describe("Source currency code (ISO 4217, e.g. 'USD'). Case-insensitive."),
   to: z
     .string()
-    .min(3)
+    .regex(CODE_RE)
     .describe("Target currency code (ISO 4217, e.g. 'EUR'). Case-insensitive."),
 });
 
@@ -74,11 +77,29 @@ async function fetchRates(base: string): Promise<CurrencyResponse> {
   throw new Error(`Currency API request failed: ${message}`);
 }
 
+function trimZeros(fixed: string): string {
+  return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
+}
+
 function formatNumber(value: number, decimals: number): string {
+  if (!Number.isFinite(value)) {
+    throw new Error("Currency conversion produced a non-finite result");
+  }
+  // toFixed switches to exponential form at >=1e21; for such large magnitudes
+  // the fractional part is insignificant, so render the rounded integer in full.
+  if (Math.abs(value) >= 1e21) {
+    return BigInt(Math.round(value)).toString();
+  }
   // toFixed with trailing-zero trim, so "100.00" -> "100" and "91.230" -> "91.23",
   // but precise rates like "0.9123" stay intact.
-  const fixed = value.toFixed(decimals);
-  return fixed.includes(".") ? fixed.replace(/\.?0+$/, "") : fixed;
+  const trimmed = trimZeros(value.toFixed(decimals));
+  if (value !== 0 && Number(trimmed) === 0) {
+    // Tiny magnitudes round to "0" at the requested decimals; widen the decimal
+    // count to keep ~4 significant figures without resorting to exponent form.
+    const sigDecimals = -Math.floor(Math.log10(Math.abs(value))) + 3;
+    return trimZeros(value.toFixed(Math.max(decimals, sigDecimals)));
+  }
+  return trimmed;
 }
 
 export const currencyConvertTool: Tool<Input, string> = {

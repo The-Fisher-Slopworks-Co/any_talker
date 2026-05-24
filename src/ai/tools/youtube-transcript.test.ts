@@ -8,6 +8,8 @@ import {
   decodeHtmlEntities,
   extractPlayerResponseJson,
   parseCaptionXml,
+  parseCaptionJson3,
+  parseCaptions,
 } from "./youtube-transcript";
 import type { ToolCallContext } from "./registry";
 
@@ -127,6 +129,8 @@ describe("extractVideoId", () => {
     ["dQw4w9WgXcQ", "dQw4w9WgXcQ"],
     ["  dQw4w9WgXcQ  ", "dQw4w9WgXcQ"],
     ["https://www.youtube.com/watch?app=desktop&v=dQw4w9WgXcQ", "dQw4w9WgXcQ"],
+    // Duplicate v= params: take the FIRST, as YouTube does (not the last).
+    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ&v=ZZZZZZZZZZZ", "dQw4w9WgXcQ"],
   ])("extracts id from %s", (input, expected) => {
     expect(extractVideoId(input)).toBe(expected);
   });
@@ -138,6 +142,8 @@ describe("extractVideoId", () => {
     "https://www.youtube.com/",
     "https://www.youtube.com/watch?v=tooShort",
     "https://vimeo.com/12345",
+    // 12+ id chars: reject rather than silently truncate to the first 11.
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQX",
   ])("throws on invalid input: %s", (input) => {
     expect(() => extractVideoId(input)).toThrow();
   });
@@ -160,6 +166,20 @@ describe("decodeHtmlEntities", () => {
 
   test("passes through plain text unchanged", () => {
     expect(decodeHtmlEntities("hello world")).toBe("hello world");
+  });
+
+  test("substitutes U+FFFD for an out-of-range code point without throwing", () => {
+    expect(() => decodeHtmlEntities("&#x110000;")).not.toThrow();
+    expect(decodeHtmlEntities("&#x110000;")).toBe("�");
+  });
+
+  test("substitutes U+FFFD for a lone surrogate (hex and decimal)", () => {
+    expect(decodeHtmlEntities("&#xD800;")).toBe("�");
+    expect(decodeHtmlEntities("&#55296;")).toBe("�");
+  });
+
+  test("still decodes valid numeric entities at the upper range", () => {
+    expect(decodeHtmlEntities("&#x1F600;")).toBe("😀");
   });
 });
 
@@ -187,6 +207,20 @@ describe("extractPlayerResponseJson", () => {
       "Could not find ytInitialPlayerResponse",
     );
   });
+
+  test("anchors on the assignment when the marker appears earlier in a string", () => {
+    const json = '{"real":true,"n":1}';
+    const html = `<script>var note = "ytInitialPlayerResponse is set below";
+      var ytInitialPlayerResponse = ${json};</script>`;
+    expect(extractPlayerResponseJson(html)).toBe(json);
+  });
+
+  test("anchors on the assignment when the marker appears earlier in a comment", () => {
+    const json = '{"real":true,"n":2}';
+    const html = `<script>// ytInitialPlayerResponse mentioned in a comment {oops}
+      var ytInitialPlayerResponse = ${json};</script>`;
+    expect(extractPlayerResponseJson(html)).toBe(json);
+  });
 });
 
 describe("parseCaptionXml", () => {
@@ -209,6 +243,42 @@ describe("parseCaptionXml", () => {
   test("skips empty cues", () => {
     const xml = srv3Xml([{ text: "real" }, { text: "" }, { text: "   " }]);
     expect(parseCaptionXml(xml)).toBe("real");
+  });
+
+  test("handles many unclosed <text> openings in linear time", () => {
+    // The old lazy `[\s\S]*?` regex backtracks quadratically on this input and
+    // stalls (~1.7s); the manual scan returns promptly (and matches no cues).
+    const pathological = "<text>".repeat(100_000);
+    const start = Date.now();
+    const result = parseCaptionXml(pathological);
+    const elapsed = Date.now() - start;
+    expect(result).toBe("");
+    expect(elapsed).toBeLessThan(500);
+  });
+});
+
+describe("parseCaptionJson3 / parseCaptions", () => {
+  test("joins JSON3 events and segments, decoding entities", () => {
+    const json3 = JSON.stringify({
+      events: [
+        { segs: [{ utf8: "Hello " }, { utf8: "world" }] },
+        { segs: [{ utf8: "it&amp;#39;s" }, { utf8: " a test" }] },
+        { segs: [{ utf8: "   " }] },
+      ],
+    });
+    expect(parseCaptionJson3(json3)).toBe("Hello world\nit's a test");
+  });
+
+  test("parseCaptions dispatches JSON3 bodies to the JSON parser", () => {
+    const json3 = JSON.stringify({
+      events: [{ segs: [{ utf8: "json3 cue" }] }],
+    });
+    expect(parseCaptions(json3)).toBe("json3 cue");
+  });
+
+  test("parseCaptions still parses XML bodies", () => {
+    const xml = srv3Xml([{ text: "xml cue" }]);
+    expect(parseCaptions(xml)).toBe("xml cue");
   });
 });
 
@@ -423,5 +493,102 @@ describe("youtube_transcript tool", () => {
     await expect(
       youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
     ).rejects.toThrow("Could not find ytInitialPlayerResponse");
+  });
+
+  test("throws a clear error when the chosen track has no baseUrl", async () => {
+    // Hand-build the player JSON so the track is missing baseUrl entirely,
+    // which the type-only cast would otherwise let through to safeFetch.
+    const playerJson = JSON.stringify({
+      videoDetails: { title: "T" },
+      captions: {
+        playerCaptionsTracklistRenderer: {
+          captionTracks: [{ languageCode: "en" }],
+        },
+      },
+    });
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(watchPageHtml(playerJson), {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+      ),
+    );
+    await expect(
+      youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
+    ).rejects.toThrow("Selected caption track has no usable URL");
+    // Only the page was fetched; we bailed before the caption request.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not crash on a non-string title and omits the heading", async () => {
+    const playerJson = JSON.stringify({
+      videoDetails: { title: { weird: true } },
+      captions: {
+        playerCaptionsTracklistRenderer: {
+          captionTracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
+        },
+      },
+    });
+    mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: "the cue" }]));
+    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    expect(result).toBe("the cue");
+  });
+
+  test("collapses interior newlines in the title into a single-line heading", async () => {
+    const playerJson = buildPlayerResponse({
+      title: "Line one\nLine two\tindented",
+      tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
+    });
+    mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: "the cue" }]));
+    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    expect(result).toBe("# Line one Line two indented\n\nthe cue");
+  });
+
+  test("returns a well-formed string when MAX_LENGTH cuts mid-surrogate", async () => {
+    // Fill exactly to the boundary with ASCII, then place an emoji (a surrogate
+    // pair) straddling MAX_LENGTH so the naive slice would keep a lone high half.
+    const cue = "x".repeat(49_999) + "😀".repeat(100);
+    const playerJson = buildPlayerResponse({
+      tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
+    });
+    mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: cue }]));
+    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    expect(result.isWellFormed()).toBe(true);
+    const last = result.charCodeAt(result.length - 1);
+    expect(last >= 0xd800 && last <= 0xdbff).toBe(false);
+  });
+
+  test("parses a JSON3 caption body returned in place of XML", async () => {
+    const json3 = JSON.stringify({
+      events: [
+        { segs: [{ utf8: "first " }, { utf8: "line" }] },
+        { segs: [{ utf8: "second line" }] },
+      ],
+    });
+    const playerJson = buildPlayerResponse({
+      title: "JSON3 video",
+      tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
+    });
+    let call = 0;
+    mockFetch.mockImplementation(() => {
+      call++;
+      if (call === 1) {
+        return Promise.resolve(
+          new Response(watchPageHtml(playerJson), {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(json3, {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    expect(result).toBe("# JSON3 video\n\nfirst line\nsecond line");
   });
 });
