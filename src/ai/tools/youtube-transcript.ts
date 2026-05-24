@@ -2,12 +2,18 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { z } from "zod";
-import { readTextCapped, safeFetch } from "./http";
+import { fetchWithTimeout, readTextCapped, safeFetch } from "./http";
 import type { Tool } from "./registry";
 
 const MAX_LENGTH = 50_000;
 const MAX_BODY_BYTES = 10_000_000;
 const TIMEOUT_MS = 15_000;
+
+// YouTube serves a "confirm you're not a bot" wall (playabilityStatus =
+// LOGIN_REQUIRED) to datacenter IPs, so the watch page is fetched through
+// Firecrawl's scrape API, which routes via its stealth proxy pool.
+const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
+const FIRECRAWL_TIMEOUT_MS = 90_000;
 
 // A real-browser-ish UA is required: YouTube serves a stripped page without
 // `ytInitialPlayerResponse` to obvious bots.
@@ -233,103 +239,150 @@ export function parseCaptions(body: string): string {
   return parseCaptionXml(body);
 }
 
-export const youtubeTranscriptTool: Tool<Input, string> = {
-  name: "youtube_transcript",
-  description:
-    "Fetch the public captions / transcript for a YouTube video and return it as plain text the model can summarise or quote. Accepts full watch URLs, youtu.be / m. / shorts URLs, or a bare 11-character video ID. Optionally select a caption language by ISO code (e.g. 'en', 'ru'); otherwise the first available track is used (preferring manual over auto-generated). Throws if the video has no captions, is private, age-restricted, or otherwise unavailable.",
-  parameters: Schema,
-  execute: async ({ url, language }, _ctx) => {
-    const videoId = extractVideoId(url);
-    // bpctr/has_verified reduce the chance of hitting the consent or age wall
-    // (the player JSON is omitted from those interstitial pages).
-    const watchUrl = `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1`;
-
-    const pageResp = await safeFetch(watchUrl, {
-      init: {
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-      },
-      timeoutMs: TIMEOUT_MS,
-      timeoutLabel: `Fetching YouTube page for ${videoId}`,
-    });
-    if (!pageResp.ok) {
-      // Drain so Bun can release the connection before throwing.
-      await pageResp.body?.cancel().catch(() => {});
-      throw new Error(`YouTube watch page returned HTTP ${pageResp.status}`);
-    }
-    const html = await readTextCapped(pageResp, MAX_BODY_BYTES);
-
-    const rawJson = extractPlayerResponseJson(html);
-    let player: PlayerResponse;
-    try {
-      player = JSON.parse(rawJson) as PlayerResponse;
-    } catch {
-      throw new Error("Could not parse ytInitialPlayerResponse JSON");
-    }
-
-    const status = player.playabilityStatus?.status;
-    if (status && status !== "OK") {
-      const reason = player.playabilityStatus?.reason ?? "unknown reason";
-      throw new Error(`Video unavailable (${status}): ${reason}`);
-    }
-
-    const tracks =
-      player.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
-    if (tracks.length === 0) {
-      throw new Error(
-        "This video has no captions (none uploaded and auto-captions unavailable).",
-      );
-    }
-
-    const track = pickTrack(tracks, language);
-
-    // The player JSON is a type-only cast; guard against a track whose baseUrl
-    // is missing or non-string so we don't hand `undefined` to safeFetch.
-    const baseUrl = track.baseUrl;
-    if (typeof baseUrl !== "string" || baseUrl.length === 0) {
-      throw new Error("Selected caption track has no usable URL");
-    }
-
-    const captionResp = await safeFetch(baseUrl, {
-      init: {
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "application/xml,text/xml,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-      },
-      timeoutMs: TIMEOUT_MS,
-      timeoutLabel: `Fetching captions for ${videoId}`,
-    });
-    if (!captionResp.ok) {
-      // Drain so Bun can release the connection before throwing.
-      await captionResp.body?.cancel().catch(() => {});
-      throw new Error(
-        `Caption track returned HTTP ${captionResp.status}: ${captionResp.statusText}`,
-      );
-    }
-    const captionBody = await readTextCapped(captionResp, MAX_BODY_BYTES);
-    const body = parseCaptions(captionBody);
-
-    if (body.length === 0) {
-      throw new Error("Caption track returned no cues");
-    }
-
-    const rawTitle = player.videoDetails?.title;
-    const title =
-      typeof rawTitle === "string" ? rawTitle.replace(/\s+/g, " ").trim() : "";
-    const out = title ? `# ${title}\n\n${body}` : body;
-    let capped = out.slice(0, MAX_LENGTH);
-    // A slice at MAX_LENGTH can leave a trailing lone high surrogate; drop it.
-    if (capped.length === MAX_LENGTH) {
-      const last = capped.charCodeAt(capped.length - 1);
-      if (last >= 0xd800 && last <= 0xdbff) {
-        capped = capped.slice(0, -1);
-      }
-    }
-    return capped;
-  },
+type FirecrawlScrapeResponse = {
+  success?: boolean;
+  error?: string;
+  data?: {
+    rawHtml?: string;
+    html?: string;
+  };
 };
+
+// Scrape a URL through Firecrawl and return its raw HTML. `proxy: "auto"` lets
+// Firecrawl escalate to its stealth proxy pool when a site (YouTube) blocks
+// plain requests; `maxAge: 0` disables Firecrawl's ~2-day scrape cache so a
+// changing playabilityStatus / caption list is never served stale.
+async function firecrawlScrapeHtml(apiKey: string, url: string): Promise<string> {
+  const response = await fetchWithTimeout(
+    FIRECRAWL_SCRAPE_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ["rawHtml"],
+        onlyMainContent: false,
+        proxy: "auto",
+        maxAge: 0,
+        timeout: FIRECRAWL_TIMEOUT_MS,
+      }),
+    },
+    // Allow the HTTP client slightly longer than Firecrawl's own timeout.
+    FIRECRAWL_TIMEOUT_MS + 5_000,
+    `Firecrawl scrape (${url})`,
+  );
+  if (!response.ok) {
+    const body = await readTextCapped(response, MAX_BODY_BYTES).catch(() => "");
+    throw new Error(
+      `Firecrawl error ${response.status}: ${response.statusText}${body ? ` — ${body}` : ""}`,
+    );
+  }
+  const text = await readTextCapped(response, MAX_BODY_BYTES);
+  let parsed: FirecrawlScrapeResponse;
+  try {
+    parsed = JSON.parse(text) as FirecrawlScrapeResponse;
+  } catch {
+    throw new Error("Firecrawl returned a non-JSON response");
+  }
+  if (!parsed.success) {
+    throw new Error(`Firecrawl scrape failed: ${parsed.error ?? "success=false"}`);
+  }
+  const html = parsed.data?.rawHtml || parsed.data?.html || "";
+  if (html.length === 0) {
+    throw new Error("Firecrawl returned an empty page");
+  }
+  return html;
+}
+
+export function createYoutubeTranscriptTool(apiKey: string): Tool<Input, string> {
+  return {
+    name: "youtube_transcript",
+    description:
+      "Fetch the public captions / transcript for a YouTube video and return it as plain text the model can summarise or quote. Accepts full watch URLs, youtu.be / m. / shorts URLs, or a bare 11-character video ID. Optionally select a caption language by ISO code (e.g. 'en', 'ru'); otherwise the first available track is used (preferring manual over auto-generated). Throws if the video has no captions, is private, age-restricted, or otherwise unavailable.",
+    parameters: Schema,
+    execute: async ({ url, language }, _ctx) => {
+      const videoId = extractVideoId(url);
+      // bpctr/has_verified reduce the chance of hitting the consent or age wall
+      // (the player JSON is omitted from those interstitial pages).
+      const watchUrl = `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1`;
+
+      const html = await firecrawlScrapeHtml(apiKey, watchUrl);
+
+      const rawJson = extractPlayerResponseJson(html);
+      let player: PlayerResponse;
+      try {
+        player = JSON.parse(rawJson) as PlayerResponse;
+      } catch {
+        throw new Error("Could not parse ytInitialPlayerResponse JSON");
+      }
+
+      const status = player.playabilityStatus?.status;
+      if (status && status !== "OK") {
+        const reason = player.playabilityStatus?.reason ?? "unknown reason";
+        throw new Error(`Video unavailable (${status}): ${reason}`);
+      }
+
+      const tracks =
+        player.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+      if (tracks.length === 0) {
+        throw new Error(
+          "This video has no captions (none uploaded and auto-captions unavailable).",
+        );
+      }
+
+      const track = pickTrack(tracks, language);
+
+      // The player JSON is a type-only cast; guard against a track whose baseUrl
+      // is missing or non-string so we don't hand `undefined` to safeFetch.
+      const baseUrl = track.baseUrl;
+      if (typeof baseUrl !== "string" || baseUrl.length === 0) {
+        throw new Error("Selected caption track has no usable URL");
+      }
+
+      // The timedtext endpoint is usually reachable from any IP, so captions are
+      // fetched directly. If this ever also hits YouTube's bot wall, route it
+      // through firecrawlScrapeHtml too.
+      const captionResp = await safeFetch(baseUrl, {
+        init: {
+          headers: {
+            "User-Agent": USER_AGENT,
+            Accept: "application/xml,text/xml,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+        },
+        timeoutMs: TIMEOUT_MS,
+        timeoutLabel: `Fetching captions for ${videoId}`,
+      });
+      if (!captionResp.ok) {
+        // Drain so Bun can release the connection before throwing.
+        await captionResp.body?.cancel().catch(() => {});
+        throw new Error(
+          `Caption track returned HTTP ${captionResp.status}: ${captionResp.statusText}`,
+        );
+      }
+      const captionBody = await readTextCapped(captionResp, MAX_BODY_BYTES);
+      const body = parseCaptions(captionBody);
+
+      if (body.length === 0) {
+        throw new Error("Caption track returned no cues");
+      }
+
+      const rawTitle = player.videoDetails?.title;
+      const title =
+        typeof rawTitle === "string" ? rawTitle.replace(/\s+/g, " ").trim() : "";
+      const out = title ? `# ${title}\n\n${body}` : body;
+      let capped = out.slice(0, MAX_LENGTH);
+      // A slice at MAX_LENGTH can leave a trailing lone high surrogate; drop it.
+      if (capped.length === MAX_LENGTH) {
+        const last = capped.charCodeAt(capped.length - 1);
+        if (last >= 0xd800 && last <= 0xdbff) {
+          capped = capped.slice(0, -1);
+        }
+      }
+      return capped;
+    },
+  };
+}
