@@ -3,7 +3,7 @@
 
 import { test, expect, describe, mock, beforeEach, afterEach } from "bun:test";
 import {
-  youtubeTranscriptTool,
+  createYoutubeTranscriptTool,
   extractVideoId,
   decodeHtmlEntities,
   extractPlayerResponseJson,
@@ -96,17 +96,22 @@ function srv3Xml(cues: Array<{ start?: string; dur?: string; text: string }>): s
   return `<?xml version="1.0" encoding="utf-8"?><transcript>${items}</transcript>`;
 }
 
+// Wrap page HTML in a Firecrawl /scrape success envelope. The tool fetches the
+// watch page via Firecrawl (reads data.rawHtml), then the caption track directly.
+function firecrawlEnvelope(pageHtml: string): Response {
+  return new Response(
+    JSON.stringify({ success: true, data: { rawHtml: pageHtml } }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
+// Dispatch by URL: the Firecrawl scrape endpoint gets the page envelope; any
+// other request (the direct, IP-pinned caption fetch) gets the caption body.
 function mockTwoCalls(pageHtml: string, captionXml: string) {
-  let call = 0;
-  mockFetch.mockImplementation(() => {
-    call++;
-    if (call === 1) {
-      return Promise.resolve(
-        new Response(pageHtml, {
-          status: 200,
-          headers: { "content-type": "text/html; charset=utf-8" },
-        }),
-      );
+  mockFetch.mockImplementation((input: RequestInfo | URL) => {
+    const u = typeof input === "string" ? input : input.toString();
+    if (u.includes("api.firecrawl.dev")) {
+      return Promise.resolve(firecrawlEnvelope(pageHtml));
     }
     return Promise.resolve(
       new Response(captionXml, {
@@ -116,6 +121,8 @@ function mockTwoCalls(pageHtml: string, captionXml: string) {
     );
   });
 }
+
+const tool = createYoutubeTranscriptTool("test-api-key");
 
 describe("extractVideoId", () => {
   test.each([
@@ -284,7 +291,7 @@ describe("parseCaptionJson3 / parseCaptions", () => {
 
 describe("youtube_transcript tool", () => {
   test("schema rejects empty url", () => {
-    expect(youtubeTranscriptTool.parameters.safeParse({ url: "" }).success).toBe(
+    expect(tool.parameters.safeParse({ url: "" }).success).toBe(
       false,
     );
   });
@@ -301,7 +308,7 @@ describe("youtube_transcript tool", () => {
       srv3Xml([{ text: "Never gonna give you up" }, { text: "Never gonna let you down" }]),
     );
 
-    const result = await youtubeTranscriptTool.execute({ url: `https://youtu.be/${VIDEO_ID}` }, ctx);
+    const result = await tool.execute({ url: `https://youtu.be/${VIDEO_ID}` }, ctx);
     expect(result).toBe(
       "# Never Gonna\n\nNever gonna give you up\nNever gonna let you down",
     );
@@ -323,12 +330,7 @@ describe("youtube_transcript tool", () => {
     mockFetch.mockImplementation((input: RequestInfo | URL) => {
       call++;
       if (call === 1) {
-        return Promise.resolve(
-          new Response(watchPageHtml(playerJson), {
-            status: 200,
-            headers: { "content-type": "text/html" },
-          }),
-        );
+        return Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson)));
       }
       secondCallUrl = typeof input === "string" ? input : input.toString();
       return Promise.resolve(
@@ -339,7 +341,7 @@ describe("youtube_transcript tool", () => {
       );
     });
 
-    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result).toContain("manual cue");
     // safeFetch pins the host to the stubbed IP so the URL we see has the IP
     // as hostname. Path + query are preserved, so assert against those.
@@ -362,12 +364,7 @@ describe("youtube_transcript tool", () => {
     mockFetch.mockImplementation((input: RequestInfo | URL) => {
       call++;
       if (call === 1) {
-        return Promise.resolve(
-          new Response(watchPageHtml(playerJson), {
-            status: 200,
-            headers: { "content-type": "text/html" },
-          }),
-        );
+        return Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson)));
       }
       secondCallUrl = typeof input === "string" ? input : input.toString();
       return Promise.resolve(
@@ -378,7 +375,7 @@ describe("youtube_transcript tool", () => {
       );
     });
 
-    const result = await youtubeTranscriptTool.execute(
+    const result = await tool.execute(
       { url: VIDEO_ID, language: "ru" },
       ctx,
     );
@@ -394,15 +391,10 @@ describe("youtube_transcript tool", () => {
       ],
     });
     mockFetch.mockImplementation(() =>
-      Promise.resolve(
-        new Response(watchPageHtml(playerJson), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson))),
     );
     await expect(
-      youtubeTranscriptTool.execute({ url: VIDEO_ID, language: "ja" }, ctx),
+      tool.execute({ url: VIDEO_ID, language: "ja" }, ctx),
     ).rejects.toThrow("No caption track for language 'ja'");
   });
 
@@ -412,15 +404,10 @@ describe("youtube_transcript tool", () => {
       captionsBlock: null,
     });
     mockFetch.mockImplementation(() =>
-      Promise.resolve(
-        new Response(watchPageHtml(playerJson), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson))),
     );
     await expect(
-      youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
+      tool.execute({ url: VIDEO_ID }, ctx),
     ).rejects.toThrow("no captions");
   });
 
@@ -430,15 +417,10 @@ describe("youtube_transcript tool", () => {
       captionsBlock: { playerCaptionsTracklistRenderer: { captionTracks: [] } },
     });
     mockFetch.mockImplementation(() =>
-      Promise.resolve(
-        new Response(watchPageHtml(playerJson), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson))),
     );
     await expect(
-      youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
+      tool.execute({ url: VIDEO_ID }, ctx),
     ).rejects.toThrow("no captions");
   });
 
@@ -448,15 +430,10 @@ describe("youtube_transcript tool", () => {
       tracks: [],
     });
     mockFetch.mockImplementation(() =>
-      Promise.resolve(
-        new Response(watchPageHtml(playerJson), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson))),
     );
     await expect(
-      youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
+      tool.execute({ url: VIDEO_ID }, ctx),
     ).rejects.toThrow("Video unavailable");
   });
 
@@ -470,28 +447,23 @@ describe("youtube_transcript tool", () => {
       watchPageHtml(playerJson),
       srv3Xml([{ text: longCue }]),
     );
-    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result.length).toBe(50_000);
   });
 
   test("throws clear error on invalid URL", async () => {
     await expect(
-      youtubeTranscriptTool.execute({ url: "https://example.com/no-id-here" }, ctx),
+      tool.execute({ url: "https://example.com/no-id-here" }, ctx),
     ).rejects.toThrow("Could not extract a YouTube video ID");
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
   test("throws when the watch page lacks ytInitialPlayerResponse", async () => {
     mockFetch.mockImplementation(() =>
-      Promise.resolve(
-        new Response("<html><body>Cookie wall</body></html>", {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      Promise.resolve(firecrawlEnvelope("<html><body>Cookie wall</body></html>")),
     );
     await expect(
-      youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
+      tool.execute({ url: VIDEO_ID }, ctx),
     ).rejects.toThrow("Could not find ytInitialPlayerResponse");
   });
 
@@ -507,15 +479,10 @@ describe("youtube_transcript tool", () => {
       },
     });
     mockFetch.mockImplementation(() =>
-      Promise.resolve(
-        new Response(watchPageHtml(playerJson), {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      ),
+      Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson))),
     );
     await expect(
-      youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx),
+      tool.execute({ url: VIDEO_ID }, ctx),
     ).rejects.toThrow("Selected caption track has no usable URL");
     // Only the page was fetched; we bailed before the caption request.
     expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -531,7 +498,7 @@ describe("youtube_transcript tool", () => {
       },
     });
     mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: "the cue" }]));
-    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result).toBe("the cue");
   });
 
@@ -541,7 +508,7 @@ describe("youtube_transcript tool", () => {
       tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
     });
     mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: "the cue" }]));
-    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result).toBe("# Line one Line two indented\n\nthe cue");
   });
 
@@ -553,7 +520,7 @@ describe("youtube_transcript tool", () => {
       tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
     });
     mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: cue }]));
-    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result.isWellFormed()).toBe(true);
     const last = result.charCodeAt(result.length - 1);
     expect(last >= 0xd800 && last <= 0xdbff).toBe(false);
@@ -574,12 +541,7 @@ describe("youtube_transcript tool", () => {
     mockFetch.mockImplementation(() => {
       call++;
       if (call === 1) {
-        return Promise.resolve(
-          new Response(watchPageHtml(playerJson), {
-            status: 200,
-            headers: { "content-type": "text/html" },
-          }),
-        );
+        return Promise.resolve(firecrawlEnvelope(watchPageHtml(playerJson)));
       }
       return Promise.resolve(
         new Response(json3, {
@@ -588,7 +550,90 @@ describe("youtube_transcript tool", () => {
         }),
       );
     });
-    const result = await youtubeTranscriptTool.execute({ url: VIDEO_ID }, ctx);
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result).toBe("# JSON3 video\n\nfirst line\nsecond line");
+  });
+});
+
+describe("youtube_transcript Firecrawl layer", () => {
+  test("scrapes the watch page via Firecrawl with the API key and rawHtml format", async () => {
+    const playerJson = buildPlayerResponse({
+      title: "T",
+      tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
+    });
+    mockTwoCalls(watchPageHtml(playerJson), srv3Xml([{ text: "cue" }]));
+    await tool.execute({ url: VIDEO_ID }, ctx);
+
+    const [calledUrl, init] = mockFetch.mock.calls[0]!;
+    expect(String(calledUrl)).toBe("https://api.firecrawl.dev/v2/scrape");
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-api-key");
+    const sent = JSON.parse(String(init?.body));
+    expect(sent.url).toContain(`watch?v=${VIDEO_ID}`);
+    expect(sent.formats).toEqual(["rawHtml"]);
+    expect(sent.proxy).toBe("auto");
+    expect(sent.maxAge).toBe(0);
+  });
+
+  test("falls back to data.html when rawHtml is absent", async () => {
+    const playerJson = buildPlayerResponse({
+      title: "HTML fallback",
+      tracks: [{ baseUrl: CAPTION_BASE_URL, languageCode: "en" }],
+    });
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const u = typeof input === "string" ? input : input.toString();
+      if (u.includes("api.firecrawl.dev")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ success: true, data: { html: watchPageHtml(playerJson) } }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(srv3Xml([{ text: "cue" }]), {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        }),
+      );
+    });
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
+    expect(result).toBe("# HTML fallback\n\ncue");
+  });
+
+  test("throws when Firecrawl returns success=false", async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ success: false, error: "blocked" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
+      "Firecrawl scrape failed: blocked",
+    );
+  });
+
+  test("throws when Firecrawl returns an empty page", async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ success: true, data: { rawHtml: "" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
+      "Firecrawl returned an empty page",
+    );
+  });
+
+  test("surfaces a non-2xx Firecrawl response as an error", async () => {
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response("rate limited", { status: 429, statusText: "Too Many Requests" }),
+      ),
+    );
+    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow("Firecrawl error 429");
   });
 });
