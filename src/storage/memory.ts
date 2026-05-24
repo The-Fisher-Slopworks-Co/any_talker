@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Storage } from "./types";
+import { USER_FACTS_MAX_PER_USER } from "./types";
 import type {
   Settings,
   WhitelistEntry,
@@ -43,6 +44,7 @@ export class MemoryStorage implements Storage {
   private checks = new Map<string, RecurringCheck>();
   private photoCache = new Map<string, Uint8Array>();
   private albums = new Map<string, Map<number, string>>();
+  private userFacts = new Map<string, Map<string, string>>();
 
   private bucketKey(chatId: string, userId: string): string {
     return `${chatId}:${userId}`;
@@ -367,5 +369,46 @@ export class MemoryStorage implements Storage {
 
   async deleteCheck(id: string): Promise<void> {
     this.checks.delete(id);
+  }
+
+  async rememberUserFact(
+    userId: string,
+    key: string,
+    value: string,
+  ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }> {
+    const normKey = key.toLowerCase();
+    let facts = this.userFacts.get(userId);
+    if (!facts) {
+      facts = new Map();
+      this.userFacts.set(userId, facts);
+    }
+    // Updates to existing keys are always allowed; only NEW keys are gated
+    // by the per-user cap.
+    if (!facts.has(normKey) && facts.size >= USER_FACTS_MAX_PER_USER) {
+      return { ok: false, reason: "limit_reached" };
+    }
+    facts.set(normKey, value);
+    return { ok: true };
+  }
+
+  async listUserFacts(
+    userId: string,
+  ): Promise<Array<{ key: string; value: string }>> {
+    const facts = this.userFacts.get(userId);
+    if (!facts) return [];
+    return [...facts.entries()]
+      .map(([key, value]) => ({ key, value }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  }
+
+  async forgetUserFact(
+    userId: string,
+    key: string,
+  ): Promise<{ existed: boolean }> {
+    const normKey = key.toLowerCase();
+    const facts = this.userFacts.get(userId);
+    if (!facts) return { existed: false };
+    const existed = facts.delete(normKey);
+    return { existed };
   }
 }

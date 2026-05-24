@@ -107,4 +107,14 @@ export interface Storage {
   getCheck(id: string): Promise<RecurringCheck | null>;
   listChecks(): Promise<RecurringCheck[]>;
   deleteCheck(id: string): Promise<void>;
+
+  rememberUserFact(
+    userId: string,
+    key: string,
+    value: string,
+  ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }>;
+  listUserFacts(userId: string): Promise<Array<{ key: string; value: string }>>;
+  forgetUserFact(userId: string, key: string): Promise<{ existed: boolean }>;
 }
+
+export const USER_FACTS_MAX_PER_USER = 50;
