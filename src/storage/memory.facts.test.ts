@@ -71,17 +71,19 @@ describe("MemoryStorage user facts", () => {
     expect(await s.forgetUserFact("ghost", "k")).toEqual({ existed: false });
   });
 
-  test("hits 50-fact cap: 51st new key returns limit_reached", async () => {
+  test("at the cap, a new key evicts the oldest and stays at the cap", async () => {
     const s = new MemoryStorage();
     for (let i = 0; i < USER_FACTS_MAX_PER_USER; i++) {
       const r = await s.rememberUserFact("u1", `k${i}`, "v");
       expect(r).toEqual({ ok: true });
     }
     const r = await s.rememberUserFact("u1", "overflow", "v");
-    expect(r).toEqual({ ok: false, reason: "limit_reached" });
-    expect((await s.listUserFacts("u1")).length).toBe(
-      USER_FACTS_MAX_PER_USER,
-    );
+    expect(r).toEqual({ ok: true });
+    const list = await s.listUserFacts("u1");
+    expect(list.length).toBe(USER_FACTS_MAX_PER_USER);
+    // The oldest-inserted key (k0) is gone; the new one is present.
+    expect(list.some((f) => f.key === "k0")).toBe(false);
+    expect(list.some((f) => f.key === "overflow")).toBe(true);
   });
 
   test("updating an existing key at the cap still works", async () => {
@@ -97,18 +99,35 @@ describe("MemoryStorage user facts", () => {
     expect(list.length).toBe(USER_FACTS_MAX_PER_USER);
   });
 
-  test("after freeing a slot, a new key can be inserted again", async () => {
+  test("eviction is FIFO: oldest-inserted keys go first", async () => {
     const s = new MemoryStorage();
     for (let i = 0; i < USER_FACTS_MAX_PER_USER; i++) {
       await s.rememberUserFact("u1", `k${i}`, "v");
     }
-    expect(
-      await s.rememberUserFact("u1", "overflow", "v"),
-    ).toEqual({ ok: false, reason: "limit_reached" });
-    await s.forgetUserFact("u1", "k0");
-    expect(await s.rememberUserFact("u1", "overflow", "v")).toEqual({
-      ok: true,
-    });
+    // Two new keys past the cap should evict the two oldest (k0, k1).
+    await s.rememberUserFact("u1", "new0", "v");
+    await s.rememberUserFact("u1", "new1", "v");
+    const keys = (await s.listUserFacts("u1")).map((f) => f.key);
+    expect(keys).not.toContain("k0");
+    expect(keys).not.toContain("k1");
+    expect(keys).toContain("k2");
+    expect(keys).toContain("new0");
+    expect(keys).toContain("new1");
+    expect(keys.length).toBe(USER_FACTS_MAX_PER_USER);
+  });
+
+  test("updating an existing key does not reset its age", async () => {
+    const s = new MemoryStorage();
+    for (let i = 0; i < USER_FACTS_MAX_PER_USER; i++) {
+      await s.rememberUserFact("u1", `k${i}`, "v");
+    }
+    // Re-touch k0 (the oldest), then overflow. k0 should still be the oldest
+    // and get evicted — an update must not renew its position.
+    await s.rememberUserFact("u1", "k0", "touched");
+    await s.rememberUserFact("u1", "overflow", "v");
+    const keys = (await s.listUserFacts("u1")).map((f) => f.key);
+    expect(keys).not.toContain("k0");
+    expect(keys).toContain("k1");
   });
 
   test("case-insensitive: Foo and foo collide (later wins, lowercased on read)", async () => {

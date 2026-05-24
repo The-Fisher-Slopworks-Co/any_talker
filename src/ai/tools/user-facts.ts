@@ -36,7 +36,7 @@ const FACTS_PURPOSE_DOC =
   "personalise future replies — favourite topics, preferences, ongoing situations, hobbies, recurring " +
   "context the user keeps mentioning. Lowercase snake_case keys (e.g. 'favourite_team', 'pets', " +
   "'job_role'). Do NOT store secrets, passwords, contact details, or anything sensitive. Limit: 50 " +
-  "facts per user.";
+  "facts per user; once full, remembering a new fact evicts the oldest one.";
 
 function createRememberFactTool(deps: {
   storage: Storage;
@@ -47,8 +47,8 @@ function createRememberFactTool(deps: {
       `Upsert one short fact about the current user. ${FACTS_PURPOSE_DOC} ` +
       "Use this whenever the user shares a stable preference or detail worth remembering for next time. " +
       "Keys are case-insensitive (stored lowercased) and must match /^[a-z0-9_]+$/i (1–64 chars). " +
-      "Values are 1–500 chars. Returns {ok:true} on success, or {ok:false, reason:'limit_reached'} " +
-      "when the 50-fact cap is reached for a NEW key (updating an existing key always succeeds).",
+      "Values are 1–500 chars. Always returns {ok:true}: updating an existing key overwrites its " +
+      "value, and adding a new key past the 50-fact cap evicts the oldest fact to make room.",
     parameters: RememberSchema,
     execute: async ({ key, value }, ctx) => {
       return deps.storage.rememberUserFact(ctx.userId, key, value);

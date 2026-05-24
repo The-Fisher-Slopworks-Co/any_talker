@@ -97,7 +97,12 @@ local exists = redis.call('HEXISTS', KEYS[1], ARGV[1])
 if exists == 0 then
   local len = redis.call('HLEN', KEYS[1])
   if len >= tonumber(ARGV[3]) then
-    return '0'
+    -- At the cap with a NEW key: evict the oldest fact to make room rather than
+    -- rejecting the write. HKEYS preserves field insertion order for the
+    -- listpack encoding small hashes use (cap 50 < hash-max-listpack-entries
+    -- default 128), so keys[1] is the oldest-inserted fact.
+    local keys = redis.call('HKEYS', KEYS[1])
+    redis.call('HDEL', KEYS[1], keys[1])
   end
 end
 redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
@@ -120,10 +125,11 @@ function parseBucketEvalReply(reply: unknown): BucketState {
   return { tokens, lastRefillTs };
 }
 
-// REMEMBER_FACT_LUA returns the bulk string '1' on success or '0' when the
-// per-user cap is reached. Validate defensively: any other reply shape
-// (Buffer, RESP3 verbatim string, null on a transient error path) must throw
-// rather than silently masquerading as the limit being reached.
+// REMEMBER_FACT_LUA now always returns the bulk string '1' (a new key at the
+// cap evicts the oldest instead of being rejected), but the '0' →
+// limit_reached mapping is kept for API stability. Validate defensively: any
+// other reply shape (Buffer, RESP3 verbatim string, null on a transient error
+// path) must throw rather than silently masquerading as a known result.
 export function parseRememberFactReply(
   reply: unknown,
 ): { ok: true } | { ok: false; reason: "limit_reached" } {

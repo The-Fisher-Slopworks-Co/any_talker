@@ -96,6 +96,15 @@ function detailLevelSection(level: DetailLevel): string {
   }
 }
 
+function factsSection(facts: Array<{ key: string; value: string }>): string {
+  const lines = facts.map((f) => `- ${f.key}: ${f.value}`).join("\n");
+  return `# Что я знаю о пользователе
+
+Это факты, которые ты ранее сохранил об этом пользователе. Учитывай их в ответах, не переспрашивая то, что здесь уже есть. Поддерживай их в актуальном состоянии инструментами remember_fact и forget_fact.
+
+${lines}`;
+}
+
 function datetimeSection(timezone: string, now: Date): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -124,6 +133,7 @@ export function buildInstruction(
     now?: Date;
     lang?: Lang;
     detailLevel?: DetailLevel;
+    facts?: Array<{ key: string; value: string }>;
   } = {},
 ): string {
   const sections: string[] = [
@@ -136,6 +146,9 @@ export function buildInstruction(
   }
   if (opts.lang) {
     sections.push(languageSection(opts.lang));
+  }
+  if (opts.facts && opts.facts.length > 0) {
+    sections.push(factsSection(opts.facts));
   }
   if (opts.detailLevel) {
     sections.push(detailLevelSection(opts.detailLevel));

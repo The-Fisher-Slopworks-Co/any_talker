@@ -382,10 +382,13 @@ export class MemoryStorage implements Storage {
       facts = new Map();
       this.userFacts.set(userId, facts);
     }
-    // Updates to existing keys are always allowed; only NEW keys are gated
-    // by the per-user cap.
+    // Updates to existing keys never evict. A NEW key at the cap evicts the
+    // oldest-inserted fact to make room — Map iterates in insertion order, so
+    // the first key is the oldest. (A bare update via Map.set keeps the key's
+    // original position, so it doesn't reset a fact's age.)
     if (!facts.has(normKey) && facts.size >= USER_FACTS_MAX_PER_USER) {
-      return { ok: false, reason: "limit_reached" };
+      const oldest = facts.keys().next().value;
+      if (oldest !== undefined) facts.delete(oldest);
     }
     facts.set(normKey, value);
     return { ok: true };

@@ -113,6 +113,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
 
   input.onAIStart?.();
 
+  // Surface the user's remembered facts in the system prompt so the model can
+  // use them without having to call list_facts on every turn.
+  const facts = await input.storage.listUserFacts(input.userId);
+
   const effects: ToolEffect[] = [];
   let result;
   try {
@@ -125,6 +129,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         timezone,
         lang: input.lang,
         detailLevel: input.detailLevel,
+        facts,
       }),
       messages,
       tools: getAllTools(),
