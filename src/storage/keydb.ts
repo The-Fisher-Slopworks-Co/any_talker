@@ -3,6 +3,7 @@
 
 import { RedisClient } from "bun";
 import type { Storage } from "./types";
+import { USER_FACTS_MAX_PER_USER } from "./types";
 import type {
   Settings,
   WhitelistEntry,
@@ -85,6 +86,22 @@ else
 end
 redis.call('SET', KEYS[1], cjson.encode({tokens = tokens, lastRefillTs = lastRefillTs}))
 return {tostring(tokens), tostring(lastRefillTs)}
+`;
+
+// Atomic upsert with cap check: HSET if the field already exists or the
+// hash is under the cap; otherwise return a sentinel. Executes server-side
+// so concurrent callers cannot race the HLEN/HSET pair. Returns "1" on
+// success, "0" when the limit was reached.
+const REMEMBER_FACT_LUA = `
+local exists = redis.call('HEXISTS', KEYS[1], ARGV[1])
+if exists == 0 then
+  local len = redis.call('HLEN', KEYS[1])
+  if len >= tonumber(ARGV[3]) then
+    return '0'
+  end
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+return '1'
 `;
 
 function parseBucketEvalReply(reply: unknown): BucketState {
@@ -563,6 +580,45 @@ export class KeyDBStorage implements Storage {
 
   async deleteCheck(id: string): Promise<void> {
     await this.client.hdel(`${PREFIX}checks`, id);
+  }
+
+  async rememberUserFact(
+    userId: string,
+    key: string,
+    value: string,
+  ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }> {
+    const normKey = key.toLowerCase();
+    const reply = await this.client.send("EVAL", [
+      REMEMBER_FACT_LUA,
+      "1",
+      `${PREFIX}user_facts:${userId}`,
+      normKey,
+      value,
+      String(USER_FACTS_MAX_PER_USER),
+    ]);
+    if (reply === "1" || reply === 1) return { ok: true };
+    return { ok: false, reason: "limit_reached" };
+  }
+
+  async listUserFacts(
+    userId: string,
+  ): Promise<Array<{ key: string; value: string }>> {
+    const all = await this.client.hgetall(`${PREFIX}user_facts:${userId}`);
+    return Object.entries(all)
+      .map(([key, value]) => ({ key, value }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  }
+
+  async forgetUserFact(
+    userId: string,
+    key: string,
+  ): Promise<{ existed: boolean }> {
+    const normKey = key.toLowerCase();
+    const removed = await this.client.hdel(
+      `${PREFIX}user_facts:${userId}`,
+      normKey,
+    );
+    return { existed: removed > 0 };
   }
 }
 

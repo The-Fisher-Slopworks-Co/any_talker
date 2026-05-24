@@ -17,6 +17,7 @@ import { fetchPageTool } from "./ai/tools/fetch-page";
 import { youtubeTranscriptTool } from "./ai/tools/youtube-transcript";
 import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
+import { createUserFactsTools } from "./ai/tools/user-facts";
 import { startScheduler } from "./reminders/scheduler";
 import { startChecksScheduler } from "./checks/runner";
 import { createBot } from "./bot";
@@ -57,6 +58,7 @@ async function main() {
     console.warn("FIRECRAWL_API_KEY not set, search_web tool disabled");
   }
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
+  for (const t of createUserFactsTools({ storage })) registerTool(logged(t));
 
   const bot = createBot({
     botToken: config.botToken,
