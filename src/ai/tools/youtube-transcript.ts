@@ -2,23 +2,19 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { z } from "zod";
-import { fetchWithTimeout, readTextCapped, safeFetch } from "./http";
+import { fetchWithTimeout, readTextCapped } from "./http";
 import type { Tool } from "./registry";
 
 const MAX_LENGTH = 50_000;
-const MAX_BODY_BYTES = 10_000_000;
-const TIMEOUT_MS = 15_000;
+const MAX_BODY_BYTES = 15_000_000;
 
-// YouTube serves a "confirm you're not a bot" wall (playabilityStatus =
-// LOGIN_REQUIRED) to datacenter IPs, so the watch page is fetched through
-// Firecrawl's scrape API, which routes via its stealth proxy pool.
+// YouTube serves a "confirm you're not a bot" wall to datacenter IPs, and its
+// timedtext caption endpoint now returns an empty body without a BotGuard "pot"
+// token. Both are sidestepped by scraping through Firecrawl: its YouTube
+// handling embeds the transcript directly in the page's markdown output, so we
+// never touch timedtext at all.
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
 const FIRECRAWL_TIMEOUT_MS = 90_000;
-
-// A real-browser-ish UA is required: YouTube serves a stripped page without
-// `ytInitialPlayerResponse` to obvious bots.
-const USER_AGENT =
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 // Covers watch?v=, youtu.be/, m.youtube.com/watch?v=, shorts/, embed/, v/.
@@ -39,7 +35,7 @@ const Schema = z.object({
     .max(10)
     .optional()
     .describe(
-      "Optional ISO language code for the caption track (e.g. 'en', 'ru'). If omitted, picks the first available track, preferring manual over auto-generated.",
+      "Optional ISO language code (e.g. 'en', 'ru'). Omit (recommended) to get the transcript in the video's original language, which is auto-detected. If set to a language the video isn't in, the result is a machine translation whose quality and even target language can be unreliable.",
     ),
 });
 
@@ -54,15 +50,11 @@ export function extractVideoId(input: string): string {
 }
 
 type CaptionTrack = {
-  baseUrl: string;
-  languageCode: string;
+  languageCode?: string;
   kind?: string;
-  name?: { simpleText?: string; runs?: Array<{ text?: string }> };
-  vssId?: string;
 };
 
 type PlayerResponse = {
-  videoDetails?: { title?: string };
   captions?: {
     playerCaptionsTracklistRenderer?: {
       captionTracks?: CaptionTrack[];
@@ -70,35 +62,6 @@ type PlayerResponse = {
   };
   playabilityStatus?: { status?: string; reason?: string };
 };
-
-// Decode HTML entities. YouTube's caption XML is double-encoded: a cue body of
-// `it's` ships as `it&amp;#39;s`, which decodes to `it&#39;s` after one pass and
-// to `it's` after two. Run two passes so both layers unwrap.
-export function decodeHtmlEntities(s: string): string {
-  // Reject out-of-range and lone-surrogate code points so fromCodePoint never
-  // throws RangeError or emits a corrupt surrogate; substitute U+FFFD instead.
-  const safeFromCodePoint = (cp: number): string => {
-    if (!Number.isFinite(cp) || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
-      return "�";
-    }
-    return String.fromCodePoint(cp);
-  };
-  const decodeOnce = (input: string): string =>
-    input
-      .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex: string) =>
-        safeFromCodePoint(Number.parseInt(hex, 16)),
-      )
-      .replace(/&#(\d+);/g, (_m, dec: string) =>
-        safeFromCodePoint(Number.parseInt(dec, 10)),
-      )
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&");
-  return decodeOnce(decodeOnce(s));
-}
 
 // Extract ytInitialPlayerResponse JSON from a watch page. YouTube embeds it as
 // `var ytInitialPlayerResponse = { ... };` (the trailing `;` may be followed by
@@ -145,114 +108,71 @@ export function extractPlayerResponseJson(html: string): string {
   throw new Error("Unbalanced braces in ytInitialPlayerResponse JSON");
 }
 
-function pickTrack(tracks: CaptionTrack[], language?: string): CaptionTrack {
-  if (language) {
-    const lang = language.toLowerCase();
-    const exactManual = tracks.find(
-      (t) => t.languageCode.toLowerCase() === lang && t.kind !== "asr",
-    );
-    if (exactManual) return exactManual;
-    const exactAuto = tracks.find((t) => t.languageCode.toLowerCase() === lang);
-    if (exactAuto) return exactAuto;
-    const prefixManual = tracks.find(
-      (t) =>
-        t.languageCode.toLowerCase().startsWith(`${lang}-`) && t.kind !== "asr",
-    );
-    if (prefixManual) return prefixManual;
-    const prefixAny = tracks.find((t) =>
-      t.languageCode.toLowerCase().startsWith(`${lang}-`),
-    );
-    if (prefixAny) return prefixAny;
-    const available = tracks.map((t) => t.languageCode).join(", ");
-    throw new Error(
-      `No caption track for language '${language}'. Available: ${available || "(none)"}`,
-    );
-  }
-  const manual = tracks.find((t) => t.kind !== "asr");
-  if (manual) return manual;
-  const first = tracks[0];
-  if (!first) throw new Error("No caption tracks available");
-  return first;
+// The original spoken language of a video. YouTube's auto-generated (asr) track
+// is transcribed from the audio, so its languageCode is the spoken language;
+// fall back to the first listed track otherwise.
+export function detectOriginalLanguage(tracks: CaptionTrack[]): string | null {
+  const asr = tracks.find((t) => t.kind === "asr");
+  const code = (asr ?? tracks[0])?.languageCode;
+  return typeof code === "string" && code.length > 0 ? code : null;
 }
 
-// Parse SRV3/TTML caption XML. Cues are simple <text ...>body</text> elements
-// (transcript endpoint) or <p ...>body</p> (TTML). Body may contain nested
-// tags; we strip them before decoding entities.
-export function parseCaptionXml(xml: string): string {
-  // Manual scan instead of a lazy `[\s\S]*?` cue regex: that backtracks
-  // quadratically on input with many unclosed `<text` openings. We find each
-  // opening, then the next closing tag via indexOf; once a tag kind has no
-  // remaining close we stop searching for it, keeping the whole pass linear.
-  const openRe = /<(text|p)\b[^>]*>/g;
-  const lines: string[] = [];
-  const closeExhausted = new Set<string>();
-  let match: RegExpExecArray | null;
-  while ((match = openRe.exec(xml)) !== null) {
-    const tag = match[1]!;
-    const closeTag = `</${tag}>`;
-    if (closeExhausted.has(closeTag)) continue;
-    const bodyStart = match.index + match[0].length;
-    const closeIdx = xml.indexOf(closeTag, bodyStart);
-    if (closeIdx === -1) {
-      closeExhausted.add(closeTag);
-      continue;
-    }
-    const raw = xml.slice(bodyStart, closeIdx);
-    const stripped = raw.replace(/<[^>]+>/g, "");
-    const decoded = decodeHtmlEntities(stripped).replace(/\s+/g, " ").trim();
-    if (decoded.length > 0) lines.push(decoded);
-    openRe.lastIndex = closeIdx + closeTag.length;
-  }
-  return lines.join("\n");
+function baseLang(code: string): string {
+  return code.toLowerCase().split("-")[0] ?? code.toLowerCase();
 }
 
-type Json3Caption = {
-  events?: Array<{ segs?: Array<{ utf8?: string }> }>;
+// Pull the transcript out of Firecrawl's markdown. Firecrawl labels it with an
+// English `## Transcript` heading regardless of the transcript's language and
+// puts it last; we take everything from that heading to the next heading (or
+// the end) and collapse the one-word-per-line layout into flowing text.
+export function extractTranscriptFromMarkdown(md: string): string {
+  const heading = /^#{1,6}[ \t]+Transcript\b[^\n]*$/im.exec(md);
+  if (!heading) return "";
+  const start = heading.index + heading[0].length;
+  const rest = md.slice(start);
+  const next = /\n#{1,6}[ \t]+\S/.exec(rest);
+  const section = next ? rest.slice(0, next.index) : rest;
+  return section.replace(/\s+/g, " ").trim();
+}
+
+type FirecrawlMetadata = { title?: string; ogTitle?: string };
+
+function cleanTitle(meta: FirecrawlMetadata | undefined): string {
+  const fromOg = typeof meta?.ogTitle === "string" ? meta.ogTitle : undefined;
+  const fromTitle =
+    typeof meta?.title === "string"
+      ? meta.title.replace(/\s*-\s*YouTube\s*$/i, "")
+      : undefined;
+  const raw = fromOg ?? fromTitle;
+  if (typeof raw !== "string") return "";
+  return raw.replace(/\s+/g, " ").trim();
+}
+
+type FirecrawlData = {
+  markdown?: string;
+  rawHtml?: string;
+  html?: string;
+  metadata?: FirecrawlMetadata;
 };
-
-// Parse YouTube's JSON3 caption format: one line per event, joining its
-// segment `utf8` chunks. Entities are decoded for parity with the XML path.
-export function parseCaptionJson3(json: string): string {
-  let parsed: Json3Caption;
-  try {
-    parsed = JSON.parse(json) as Json3Caption;
-  } catch {
-    return "";
-  }
-  const lines: string[] = [];
-  for (const event of parsed.events ?? []) {
-    const text = (event.segs ?? [])
-      .map((seg) => seg.utf8 ?? "")
-      .join("");
-    const decoded = decodeHtmlEntities(text).replace(/\s+/g, " ").trim();
-    if (decoded.length > 0) lines.push(decoded);
-  }
-  return lines.join("\n");
-}
-
-// Dispatch on the body shape: JSON3 (starts with `{`) falls back to the JSON
-// parser, everything else is treated as caption XML.
-export function parseCaptions(body: string): string {
-  if (body.trimStart().startsWith("{")) {
-    return parseCaptionJson3(body);
-  }
-  return parseCaptionXml(body);
-}
 
 type FirecrawlScrapeResponse = {
   success?: boolean;
   error?: string;
-  data?: {
-    rawHtml?: string;
-    html?: string;
-  };
+  data?: FirecrawlData;
 };
 
-// Scrape a URL through Firecrawl and return its raw HTML. `proxy: "auto"` lets
-// Firecrawl escalate to its stealth proxy pool when a site (YouTube) blocks
-// plain requests; `maxAge: 0` disables Firecrawl's ~2-day scrape cache so a
-// changing playabilityStatus / caption list is never served stale.
-async function firecrawlScrapeHtml(apiKey: string, url: string): Promise<string> {
+// Scrape a URL through Firecrawl. `proxy: "auto"` lets Firecrawl escalate to its
+// stealth proxy pool when YouTube blocks plain requests; `maxAge: 0` disables
+// the scrape cache so a changing playabilityStatus is never served stale;
+// `location.languages` controls the language YouTube renders the transcript in;
+// `onlyMainContent: false` keeps the `<script>` carrying ytInitialPlayerResponse
+// in rawHtml.
+async function firecrawlScrape(
+  apiKey: string,
+  url: string,
+  languages: string[],
+  formats: string[],
+): Promise<FirecrawlData> {
   const response = await fetchWithTimeout(
     FIRECRAWL_SCRAPE_URL,
     {
@@ -263,10 +183,11 @@ async function firecrawlScrapeHtml(apiKey: string, url: string): Promise<string>
       },
       body: JSON.stringify({
         url,
-        formats: ["rawHtml"],
+        formats,
         onlyMainContent: false,
         proxy: "auto",
         maxAge: 0,
+        location: { languages },
         timeout: FIRECRAWL_TIMEOUT_MS,
       }),
     },
@@ -290,26 +211,34 @@ async function firecrawlScrapeHtml(apiKey: string, url: string): Promise<string>
   if (!parsed.success) {
     throw new Error(`Firecrawl scrape failed: ${parsed.error ?? "success=false"}`);
   }
-  const html = parsed.data?.rawHtml || parsed.data?.html || "";
-  if (html.length === 0) {
-    throw new Error("Firecrawl returned an empty page");
+  if (!parsed.data) {
+    throw new Error("Firecrawl returned no data");
   }
-  return html;
+  return parsed.data;
 }
 
 export function createYoutubeTranscriptTool(apiKey: string): Tool<Input, string> {
   return {
     name: "youtube_transcript",
     description:
-      "Fetch the public captions / transcript for a YouTube video and return it as plain text the model can summarise or quote. Accepts full watch URLs, youtu.be / m. / shorts URLs, or a bare 11-character video ID. Optionally select a caption language by ISO code (e.g. 'en', 'ru'); otherwise the first available track is used (preferring manual over auto-generated). Throws if the video has no captions, is private, age-restricted, or otherwise unavailable.",
+      "Fetch the captions / transcript for a YouTube video and return it as plain text the model can summarise or quote. Accepts full watch URLs, youtu.be / m. / shorts URLs, or a bare 11-character video ID. By default the transcript comes back in the video's original language (auto-detected); pass a `language` ISO code only to force a (best-effort) translation. Throws if the video has no captions, is private, age-restricted, or otherwise unavailable.",
     parameters: Schema,
-    execute: async ({ url, language }, _ctx) => {
+    execute: async ({ url, language }, ctx) => {
       const videoId = extractVideoId(url);
-      // bpctr/has_verified reduce the chance of hitting the consent or age wall
-      // (the player JSON is omitted from those interstitial pages).
-      const watchUrl = `https://www.youtube.com/watch?v=${videoId}&bpctr=9999999999&has_verified=1`;
+      const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      // First pass: request the conversation language and grab both the player
+      // JSON (to learn the original language) and the rendered transcript.
+      const requested = language ?? ctx.lang;
 
-      const html = await firecrawlScrapeHtml(apiKey, watchUrl);
+      const first = await firecrawlScrape(apiKey, watchUrl, [requested], [
+        "rawHtml",
+        "markdown",
+      ]);
+
+      const html = first.rawHtml || first.html || "";
+      if (html.length === 0) {
+        throw new Error("Firecrawl returned an empty page");
+      }
 
       const rawJson = extractPlayerResponseJson(html);
       let player: PlayerResponse;
@@ -333,47 +262,30 @@ export function createYoutubeTranscriptTool(apiKey: string): Tool<Input, string>
         );
       }
 
-      const track = pickTrack(tracks, language);
+      let markdown = first.markdown ?? "";
 
-      // The player JSON is a type-only cast; guard against a track whose baseUrl
-      // is missing or non-string so we don't hand `undefined` to safeFetch.
-      const baseUrl = track.baseUrl;
-      if (typeof baseUrl !== "string" || baseUrl.length === 0) {
-        throw new Error("Selected caption track has no usable URL");
+      // No explicit language requested: prefer the video's original. The first
+      // scrape used ctx.lang; if that isn't the original language, Firecrawl
+      // gave us a (possibly garbled) translation, so re-fetch in the original.
+      const originalLang = detectOriginalLanguage(tracks);
+      if (
+        !language &&
+        originalLang &&
+        baseLang(originalLang) !== baseLang(requested)
+      ) {
+        const second = await firecrawlScrape(apiKey, watchUrl, [originalLang], [
+          "markdown",
+        ]);
+        markdown = second.markdown ?? markdown;
       }
 
-      // The timedtext endpoint is usually reachable from any IP, so captions are
-      // fetched directly. If this ever also hits YouTube's bot wall, route it
-      // through firecrawlScrapeHtml too.
-      const captionResp = await safeFetch(baseUrl, {
-        init: {
-          headers: {
-            "User-Agent": USER_AGENT,
-            Accept: "application/xml,text/xml,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-          },
-        },
-        timeoutMs: TIMEOUT_MS,
-        timeoutLabel: `Fetching captions for ${videoId}`,
-      });
-      if (!captionResp.ok) {
-        // Drain so Bun can release the connection before throwing.
-        await captionResp.body?.cancel().catch(() => {});
-        throw new Error(
-          `Caption track returned HTTP ${captionResp.status}: ${captionResp.statusText}`,
-        );
-      }
-      const captionBody = await readTextCapped(captionResp, MAX_BODY_BYTES);
-      const body = parseCaptions(captionBody);
-
-      if (body.length === 0) {
-        throw new Error("Caption track returned no cues");
+      const transcript = extractTranscriptFromMarkdown(markdown);
+      if (transcript.length === 0) {
+        throw new Error("No transcript could be extracted for this video.");
       }
 
-      const rawTitle = player.videoDetails?.title;
-      const title =
-        typeof rawTitle === "string" ? rawTitle.replace(/\s+/g, " ").trim() : "";
-      const out = title ? `# ${title}\n\n${body}` : body;
+      const title = cleanTitle(first.metadata);
+      const out = title ? `# ${title}\n\n${transcript}` : transcript;
       let capped = out.slice(0, MAX_LENGTH);
       // A slice at MAX_LENGTH can leave a trailing lone high surrogate; drop it.
       if (capped.length === MAX_LENGTH) {
