@@ -14,6 +14,7 @@ import { randomChoiceTool } from "./ai/tools/random-choice";
 import { currencyConvertTool } from "./ai/tools/currency-convert";
 import { calculatorTool } from "./ai/tools/calculator";
 import { fetchPageTool } from "./ai/tools/fetch-page";
+import { youtubeTranscriptTool } from "./ai/tools/youtube-transcript";
 import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
 import { startScheduler } from "./reminders/scheduler";
@@ -49,6 +50,7 @@ async function main() {
   registerTool(logged(currencyConvertTool));
   registerTool(logged(calculatorTool));
   registerTool(logged(fetchPageTool));
+  registerTool(logged(youtubeTranscriptTool));
   if (config.firecrawlApiKey) {
     registerTool(logged(createSearchWebTool(config.firecrawlApiKey, config.firecrawlConcurrency)));
   } else {
