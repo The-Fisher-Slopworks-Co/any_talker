@@ -79,6 +79,27 @@ describe("buildInstruction", () => {
     expect(out).not.toContain("# Язык ответа");
   });
 
+  test("renders remembered facts as a bullet list when facts are provided", () => {
+    const out = buildInstruction("X", {
+      facts: [
+        { key: "salary_days", value: "15th and last day of month" },
+        { key: "pet", value: "cat named pumpkin" },
+      ],
+    });
+    expect(out).toContain("# Что я знаю о пользователе");
+    expect(out).toContain("- salary_days: 15th and last day of month");
+    expect(out).toContain("- pet: cat named pumpkin");
+    expect(out).toContain("remember_fact");
+    expect(out).toContain("forget_fact");
+  });
+
+  test("omits the facts section when facts are absent or empty", () => {
+    expect(buildInstruction("X")).not.toContain("# Что я знаю о пользователе");
+    expect(buildInstruction("X", { facts: [] })).not.toContain(
+      "# Что я знаю о пользователе",
+    );
+  });
+
   test("omits detail-level section when not provided", () => {
     const out = buildInstruction("X");
     expect(out).not.toContain("# Уровень подробности");

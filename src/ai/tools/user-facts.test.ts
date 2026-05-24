@@ -245,7 +245,7 @@ describe("userId plumbing", () => {
     expect(await tools.list_facts.execute({}, c)).toEqual([]);
   });
 
-  test("returns limit_reached through the tool when storage rejects", async () => {
+  test("at the cap, the tool evicts the oldest fact and still succeeds", async () => {
     const { tools, storage } = makeTools();
     const c = ctx({ userId: "u-cap" });
     for (let i = 0; i < 50; i++) {
@@ -255,6 +255,10 @@ describe("userId plumbing", () => {
       { key: "overflow", value: "v" },
       c,
     );
-    expect(r).toEqual({ ok: false, reason: "limit_reached" });
+    expect(r).toEqual({ ok: true });
+    const keys = (await storage.listUserFacts("u-cap")).map((f) => f.key);
+    expect(keys.length).toBe(50);
+    expect(keys).not.toContain("k0");
+    expect(keys).toContain("overflow");
   });
 });
