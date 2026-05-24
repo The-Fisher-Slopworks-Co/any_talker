@@ -23,7 +23,7 @@ export function withLogging<TIn, TOut>(
       const start = Date.now();
       emit(format, "info", "tool_call", {
         tool: tool.name,
-        input,
+        input: capLogValue(input),
         source: ctx.source,
         chat_id: ctx.chatId,
         user_id: ctx.userId,
@@ -33,7 +33,7 @@ export function withLogging<TIn, TOut>(
         const result = await tool.execute(input, ctx);
         emit(format, "info", "tool_result", {
           tool: tool.name,
-          result,
+          result: capLogValue(result),
           duration_ms: Date.now() - start,
         });
         return result;
@@ -61,4 +61,44 @@ function emit(
   fields: LogFields,
 ): void {
   emitLog({ level, msg, fields }, format);
+}
+
+// Largest free-form log field we allow before truncating. The `tool_call`
+// input and `tool_result` result can be huge (e.g. youtube_transcript ~50k
+// chars, list_facts ~25k chars) and in JSON mode log.ts does NOT cap field
+// sizes, so a single call would emit one enormous log line that breaks
+// downstream log-shipping (and bulk-echoes durable PII). Cap here so the
+// problem is bounded regardless of LOG_FORMAT.
+export const LOG_VALUE_MAX = 2048;
+
+// Produce a bounded representation of a free-form field value. Strings longer
+// than LOG_VALUE_MAX (and objects/arrays whose JSON serialization exceeds it)
+// are truncated with an indicator and the original length. Small values pass
+// through UNCHANGED so the existing log shape is preserved.
+export function capLogValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return capString(value);
+  }
+  // null and scalars (number/boolean/undefined/bigint/symbol) are small and
+  // pass through unchanged.
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  // Arrays/objects: only pay the stringify cost to decide whether to truncate.
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    // Non-serializable (circular, etc.) — leave it to the formatter.
+    return value;
+  }
+  if (serialized === undefined || serialized.length <= LOG_VALUE_MAX) {
+    return value;
+  }
+  return capString(serialized);
+}
+
+function capString(s: string): string {
+  if (s.length <= LOG_VALUE_MAX) return s;
+  return `${s.slice(0, LOG_VALUE_MAX)}… (${s.length} chars total)`;
 }
