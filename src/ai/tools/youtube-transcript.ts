@@ -16,8 +16,12 @@ const USER_AGENT =
 
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 // Covers watch?v=, youtu.be/, m.youtube.com/watch?v=, shorts/, embed/, v/.
+// The pre-`v=` group is lazy (`(?:.*?&)??`) so matching prefers skipping it —
+// picking the FIRST v= param (as YouTube does), not the last. The trailing
+// `(?![A-Za-z0-9_-])` rejects 12+ char runs rather than silently truncating
+// them to the first 11 characters.
 const URL_VIDEO_ID_RE =
-  /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+  /(?:youtube\.com\/(?:watch\?(?:.*?&)??v=|shorts\/|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/;
 
 const Schema = z.object({
   url: z.string().min(1).describe(
@@ -65,13 +69,21 @@ type PlayerResponse = {
 // `it's` ships as `it&amp;#39;s`, which decodes to `it&#39;s` after one pass and
 // to `it's` after two. Run two passes so both layers unwrap.
 export function decodeHtmlEntities(s: string): string {
+  // Reject out-of-range and lone-surrogate code points so fromCodePoint never
+  // throws RangeError or emits a corrupt surrogate; substitute U+FFFD instead.
+  const safeFromCodePoint = (cp: number): string => {
+    if (!Number.isFinite(cp) || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
+      return "�";
+    }
+    return String.fromCodePoint(cp);
+  };
   const decodeOnce = (input: string): string =>
     input
       .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex: string) =>
-        String.fromCodePoint(Number.parseInt(hex, 16)),
+        safeFromCodePoint(Number.parseInt(hex, 16)),
       )
       .replace(/&#(\d+);/g, (_m, dec: string) =>
-        String.fromCodePoint(Number.parseInt(dec, 10)),
+        safeFromCodePoint(Number.parseInt(dec, 10)),
       )
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
@@ -87,15 +99,13 @@ export function decodeHtmlEntities(s: string): string {
 // other JS). We scan brace-by-brace from the opening `{` to find the matching
 // `}` while respecting string literals and escapes.
 export function extractPlayerResponseJson(html: string): string {
-  const marker = "ytInitialPlayerResponse";
-  const markerIdx = html.indexOf(marker);
-  if (markerIdx === -1) {
+  // Anchor on the assignment form so an earlier mention in a string literal,
+  // comment, or ytcfg reference doesn't make us walk the wrong object.
+  const assignment = /ytInitialPlayerResponse\s*=\s*\{/.exec(html);
+  if (!assignment) {
     throw new Error("Could not find ytInitialPlayerResponse on the page");
   }
-  const braceStart = html.indexOf("{", markerIdx);
-  if (braceStart === -1) {
-    throw new Error("Could not find ytInitialPlayerResponse JSON body");
-  }
+  const braceStart = assignment.index + assignment[0].length - 1;
   let depth = 0;
   let inString = false;
   let escape = false;
@@ -163,17 +173,64 @@ function pickTrack(tracks: CaptionTrack[], language?: string): CaptionTrack {
 // (transcript endpoint) or <p ...>body</p> (TTML). Body may contain nested
 // tags; we strip them before decoding entities.
 export function parseCaptionXml(xml: string): string {
-  const cueRe = /<(?:text|p)\b[^>]*>([\s\S]*?)<\/(?:text|p)>/g;
+  // Manual scan instead of a lazy `[\s\S]*?` cue regex: that backtracks
+  // quadratically on input with many unclosed `<text` openings. We find each
+  // opening, then the next closing tag via indexOf; once a tag kind has no
+  // remaining close we stop searching for it, keeping the whole pass linear.
+  const openRe = /<(text|p)\b[^>]*>/g;
   const lines: string[] = [];
+  const closeExhausted = new Set<string>();
   let match: RegExpExecArray | null;
-  while ((match = cueRe.exec(xml)) !== null) {
-    const raw = match[1];
-    if (raw === undefined) continue;
+  while ((match = openRe.exec(xml)) !== null) {
+    const tag = match[1]!;
+    const closeTag = `</${tag}>`;
+    if (closeExhausted.has(closeTag)) continue;
+    const bodyStart = match.index + match[0].length;
+    const closeIdx = xml.indexOf(closeTag, bodyStart);
+    if (closeIdx === -1) {
+      closeExhausted.add(closeTag);
+      continue;
+    }
+    const raw = xml.slice(bodyStart, closeIdx);
     const stripped = raw.replace(/<[^>]+>/g, "");
     const decoded = decodeHtmlEntities(stripped).replace(/\s+/g, " ").trim();
     if (decoded.length > 0) lines.push(decoded);
+    openRe.lastIndex = closeIdx + closeTag.length;
   }
   return lines.join("\n");
+}
+
+type Json3Caption = {
+  events?: Array<{ segs?: Array<{ utf8?: string }> }>;
+};
+
+// Parse YouTube's JSON3 caption format: one line per event, joining its
+// segment `utf8` chunks. Entities are decoded for parity with the XML path.
+export function parseCaptionJson3(json: string): string {
+  let parsed: Json3Caption;
+  try {
+    parsed = JSON.parse(json) as Json3Caption;
+  } catch {
+    return "";
+  }
+  const lines: string[] = [];
+  for (const event of parsed.events ?? []) {
+    const text = (event.segs ?? [])
+      .map((seg) => seg.utf8 ?? "")
+      .join("");
+    const decoded = decodeHtmlEntities(text).replace(/\s+/g, " ").trim();
+    if (decoded.length > 0) lines.push(decoded);
+  }
+  return lines.join("\n");
+}
+
+// Dispatch on the body shape: JSON3 (starts with `{`) falls back to the JSON
+// parser, everything else is treated as caption XML.
+export function parseCaptions(body: string): string {
+  if (body.trimStart().startsWith("{")) {
+    return parseCaptionJson3(body);
+  }
+  return parseCaptionXml(body);
 }
 
 export const youtubeTranscriptTool: Tool<Input, string> = {
@@ -199,6 +256,8 @@ export const youtubeTranscriptTool: Tool<Input, string> = {
       timeoutLabel: `Fetching YouTube page for ${videoId}`,
     });
     if (!pageResp.ok) {
+      // Drain so Bun can release the connection before throwing.
+      await pageResp.body?.cancel().catch(() => {});
       throw new Error(`YouTube watch page returned HTTP ${pageResp.status}`);
     }
     const html = await readTextCapped(pageResp, MAX_BODY_BYTES);
@@ -227,7 +286,14 @@ export const youtubeTranscriptTool: Tool<Input, string> = {
 
     const track = pickTrack(tracks, language);
 
-    const captionResp = await safeFetch(track.baseUrl, {
+    // The player JSON is a type-only cast; guard against a track whose baseUrl
+    // is missing or non-string so we don't hand `undefined` to safeFetch.
+    const baseUrl = track.baseUrl;
+    if (typeof baseUrl !== "string" || baseUrl.length === 0) {
+      throw new Error("Selected caption track has no usable URL");
+    }
+
+    const captionResp = await safeFetch(baseUrl, {
       init: {
         headers: {
           "User-Agent": USER_AGENT,
@@ -239,19 +305,31 @@ export const youtubeTranscriptTool: Tool<Input, string> = {
       timeoutLabel: `Fetching captions for ${videoId}`,
     });
     if (!captionResp.ok) {
+      // Drain so Bun can release the connection before throwing.
+      await captionResp.body?.cancel().catch(() => {});
       throw new Error(
         `Caption track returned HTTP ${captionResp.status}: ${captionResp.statusText}`,
       );
     }
-    const captionXml = await readTextCapped(captionResp, MAX_BODY_BYTES);
-    const body = parseCaptionXml(captionXml);
+    const captionBody = await readTextCapped(captionResp, MAX_BODY_BYTES);
+    const body = parseCaptions(captionBody);
 
     if (body.length === 0) {
       throw new Error("Caption track returned no cues");
     }
 
-    const title = player.videoDetails?.title?.trim();
+    const rawTitle = player.videoDetails?.title;
+    const title =
+      typeof rawTitle === "string" ? rawTitle.replace(/\s+/g, " ").trim() : "";
     const out = title ? `# ${title}\n\n${body}` : body;
-    return out.slice(0, MAX_LENGTH);
+    let capped = out.slice(0, MAX_LENGTH);
+    // A slice at MAX_LENGTH can leave a trailing lone high surrogate; drop it.
+    if (capped.length === MAX_LENGTH) {
+      const last = capped.charCodeAt(capped.length - 1);
+      if (last >= 0xd800 && last <= 0xdbff) {
+        capped = capped.slice(0, -1);
+      }
+    }
+    return capped;
   },
 };

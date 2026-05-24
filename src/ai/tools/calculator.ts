@@ -54,7 +54,9 @@ export function formatNumber(n: number): string {
   if (Number.isInteger(n)) {
     // Avoid "-0".
     if (Object.is(n, -0)) return "0";
-    return n.toFixed(0);
+    // BigInt gives full digits with no exponent; n.toFixed(0) switches to
+    // exponential form at >=1e21 (e.g. "1e+21").
+    return BigInt(n).toString();
   }
   // Full JS precision; String() already uses the shortest round-trippable form.
   return String(n);

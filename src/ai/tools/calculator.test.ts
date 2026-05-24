@@ -222,6 +222,13 @@ describe("calculator tool — formatting", () => {
     expect(formatNumber(1e10)).toBe("10000000000");
   });
 
+  test("large integers use full digits, not exponential form", async () => {
+    expect(formatNumber(1e21)).toBe("1000000000000000000000");
+    expect(formatNumber(1e21)).not.toContain("e+");
+    expect(formatNumber(2 ** 70)).toBe("1180591620717411303424");
+    expect(await run("10^21")).toBe("1000000000000000000000");
+  });
+
   test("non-integer keeps full precision", () => {
     expect(formatNumber(0.1 + 0.2)).toBe(String(0.1 + 0.2));
   });

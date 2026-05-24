@@ -120,6 +120,22 @@ function parseBucketEvalReply(reply: unknown): BucketState {
   return { tokens, lastRefillTs };
 }
 
+// REMEMBER_FACT_LUA returns the bulk string '1' on success or '0' when the
+// per-user cap is reached. Validate defensively: any other reply shape
+// (Buffer, RESP3 verbatim string, null on a transient error path) must throw
+// rather than silently masquerading as the limit being reached.
+export function parseRememberFactReply(
+  reply: unknown,
+): { ok: true } | { ok: false; reason: "limit_reached" } {
+  if (reply === "1" || reply === 1) return { ok: true };
+  if (reply === "0" || reply === 0) {
+    return { ok: false, reason: "limit_reached" };
+  }
+  throw new Error(
+    `Unexpected EVAL reply for rememberUserFact: ${JSON.stringify(reply)}`,
+  );
+}
+
 export class KeyDBStorage implements Storage {
   constructor(private readonly client: RedisClient) {}
 
@@ -596,8 +612,7 @@ export class KeyDBStorage implements Storage {
       value,
       String(USER_FACTS_MAX_PER_USER),
     ]);
-    if (reply === "1" || reply === 1) return { ok: true };
-    return { ok: false, reason: "limit_reached" };
+    return parseRememberFactReply(reply);
   }
 
   async listUserFacts(
