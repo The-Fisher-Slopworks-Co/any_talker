@@ -41,10 +41,7 @@ export function RateLimitTab({
   }, []);
 
   const dirty =
-    config.capacity !== settings.rateLimit.capacity ||
-    config.refillAmount !== settings.rateLimit.refillAmount ||
-    config.refillIntervalMs !== settings.rateLimit.refillIntervalMs ||
-    config.ownerExempt !== settings.rateLimit.ownerExempt;
+    JSON.stringify(config) !== JSON.stringify(settings.rateLimit);
 
   const save = async () => {
     setSaving(true);
