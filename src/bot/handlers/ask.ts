@@ -134,6 +134,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      serviceTier: settings.serviceTier,
       apiKey: byokKey,
       toolCallContext: {
         source: "ask",

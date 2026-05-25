@@ -18,6 +18,14 @@ export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
   "latency",
 ];
 
+// OpenRouter service tiers trade cost against latency/availability. Omitting
+// the field (null) uses the standard tier; "flex" is cheaper but slower, and
+// "priority" is faster at a higher price.
+// https://openrouter.ai/docs/guides/features/service-tiers
+export type ServiceTier = "flex" | "priority";
+
+export const SERVICE_TIER_VALUES: readonly ServiceTier[] = ["flex", "priority"];
+
 export type Gender = "male" | "female";
 
 export type Settings = {
@@ -26,6 +34,7 @@ export type Settings = {
   rateLimit: RateLimitConfig;
   timezone: string;
   providerSort: ProviderSort | null;
+  serviceTier: ServiceTier | null;
   expandableBlockquoteThreshold: number;
 };
 
@@ -78,6 +87,7 @@ export type ChatSettings = {
   botName?: string;
   timezone?: string;
   providerSort?: ProviderSort | null;
+  serviceTier?: ServiceTier | null;
   keywordFilter?: KeywordFilter;
 };
 
@@ -113,6 +123,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   timezone: "UTC",
   providerSort: null,
+  serviceTier: null,
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
 };
 
@@ -147,6 +158,7 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.botName === undefined &&
     s.timezone === undefined &&
     s.providerSort === undefined &&
+    s.serviceTier === undefined &&
     s.keywordFilter === undefined
   );
 }
@@ -167,6 +179,10 @@ export function messageMatchesKeyword(
 
 export function isValidProviderSort(v: unknown): v is ProviderSort {
   return v === "price" || v === "throughput" || v === "latency";
+}
+
+export function isValidServiceTier(v: unknown): v is ServiceTier {
+  return v === "flex" || v === "priority";
 }
 
 export function isValidGender(v: unknown): v is Gender {

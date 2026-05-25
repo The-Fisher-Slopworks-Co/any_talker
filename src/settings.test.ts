@@ -70,6 +70,7 @@ describe("applyChatOverrides", () => {
       },
       timezone: DEFAULT_SETTINGS.timezone,
       providerSort: DEFAULT_SETTINGS.providerSort,
+      serviceTier: DEFAULT_SETTINGS.serviceTier,
       expandableBlockquoteThreshold:
         DEFAULT_SETTINGS.expandableBlockquoteThreshold,
     });
@@ -153,6 +154,23 @@ describe("applyChatOverrides", () => {
   test("provider sort: chat string overrides global", () => {
     const r = applyChatOverrides(DEFAULT_SETTINGS, { providerSort: "latency" });
     expect(r.providerSort).toBe("latency");
+  });
+
+  test("service tier: chat null overrides global value", () => {
+    const global = { ...DEFAULT_SETTINGS, serviceTier: "flex" as const };
+    const r = applyChatOverrides(global, { serviceTier: null });
+    expect(r.serviceTier).toBeNull();
+  });
+
+  test("service tier: chat undefined inherits global value", () => {
+    const global = { ...DEFAULT_SETTINGS, serviceTier: "priority" as const };
+    const r = applyChatOverrides(global, { systemPrompt: "x" });
+    expect(r.serviceTier).toBe("priority");
+  });
+
+  test("service tier: chat string overrides global", () => {
+    const r = applyChatOverrides(DEFAULT_SETTINGS, { serviceTier: "flex" });
+    expect(r.serviceTier).toBe("flex");
   });
 });
 

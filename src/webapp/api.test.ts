@@ -182,6 +182,54 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(400);
   });
 
+  test("accepts a valid serviceTier", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { serviceTier: "flex" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.serviceTier).toBe("flex");
+  });
+
+  test("accepts null serviceTier to clear it", async () => {
+    const d = deps();
+    await d.storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      serviceTier: "priority",
+    });
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { serviceTier: null },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.serviceTier).toBeNull();
+  });
+
+  test("rejects an invalid serviceTier with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { serviceTier: "turbo" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("rejects an empty models array with 400", async () => {
     const d = deps();
     const res = await handleApi(
@@ -1510,6 +1558,75 @@ describe("/api/admin/chats", () => {
         method: "PUT",
         path: "/api/admin/chats/-100",
         body: { systemPrompt: "p", providerSort: "fastest" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      systemPrompt: "p",
+    });
+  });
+
+  test("PUT accepts serviceTier string override", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { serviceTier: "priority" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      serviceTier: "priority",
+    });
+  });
+
+  test("PUT accepts serviceTier=null to override-to-none", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { serviceTier: null },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      serviceTier: null,
+    });
+  });
+
+  test("PUT silently drops invalid serviceTier string", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { systemPrompt: "p", serviceTier: "turbo" },
       },
       d,
       owner,

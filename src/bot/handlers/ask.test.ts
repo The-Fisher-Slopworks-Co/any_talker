@@ -393,6 +393,33 @@ describe("askHandler", () => {
     expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBeNull();
   });
 
+  test("service tier: forwards global setting to the AI client", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      serviceTier: "flex",
+    });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { serviceTier: unknown }).serviceTier).toBe("flex");
+  });
+
+  test("service tier: chat override beats global", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      serviceTier: "flex",
+    });
+    await storage.saveChatSettings("c1", { serviceTier: "priority" });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { serviceTier: unknown }).serviceTier).toBe(
+      "priority",
+    );
+  });
+
   test("answered: deducts tokens from bucket", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
