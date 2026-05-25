@@ -63,18 +63,6 @@ export function RateLimitFields({
       </div>
       <label className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>
-          {s.ui_ratelimit_detailed_multiplier}
-        </span>
-        <NumberInput
-          className={INPUT_CLS}
-          step="0.1"
-          min={0}
-          value={value.detailedMultiplier}
-          onChange={(n) => onChange({ ...value, detailedMultiplier: n })}
-        />
-      </label>
-      <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>
           {s.ui_ratelimit_wise_multiplier}
         </span>
         <NumberInput

@@ -49,11 +49,10 @@ export type BotDeps = {
   logDebug: boolean;
 };
 
-const ASK_CAPTION_RE = /^\/(ask|askmore|askwise)(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+const ASK_CAPTION_RE = /^\/(ask|askwise)(?:@\w+)?(?:\s+([\s\S]*))?$/i;
 
 const COMMAND_TO_DETAIL: Record<string, DetailLevel> = {
   ask: "short",
-  askmore: "detailed",
   askwise: "wise",
 };
 
@@ -486,7 +485,6 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   };
 
   bot.command("ask", (ctx) => dispatchTextCommand(ctx, "short"));
-  bot.command("askmore", (ctx) => dispatchTextCommand(ctx, "detailed"));
   bot.command("askwise", (ctx) => dispatchTextCommand(ctx, "wise"));
 
   bot.on("message:photo", async (ctx) => {

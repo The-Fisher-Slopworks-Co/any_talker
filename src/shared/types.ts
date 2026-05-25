@@ -6,11 +6,14 @@ export type RateLimitConfig = {
   refillAmount: number;
   refillIntervalMs: number;
   ownerExempt: boolean;
-  detailedMultiplier: number;
   wiseMultiplier: number;
 };
 
 export type ProviderSort = "price" | "throughput" | "latency";
+
+// Reasoning effort passed through to the model per request.
+// https://openrouter.ai/docs/use-cases/reasoning-tokens
+export type ReasoningEffort = "low" | "high";
 
 export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
   "price",
@@ -118,7 +121,6 @@ export const DEFAULT_SETTINGS: Settings = {
     refillAmount: 3000,
     refillIntervalMs: 40 * 60 * 1000,
     ownerExempt: true,
-    detailedMultiplier: 1.3,
     wiseMultiplier: 1.8,
   },
   timezone: "UTC",

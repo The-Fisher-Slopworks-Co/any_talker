@@ -5,7 +5,7 @@ import { generateText, tool as aiTool, stepCountIs, type ToolSet } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
-import type { ProviderSort, ServiceTier } from "../shared/types";
+import type { ProviderSort, ReasoningEffort, ServiceTier } from "../shared/types";
 import { proxiedFetch } from "../proxy";
 import {
   aiRequestDurationSeconds,
@@ -39,6 +39,7 @@ export class OpenRouterAIClient implements AIClient {
     tools: Tool[];
     providerSort?: ProviderSort | null;
     serviceTier?: ServiceTier | null;
+    reasoningEffort?: ReasoningEffort | null;
     toolCallContext: ToolCallContext;
     apiKey?: string | null;
   }): Promise<AskResult> {
@@ -74,6 +75,7 @@ export class OpenRouterAIClient implements AIClient {
       models?: string[];
       provider?: { sort: ProviderSort };
       service_tier?: ServiceTier;
+      reasoning?: { effort: ReasoningEffort };
     } = {};
     if (fallbacks.length > 0) openrouterOpts.models = fallbacks;
     if (opts.providerSort) {
@@ -83,6 +85,9 @@ export class OpenRouterAIClient implements AIClient {
     // spreads any providerOptions.openrouter key straight into the request.
     if (opts.serviceTier) {
       openrouterOpts.service_tier = opts.serviceTier;
+    }
+    if (opts.reasoningEffort) {
+      openrouterOpts.reasoning = { effort: opts.reasoningEffort };
     }
 
     const start = performance.now();
