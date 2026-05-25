@@ -4,7 +4,11 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import type { ProviderSort, Settings } from "../../../../shared/types";
+import type {
+  ProviderSort,
+  ServiceTier,
+  Settings,
+} from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
@@ -14,6 +18,7 @@ import {
 import { SaveButton } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { ProviderSortField } from "../../components/provider-sort-field";
+import { ServiceTierField } from "../../components/service-tier-field";
 import { TimezoneSelect } from "../../components/timezone-select";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 
@@ -30,6 +35,9 @@ export function PromptTab({
   const [timezone, setTimezone] = useState(settings.timezone);
   const [providerSort, setProviderSort] = useState<ProviderSort | null>(
     settings.providerSort,
+  );
+  const [serviceTier, setServiceTier] = useState<ServiceTier | null>(
+    settings.serviceTier,
   );
   const [thresholdInput, setThresholdInput] = useState(
     String(settings.expandableBlockquoteThreshold),
@@ -53,6 +61,7 @@ export function PromptTab({
     prompt !== settings.systemPrompt ||
     timezone !== settings.timezone ||
     providerSort !== settings.providerSort ||
+    serviceTier !== settings.serviceTier ||
     thresholdDirty;
   const canSave = dirty && trimmed.length > 0 && thresholdValid;
 
@@ -63,12 +72,14 @@ export function PromptTab({
       systemPrompt: prompt,
       timezone,
       providerSort,
+      serviceTier,
       expandableBlockquoteThreshold: parsedThreshold,
     });
     onSaved(next);
     setModels(next.models);
     setTimezone(next.timezone);
     setProviderSort(next.providerSort);
+    setServiceTier(next.serviceTier);
     setThresholdInput(String(next.expandableBlockquoteThreshold));
     setSaving(false);
   };
@@ -86,6 +97,10 @@ export function PromptTab({
       <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
       <ProviderSortField value={providerSort} onChange={setProviderSort} />
       <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>
+      <ServiceTierField value={serviceTier} onChange={setServiceTier} />
+      <SectionFooter>{s.ui_prompt_service_tier_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_system_prompt}</SectionHeader>
       <Card>

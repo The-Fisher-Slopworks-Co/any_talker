@@ -3,7 +3,11 @@
 
 import type { Storage } from "./storage/types";
 import type { Settings, ChatSettings, RateLimitConfig } from "./shared/types";
-import { DEFAULT_SETTINGS, isValidProviderSort } from "./shared/types";
+import {
+  DEFAULT_SETTINGS,
+  isValidProviderSort,
+  isValidServiceTier,
+} from "./shared/types";
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   const existing = await storage.getSettings();
@@ -38,6 +42,7 @@ function normalize(s: Settings): Settings {
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
   const providerSort = isValidProviderSort(s.providerSort) ? s.providerSort : null;
+  const serviceTier = isValidServiceTier(s.serviceTier) ? s.serviceTier : null;
   const rateLimit = normalizeRateLimit(s.rateLimit);
   const expandableBlockquoteThreshold =
     typeof s.expandableBlockquoteThreshold === "number" &&
@@ -50,6 +55,7 @@ function normalize(s: Settings): Settings {
     models,
     timezone,
     providerSort,
+    serviceTier,
     rateLimit,
     expandableBlockquoteThreshold,
   };
@@ -67,6 +73,8 @@ export function applyChatOverrides(
     timezone: chat.timezone ?? global.timezone,
     providerSort:
       chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
+    serviceTier:
+      chat.serviceTier !== undefined ? chat.serviceTier : global.serviceTier,
     expandableBlockquoteThreshold: global.expandableBlockquoteThreshold,
   };
 }
