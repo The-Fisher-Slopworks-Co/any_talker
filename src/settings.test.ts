@@ -53,7 +53,6 @@ describe("applyChatOverrides", () => {
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
-        detailedMultiplier: 1.5,
         wiseMultiplier: 2,
       },
     });
@@ -65,7 +64,6 @@ describe("applyChatOverrides", () => {
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
-        detailedMultiplier: 1.5,
         wiseMultiplier: 2,
       },
       timezone: DEFAULT_SETTINGS.timezone,
@@ -85,9 +83,6 @@ describe("applyChatOverrides", () => {
         ownerExempt: false,
       } as never,
     });
-    expect(r.rateLimit.detailedMultiplier).toBe(
-      DEFAULT_SETTINGS.rateLimit.detailedMultiplier,
-    );
     expect(r.rateLimit.wiseMultiplier).toBe(
       DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
     );
@@ -131,9 +126,6 @@ describe("applyChatOverrides", () => {
     };
     await storage.saveSettings(legacy);
     const s = await getOrInitSettings(storage);
-    expect(s.rateLimit.detailedMultiplier).toBe(
-      DEFAULT_SETTINGS.rateLimit.detailedMultiplier,
-    );
     expect(s.rateLimit.wiseMultiplier).toBe(
       DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
     );

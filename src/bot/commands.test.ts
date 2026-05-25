@@ -15,16 +15,14 @@ describe("command lists", () => {
   test("English list matches the expected shape", () => {
     expect(BOT_COMMANDS_EN).toEqual([
       { command: "ask", description: "Ask (short answer)" },
-      { command: "askmore", description: "Ask (detailed answer)" },
-      { command: "askwise", description: "Ask wise man (exhaustive answer)" },
+      { command: "askwise", description: "Ask (detailed answer)" },
     ]);
   });
 
   test("Russian list matches the expected shape", () => {
     expect(BOT_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
-      { command: "askmore", description: "Спросить (подробно)" },
-      { command: "askwise", description: "Спросить мудреца (исчерпывающе)" },
+      { command: "askwise", description: "Спросить (подробно)" },
     ]);
   });
 

@@ -260,34 +260,26 @@ describe("askHandler", () => {
     expect(sys).toContain("Grumpy pirate.");
   });
 
-  test("detail level short: instruction asks for a brief answer", async () => {
+  test("detail level short: brief answer + low reasoning effort", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai, detailLevel: "short" }));
-    const sys = (ai.calls[0] as { system: string }).system;
-    expect(sys).toContain("# Уровень подробности");
-    expect(sys).toContain("3 предложения");
+    const call = ai.calls[0] as { system: string; reasoningEffort: unknown };
+    expect(call.system).toContain("# Уровень подробности");
+    expect(call.system).toContain("3 предложения");
+    expect(call.reasoningEffort).toBe("low");
   });
 
-  test("detail level detailed: instruction lets the model decide length", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai, detailLevel: "detailed" }));
-    const sys = (ai.calls[0] as { system: string }).system;
-    expect(sys).toContain("# Уровень подробности");
-    expect(sys).toContain("настолько подробно");
-  });
-
-  test("detail level wise: instruction asks for an exhaustive answer", async () => {
+  test("detail level wise: detailed answer + high reasoning effort", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai, detailLevel: "wise" }));
-    const sys = (ai.calls[0] as { system: string }).system;
-    expect(sys).toContain("# Уровень подробности");
-    expect(sys).toContain("исчерпывающе");
+    const call = ai.calls[0] as { system: string; reasoningEffort: unknown };
+    expect(call.system).toContain("# Уровень подробности");
+    expect(call.system).toContain("Отвечай подробно");
+    expect(call.reasoningEffort).toBe("high");
   });
 
   test("timezone resolution: user > chat > global", async () => {
@@ -433,27 +425,6 @@ describe("askHandler", () => {
     );
   });
 
-  test("detailed level multiplies deduction by detailedMultiplier", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      rateLimit: {
-        ...DEFAULT_SETTINGS.rateLimit,
-        detailedMultiplier: 1.3,
-      },
-    });
-    const rlStorage = new MemoryStorage();
-    const rl = new TokenBucketLimiter(rlStorage);
-    const ai = new FakeAI({ text: "ok", totalTokens: 1000 });
-    await askHandler(
-      baseInput({ storage, rateLimiter: rl, ai, detailLevel: "detailed" }),
-    );
-    expect((await rlStorage.getBucket("c1", "42"))?.tokens).toBe(
-      DEFAULT_SETTINGS.rateLimit.capacity - 1300,
-    );
-  });
-
   test("wise level multiplies deduction by wiseMultiplier", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
@@ -482,7 +453,6 @@ describe("askHandler", () => {
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
-        detailedMultiplier: 5,
         wiseMultiplier: 10,
       },
     });

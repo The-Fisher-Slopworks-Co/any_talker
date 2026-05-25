@@ -17,15 +17,11 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
 }
 
 function normalizeRateLimit(rl: RateLimitConfig): RateLimitConfig {
-  const detailedMultiplier =
-    typeof rl.detailedMultiplier === "number" && rl.detailedMultiplier > 0
-      ? rl.detailedMultiplier
-      : DEFAULT_SETTINGS.rateLimit.detailedMultiplier;
   const wiseMultiplier =
     typeof rl.wiseMultiplier === "number" && rl.wiseMultiplier > 0
       ? rl.wiseMultiplier
       : DEFAULT_SETTINGS.rateLimit.wiseMultiplier;
-  return { ...rl, detailedMultiplier, wiseMultiplier };
+  return { ...rl, wiseMultiplier };
 }
 
 function normalize(s: Settings): Settings {

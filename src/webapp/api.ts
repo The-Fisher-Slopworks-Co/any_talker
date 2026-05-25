@@ -267,8 +267,6 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
       typeof r.refillAmount === "number" &&
       typeof r.refillIntervalMs === "number" &&
       typeof r.ownerExempt === "boolean" &&
-      typeof r.detailedMultiplier === "number" &&
-      r.detailedMultiplier > 0 &&
       typeof r.wiseMultiplier === "number" &&
       r.wiseMultiplier > 0
     ) {
@@ -277,7 +275,6 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
         refillAmount: r.refillAmount,
         refillIntervalMs: r.refillIntervalMs,
         ownerExempt: r.ownerExempt,
-        detailedMultiplier: r.detailedMultiplier,
         wiseMultiplier: r.wiseMultiplier,
       };
     }
@@ -514,12 +511,8 @@ export async function handleApi(
       if (patch.rateLimit !== undefined) {
         const rl = patch.rateLimit as Partial<RateLimitConfig>;
         if (
-          (rl.detailedMultiplier !== undefined &&
-            (typeof rl.detailedMultiplier !== "number" ||
-              !(rl.detailedMultiplier > 0))) ||
-          (rl.wiseMultiplier !== undefined &&
-            (typeof rl.wiseMultiplier !== "number" ||
-              !(rl.wiseMultiplier > 0)))
+          rl.wiseMultiplier !== undefined &&
+          (typeof rl.wiseMultiplier !== "number" || !(rl.wiseMultiplier > 0))
         ) {
           return BAD_RATE_LIMIT_MULTIPLIER;
         }
