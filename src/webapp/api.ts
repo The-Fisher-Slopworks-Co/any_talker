@@ -656,6 +656,24 @@ export async function handleApi(
     }
   }
 
+  const rlUserMatch = req.path.match(/^\/api\/ratelimit\/user\/(.+)$/);
+  if (rlUserMatch) {
+    const id = rlUserMatch[1]!;
+    if (req.method === "GET") {
+      const bucket = await deps.storage.getBucket(id, id);
+      return { status: 200, body: { bucket } };
+    }
+    if (req.method === "PUT") {
+      const settings = await getOrInitSettings(deps.storage);
+      const body = (req.body ?? {}) as { reset?: boolean };
+      if (body.reset) {
+        await deps.rateLimiter.reset(id, id, settings.rateLimit, Date.now());
+      }
+      const bucket = await deps.storage.getBucket(id, id);
+      return { status: 200, body: { bucket } };
+    }
+  }
+
   if (req.path === "/api/admin/chats" && req.method === "GET") {
     const chats = await deps.storage.listChats();
     return { status: 200, body: { chats } };

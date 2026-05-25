@@ -418,6 +418,40 @@ describe("ratelimit endpoints", () => {
     const b = await d.storage.getBucket(ownerId, ownerId);
     expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
   });
+
+  test("GET /api/ratelimit/user/:id returns that user's bucket", async () => {
+    const d = deps();
+    await d.storage.saveBucket("42", "42", { tokens: 7, lastRefillTs: 123 });
+    const r = await handleApi(
+      { method: "GET", path: "/api/ratelimit/user/42", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ bucket: { tokens: 7, lastRefillTs: 123 } });
+  });
+
+  test("PUT /api/ratelimit/user/:id { reset: true } resets that user's bucket", async () => {
+    const d = deps();
+    await d.storage.saveBucket("42", "42", { tokens: -100, lastRefillTs: 1 });
+    const r = await handleApi(
+      { method: "PUT", path: "/api/ratelimit/user/42", body: { reset: true } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const b = await d.storage.getBucket("42", "42");
+    expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
+  });
+
+  test("non-owner gets 403 from /api/ratelimit/user/:id", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/ratelimit/user/42", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
 });
 
 describe("/api/me", () => {
