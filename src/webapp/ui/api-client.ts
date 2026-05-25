@@ -75,6 +75,10 @@ export type ChatSettingsResponse = {
   settings: ChatSettings;
   whitelisted: boolean;
 };
+export type UserBucketEntry = {
+  chat: Chat;
+  bucket: BucketState;
+};
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -119,10 +123,11 @@ export const api = {
   getMyBucket: () => req<{ bucket: BucketState | null }>("GET", "/api/ratelimit/me"),
   resetMyBucket: () =>
     req<{ bucket: BucketState | null }>("PUT", "/api/ratelimit/me", { reset: true }),
-  getUserBucket: (id: string) =>
-    req<{ bucket: BucketState | null }>("GET", `/api/ratelimit/user/${id}`),
-  resetUserBucket: (id: string) =>
-    req<{ bucket: BucketState | null }>("PUT", `/api/ratelimit/user/${id}`, {
+  getUserBuckets: (id: string) =>
+    req<{ buckets: UserBucketEntry[] }>("GET", `/api/ratelimit/user/${id}`),
+  resetUserBucket: (id: string, chatId: string) =>
+    req<{ buckets: UserBucketEntry[] }>("PUT", `/api/ratelimit/user/${id}`, {
+      chatId,
       reset: true,
     }),
   getMe: () => req<MeResponse>("GET", "/api/me"),

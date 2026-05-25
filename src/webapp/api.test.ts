@@ -6,6 +6,7 @@ import { MemoryStorage } from "../storage/memory";
 import { TokenBucketLimiter } from "../ratelimit/token-bucket";
 import { handleApi } from "./api";
 import { DEFAULT_SETTINGS } from "../shared/types";
+import type { Chat } from "../shared/types";
 
 const ownerId = "1";
 function deps() {
@@ -467,28 +468,81 @@ describe("ratelimit endpoints", () => {
     expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
   });
 
-  test("GET /api/ratelimit/user/:id returns that user's bucket", async () => {
+  test("GET /api/ratelimit/user/:id lists the user's buckets across chats", async () => {
     const d = deps();
-    await d.storage.saveBucket("42", "42", { tokens: 7, lastRefillTs: 123 });
+    const group: Chat = {
+      id: "-100",
+      type: "supergroup",
+      title: "Group",
+      username: null,
+      lastSeenAt: 20,
+    };
+    const dm: Chat = {
+      id: "42",
+      type: "private",
+      title: null,
+      username: null,
+      lastSeenAt: 10,
+    };
+    await d.storage.upsertChat(group);
+    await d.storage.upsertChat(dm);
+    await d.storage.saveBucket("-100", "42", { tokens: 7, lastRefillTs: 123 });
+    await d.storage.saveBucket("42", "42", { tokens: 3, lastRefillTs: 456 });
     const r = await handleApi(
       { method: "GET", path: "/api/ratelimit/user/42", body: null },
       d,
       owner,
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ bucket: { tokens: 7, lastRefillTs: 123 } });
+    expect(r.body).toEqual({
+      buckets: [
+        { chat: group, bucket: { tokens: 7, lastRefillTs: 123 } },
+        { chat: dm, bucket: { tokens: 3, lastRefillTs: 456 } },
+      ],
+    });
   });
 
-  test("PUT /api/ratelimit/user/:id { reset: true } resets that user's bucket", async () => {
+  test("GET /api/ratelimit/user/:id omits chats where the user has no bucket", async () => {
     const d = deps();
-    await d.storage.saveBucket("42", "42", { tokens: -100, lastRefillTs: 1 });
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "supergroup",
+      title: "Group",
+      username: null,
+      lastSeenAt: 1,
+    });
+    // A bucket for a different user in the same chat must not leak through.
+    await d.storage.saveBucket("-100", "99", { tokens: 5, lastRefillTs: 1 });
     const r = await handleApi(
-      { method: "PUT", path: "/api/ratelimit/user/42", body: { reset: true } },
+      { method: "GET", path: "/api/ratelimit/user/42", body: null },
       d,
       owner,
     );
     expect(r.status).toBe(200);
-    const b = await d.storage.getBucket("42", "42");
+    expect(r.body).toEqual({ buckets: [] });
+  });
+
+  test("PUT /api/ratelimit/user/:id resets the bucket for the given chat", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "supergroup",
+      title: "Group",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.saveBucket("-100", "42", { tokens: -100, lastRefillTs: 1 });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/ratelimit/user/42",
+        body: { chatId: "-100", reset: true },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const b = await d.storage.getBucket("-100", "42");
     expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
   });
 
