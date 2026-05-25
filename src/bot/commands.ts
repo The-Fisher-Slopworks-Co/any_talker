@@ -25,6 +25,7 @@ export const BOT_COMMANDS_RU: readonly BotCommand[] = [
 export const BOT_COMMAND_SCOPES: readonly BotCommandScope[] = [
   { type: "all_private_chats" },
   { type: "all_group_chats" },
+  { type: "all_chat_administrators" },
 ];
 
 export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {
