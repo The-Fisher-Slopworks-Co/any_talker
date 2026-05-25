@@ -377,6 +377,77 @@ describe("buildContext", () => {
     ]);
   });
 
+  test("voice audio is attached as a content part alongside the envelope", async () => {
+    const storage = new MemoryStorage();
+    const bytes = new Uint8Array([0x4f, 0x67, 0x67, 0x53]); // OggS magic
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what did they say?",
+      quote: null,
+      replyTarget: null,
+      images: [],
+      audios: [bytes],
+    });
+    expect(msgs).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: envelope({ text: "what did they say?" }) },
+          { type: "audio", audio: bytes, mediaType: "audio/ogg" },
+        ],
+      },
+    ]);
+  });
+
+  test("voice-only message (no text, no quote) still produces multi-part envelope", async () => {
+    const storage = new MemoryStorage();
+    const bytes = new Uint8Array([1, 2, 3]);
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "",
+      quote: null,
+      replyTarget: null,
+      images: [],
+      audios: [bytes],
+    });
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]!.content).toEqual([
+      { type: "text", text: envelope({ text: "" }) },
+      { type: "audio", audio: bytes, mediaType: "audio/ogg" },
+    ]);
+  });
+
+  test("reply voice is attached to the synthetic context when reply isn't in the chain", async () => {
+    const storage = new MemoryStorage();
+    const replyBytes = new Uint8Array([0x4f, 0x67, 0x67, 0x53]);
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what did they say?",
+      quote: null,
+      images: [],
+      replyTarget: {
+        messageId: 999,
+        text: null,
+        authorFirstName: "Alice",
+        images: [],
+        audios: [replyBytes],
+      },
+    });
+    expect(msgs[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Context (replied message from Alice): <media>" },
+        { type: "audio", audio: replyBytes, mediaType: "audio/ogg" },
+      ],
+    });
+  });
+
   test("image-only message (no text, no quote) still produces multi-part envelope", async () => {
     const storage = new MemoryStorage();
     const bytes = new Uint8Array([1, 2, 3]);

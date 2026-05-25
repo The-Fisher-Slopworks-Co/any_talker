@@ -16,6 +16,11 @@ const SerializedAIUserContentPartSchema = z.discriminatedUnion("type", [
     image_base64: z.string(),
     mediaType: z.string(),
   }),
+  z.object({
+    type: z.literal("audio"),
+    audio_base64: z.string(),
+    mediaType: z.string(),
+  }),
 ]);
 
 const SerializedAIMessageSchema = z.discriminatedUnion("role", [

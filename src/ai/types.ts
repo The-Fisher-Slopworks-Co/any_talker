@@ -6,7 +6,8 @@ import type { ProviderSort, ServiceTier } from "../shared/types";
 
 export type AIUserContentPart =
   | { type: "text"; text: string }
-  | { type: "image"; image: Uint8Array; mediaType: string };
+  | { type: "image"; image: Uint8Array; mediaType: string }
+  | { type: "audio"; audio: Uint8Array; mediaType: string };
 
 export type AIMessage =
   | { role: "user"; content: string | AIUserContentPart[] }
@@ -14,7 +15,8 @@ export type AIMessage =
 
 export type SerializedAIUserContentPart =
   | { type: "text"; text: string }
-  | { type: "image"; image_base64: string; mediaType: string };
+  | { type: "image"; image_base64: string; mediaType: string }
+  | { type: "audio"; audio_base64: string; mediaType: string };
 
 export type SerializedAIMessage =
   | { role: "user"; content: string | SerializedAIUserContentPart[] }

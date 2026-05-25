@@ -11,7 +11,11 @@ export type ReplyTarget = {
   text: string | null;
   authorFirstName: string | null;
   images: Uint8Array[];
+  audios?: Uint8Array[];
 };
+
+// Telegram voice notes are always OGG/OPUS; OpenRouter accepts the `ogg` format.
+const VOICE_MEDIA_TYPE = "audio/ogg";
 
 export type Sender = {
   firstName: string | null;
@@ -27,6 +31,7 @@ export type BuildContextArgs = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
+  audios?: Uint8Array[];
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
   fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
@@ -50,16 +55,24 @@ export function buildUserEnvelope(args: {
   return JSON.stringify(obj);
 }
 
-function withImages(text: string, images: Uint8Array[]): AIUserContentPart[] {
+function withMedia(
+  text: string,
+  images: Uint8Array[],
+  audios: Uint8Array[],
+): AIUserContentPart[] {
   const parts: AIUserContentPart[] = [{ type: "text", text }];
   for (const image of images) {
     parts.push({ type: "image", image, mediaType: "image/jpeg" });
+  }
+  for (const audio of audios) {
+    parts.push({ type: "audio", audio, mediaType: VOICE_MEDIA_TYPE });
   }
   return parts;
 }
 
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
   const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
+  const audios = args.audios ?? [];
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   const messages: AIMessage[] = [];
 
@@ -72,7 +85,7 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
         if (chainImages.length > 0) {
           messages.push({
             role: "user",
-            content: withImages(c.userQuestion, chainImages),
+            content: withMedia(c.userQuestion, chainImages, []),
           });
         } else {
           messages.push({ role: "user", content: c.userQuestion });
@@ -83,10 +96,11 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
       const author = replyTarget.authorFirstName ?? "unknown";
       const text = replyTarget.text ?? "<media>";
       const header = `Context (replied message from ${author}): ${text}`;
-      if (replyTarget.images.length > 0) {
+      const replyAudios = replyTarget.audios ?? [];
+      if (replyTarget.images.length > 0 || replyAudios.length > 0) {
         messages.push({
           role: "user",
-          content: withImages(header, replyTarget.images),
+          content: withMedia(header, replyTarget.images, replyAudios),
         });
       } else {
         messages.push({ role: "user", content: header });
@@ -95,10 +109,10 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   }
 
   const hasQuote = quote !== null && quote.trim() !== "";
-  if (userText.trim() !== "" || hasQuote || images.length > 0) {
+  if (userText.trim() !== "" || hasQuote || images.length > 0 || audios.length > 0) {
     const envelope = buildUserEnvelope({ sender, quote, text: userText });
-    if (images.length > 0) {
-      messages.push({ role: "user", content: withImages(envelope, images) });
+    if (images.length > 0 || audios.length > 0) {
+      messages.push({ role: "user", content: withMedia(envelope, images, audios) });
     } else {
       messages.push({ role: "user", content: envelope });
     }

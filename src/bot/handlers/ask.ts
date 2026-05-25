@@ -29,6 +29,7 @@ export type AskInput = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
+  audios?: Uint8Array[];
   imageFileIds: string[];
   replyImageFileIds: string[];
   replyTarget: ReplyTarget | null;
@@ -66,10 +67,12 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   ]);
   if (!allowed && byokKey === null) return { kind: "denied" };
 
+  const audios = input.audios ?? [];
   if (
     input.userText.trim() === "" &&
     input.replyTarget === null &&
-    input.images.length === 0
+    input.images.length === 0 &&
+    audios.length === 0
   ) {
     return { kind: "usage" };
   }
@@ -107,6 +110,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     userText: input.userText,
     quote: input.quote,
     images: input.images,
+    audios,
     replyTarget: input.replyTarget,
     fetchPhoto: input.fetchPhoto,
   });
