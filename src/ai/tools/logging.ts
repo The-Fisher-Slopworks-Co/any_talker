@@ -41,7 +41,11 @@ export function withLogging<TIn, TOut>(
         outcome = "error";
         emit(format, "error", "tool_error", {
           tool: tool.name,
-          error: err instanceof Error ? err.message : String(err),
+          // Cap like input/result: an error message can embed a large upstream
+          // response body (e.g. firecrawlScrape echoes the HTTP body), which
+          // would otherwise blow the log line past the bound this module exists
+          // to enforce.
+          error: capString(err instanceof Error ? err.message : String(err)),
           duration_ms: Date.now() - start,
         });
         throw err;
@@ -100,5 +104,10 @@ export function capLogValue(value: unknown): unknown {
 
 function capString(s: string): string {
   if (s.length <= LOG_VALUE_MAX) return s;
-  return `${s.slice(0, LOG_VALUE_MAX)}… (${s.length} chars total)`;
+  let head = s.slice(0, LOG_VALUE_MAX);
+  // A slice can split a surrogate pair, leaving a trailing lone high surrogate;
+  // drop it so the truncated value stays well-formed UTF-16.
+  const last = head.charCodeAt(head.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) head = head.slice(0, -1);
+  return `${head}… (${s.length} chars total)`;
 }

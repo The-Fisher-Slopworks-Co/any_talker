@@ -293,6 +293,21 @@ describe("currency_convert tool", () => {
       expect(result).toContain("rate 0.00001304");
     });
 
+    test("does not crash on an extremely small rate (toFixed argument clamped to 100)", async () => {
+      // sigDecimals for a value ~1e-120 exceeds 100; toFixed throws RangeError
+      // above 100, so the digit count must be clamped rather than passed raw.
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(jsonResponse({ date: "2026-05-23", usd: { shib: 1e-120 } })),
+      );
+      const result = await currencyConvertTool.execute(
+        { amount: 1, from: "usd", to: "shib" },
+        ctx,
+      );
+      // The rate is unrepresentable in 100 decimals, so it renders as "0";
+      // the point is that it returns a string instead of throwing.
+      expect(result).toContain("rate 0");
+    });
+
     test("throws instead of leaking a non-finite/exponential converted amount", async () => {
       mockFetch.mockImplementation(() =>
         Promise.resolve(jsonResponse({ date: "2026-05-23", usd: { eur: 1e300 } })),

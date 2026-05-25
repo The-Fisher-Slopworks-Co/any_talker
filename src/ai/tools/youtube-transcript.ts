@@ -145,7 +145,10 @@ function cleanTitle(meta: FirecrawlMetadata | undefined): string {
       : undefined;
   const raw = fromOg ?? fromTitle;
   if (typeof raw !== "string") return "";
-  return raw.replace(/\s+/g, " ").trim();
+  // Bound the title: it's untrusted scrape metadata, and an oversized title
+  // joined to the transcript would otherwise consume the whole MAX_LENGTH budget
+  // and evict the transcript the caller asked for. Real titles are <100 chars.
+  return raw.replace(/\s+/g, " ").trim().slice(0, 200);
 }
 
 type FirecrawlData = {

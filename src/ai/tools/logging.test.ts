@@ -36,6 +36,18 @@ describe("capLogValue", () => {
     expect(capped.length).toBeLessThan(LOG_VALUE_MAX + 64);
   });
 
+  test("does not leave a lone surrogate when truncating mid-pair", () => {
+    // Place an emoji (a surrogate pair) so its high half lands at the last kept
+    // index; the truncated value must not end in a lone surrogate.
+    const s = "a".repeat(LOG_VALUE_MAX - 1) + "😀" + "b".repeat(100);
+    const capped = capLogValue(s) as string;
+
+    const head = capped.slice(0, capped.indexOf("…"));
+    expect(head).toBe("a".repeat(LOG_VALUE_MAX - 1));
+    // No lone high surrogate anywhere in the kept prefix.
+    expect(/[\ud800-\udbff](?![\udc00-\udfff])/.test(head)).toBe(false);
+  });
+
   test("passes small objects through unchanged (same reference)", () => {
     const obj = { a: 1, b: "two" };
     expect(capLogValue(obj)).toBe(obj);
@@ -153,6 +165,29 @@ describe("withLogging", () => {
     expect(resultLine).toBeDefined();
     const parsed = JSON.parse(resultLine as string);
     expect(parsed.result).toBe(123);
+  });
+
+  test("caps a huge error message in the tool_error line", async () => {
+    const total = LOG_VALUE_MAX + 5000;
+    const wrapped = withLogging<{ q: string }, string>(
+      {
+        name: "test_tool",
+        description: "a test tool",
+        parameters: z.object({ q: z.string() }),
+        execute: () => {
+          throw new Error("E".repeat(total));
+        },
+      },
+      "json",
+    );
+
+    await expect(wrapped.execute({ q: "hi" }, ctx)).rejects.toThrow();
+
+    const errorLine = logs.find((l) => l.includes('"msg":"tool_error"'));
+    expect(errorLine).toBeDefined();
+    const parsed = JSON.parse(errorLine as string);
+    expect(parsed.error).toContain(`(${total} chars total)`);
+    expect((parsed.error as string).length).toBeLessThan(LOG_VALUE_MAX + 64);
   });
 
   test("does not cap small scalar metadata fields", async () => {

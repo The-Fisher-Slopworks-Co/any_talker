@@ -97,7 +97,12 @@ function detailLevelSection(level: DetailLevel): string {
 }
 
 function factsSection(facts: Array<{ key: string; value: string }>): string {
-  const lines = facts.map((f) => `- ${f.key}: ${f.value}`).join("\n");
+  // Collapse whitespace in each value: fact values are user-controlled and may
+  // contain newlines, which would otherwise let a stored value forge a new
+  // `#`-prefixed section in this markdown-structured system prompt.
+  const lines = facts
+    .map((f) => `- ${f.key}: ${f.value.replace(/\s+/g, " ").trim()}`)
+    .join("\n");
   return `# Что я знаю о пользователе
 
 Это факты, которые ты ранее сохранил об этом пользователе. Учитывай их в ответах, не переспрашивая то, что здесь уже есть. Поддерживай их в актуальном состоянии инструментами remember_fact и forget_fact.
