@@ -115,6 +115,7 @@ export async function guestAskHandler(
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      serviceTier: settings.serviceTier,
       apiKey: byokKey,
       toolCallContext: {
         source: "guest",
