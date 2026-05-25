@@ -15,6 +15,7 @@ import type {
 import {
   isValidTimezone,
   isValidProviderSort,
+  isValidServiceTier,
   isValidGender,
 } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
@@ -137,6 +138,11 @@ const BAD_PROVIDER_SORT: ApiResponse = {
   body: { error: "invalid providerSort" },
 };
 
+const BAD_SERVICE_TIER: ApiResponse = {
+  status: 400,
+  body: { error: "invalid serviceTier" },
+};
+
 const BAD_MODELS: ApiResponse = {
   status: 400,
   body: { error: "models must be a non-empty array of non-empty strings" },
@@ -236,6 +242,7 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     botName?: unknown;
     timezone?: unknown;
     providerSort?: unknown;
+    serviceTier?: unknown;
     keywordFilter?: unknown;
   };
   const out: ChatSettings = {};
@@ -289,6 +296,11 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     out.providerSort = null;
   } else if (isValidProviderSort(body.providerSort)) {
     out.providerSort = body.providerSort;
+  }
+  if (body.serviceTier === null) {
+    out.serviceTier = null;
+  } else if (isValidServiceTier(body.serviceTier)) {
+    out.serviceTier = body.serviceTier;
   }
   if (
     body.keywordFilter &&
@@ -488,6 +500,13 @@ export async function handleApi(
         !isValidProviderSort(patch.providerSort)
       ) {
         return BAD_PROVIDER_SORT;
+      }
+      if (
+        patch.serviceTier !== undefined &&
+        patch.serviceTier !== null &&
+        !isValidServiceTier(patch.serviceTier)
+      ) {
+        return BAD_SERVICE_TIER;
       }
       if (patch.models !== undefined && !isValidModelsList(patch.models)) {
         return BAD_MODELS;

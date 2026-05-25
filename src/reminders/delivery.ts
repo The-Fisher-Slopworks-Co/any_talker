@@ -141,6 +141,7 @@ async function composeReminderMessage(
     messages,
     tools: getAllTools(),
     providerSort: settings.providerSort,
+    serviceTier: settings.serviceTier,
     apiKey: byokKey,
     toolCallContext: {
       source: toolSource,

@@ -135,6 +135,8 @@ type Strings = {
   ui_prompt_models_footer: string;
   ui_prompt_provider_routing: string;
   ui_prompt_provider_routing_footer: string;
+  ui_prompt_service_tier: string;
+  ui_prompt_service_tier_footer: string;
   ui_prompt_system_prompt: string;
   ui_prompt_system_prompt_footer: string;
   ui_prompt_placeholder: string;
@@ -147,6 +149,10 @@ type Strings = {
   ui_sort_price: string;
   ui_sort_throughput: string;
   ui_sort_latency: string;
+
+  ui_tier_default: string;
+  ui_tier_flex: string;
+  ui_tier_priority: string;
 
   ui_models_fallback_n: (n: number) => string;
   ui_models_model_id: string;
@@ -227,6 +233,9 @@ type Strings = {
   ui_chat_provider_routing: string;
   ui_chat_provider_routing_on_footer: string;
   ui_chat_provider_routing_off_footer: (sort: string) => string;
+  ui_chat_service_tier: string;
+  ui_chat_service_tier_on_footer: string;
+  ui_chat_service_tier_off_footer: (tier: string) => string;
   ui_chat_prompt_placeholder: string;
   ui_chat_keyword_filter: string;
   ui_chat_keyword_filter_enabled: string;
@@ -432,6 +441,9 @@ const en: Strings = {
   ui_prompt_provider_routing: "Provider Routing",
   ui_prompt_provider_routing_footer:
     "How OpenRouter picks a provider for the model. Auto lets OpenRouter decide; the others sort by price, throughput, or latency.",
+  ui_prompt_service_tier: "Service Tier",
+  ui_prompt_service_tier_footer:
+    "Processing tier for OpenRouter requests. Default uses standard processing; Flex is cheaper but slower with lower availability; Priority is faster at a higher cost.",
   ui_prompt_system_prompt: "System Prompt",
   ui_prompt_system_prompt_footer:
     "Character description embedded into the system instruction.",
@@ -447,6 +459,10 @@ const en: Strings = {
   ui_sort_price: "Price",
   ui_sort_throughput: "Throughput",
   ui_sort_latency: "Latency",
+
+  ui_tier_default: "Default",
+  ui_tier_flex: "Flex",
+  ui_tier_priority: "Priority",
 
   ui_models_fallback_n: (n) => `#${n}`,
   ui_models_model_id: "Model ID",
@@ -538,6 +554,10 @@ const en: Strings = {
     "How OpenRouter picks a provider for the model in this chat.",
   ui_chat_provider_routing_off_footer: (sort) =>
     `Using global routing (${sort}).`,
+  ui_chat_service_tier: "Service Tier",
+  ui_chat_service_tier_on_footer:
+    "Processing tier for OpenRouter requests in this chat.",
+  ui_chat_service_tier_off_footer: (tier) => `Using global tier (${tier}).`,
   ui_chat_prompt_placeholder:
     "Describe how the bot should behave in this chat",
   ui_chat_keyword_filter: "Keyword Filter",
@@ -762,6 +782,9 @@ const ru: Strings = {
   ui_prompt_provider_routing: "Маршрутизация провайдеров",
   ui_prompt_provider_routing_footer:
     "Как OpenRouter выбирает провайдера для модели. «Авто» — выбор OpenRouter; остальные сортируют по цене, скорости или задержке.",
+  ui_prompt_service_tier: "Тариф обслуживания",
+  ui_prompt_service_tier_footer:
+    "Тариф обработки запросов OpenRouter. «По умолчанию» — стандартная обработка; Flex дешевле, но медленнее и менее доступен; Priority быстрее, но дороже.",
   ui_prompt_system_prompt: "Системный промпт",
   ui_prompt_system_prompt_footer:
     "Описание персонажа, встраиваемое в системную инструкцию.",
@@ -777,6 +800,10 @@ const ru: Strings = {
   ui_sort_price: "Цена",
   ui_sort_throughput: "Скорость",
   ui_sort_latency: "Задержка",
+
+  ui_tier_default: "По умолчанию",
+  ui_tier_flex: "Flex",
+  ui_tier_priority: "Priority",
 
   ui_models_fallback_n: (n) => `#${n}`,
   ui_models_model_id: "ID модели",
@@ -871,6 +898,11 @@ const ru: Strings = {
     "Как OpenRouter выбирает провайдера для модели в этом чате.",
   ui_chat_provider_routing_off_footer: (sort) =>
     `Используется глобальная маршрутизация (${sort}).`,
+  ui_chat_service_tier: "Тариф обслуживания",
+  ui_chat_service_tier_on_footer:
+    "Тариф обработки запросов OpenRouter в этом чате.",
+  ui_chat_service_tier_off_footer: (tier) =>
+    `Используется глобальный тариф (${tier}).`,
   ui_chat_prompt_placeholder: "Опиши, как должен вести себя бот в этом чате",
   ui_chat_keyword_filter: "Фильтр по ключевым словам",
   ui_chat_keyword_filter_enabled: "Включён",

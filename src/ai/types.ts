@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Tool, ToolCallContext } from "./tools/registry";
-import type { ProviderSort } from "../shared/types";
+import type { ProviderSort, ServiceTier } from "../shared/types";
 
 export type AIUserContentPart =
   | { type: "text"; text: string }
@@ -32,6 +32,7 @@ export interface AIClient {
     messages: AIMessage[];
     tools: Tool[];
     providerSort?: ProviderSort | null;
+    serviceTier?: ServiceTier | null;
     toolCallContext: ToolCallContext;
     apiKey?: string | null;
   }): Promise<AskResult>;

@@ -5,7 +5,7 @@ import { generateText, tool as aiTool, stepCountIs, type ToolSet } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
-import type { ProviderSort } from "../shared/types";
+import type { ProviderSort, ServiceTier } from "../shared/types";
 import { proxiedFetch } from "../proxy";
 import {
   aiRequestDurationSeconds,
@@ -38,6 +38,7 @@ export class OpenRouterAIClient implements AIClient {
     messages: AIMessage[];
     tools: Tool[];
     providerSort?: ProviderSort | null;
+    serviceTier?: ServiceTier | null;
     toolCallContext: ToolCallContext;
     apiKey?: string | null;
   }): Promise<AskResult> {
@@ -72,10 +73,16 @@ export class OpenRouterAIClient implements AIClient {
     const openrouterOpts: {
       models?: string[];
       provider?: { sort: ProviderSort };
+      service_tier?: ServiceTier;
     } = {};
     if (fallbacks.length > 0) openrouterOpts.models = fallbacks;
     if (opts.providerSort) {
       openrouterOpts.provider = { sort: opts.providerSort };
+    }
+    // OpenRouter reads `service_tier` as a top-level body field; the provider
+    // spreads any providerOptions.openrouter key straight into the request.
+    if (opts.serviceTier) {
+      openrouterOpts.service_tier = opts.serviceTier;
     }
 
     const start = performance.now();
