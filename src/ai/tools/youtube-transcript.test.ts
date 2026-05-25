@@ -354,6 +354,21 @@ describe("youtube_transcript tool", () => {
     expect(result.length).toBe(50_000);
   });
 
+  test("a huge title does not evict the transcript from the MAX_LENGTH budget", async () => {
+    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    mockFetch.mockResolvedValue(
+      firecrawlEnvelope({
+        rawHtml,
+        markdown: markdownDoc({ transcript: "the actual transcript" }),
+        metadata: { ogTitle: "T".repeat(60_000) },
+      }),
+    );
+    const result = await tool.execute({ url: VIDEO_ID }, ctx);
+    // Title is bounded, so the transcript still makes it into the output.
+    expect(result).toContain("the actual transcript");
+    expect(result.length).toBeLessThan(1_000);
+  });
+
   test("returns a well-formed string when MAX_LENGTH cuts mid-surrogate", async () => {
     const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
     // Fill to just under the boundary so an emoji surrogate pair straddles it.

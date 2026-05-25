@@ -96,8 +96,11 @@ function formatNumber(value: number, decimals: number): string {
   if (value !== 0 && Number(trimmed) === 0) {
     // Tiny magnitudes round to "0" at the requested decimals; widen the decimal
     // count to keep ~4 significant figures without resorting to exponent form.
+    // Clamp to 100: toFixed throws RangeError above that, and a value smaller
+    // than ~1e-100 (e.g. a defunct/hyperinflated token rate) is "0" to us anyway.
     const sigDecimals = -Math.floor(Math.log10(Math.abs(value))) + 3;
-    return trimZeros(value.toFixed(Math.max(decimals, sigDecimals)));
+    const digits = Math.min(100, Math.max(decimals, sigDecimals));
+    return trimZeros(value.toFixed(digits));
   }
   return trimmed;
 }
