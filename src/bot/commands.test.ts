@@ -49,10 +49,11 @@ describe("command lists", () => {
 });
 
 describe("BOT_COMMAND_SCOPES", () => {
-  test("includes all_private_chats and all_group_chats", () => {
+  test("includes all_private_chats, all_group_chats and all_chat_administrators", () => {
     expect(BOT_COMMAND_SCOPES).toEqual([
       { type: "all_private_chats" },
       { type: "all_group_chats" },
+      { type: "all_chat_administrators" },
     ]);
   });
 });
@@ -136,6 +137,30 @@ describe("syncBotCommands", () => {
     );
     expect(groupScopeCalls).toHaveLength(3);
     expect(groupScopeCalls.map((c) => c.commands)).toEqual([
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_RU,
+    ]);
+  });
+
+  test("registers commands under BotCommandScopeAllChatAdministrators", async () => {
+    const calls: Array<{
+      commands: readonly BotCommand[];
+      other?: { language_code?: string; scope?: BotCommandScope };
+    }> = [];
+    const api: SyncCommandsApi = {
+      async setMyCommands(commands, other) {
+        calls.push({ commands, other });
+      },
+    };
+
+    await syncBotCommands(api);
+
+    const adminScopeCalls = calls.filter(
+      (c) => c.other?.scope?.type === "all_chat_administrators",
+    );
+    expect(adminScopeCalls).toHaveLength(3);
+    expect(adminScopeCalls.map((c) => c.commands)).toEqual([
       BOT_COMMANDS_EN,
       BOT_COMMANDS_EN,
       BOT_COMMANDS_RU,
