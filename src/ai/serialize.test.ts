@@ -48,6 +48,38 @@ describe("serializeMessages / deserializeMessages", () => {
     expect(img.mediaType).toBe("image/jpeg");
   });
 
+  test("round-trips a user message with audio bytes via base64", () => {
+    const bytes = new Uint8Array([0x4f, 0x67, 0x67, 0x53, 1, 2, 3]); // "OggS" + data
+    const msgs: AIMessage[] = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "transcribe:" },
+          { type: "audio", audio: bytes, mediaType: "audio/ogg" },
+        ],
+      },
+    ];
+    const serialized = serializeMessages(msgs);
+    const part1 = (serialized[0]!.content as { type: string }[])[1] as {
+      type: "audio";
+      audio_base64: string;
+      mediaType: string;
+    };
+    expect(part1.type).toBe("audio");
+    expect(part1.mediaType).toBe("audio/ogg");
+    expect(typeof part1.audio_base64).toBe("string");
+
+    const back = deserializeMessages(serialized);
+    const recovered = back[0]!.content as Array<
+      | { type: "text"; text: string }
+      | { type: "audio"; audio: Uint8Array; mediaType: string }
+    >;
+    const audio = recovered[1]!;
+    if (audio.type !== "audio") throw new Error();
+    expect(Array.from(audio.audio)).toEqual(Array.from(bytes));
+    expect(audio.mediaType).toBe("audio/ogg");
+  });
+
   test("serialized form is JSON-safe (no Uint8Array)", () => {
     const msgs: AIMessage[] = [
       {

@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { generateText, tool as aiTool, stepCountIs, type ToolSet } from "ai";
+import {
+  generateText,
+  tool as aiTool,
+  stepCountIs,
+  type ModelMessage,
+  type ToolSet,
+} from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
@@ -91,7 +97,7 @@ export class OpenRouterAIClient implements AIClient {
       const result = await generateText({
         model: provider(primary),
         system: opts.system,
-        messages: opts.messages,
+        messages: toModelMessages(opts.messages),
         tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
         stopWhen: stepCountIs(8),
         providerOptions:
@@ -113,6 +119,29 @@ export class OpenRouterAIClient implements AIClient {
       aiRequestDurationSeconds.observe({ outcome }, seconds);
     }
   }
+}
+
+// Maps our domain messages onto the AI SDK's prompt format. Audio parts become
+// `file` parts: the OpenRouter provider turns any `file` part with an `audio/*`
+// media type into the `input_audio` body field the API expects.
+function toModelMessages(messages: AIMessage[]): ModelMessage[] {
+  return messages.map((m) => {
+    if (m.role === "assistant") return { role: "assistant", content: m.content };
+    if (typeof m.content === "string") return { role: "user", content: m.content };
+    return {
+      role: "user",
+      content: m.content.map((part) => {
+        switch (part.type) {
+          case "text":
+            return { type: "text", text: part.text };
+          case "image":
+            return { type: "image", image: part.image, mediaType: part.mediaType };
+          case "audio":
+            return { type: "file", data: part.audio, mediaType: part.mediaType };
+        }
+      }),
+    };
+  });
 }
 
 function buildAttributionHeaders(

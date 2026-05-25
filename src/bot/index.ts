@@ -15,7 +15,7 @@ import { guestAskHandler } from "./handlers/guest";
 import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
-import { pickPhotoSize, fetchTelegramPhoto } from "./photo";
+import { pickPhotoSize, fetchTelegramPhoto, downloadTelegramFile } from "./photo";
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
@@ -253,6 +253,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     askMessageId: number;
     images: Uint8Array[];
     imageFileIds: string[];
+    audios: Uint8Array[];
     replyToMessage: Message | undefined;
     quote: string | null;
     forwardOrigin: boolean;
@@ -272,6 +273,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       ask_message_id: args.askMessageId,
       images: args.images.length,
       image_file_ids: args.imageFileIds.length,
+      audios: args.audios.length,
       user_text_len: args.userText.length,
       has_quote: args.quote !== null,
       has_reply_target: args.replyToMessage !== undefined,
@@ -307,6 +309,21 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         album_index_size: reply.albumIndexSize,
         images: reply.images.length,
       });
+    }
+
+    const replyVoice = args.replyToMessage?.voice;
+    if (replyTarget && replyVoice) {
+      try {
+        replyTarget.audios = [
+          await downloadTelegramFile(deps.botToken, replyVoice.file_id),
+        ];
+        debugLog("reply_voice_resolved", {
+          chat_id: chatId,
+          reply_message_id: args.replyToMessage?.message_id,
+        });
+      } catch (err) {
+        console.error("reply voice download failed:", err);
+      }
     }
 
     const [nameOverride, gender] = await Promise.all([
@@ -352,6 +369,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           userText: args.userText,
           quote: args.quote,
           images: args.images,
+          audios: args.audios,
           imageFileIds: args.imageFileIds,
           replyImageFileIds,
           replyTarget,
@@ -459,6 +477,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         askMessageId,
         images,
         imageFileIds: fileIds,
+        audios: [],
         replyToMessage: askItem.reply_to_message,
         quote: askItem.quote?.text ?? null,
         forwardOrigin: false,
@@ -478,6 +497,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       askMessageId: msg.message_id,
       images: [],
       imageFileIds: [],
+      audios: [],
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),
@@ -554,6 +574,48 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       askMessageId: msg.message_id,
       images: image ? [image] : [],
       imageFileIds: imageFileId ? [imageFileId] : [],
+      audios: [],
+      replyToMessage: msg.reply_to_message,
+      quote: msg.quote?.text ?? null,
+      forwardOrigin: Boolean(msg.forward_origin),
+      detailLevel,
+    });
+  });
+
+  bot.on("message:voice", async (ctx) => {
+    const msg = ctx.message;
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return;
+
+    const captionRaw = msg.caption ?? "";
+    const m = captionRaw.match(ASK_CAPTION_RE);
+    debugLog("voice_received", {
+      chat_id: chatId,
+      message_id: msg.message_id,
+      caption_len: captionRaw.length,
+      ask_caption: m !== null,
+      duration: msg.voice.duration,
+    });
+    if (!m) return;
+
+    const detailLevel = COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short";
+    const userText = (m[2] ?? "").trim();
+
+    let audio: Uint8Array;
+    try {
+      audio = await downloadTelegramFile(deps.botToken, msg.voice.file_id);
+    } catch (err) {
+      console.error("voice download failed:", err);
+      await ctx.reply(ctx.t.bot_voice_cant_fetch);
+      return;
+    }
+
+    await dispatchAsk(ctx, {
+      userText,
+      askMessageId: msg.message_id,
+      images: [],
+      imageFileIds: [],
+      audios: [audio],
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),
@@ -642,6 +704,7 @@ function extractReplyTarget(reply: Message): ReplyTarget {
     text,
     authorFirstName: resolveReplyAuthor(reply),
     images: [],
+    audios: [],
   };
 }
 

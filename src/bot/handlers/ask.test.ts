@@ -51,6 +51,30 @@ describe("askHandler", () => {
     expect(out.kind).toBe("usage");
   });
 
+  test("voice-only request (empty text, audio attached) is not a usage hint", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai,
+        userText: "",
+        audios: [new Uint8Array([0x4f, 0x67, 0x67, 0x53])],
+      }),
+    );
+    expect(out.kind).toBe("answered");
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    expect(sent[0]!.content).toEqual([
+      { type: "text", text: JSON.stringify({ author: "John Doe", text: "" }) },
+      {
+        type: "audio",
+        audio: new Uint8Array([0x4f, 0x67, 0x67, 0x53]),
+        mediaType: "audio/ogg",
+      },
+    ]);
+  });
+
   test("rate-limit hit returns rateLimited", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
