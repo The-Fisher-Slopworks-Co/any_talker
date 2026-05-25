@@ -4,14 +4,14 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api, type UserSettingsResponse } from "../../api-client";
-import type { Gender } from "../../../../shared/types";
+import type { BucketState, Gender } from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { LoadingState } from "../../components/states";
+import { EmptyState, LoadingState } from "../../components/states";
 import { RowButton, SaveButton, Toggle } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { TimezoneSelect } from "../../components/timezone-select";
@@ -36,6 +36,8 @@ export function UserEditView({ userId }: { userId: string }) {
   const [genderValue, setGenderValue] = useState<Gender>("male");
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [bucket, setBucket] = useState<BucketState | null>(null);
+  const [capacity, setCapacity] = useState<number | null>(null);
 
   useEffect(() => {
     api
@@ -49,7 +51,14 @@ export function UserEditView({ userId }: { userId: string }) {
         setGenderValue(d.gender ?? "male");
       })
       .catch(() => setNotFound(true));
+    api.getUserBucket(userId).then((r) => setBucket(r.bucket));
+    api.getSettings().then((s) => setCapacity(s.rateLimit.capacity));
   }, [userId]);
+
+  const resetBucket = async () => {
+    const r = await api.resetUserBucket(userId);
+    setBucket(r.bucket);
+  };
 
   if (notFound) return <LoadingState text={s.ui_user_not_found} />;
   if (!data) return <LoadingState />;
@@ -185,6 +194,32 @@ export function UserEditView({ userId }: { userId: string }) {
         disabled={saving || !dirty || nameError !== null}
         onClick={save}
       />
+
+      <SectionHeader>{s.ui_user_bucket}</SectionHeader>
+      <Card>
+        {bucket ? (
+          <>
+            <div className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_tokens}</span>
+              <span className={ROW_VALUE_CLS}>
+                {bucket.tokens.toLocaleString()}
+                {capacity !== null ? ` / ${capacity.toLocaleString()}` : ""}
+              </span>
+            </div>
+            <div className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>
+                {s.ui_ratelimit_last_refill}
+              </span>
+              <span className={ROW_VALUE_CLS}>
+                {new Date(bucket.lastRefillTs).toLocaleString()}
+              </span>
+            </div>
+            <RowButton onClick={resetBucket}>{s.ui_ratelimit_reset}</RowButton>
+          </>
+        ) : (
+          <EmptyState>{s.ui_ratelimit_no_bucket}</EmptyState>
+        )}
+      </Card>
     </Stack>
   );
 }

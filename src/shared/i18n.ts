@@ -194,6 +194,7 @@ type Strings = {
   ui_user_last_seen: string;
   ui_user_open_in_tg: string;
   ui_user_display_name_footer: string;
+  ui_user_bucket: string;
 
   ui_chats_all: string;
   ui_chats_empty: string;
@@ -497,6 +498,7 @@ const en: Strings = {
   ui_user_open_in_tg: "Open in Telegram",
   ui_user_display_name_footer:
     "Override the name shown to the AI for this user.",
+  ui_user_bucket: "Rate Limit Bucket",
 
   ui_chats_all: "All Chats",
   ui_chats_empty: "No chats yet — they appear after the first message.",
@@ -828,6 +830,7 @@ const ru: Strings = {
   ui_user_open_in_tg: "Открыть в Telegram",
   ui_user_display_name_footer:
     "Переопределить имя, которое видит ИИ для этого пользователя.",
+  ui_user_bucket: "Бакет лимита",
 
   ui_chats_all: "Все чаты",
   ui_chats_empty: "Чатов пока нет — они появятся после первого сообщения.",
