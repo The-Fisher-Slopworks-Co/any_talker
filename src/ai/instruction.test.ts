@@ -121,16 +121,11 @@ describe("buildInstruction", () => {
     expect(out).toContain("3 предложения");
   });
 
-  test("detailed detail level lets the model decide the length", () => {
-    const out = buildInstruction("X", { detailLevel: "detailed" });
-    expect(out).toContain("# Уровень подробности");
-    expect(out).toContain("настолько подробно");
-  });
-
-  test("wise detail level asks for an exhaustive answer", () => {
+  test("wise detail level asks for a detailed (not exhaustive) answer", () => {
     const out = buildInstruction("X", { detailLevel: "wise" });
     expect(out).toContain("# Уровень подробности");
-    expect(out).toContain("исчерпывающе");
-    expect(out).toContain("максимально подробно");
+    expect(out).toContain("Отвечай подробно");
+    expect(out).toContain("глубина важнее объёма");
+    expect(out).not.toContain("исчерпывающе");
   });
 });

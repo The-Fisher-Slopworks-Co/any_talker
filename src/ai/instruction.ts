@@ -2,9 +2,9 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { languageSection, type Lang } from "../shared/i18n";
-import type { RateLimitConfig } from "../shared/types";
+import type { RateLimitConfig, ReasoningEffort } from "../shared/types";
 
-export type DetailLevel = "short" | "detailed" | "wise";
+export type DetailLevel = "short" | "wise";
 
 export const DEFAULT_DETAIL_LEVEL: DetailLevel = "short";
 
@@ -15,10 +15,17 @@ export function detailLevelMultiplier(
   switch (level) {
     case "short":
       return 1;
-    case "detailed":
-      return rl.detailedMultiplier;
     case "wise":
       return rl.wiseMultiplier;
+  }
+}
+
+export function detailLevelReasoningEffort(level: DetailLevel): ReasoningEffort {
+  switch (level) {
+    case "short":
+      return "low";
+    case "wise":
+      return "high";
   }
 }
 
@@ -85,14 +92,10 @@ function detailLevelSection(level: DetailLevel): string {
       return `# Уровень подробности
 
 Отвечай кратко, ориентируйся примерно на 3 предложения. Дай только суть, без лишних деталей и оговорок.`;
-    case "detailed":
-      return `# Уровень подробности
-
-Отвечай настолько подробно, насколько действительно нужно для полного ответа на вопрос. Не урезай искусственно, но и не растягивай без необходимости.`;
     case "wise":
       return `# Уровень подробности
 
-Отвечай исчерпывающе и максимально подробно. Разбери контекст, рассмотри разные углы зрения, приведи нюансы, примеры и исключения. Если ответ длинный — структурируй его.`;
+Отвечай подробно: раскрой тему по существу, поясни ключевые моменты и приведи примеры, где это уместно. Не растягивай ответ искусственно — глубина важнее объёма.`;
   }
 }
 

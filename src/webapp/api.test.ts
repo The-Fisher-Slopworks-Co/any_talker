@@ -301,7 +301,6 @@ describe("PUT /api/settings", () => {
             refillAmount: 1000,
             refillIntervalMs: 60000,
             ownerExempt: false,
-            detailedMultiplier: 1.5,
             wiseMultiplier: 2.2,
           },
         },
@@ -313,7 +312,6 @@ describe("PUT /api/settings", () => {
     const saved = await d.storage.getSettings();
     expect(saved?.rateLimit.capacity).toBe(50000);
     expect(saved?.rateLimit.ownerExempt).toBe(false);
-    expect(saved?.rateLimit.detailedMultiplier).toBe(1.5);
     expect(saved?.rateLimit.wiseMultiplier).toBe(2.2);
   });
 
@@ -399,7 +397,7 @@ describe("PUT /api/settings", () => {
       {
         method: "PUT",
         path: "/api/settings",
-        body: { rateLimit: { detailedMultiplier: -1 } },
+        body: { rateLimit: { wiseMultiplier: -1 } },
       },
       d,
       owner,
@@ -1429,7 +1427,6 @@ describe("/api/admin/chats", () => {
             refillAmount: 1,
             refillIntervalMs: 1000,
             ownerExempt: false,
-            detailedMultiplier: 1.4,
             wiseMultiplier: 2.1,
           },
         },
@@ -1446,7 +1443,6 @@ describe("/api/admin/chats", () => {
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
-        detailedMultiplier: 1.4,
         wiseMultiplier: 2.1,
       },
     });
