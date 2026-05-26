@@ -52,7 +52,6 @@ type Strings = {
   ui_updating: string;
   ui_open: string;
   ui_remove: string;
-  ui_edit: string;
   ui_yes: string;
   ui_no: string;
   ui_dash: string;
@@ -352,7 +351,6 @@ const en: Strings = {
   ui_updating: "Updating…",
   ui_open: "Open",
   ui_remove: "Remove",
-  ui_edit: "Edit",
   ui_yes: "yes",
   ui_no: "no",
   ui_dash: "—",
@@ -701,7 +699,6 @@ const ru: Strings = {
   ui_updating: "Обновление…",
   ui_open: "Открыть",
   ui_remove: "Удалить",
-  ui_edit: "Изменить",
   ui_yes: "да",
   ui_no: "нет",
   ui_dash: "—",

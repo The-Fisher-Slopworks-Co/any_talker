@@ -10,9 +10,8 @@ import {
   Stack,
 } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
-import { ROW_CLS } from "../../components/row";
+import { SELECTABLE_ROW_CLS } from "../../components/row";
 import { formatUsd, userDisplayName } from "../../lib/labels";
-import { openTelegramProfile } from "../../lib/telegram";
 import { useLoadable } from "../../lib/use-loadable";
 
 export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
@@ -30,7 +29,12 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
           <EmptyState>{s.ui_users_empty}</EmptyState>
         ) : (
           users.map((u) => (
-            <div key={u.id} className={ROW_CLS}>
+            <button
+              key={u.id}
+              type="button"
+              className={SELECTABLE_ROW_CLS}
+              onClick={() => onEdit(u.id)}
+            >
               <div className="flex-1 min-w-0">
                 <div className="truncate">
                   {userDisplayName(u, displayNames[u.id])}
@@ -44,19 +48,8 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
                   formatUsd(spending[u.id]?.month ?? 0),
                 )}
               </span>
-              <button
-                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
-                onClick={() => openTelegramProfile(u)}
-              >
-                {s.ui_open}
-              </button>
-              <button
-                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
-                onClick={() => onEdit(u.id)}
-              >
-                {s.ui_edit}
-              </button>
-            </div>
+              <span className="shrink-0 text-tg-hint text-[15px]">›</span>
+            </button>
           ))
         )}
       </Card>
