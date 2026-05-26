@@ -11,6 +11,7 @@ import type {
   ChatSettings,
   RateLimitConfig,
   Gender,
+  BucketState,
 } from "../shared/types";
 import {
   isValidTimezone,
@@ -60,6 +61,25 @@ function badDisplayName(reason: DisplayNameError): ApiResponse {
     status: 400,
     body: { error: "invalid display name", reason },
   };
+}
+
+export type UserBucketEntry = { chat: Chat; bucket: BucketState };
+
+// Rate-limit buckets are keyed per (chat, user), so a user has a distinct
+// bucket in every chat they talk in. Walk the known chats and collect the
+// ones where this user has a bucket.
+async function listUserBuckets(
+  storage: Storage,
+  userId: string,
+): Promise<UserBucketEntry[]> {
+  const chats = await storage.listChats();
+  const entries = await Promise.all(
+    chats.map(async (chat) => {
+      const bucket = await storage.getBucket(chat.id, userId);
+      return bucket ? { chat, bucket } : null;
+    }),
+  );
+  return entries.filter((e): e is UserBucketEntry => e !== null);
 }
 
 function normalizeTimezoneOrNull(input: unknown): string | null {
@@ -672,17 +692,22 @@ export async function handleApi(
   if (rlUserMatch) {
     const id = rlUserMatch[1]!;
     if (req.method === "GET") {
-      const bucket = await deps.storage.getBucket(id, id);
-      return { status: 200, body: { bucket } };
+      const buckets = await listUserBuckets(deps.storage, id);
+      return { status: 200, body: { buckets } };
     }
     if (req.method === "PUT") {
-      const settings = await getOrInitSettings(deps.storage);
-      const body = (req.body ?? {}) as { reset?: boolean };
-      if (body.reset) {
-        await deps.rateLimiter.reset(id, id, settings.rateLimit, Date.now());
+      const body = (req.body ?? {}) as { chatId?: string; reset?: boolean };
+      if (body.reset && typeof body.chatId === "string") {
+        const settings = await getOrInitSettings(deps.storage);
+        await deps.rateLimiter.reset(
+          body.chatId,
+          id,
+          settings.rateLimit,
+          Date.now(),
+        );
       }
-      const bucket = await deps.storage.getBucket(id, id);
-      return { status: 200, body: { bucket } };
+      const buckets = await listUserBuckets(deps.storage, id);
+      return { status: 200, body: { buckets } };
     }
   }
 
