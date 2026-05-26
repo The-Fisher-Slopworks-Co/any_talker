@@ -11,7 +11,7 @@ import {
 } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
 import { ROW_CLS } from "../../components/row";
-import { userDisplayName } from "../../lib/labels";
+import { formatUsd, userDisplayName } from "../../lib/labels";
 import { openTelegramProfile } from "../../lib/telegram";
 import { useLoadable } from "../../lib/use-loadable";
 
@@ -20,7 +20,7 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { data } = useLoadable(() => api.listAdminUsers(), []);
 
   if (data === null) return <LoadingState />;
-  const { users, displayNames } = data;
+  const { users, displayNames, spending } = data;
 
   return (
     <Stack>
@@ -39,6 +39,11 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
                   {u.username ? `@${u.username}` : `id ${u.id}`}
                 </div>
               </div>
+              <span className="shrink-0 text-[13px] text-tg-hint tabular-nums">
+                {s.ui_spending_month_short(
+                  formatUsd(spending[u.id]?.month ?? 0),
+                )}
+              </span>
               <button
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
                 onClick={() => openTelegramProfile(u)}

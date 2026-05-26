@@ -17,6 +17,7 @@ import type {
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { SpendSummary } from "../spending/window";
 
 export interface Storage {
   getSettings(): Promise<Settings | null>;
@@ -59,6 +60,11 @@ export interface Storage {
 
   getUserOpenrouterModels(userId: string): Promise<string[] | null>;
   setUserOpenrouterModels(userId: string, models: string[] | null): Promise<void>;
+
+  // Accrues `costUsd` to the user's spend for the UTC date of `nowMs`. A
+  // non-positive cost is a no-op so free/uncosted replies don't create buckets.
+  addUserSpend(userId: string, costUsd: number, nowMs: number): Promise<void>;
+  getUserSpend(userId: string, nowMs: number): Promise<SpendSummary>;
 
   listUsers(): Promise<User[]>;
   upsertUser(user: User): Promise<void>;

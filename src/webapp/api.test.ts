@@ -1137,7 +1137,7 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ users: [], displayNames: {} });
+    expect(r.body).toEqual({ users: [], displayNames: {}, spending: {} });
   });
 
   test("GET list returns upserted users sorted by lastSeenAt desc", async () => {
@@ -1365,6 +1365,73 @@ describe("/api/admin/users", () => {
       { method: "GET", path: "/api/admin/users", body: null },
       deps(),
       guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+
+  test("GET list includes a spend summary per user", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Spender",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.addUserSpend("42", 0.75, Date.now());
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users", body: null },
+      d,
+      owner,
+    );
+    const body = r.body as { spending: Record<string, { day: number }> };
+    expect(body.spending["42"]!.day).toBeCloseTo(0.75, 6);
+  });
+});
+
+describe("spending endpoints", () => {
+  test("GET /api/me/spending returns the caller's summary", async () => {
+    const d = deps();
+    await d.storage.addUserSpend("42", 1.5, Date.now());
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/spending", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    const body = r.body as { spending: { day: number; month: number } };
+    expect(body.spending.day).toBeCloseTo(1.5, 6);
+    expect(body.spending.month).toBeCloseTo(1.5, 6);
+  });
+
+  test("GET /api/me/spending is zero for a user with no spend", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/spending", body: null },
+      deps(),
+      guest("99"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ spending: { day: 0, week: 0, month: 0 } });
+  });
+
+  test("GET /api/admin/users/:id/spending returns that user's summary", async () => {
+    const d = deps();
+    await d.storage.addUserSpend("42", 2.25, Date.now());
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/spending", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const body = r.body as { spending: { day: number } };
+    expect(body.spending.day).toBeCloseTo(2.25, 6);
+  });
+
+  test("GET /api/admin/users/:id/spending is owner-only", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/spending", body: null },
+      deps(),
+      guest("7"),
     );
     expect(r.status).toBe(403);
   });
