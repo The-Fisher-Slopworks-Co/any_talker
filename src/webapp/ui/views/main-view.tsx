@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../i18n-context";
-import { api, type MeResponse } from "../api-client";
+import { api, type MeResponse, type SpendSummary } from "../api-client";
+import { SpendingCard } from "../components/spending-card";
 import { composeFullName, type Gender } from "../../../shared/types";
 import { SUPPORTED_LANGS, type Lang } from "../../../shared/i18n";
 import { validateDisplayName } from "../../../shared/display-name";
@@ -36,6 +37,11 @@ export function MainView({
   const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
   const [langValue, setLangValue] = useState<Lang>(resolvedLang);
   const [saving, setSaving] = useState(false);
+  const [spending, setSpending] = useState<SpendSummary | null>(null);
+
+  useEffect(() => {
+    api.getMySpending().then((r) => setSpending(r.spending));
+  }, []);
 
   const tg = window.Telegram?.WebApp;
   const tgUser = tg?.initDataUnsafe?.user;
@@ -154,6 +160,8 @@ export function MainView({
         disabled={saving || !dirty || nameError !== null}
         onClick={save}
       />
+
+      {spending && <SpendingCard spending={spending} />}
 
       <SectionHeader>{s.ui_main_byok}</SectionHeader>
       <Card>
