@@ -7,6 +7,17 @@ import type { Reminder } from "../../../reminders/types";
 import type { Lang } from "../../../shared/i18n";
 import type { DisplayNameError } from "../../../shared/display-name";
 
+// USD spend can range from fractions of a cent per request to dollars over a
+// month, so allow up to 4 decimals while always showing at least 2.
+export function formatUsd(n: number): string {
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+}
+
 export function chatTitle(s: Strings, c: Chat): string {
   if (c.title && c.title.length > 0) return c.title;
   if (c.username) return `@${c.username}`;

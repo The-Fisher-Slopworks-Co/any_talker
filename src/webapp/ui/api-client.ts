@@ -16,6 +16,9 @@ import type { Lang } from "../../shared/i18n";
 import type { Reminder } from "../../reminders/types";
 import type { RecurringCheck } from "../../checks/types";
 import type { CheckInputFields } from "../../checks/validate";
+import type { SpendSummary } from "../../spending/window";
+
+export type { SpendSummary };
 
 declare global {
   interface Window {
@@ -79,6 +82,9 @@ export type UserBucketEntry = {
   chat: Chat;
   bucket: BucketState;
 };
+export type SpendingResponse = {
+  spending: SpendSummary;
+};
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -130,6 +136,9 @@ export const api = {
       chatId,
       reset: true,
     }),
+  getMySpending: () => req<SpendingResponse>("GET", "/api/me/spending"),
+  getUserSpending: (id: string) =>
+    req<SpendingResponse>("GET", `/api/admin/users/${id}/spending`),
   getMe: () => req<MeResponse>("GET", "/api/me"),
   putMe: (patch: {
     displayName?: string | null;
@@ -148,10 +157,11 @@ export const api = {
       models,
     }),
   listAdminUsers: () =>
-    req<{ users: User[]; displayNames: Record<string, string | null> }>(
-      "GET",
-      "/api/admin/users",
-    ),
+    req<{
+      users: User[];
+      displayNames: Record<string, string | null>;
+      spending: Record<string, SpendSummary>;
+    }>("GET", "/api/admin/users"),
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
   putAdminUser: (

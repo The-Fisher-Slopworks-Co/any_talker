@@ -491,6 +491,37 @@ describe("askHandler", () => {
     );
   });
 
+  test("answered: records reported costUsd to the user's spend", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "ok", totalTokens: 100, costUsd: 0.0123 });
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    const spend = await storage.getUserSpend("42", 1000);
+    expect(spend.day).toBeCloseTo(0.0123, 6);
+    expect(spend.month).toBeCloseTo(0.0123, 6);
+  });
+
+  test("answered: records spend even when rate-limit exempt (owner)", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: true },
+    });
+    const ai = new FakeAI({ text: "ok", totalTokens: 10, costUsd: 0.5 });
+    const out = await askHandler(baseInput({ storage, ai, userId: "1" }));
+    expect(out.kind).toBe("answered");
+    expect((await storage.getUserSpend("1", 1000)).day).toBeCloseTo(0.5, 6);
+  });
+
+  test("answered: records no spend when costUsd is absent or zero", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "ok", totalTokens: 100 });
+    await askHandler(baseInput({ storage, ai }));
+    expect((await storage.getUserSpend("42", 1000)).month).toBe(0);
+  });
+
   test("answered: propagates tool effects recorded into ctx.effects", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

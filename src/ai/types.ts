@@ -25,6 +25,9 @@ export type SerializedAIMessage =
 export type AskResult = {
   text: string;
   totalTokens: number;
+  // USD cost reported by OpenRouter usage accounting, summed across tool-call
+  // steps. Optional so existing fixtures/callers that don't care still type.
+  costUsd?: number;
 };
 
 export interface AIClient {

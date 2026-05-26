@@ -27,6 +27,7 @@ import {
 } from "../shared/display-name";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { SpendSummary } from "../spending/window";
 import { normalizeCheckInput } from "../checks/validate";
 import { getOrInitSettings } from "../settings";
 import {
@@ -472,6 +473,11 @@ export async function handleApi(
     }
   }
 
+  if (req.path === "/api/me/spending" && req.method === "GET") {
+    const spending = await deps.storage.getUserSpend(actor.userId, Date.now());
+    return { status: 200, body: { spending } };
+  }
+
   // OpenRouter endpoint metadata is read by the BYOK model picker (non-admin
   // users) as well as the admin views, so this handler intentionally sits
   // above the owner gate below. Anything added here must stay safe to expose
@@ -585,16 +591,25 @@ export async function handleApi(
   }
 
   if (req.path === "/api/admin/users" && req.method === "GET") {
+    const now = Date.now();
     const users = await deps.storage.listUsers();
-    const namePairs = await Promise.all(
+    const rows = await Promise.all(
       users.map(
         async (u) =>
-          [u.id, await readValidDisplayName(deps.storage, u.id)] as const,
+          [
+            u.id,
+            await readValidDisplayName(deps.storage, u.id),
+            await deps.storage.getUserSpend(u.id, now),
+          ] as const,
       ),
     );
     const displayNames: Record<string, string | null> = {};
-    for (const [id, name] of namePairs) displayNames[id] = name;
-    return { status: 200, body: { users, displayNames } };
+    const spending: Record<string, SpendSummary> = {};
+    for (const [id, name, spend] of rows) {
+      displayNames[id] = name;
+      spending[id] = spend;
+    }
+    return { status: 200, body: { users, displayNames, spending } };
   }
 
   if (req.path === "/api/admin/reminders" && req.method === "GET") {
@@ -602,6 +617,17 @@ export async function handleApi(
       deps.storage,
       await deps.storage.listAllReminders(),
     );
+  }
+
+  const userSpendMatch = req.path.match(
+    /^\/api\/admin\/users\/(.+)\/spending$/,
+  );
+  if (userSpendMatch && req.method === "GET") {
+    const spending = await deps.storage.getUserSpend(
+      userSpendMatch[1]!,
+      Date.now(),
+    );
+    return { status: 200, body: { spending } };
   }
 
   const userMatch = req.path.match(/^\/api\/admin\/users\/(.+)$/);
