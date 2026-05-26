@@ -21,7 +21,13 @@ function normalizeRateLimit(rl: RateLimitConfig): RateLimitConfig {
     typeof rl.wiseMultiplier === "number" && rl.wiseMultiplier > 0
       ? rl.wiseMultiplier
       : DEFAULT_SETTINGS.rateLimit.wiseMultiplier;
-  return { ...rl, wiseMultiplier };
+  return {
+    capacity: rl.capacity,
+    refillAmount: rl.refillAmount,
+    refillIntervalMs: rl.refillIntervalMs,
+    ownerExempt: rl.ownerExempt,
+    wiseMultiplier,
+  };
 }
 
 function normalize(s: Settings): Settings {
