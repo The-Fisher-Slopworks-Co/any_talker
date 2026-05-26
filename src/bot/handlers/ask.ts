@@ -11,6 +11,7 @@ import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import {
   buildInstruction,
   detailLevelMultiplier,
+  detailLevelReasoningEffort,
   type DetailLevel,
 } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
@@ -139,6 +140,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       tools: getAllTools(),
       providerSort: settings.providerSort,
       serviceTier: settings.serviceTier,
+      reasoningEffort: detailLevelReasoningEffort(input.detailLevel),
       apiKey: byokKey,
       toolCallContext: {
         source: "ask",
