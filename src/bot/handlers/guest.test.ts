@@ -130,6 +130,23 @@ describe("guestAskHandler", () => {
     expect(out.kind).toBe("answered");
   });
 
+  test("answered: records reported costUsd to the user's spend", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "hi", totalTokens: 50, costUsd: 0.02 });
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    expect((await storage.getUserSpend("42", 1000)).day).toBeCloseTo(0.02, 6);
+  });
+
+  test("answered: records no spend when costUsd is absent", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "hi", totalTokens: 50 });
+    await guestAskHandler(baseInput({ storage, ai }));
+    expect((await storage.getUserSpend("42", 1000)).month).toBe(0);
+  });
+
   test("user with BYOK key + custom models passes the custom models", async () => {
     const storage = new MemoryStorage();
     await storage.setUserOpenrouterKey("42", "sk-or-byok");

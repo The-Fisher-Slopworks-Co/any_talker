@@ -32,6 +32,14 @@ import {
 } from "../reminders/parse";
 import type { RecurringCheck } from "../checks/types";
 import { photoCacheErrorsTotal, remindersParseFailuresTotal } from "../metrics";
+import type { SpendSummary } from "../spending/window";
+import {
+  SPEND_RETENTION_DAYS,
+  SPEND_WINDOW_DAYS,
+  recentUtcDateKeys,
+  summarizeSpend,
+  utcDateKey,
+} from "../spending/window";
 
 const PREFIX = "at:";
 const FETCH_DUE_LIMIT = 100;
@@ -308,6 +316,31 @@ export class KeyDBStorage implements Storage {
     const k = `${PREFIX}user_or_models:${userId}`;
     if (models === null) await this.client.del(k);
     else await this.client.set(k, JSON.stringify(models));
+  }
+
+  async addUserSpend(
+    userId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    const key = `${PREFIX}spend:${userId}:${utcDateKey(nowMs)}`;
+    await this.client.send("INCRBYFLOAT", [key, String(costUsd)]);
+    await this.client.expire(key, SPEND_RETENTION_DAYS * 24 * 60 * 60);
+  }
+
+  async getUserSpend(userId: string, nowMs: number): Promise<SpendSummary> {
+    const dates = recentUtcDateKeys(nowMs, SPEND_WINDOW_DAYS.month);
+    const raws = await this.client.mget(
+      ...dates.map((d) => `${PREFIX}spend:${userId}:${d}`),
+    );
+    const byDate: Record<string, number> = {};
+    for (let i = 0; i < dates.length; i++) {
+      const raw = raws[i];
+      const n = raw === null || raw === undefined ? 0 : Number(raw);
+      byDate[dates[i]!] = Number.isFinite(n) ? n : 0;
+    }
+    return summarizeSpend(byDate, nowMs);
   }
 
   async listUsers(): Promise<User[]> {

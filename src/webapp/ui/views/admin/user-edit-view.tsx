@@ -5,9 +5,11 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import {
   api,
+  type SpendSummary,
   type UserBucketEntry,
   type UserSettingsResponse,
 } from "../../api-client";
+import { SpendingCard } from "../../components/spending-card";
 import type { Gender } from "../../../../shared/types";
 import {
   Card,
@@ -47,6 +49,7 @@ export function UserEditView({ userId }: { userId: string }) {
   const [notFound, setNotFound] = useState(false);
   const [buckets, setBuckets] = useState<UserBucketEntry[] | null>(null);
   const [capacity, setCapacity] = useState<number | null>(null);
+  const [spending, setSpending] = useState<SpendSummary | null>(null);
 
   useEffect(() => {
     api
@@ -61,6 +64,7 @@ export function UserEditView({ userId }: { userId: string }) {
       })
       .catch(() => setNotFound(true));
     api.getUserBuckets(userId).then((r) => setBuckets(r.buckets));
+    api.getUserSpending(userId).then((r) => setSpending(r.spending));
     api.getSettings().then((s) => setCapacity(s.rateLimit.capacity));
   }, [userId]);
 
@@ -203,6 +207,8 @@ export function UserEditView({ userId }: { userId: string }) {
         disabled={saving || !dirty || nameError !== null}
         onClick={save}
       />
+
+      {spending && <SpendingCard spending={spending} />}
 
       <SectionHeader>{s.ui_user_bucket}</SectionHeader>
       {buckets === null ? null : buckets.length === 0 ? (

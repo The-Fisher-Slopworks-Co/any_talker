@@ -144,6 +144,13 @@ export async function guestAskHandler(
     );
   }
 
+  // Record spend regardless of rate-limit exemption — owner and BYOK usage is
+  // still money this user spent through the bot. Best-effort: a storage hiccup
+  // on this display-only accounting must not fail an answer already produced.
+  await input.storage
+    .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
+    .catch((err) => console.error("recording user spend failed:", err));
+
   const sanitized = sanitizeHtml(result.text);
 
   return {

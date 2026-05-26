@@ -202,6 +202,13 @@ type Strings = {
   ui_user_display_name_footer: string;
   ui_user_bucket: string;
 
+  ui_spending_title: string;
+  ui_spending_day: string;
+  ui_spending_week: string;
+  ui_spending_month: string;
+  ui_spending_month_short: (amount: string) => string;
+  ui_spending_footer: string;
+
   ui_chats_all: string;
   ui_chats_empty: string;
   ui_chats_footer: string;
@@ -515,6 +522,14 @@ const en: Strings = {
   ui_user_display_name_footer:
     "Override the name shown to the AI for this user.",
   ui_user_bucket: "Rate Limit Buckets",
+
+  ui_spending_title: "Spending",
+  ui_spending_day: "Today",
+  ui_spending_week: "Last 7 days",
+  ui_spending_month: "Last 30 days",
+  ui_spending_month_short: (amount) => `30d: ${amount}`,
+  ui_spending_footer:
+    "Money spent on AI requests, in USD, as reported by OpenRouter. Periods are trailing windows by UTC date.",
 
   ui_chats_all: "All Chats",
   ui_chats_empty: "No chats yet — they appear after the first message.",
@@ -858,6 +873,14 @@ const ru: Strings = {
   ui_user_display_name_footer:
     "Переопределить имя, которое видит ИИ для этого пользователя.",
   ui_user_bucket: "Бакеты лимита",
+
+  ui_spending_title: "Расходы",
+  ui_spending_day: "Сегодня",
+  ui_spending_week: "За 7 дней",
+  ui_spending_month: "За 30 дней",
+  ui_spending_month_short: (amount) => `30д: ${amount}`,
+  ui_spending_footer:
+    "Деньги, потраченные на запросы к ИИ, в USD, по данным OpenRouter. Периоды — скользящие окна по датам UTC.",
 
   ui_chats_all: "Все чаты",
   ui_chats_empty: "Чатов пока нет — они появятся после первого сообщения.",

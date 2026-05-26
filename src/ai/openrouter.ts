@@ -82,7 +82,12 @@ export class OpenRouterAIClient implements AIClient {
       provider?: { sort: ProviderSort };
       service_tier?: ServiceTier;
       reasoning?: { effort: ReasoningEffort };
-    } = {};
+      usage?: { include: boolean };
+    } = {
+      // Ask OpenRouter to include usage accounting so each response carries the
+      // request's USD cost in providerMetadata.openrouter.usage.cost.
+      usage: { include: true },
+    };
     if (fallbacks.length > 0) openrouterOpts.models = fallbacks;
     if (opts.providerSort) {
       openrouterOpts.provider = { sort: opts.providerSort };
@@ -114,6 +119,7 @@ export class OpenRouterAIClient implements AIClient {
       return {
         text: result.text,
         totalTokens: result.totalUsage.totalTokens ?? 0,
+        costUsd: sumStepCostUsd(result.steps),
       };
     } catch (err) {
       outcome = "error";
@@ -147,6 +153,23 @@ function toModelMessages(messages: AIMessage[]): ModelMessage[] {
       }),
     };
   });
+}
+
+// Sums the per-request USD cost OpenRouter reports for each generation step.
+// With tool calls a single ask fans out into multiple steps, each its own
+// billed request; totalUsage aggregates tokens the same way.
+function sumStepCostUsd(
+  steps: ReadonlyArray<{ providerMetadata?: Record<string, unknown> }>,
+): number {
+  let total = 0;
+  for (const step of steps) {
+    const openrouter = step.providerMetadata?.openrouter as
+      | { usage?: { cost?: unknown } }
+      | undefined;
+    const cost = openrouter?.usage?.cost;
+    if (typeof cost === "number" && Number.isFinite(cost)) total += cost;
+  }
+  return total;
 }
 
 function buildAttributionHeaders(

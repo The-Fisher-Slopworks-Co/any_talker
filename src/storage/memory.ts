@@ -20,6 +20,12 @@ import { isEmptyChatSettings } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { SpendSummary } from "../spending/window";
+import {
+  SPEND_RETENTION_DAYS,
+  summarizeSpend,
+  utcDateKey,
+} from "../spending/window";
 
 export class MemoryStorage implements Storage {
   private settings: Settings | null = null;
@@ -36,6 +42,7 @@ export class MemoryStorage implements Storage {
   private userLangs = new Map<string, Lang>();
   private userOpenrouterKeys = new Map<string, string>();
   private userOpenrouterModels = new Map<string, string[]>();
+  private userSpend = new Map<string, Map<string, number>>();
   private users = new Map<string, User>();
   private chats = new Map<string, Chat>();
   private chatSettings = new Map<string, ChatSettings>();
@@ -199,6 +206,31 @@ export class MemoryStorage implements Storage {
   ): Promise<void> {
     if (models === null) this.userOpenrouterModels.delete(userId);
     else this.userOpenrouterModels.set(userId, [...models]);
+  }
+
+  async addUserSpend(
+    userId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    let byDate = this.userSpend.get(userId);
+    if (!byDate) {
+      byDate = new Map();
+      this.userSpend.set(userId, byDate);
+    }
+    const key = utcDateKey(nowMs);
+    byDate.set(key, (byDate.get(key) ?? 0) + costUsd);
+    // Prune buckets older than the retention window. Date keys are fixed-width
+    // so a lexical comparison is a date comparison.
+    const cutoff = utcDateKey(nowMs - SPEND_RETENTION_DAYS * 86_400_000);
+    for (const k of byDate.keys()) {
+      if (k < cutoff) byDate.delete(k);
+    }
+  }
+
+  async getUserSpend(userId: string, nowMs: number): Promise<SpendSummary> {
+    return summarizeSpend(this.userSpend.get(userId) ?? new Map(), nowMs);
   }
 
   async listUsers(): Promise<User[]> {

@@ -181,3 +181,72 @@ describe("MemoryStorage album index", () => {
     ]);
   });
 });
+
+describe("MemoryStorage user spend", () => {
+  const DAY = 86_400_000;
+  const NOW = Date.UTC(2026, 4, 26, 12);
+
+  test("returns all-zero summary for a user with no spend", async () => {
+    const s = new MemoryStorage();
+    expect(await s.getUserSpend("42", NOW)).toEqual({
+      day: 0,
+      week: 0,
+      month: 0,
+    });
+  });
+
+  test("accrues same-day spend and buckets into day/week/month", async () => {
+    const s = new MemoryStorage();
+    await s.addUserSpend("42", 0.5, NOW);
+    await s.addUserSpend("42", 0.25, NOW);
+    expect(await s.getUserSpend("42", NOW)).toEqual({
+      day: 0.75,
+      week: 0.75,
+      month: 0.75,
+    });
+  });
+
+  test("older spend falls out of the shorter windows", async () => {
+    const s = new MemoryStorage();
+    await s.addUserSpend("42", 1, NOW);
+    await s.addUserSpend("42", 2, NOW - 3 * DAY);
+    await s.addUserSpend("42", 4, NOW - 10 * DAY);
+    expect(await s.getUserSpend("42", NOW)).toEqual({
+      day: 1,
+      week: 3,
+      month: 7,
+    });
+  });
+
+  test("ignores non-positive costs", async () => {
+    const s = new MemoryStorage();
+    await s.addUserSpend("42", 0, NOW);
+    await s.addUserSpend("42", -5, NOW);
+    expect(await s.getUserSpend("42", NOW)).toEqual({
+      day: 0,
+      week: 0,
+      month: 0,
+    });
+  });
+
+  test("scopes spend per user", async () => {
+    const s = new MemoryStorage();
+    await s.addUserSpend("1", 3, NOW);
+    await s.addUserSpend("2", 7, NOW);
+    expect((await s.getUserSpend("1", NOW)).day).toBe(3);
+    expect((await s.getUserSpend("2", NOW)).day).toBe(7);
+  });
+
+  test("prunes buckets beyond the retention window", async () => {
+    const s = new MemoryStorage();
+    await s.addUserSpend("42", 9, NOW - 100 * DAY);
+    // A later write triggers pruning of the stale bucket.
+    await s.addUserSpend("42", 1, NOW);
+    // Query as of the old date: the pruned bucket is gone.
+    expect(await s.getUserSpend("42", NOW - 100 * DAY)).toEqual({
+      day: 0,
+      week: 0,
+      month: 0,
+    });
+  });
+});
