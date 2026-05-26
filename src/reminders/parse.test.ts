@@ -35,6 +35,23 @@ describe("parseStoredReminder — valid records", () => {
     expect(out).toEqual(validRecord as Reminder);
   });
 
+  test("round-trips a record with an audio content part", () => {
+    const r = {
+      ...validRecord,
+      contextMessages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "transcribe" },
+            { type: "audio", audio_base64: "T2dnUw==", mediaType: "audio/ogg" },
+          ],
+        },
+        { role: "assistant", content: "done" },
+      ],
+    };
+    expect(parseStoredReminder(stringify(r))).toEqual(r as Reminder);
+  });
+
   test("guest_dm target round-trips", () => {
     const r = {
       ...validRecord,

@@ -34,6 +34,7 @@ export type ReminderTimeParts = {
 
 type Strings = {
   bot_photo_cant_fetch: string;
+  bot_voice_cant_fetch: string;
   bot_ask_usage: string;
   bot_rate_limited: (min: number) => string;
   bot_ai_error: string;
@@ -319,6 +320,7 @@ type Strings = {
 
 const en: Strings = {
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
+  bot_voice_cant_fetch: "⚠️ Couldn't fetch the voice message.",
   bot_ask_usage:
     "Usage: /ask <text> (short), /askmore <text> (detailed), /askwise <text> (exhaustive) — or reply to a message with any of these.",
   bot_rate_limited: (min) =>
@@ -660,6 +662,7 @@ const en: Strings = {
 
 const ru: Strings = {
   bot_photo_cant_fetch: "⚠️ Не удалось загрузить прикреплённое фото.",
+  bot_voice_cant_fetch: "⚠️ Не удалось загрузить голосовое сообщение.",
   bot_ask_usage:
     "Использование: /ask <текст> (коротко), /askmore <текст> (подробно), /askwise <текст> (исчерпывающе) — или ответь на сообщение любой из этих команд.",
   bot_rate_limited: (min) =>
