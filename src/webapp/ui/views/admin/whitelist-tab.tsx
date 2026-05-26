@@ -41,7 +41,11 @@ function WhitelistList({
           <EmptyState>{s.ui_whitelist_no_entries}</EmptyState>
         ) : (
           entries.map((e) => (
-            <div key={e.id} className={ROW_CLS}>
+            <div
+              key={e.id}
+              className={`${ROW_CLS} cursor-pointer active:bg-[var(--tg-separator)]`}
+              onClick={() => onOpen(e.id)}
+            >
               <div className="flex-1 min-w-0">
                 <div className="truncate">{e.label || `id:${e.id}`}</div>
                 <div className="text-[13px] text-tg-hint truncate">
@@ -49,14 +53,11 @@ function WhitelistList({
                 </div>
               </div>
               <button
-                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-link cursor-pointer"
-                onClick={() => onOpen(e.id)}
-              >
-                {s.ui_open}
-              </button>
-              <button
                 className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
-                onClick={() => onRemove(e.id)}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onRemove(e.id);
+                }}
               >
                 {s.ui_remove}
               </button>
