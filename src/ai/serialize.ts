@@ -14,15 +14,21 @@ export function serializeMessages(msgs: AIMessage[]): SerializedAIMessage[] {
     if (typeof m.content === "string") {
       return { role: "user", content: m.content };
     }
-    const parts: SerializedAIUserContentPart[] = m.content.map((p) =>
-      p.type === "text"
-        ? { type: "text", text: p.text }
-        : {
-            type: "image",
-            image_base64: Buffer.from(p.image).toString("base64"),
-            mediaType: p.mediaType,
-          },
-    );
+    const parts: SerializedAIUserContentPart[] = m.content.map((p) => {
+      if (p.type === "text") return { type: "text", text: p.text };
+      if (p.type === "image") {
+        return {
+          type: "image",
+          image_base64: Buffer.from(p.image).toString("base64"),
+          mediaType: p.mediaType,
+        };
+      }
+      return {
+        type: "audio",
+        audio_base64: Buffer.from(p.audio).toString("base64"),
+        mediaType: p.mediaType,
+      };
+    });
     return { role: "user", content: parts };
   });
 }
@@ -43,6 +49,13 @@ export function deserializeMessages(
         return {
           type: "image",
           image: new Uint8Array(Buffer.from(p.image_base64, "base64")),
+          mediaType: p.mediaType,
+        };
+      }
+      if (p.type === "audio") {
+        return {
+          type: "audio",
+          audio: new Uint8Array(Buffer.from(p.audio_base64, "base64")),
           mediaType: p.mediaType,
         };
       }
