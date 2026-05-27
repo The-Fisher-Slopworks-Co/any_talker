@@ -634,32 +634,36 @@ export async function handleApi(
   if (userMatch) {
     const id = userMatch[1]!;
     if (req.method === "GET") {
-      const [user, displayName, timezone, gender, whitelisted] =
+      const [user, displayName, timezone, gender, language, whitelisted] =
         await Promise.all([
           deps.storage.getUser(id),
           readValidDisplayName(deps.storage, id),
           deps.storage.getUserTimezone(id),
           deps.storage.getUserGender(id),
+          deps.storage.getUserLang(id),
           deps.storage.isWhitelisted("users", id),
         ]);
       if (!user) return { status: 404, body: { error: "user not found" } };
       return {
         status: 200,
-        body: { user, displayName, timezone, gender, whitelisted },
+        body: { user, displayName, timezone, gender, language, whitelisted },
       };
     }
     if (req.method === "PUT") {
       const user = await deps.storage.getUser(id);
       if (!user) return { status: 404, body: { error: "user not found" } };
       const body = (req.body ?? {}) as Record<string, unknown>;
-      const [currentName, currentTz, currentGender] = await Promise.all([
-        readValidDisplayName(deps.storage, id),
-        deps.storage.getUserTimezone(id),
-        deps.storage.getUserGender(id),
-      ]);
+      const [currentName, currentTz, currentGender, currentLang] =
+        await Promise.all([
+          readValidDisplayName(deps.storage, id),
+          deps.storage.getUserTimezone(id),
+          deps.storage.getUserGender(id),
+          deps.storage.getUserLang(id),
+        ]);
       let displayName = currentName;
       let timezone = currentTz;
       let gender: Gender | null = currentGender;
+      let language: Lang | null = currentLang;
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
@@ -684,11 +688,17 @@ export async function handleApi(
         gender = nextGender;
         writes.push(deps.storage.setUserGender(id, gender));
       }
+      if ("language" in body) {
+        const nextLang = normalizeEnumInput(body.language, isValidLang);
+        if (nextLang === "invalid") return BAD_LANG;
+        language = nextLang;
+        writes.push(deps.storage.setUserLang(id, language));
+      }
 
       await Promise.all(writes);
       return {
         status: 200,
-        body: { user, displayName, timezone, gender },
+        body: { user, displayName, timezone, gender, language },
       };
     }
   }
