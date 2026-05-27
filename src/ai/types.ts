@@ -37,6 +37,7 @@ export interface AIClient {
     messages: AIMessage[];
     tools: Tool[];
     providerSort?: ProviderSort | null;
+    provider?: string | null;
     serviceTier?: ServiceTier | null;
     reasoningEffort?: ReasoningEffort | null;
     toolCallContext: ToolCallContext;

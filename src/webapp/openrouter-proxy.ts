@@ -7,6 +7,9 @@ const OPENROUTER_TIMEOUT_MS = 10_000;
 
 export type ProxyEndpoint = {
   provider_name: string;
+  // Routing slug for the provider (e.g. "deepinfra/fp4"). Distinct from the
+  // human-readable provider_name and what OpenRouter's provider.order expects.
+  provider_slug: string | null;
   pricing: {
     prompt?: string;
     completion?: string;
@@ -27,6 +30,7 @@ const cache = new Map<string, Cached>();
 type FrontendStats = {
   data?: Array<{
     provider_name?: string;
+    provider_slug?: string;
     pricing?: { prompt?: string; completion?: string; image?: string };
     stats?: {
       p50_throughput?: number;
@@ -55,6 +59,8 @@ export const fetchOpenRouterStats: FetchOpenRouterStats = async (
     .filter((e) => typeof e.provider_name === "string")
     .map((e) => ({
       provider_name: e.provider_name as string,
+      provider_slug:
+        typeof e.provider_slug === "string" ? e.provider_slug : null,
       pricing: {
         prompt: e.pricing?.prompt,
         completion: e.pricing?.completion,

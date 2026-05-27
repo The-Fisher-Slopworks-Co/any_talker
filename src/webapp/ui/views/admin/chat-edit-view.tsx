@@ -23,6 +23,7 @@ import { SaveButton, Toggle } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { OverrideSection } from "../../components/override-section";
 import { ProviderSortField } from "../../components/provider-sort-field";
+import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
 import { RateLimitFields } from "../../components/rate-limit-fields";
 import { TimezoneSelect } from "../../components/timezone-select";
@@ -52,6 +53,8 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   const [tzValue, setTzValue] = useState("UTC");
   const [psOverride, setPsOverride] = useState(false);
   const [psValue, setPsValue] = useState<ProviderSort | null>(null);
+  const [provOverride, setProvOverride] = useState(false);
+  const [provValue, setProvValue] = useState<string | null>(null);
   const [stOverride, setStOverride] = useState(false);
   const [stValue, setStValue] = useState<ServiceTier | null>(null);
   const [kfEnabled, setKfEnabled] = useState(false);
@@ -82,6 +85,10 @@ export function ChatEditView({ chatId }: { chatId: string }) {
           d.settings.providerSort !== undefined
             ? d.settings.providerSort
             : g.providerSort,
+        );
+        setProvOverride(d.settings.provider !== undefined);
+        setProvValue(
+          d.settings.provider !== undefined ? d.settings.provider : g.provider,
         );
         setStOverride(d.settings.serviceTier !== undefined);
         setStValue(
@@ -115,6 +122,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     if (trimmedBotName.length > 0) next.botName = trimmedBotName;
     if (tzOverride) next.timezone = tzValue;
     if (psOverride) next.providerSort = psValue;
+    if (provOverride) next.provider = provValue;
     if (stOverride) next.serviceTier = stValue;
     if (kfEnabled || parsedKeywords.length > 0) {
       next.keywordFilter = {
@@ -133,6 +141,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     rlOverride !== wasOverridden("rateLimit") ||
     tzOverride !== wasOverridden("timezone") ||
     psOverride !== wasOverridden("providerSort") ||
+    provOverride !== wasOverridden("provider") ||
     stOverride !== wasOverridden("serviceTier") ||
     (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
     (modelsOverride &&
@@ -141,6 +150,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
     (tzOverride && payload.timezone !== original.timezone) ||
     (psOverride && payload.providerSort !== original.providerSort) ||
+    (provOverride && payload.provider !== original.provider) ||
     (stOverride && payload.serviceTier !== original.serviceTier) ||
     trimmedBotName !== (original.botName ?? "") ||
     JSON.stringify(payload.keywordFilter ?? null) !==
@@ -167,6 +177,12 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         result.settings.providerSort !== undefined
           ? result.settings.providerSort
           : global.providerSort,
+      );
+      setProvOverride(result.settings.provider !== undefined);
+      setProvValue(
+        result.settings.provider !== undefined
+          ? result.settings.provider
+          : global.provider,
       );
       setStOverride(result.settings.serviceTier !== undefined);
       setStValue(
@@ -308,6 +324,23 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         }
       >
         <ProviderSortField value={psValue} onChange={setPsValue} />
+      </OverrideSection>
+
+      <OverrideSection
+        title={s.ui_chat_provider}
+        override={provOverride}
+        onToggle={setProvOverride}
+        footer={
+          provOverride
+            ? s.ui_chat_provider_on_footer
+            : s.ui_chat_provider_off_footer(global.provider ?? s.ui_sort_default)
+        }
+      >
+        <ProviderSelectField
+          modelId={(modelsOverride ? trimmedModels[0] : global.models[0]) ?? ""}
+          value={provValue}
+          onChange={setProvValue}
+        />
       </OverrideSection>
 
       <OverrideSection

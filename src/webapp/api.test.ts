@@ -26,6 +26,7 @@ describe("GET /api/openrouter/endpoints/:permaslug", () => {
         endpoints: [
           {
             provider_name: "DeepInfra",
+            provider_slug: "deepinfra/fp4",
             pricing: { prompt: "0.000000039", completion: "0.00000019" },
             throughput: 36,
             latency: 343,
@@ -48,6 +49,7 @@ describe("GET /api/openrouter/endpoints/:permaslug", () => {
       endpoints: [
         {
           provider_name: "DeepInfra",
+          provider_slug: "deepinfra/fp4",
           pricing: { prompt: "0.000000039", completion: "0.00000019" },
           throughput: 36,
           latency: 343,
@@ -176,6 +178,51 @@ describe("PUT /api/settings", () => {
         method: "PUT",
         path: "/api/settings",
         body: { providerSort: "nope" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("accepts a valid provider slug", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { provider: "deepinfra/fp4" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.provider).toBe("deepinfra/fp4");
+  });
+
+  test("accepts null provider to clear it", async () => {
+    const d = deps();
+    await d.storage.saveSettings({ ...DEFAULT_SETTINGS, provider: "novita" });
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { provider: null },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.provider).toBeNull();
+  });
+
+  test("rejects an invalid provider slug with 400", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { provider: "not a slug!" },
       },
       d,
       owner,
@@ -1675,6 +1722,75 @@ describe("/api/admin/chats", () => {
         method: "PUT",
         path: "/api/admin/chats/-100",
         body: { systemPrompt: "p", providerSort: "fastest" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      systemPrompt: "p",
+    });
+  });
+
+  test("PUT accepts provider slug override", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { provider: "deepinfra/fp4" },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      provider: "deepinfra/fp4",
+    });
+  });
+
+  test("PUT accepts provider=null to override-to-none", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { provider: null },
+      },
+      d,
+      owner,
+    );
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      provider: null,
+    });
+  });
+
+  test("PUT silently drops invalid provider slug", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { systemPrompt: "p", provider: "not a slug!" },
       },
       d,
       owner,

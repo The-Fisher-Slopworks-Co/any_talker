@@ -409,6 +409,28 @@ describe("askHandler", () => {
     expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBeNull();
   });
 
+  test("provider: forwards the pinned provider slug to the AI client", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      provider: "deepinfra/fp4",
+    });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { provider: unknown }).provider).toBe("deepinfra/fp4");
+  });
+
+  test("provider: chat override beats global", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({ ...DEFAULT_SETTINGS, provider: "deepinfra" });
+    await storage.saveChatSettings("c1", { provider: "novita" });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect((ai.calls[0] as { provider: unknown }).provider).toBe("novita");
+  });
+
   test("service tier: forwards global setting to the AI client", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

@@ -23,6 +23,23 @@ export type OpenRouterAppAttribution = {
   title?: string | undefined;
 };
 
+// The `provider` field OpenRouter accepts on a request: either sort all
+// providers by a metric, or pin to a specific provider with no fallback.
+export type ProviderRouting =
+  | { sort: ProviderSort }
+  | { order: string[]; allow_fallbacks: boolean };
+
+// A pinned provider wins over a sort: the request is restricted to that single
+// provider slug with fallbacks disabled, so it never silently lands elsewhere.
+export function buildProviderRouting(
+  provider: string | null | undefined,
+  providerSort: ProviderSort | null | undefined,
+): ProviderRouting | undefined {
+  if (provider) return { order: [provider], allow_fallbacks: false };
+  if (providerSort) return { sort: providerSort };
+  return undefined;
+}
+
 export class OpenRouterAIClient implements AIClient {
   private readonly defaultApiKey: string;
   private readonly defaultProvider: ReturnType<typeof createOpenRouter>;
@@ -44,6 +61,7 @@ export class OpenRouterAIClient implements AIClient {
     messages: AIMessage[];
     tools: Tool[];
     providerSort?: ProviderSort | null;
+    provider?: string | null;
     serviceTier?: ServiceTier | null;
     reasoningEffort?: ReasoningEffort | null;
     toolCallContext: ToolCallContext;
@@ -79,7 +97,7 @@ export class OpenRouterAIClient implements AIClient {
 
     const openrouterOpts: {
       models?: string[];
-      provider?: { sort: ProviderSort };
+      provider?: ProviderRouting;
       service_tier?: ServiceTier;
       reasoning?: { effort: ReasoningEffort };
       usage?: { include: boolean };
@@ -89,8 +107,12 @@ export class OpenRouterAIClient implements AIClient {
       usage: { include: true },
     };
     if (fallbacks.length > 0) openrouterOpts.models = fallbacks;
-    if (opts.providerSort) {
-      openrouterOpts.provider = { sort: opts.providerSort };
+    const providerRouting = buildProviderRouting(
+      opts.provider,
+      opts.providerSort,
+    );
+    if (providerRouting) {
+      openrouterOpts.provider = providerRouting;
     }
     // OpenRouter reads `service_tier` as a top-level body field; the provider
     // spreads any providerOptions.openrouter key straight into the request.
