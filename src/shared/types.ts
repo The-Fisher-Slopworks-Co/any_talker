@@ -37,6 +37,10 @@ export type Settings = {
   rateLimit: RateLimitConfig;
   timezone: string;
   providerSort: ProviderSort | null;
+  // OpenRouter provider slug to pin routing to (e.g. "deepinfra/fp4"). When set
+  // it takes precedence over providerSort: the request goes only to this
+  // provider with no fallback. null lets providerSort (or OpenRouter) decide.
+  provider: string | null;
   serviceTier: ServiceTier | null;
   expandableBlockquoteThreshold: number;
 };
@@ -90,6 +94,7 @@ export type ChatSettings = {
   botName?: string;
   timezone?: string;
   providerSort?: ProviderSort | null;
+  provider?: string | null;
   serviceTier?: ServiceTier | null;
   keywordFilter?: KeywordFilter;
 };
@@ -125,6 +130,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   timezone: "UTC",
   providerSort: null,
+  provider: null,
   serviceTier: null,
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
 };
@@ -160,6 +166,7 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.botName === undefined &&
     s.timezone === undefined &&
     s.providerSort === undefined &&
+    s.provider === undefined &&
     s.serviceTier === undefined &&
     s.keywordFilter === undefined
   );
@@ -181,6 +188,17 @@ export function messageMatchesKeyword(
 
 export function isValidProviderSort(v: unknown): v is ProviderSort {
   return v === "price" || v === "throughput" || v === "latency";
+}
+
+// OpenRouter provider slugs are lowercase identifiers, optionally with a
+// variant segment after a slash (e.g. "deepinfra", "deepinfra/fp4",
+// "google-vertex/us-east5"). Validate the shape rather than an allow-list so we
+// don't have to track OpenRouter's evolving provider catalogue; the value is
+// only ever placed in a JSON body field, so there's no injection surface.
+const PROVIDER_SLUG_RE = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)*$/i;
+
+export function isValidProviderSlug(v: unknown): v is string {
+  return typeof v === "string" && v.length <= 100 && PROVIDER_SLUG_RE.test(v);
 }
 
 export function isValidServiceTier(v: unknown): v is ServiceTier {

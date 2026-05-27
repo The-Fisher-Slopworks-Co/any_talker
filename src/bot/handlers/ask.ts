@@ -139,6 +139,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       messages,
       tools: getAllTools(),
       providerSort: settings.providerSort,
+      provider: settings.provider,
       serviceTier: settings.serviceTier,
       reasoningEffort: detailLevelReasoningEffort(input.detailLevel),
       apiKey: byokKey,

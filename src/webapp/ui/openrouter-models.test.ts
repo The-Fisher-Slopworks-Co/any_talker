@@ -5,6 +5,7 @@ import { test, expect, describe } from "bun:test";
 import {
   lookupOpenRouterModel,
   pickEndpointBySort,
+  toProviderOptions,
   type OpenRouterEndpoint,
   type OpenRouterModel,
 } from "./openrouter-models";
@@ -109,5 +110,49 @@ describe("pickEndpointBySort", () => {
   test("latency: returns null when no candidate has data", () => {
     const x = ep("X", "0", "0", 100, null);
     expect(pickEndpointBySort([x], "latency")).toBeNull();
+  });
+});
+
+describe("toProviderOptions", () => {
+  const slugged = (
+    provider_name: string,
+    provider_slug: string | null,
+  ): OpenRouterEndpoint => ({
+    provider_name,
+    provider_slug,
+    pricing: {},
+    throughput: null,
+    latency: null,
+  });
+
+  test("maps endpoints to {slug, name} preserving order", () => {
+    const out = toProviderOptions([
+      slugged("DeepInfra", "deepinfra/fp4"),
+      slugged("Novita", "novita/fp8"),
+    ]);
+    expect(out).toEqual([
+      { slug: "deepinfra/fp4", name: "DeepInfra" },
+      { slug: "novita/fp8", name: "Novita" },
+    ]);
+  });
+
+  test("drops endpoints without a slug", () => {
+    const out = toProviderOptions([
+      slugged("Mystery", null),
+      slugged("DeepInfra", "deepinfra"),
+    ]);
+    expect(out).toEqual([{ slug: "deepinfra", name: "DeepInfra" }]);
+  });
+
+  test("dedupes by slug, keeping the first occurrence", () => {
+    const out = toProviderOptions([
+      slugged("DeepInfra", "deepinfra"),
+      slugged("DeepInfra (mirror)", "deepinfra"),
+    ]);
+    expect(out).toEqual([{ slug: "deepinfra", name: "DeepInfra" }]);
+  });
+
+  test("returns an empty list for no endpoints", () => {
+    expect(toProviderOptions([])).toEqual([]);
   });
 });

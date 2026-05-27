@@ -23,6 +23,10 @@ export type OpenRouterModel = {
 
 export type OpenRouterEndpoint = {
   provider_name: string;
+  // Routing slug (e.g. "deepinfra/fp4") used to pin OpenRouter to this
+  // provider. May be null for older cached responses; such endpoints can't be
+  // pinned. Optional on the type so existing fixtures keep typechecking.
+  provider_slug?: string | null;
   pricing: {
     prompt?: string;
     completion?: string;
@@ -89,6 +93,25 @@ function priceSum(e: OpenRouterEndpoint): number {
     return Number.isFinite(n) && n >= 0 ? n : Infinity;
   };
   return parse(e.pricing.prompt) + parse(e.pricing.completion);
+}
+
+export type ProviderOption = { slug: string; name: string };
+
+// Distinct routable providers for a model, keyed by slug, preserving the order
+// OpenRouter returned them in. Endpoints without a slug can't be pinned, so
+// they're dropped.
+export function toProviderOptions(
+  endpoints: OpenRouterEndpoint[],
+): ProviderOption[] {
+  const seen = new Set<string>();
+  const out: ProviderOption[] = [];
+  for (const e of endpoints) {
+    const slug = e.provider_slug;
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    out.push({ slug, name: e.provider_name });
+  }
+  return out;
 }
 
 export function pickEndpointBySort(
