@@ -12,6 +12,11 @@ import {
 import { SpendingCard } from "../../components/spending-card";
 import type { Gender } from "../../../../shared/types";
 import {
+  SUPPORTED_LANGS,
+  DEFAULT_LANG,
+  type Lang,
+} from "../../../../shared/i18n";
+import {
   Card,
   SectionFooter,
   SectionHeader,
@@ -32,6 +37,7 @@ import {
   chatSubtitle,
   chatTitle,
   DISPLAY_NAME_ERR_KEY,
+  LANG_LABEL_KEY,
   userDisplayName,
 } from "../../lib/labels";
 import { openTelegramProfile } from "../../lib/telegram";
@@ -45,6 +51,8 @@ export function UserEditView({ userId }: { userId: string }) {
   const [tzValue, setTzValue] = useState("UTC");
   const [genderOn, setGenderOn] = useState(false);
   const [genderValue, setGenderValue] = useState<Gender>("male");
+  const [langOn, setLangOn] = useState(false);
+  const [langValue, setLangValue] = useState<Lang>(DEFAULT_LANG);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [buckets, setBuckets] = useState<UserBucketEntry[] | null>(null);
@@ -61,6 +69,8 @@ export function UserEditView({ userId }: { userId: string }) {
         setTzValue(d.timezone ?? "UTC");
         setGenderOn(d.gender !== null);
         setGenderValue(d.gender ?? "male");
+        setLangOn(d.language !== null);
+        setLangValue(d.language ?? DEFAULT_LANG);
       })
       .catch(() => setNotFound(true));
     api.getUserBuckets(userId).then((r) => setBuckets(r.buckets));
@@ -81,12 +91,14 @@ export function UserEditView({ userId }: { userId: string }) {
   const effectiveName = userDisplayName(user, data.displayName);
   const desiredTz = tzOverride ? tzValue : null;
   const desiredGender: Gender | null = genderOn ? genderValue : null;
+  const desiredLang: Lang | null = langOn ? langValue : null;
   const nameValidation = validateDisplayName(name);
   const nameError = !nameValidation.ok ? nameValidation.reason : null;
   const dirty =
     name.trim() !== (data.displayName ?? "") ||
     desiredTz !== data.timezone ||
-    desiredGender !== data.gender;
+    desiredGender !== data.gender ||
+    desiredLang !== data.language;
 
   const save = async () => {
     setSaving(true);
@@ -95,6 +107,7 @@ export function UserEditView({ userId }: { userId: string }) {
         displayName: name.trim() || null,
         timezone: desiredTz,
         gender: desiredGender,
+        language: desiredLang,
       });
       setData((prev) => (prev ? { ...prev, ...next } : null));
       setName(next.displayName ?? "");
@@ -102,6 +115,8 @@ export function UserEditView({ userId }: { userId: string }) {
       setTzValue(next.timezone ?? "UTC");
       setGenderOn(next.gender !== null);
       setGenderValue(next.gender ?? "male");
+      setLangOn(next.language !== null);
+      setLangValue(next.language ?? DEFAULT_LANG);
     } finally {
       setSaving(false);
     }
@@ -200,6 +215,28 @@ export function UserEditView({ userId }: { userId: string }) {
         <TimezoneSelect value={tzValue} onChange={setTzValue} />
       ) : null}
       <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_main_language}</SectionHeader>
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_user_set_language}</span>
+          <span className="flex-1" />
+          <Toggle value={langOn} onChange={setLangOn} />
+        </div>
+      </Card>
+      {langOn ? (
+        <Card>
+          {SUPPORTED_LANGS.map((code) => (
+            <SelectRow
+              key={code}
+              label={s[LANG_LABEL_KEY[code]]}
+              selected={langValue === code}
+              onSelect={() => setLangValue(code)}
+            />
+          ))}
+        </Card>
+      ) : null}
+      <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
 
       <SaveButton
         saving={saving}

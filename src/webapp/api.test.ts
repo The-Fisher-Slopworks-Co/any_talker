@@ -1360,6 +1360,120 @@ describe("/api/admin/users", () => {
     expect(r.status).toBe(400);
   });
 
+  test("GET /api/admin/users/:id returns language", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserLang("42", "ru");
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { language: string | null }).language).toBe("ru");
+  });
+
+  test("PUT /api/admin/users/:id sets language for that user", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { language: "ru" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { language: string | null }).language).toBe("ru");
+    expect(await d.storage.getUserLang("42")).toBe("ru");
+  });
+
+  test("PUT null clears language", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserLang("42", "ru");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { language: null },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserLang("42")).toBeNull();
+  });
+
+  test("PUT rejects invalid language with 400", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { language: "de" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("PUT with only language preserves displayName, timezone, and gender", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Alice",
+      lastName: null,
+      username: null,
+      lastSeenAt: 1,
+    });
+    await d.storage.setUserName("42", "Override");
+    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.setUserGender("42", "female");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42",
+        body: { language: "ru" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserLang("42")).toBe("ru");
+    expect(await d.storage.getUserName("42")).toBe("Override");
+    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.getUserGender("42")).toBe("female");
+  });
+
   test("non-owner gets 403", async () => {
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users", body: null },
