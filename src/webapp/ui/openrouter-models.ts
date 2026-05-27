@@ -97,17 +97,27 @@ function priceSum(e: OpenRouterEndpoint): number {
 
 export type ProviderOption = { slug: string; name: string };
 
-// Distinct routable providers for a model, keyed by slug, preserving the order
-// OpenRouter returned them in. Endpoints without a slug can't be pinned, so
-// they're dropped.
+// OpenRouter routes a base provider slug (the part before the first "/") to all
+// of that provider's variants/regions, so "deepinfra/fp4" and
+// "amazon-bedrock/eu-west-1" collapse to "deepinfra" / "amazon-bedrock".
+function baseProviderSlug(tag: string): string {
+  const slash = tag.indexOf("/");
+  return slash === -1 ? tag : tag.slice(0, slash);
+}
+
+// Distinct pinnable providers for a model, keyed by base slug, preserving the
+// order OpenRouter returned them in. Endpoints without a slug can't be pinned,
+// so they're dropped; quant/region variants of one provider collapse into a
+// single option.
 export function toProviderOptions(
   endpoints: OpenRouterEndpoint[],
 ): ProviderOption[] {
   const seen = new Set<string>();
   const out: ProviderOption[] = [];
   for (const e of endpoints) {
-    const slug = e.provider_slug;
-    if (!slug || seen.has(slug)) continue;
+    if (!e.provider_slug) continue;
+    const slug = baseProviderSlug(e.provider_slug);
+    if (seen.has(slug)) continue;
     seen.add(slug);
     out.push({ slug, name: e.provider_name });
   }

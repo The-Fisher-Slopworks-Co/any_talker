@@ -125,14 +125,14 @@ describe("toProviderOptions", () => {
     latency: null,
   });
 
-  test("maps endpoints to {slug, name} preserving order", () => {
+  test("collapses variant slugs to the base provider, preserving order", () => {
     const out = toProviderOptions([
       slugged("DeepInfra", "deepinfra/fp4"),
       slugged("Novita", "novita/fp8"),
     ]);
     expect(out).toEqual([
-      { slug: "deepinfra/fp4", name: "DeepInfra" },
-      { slug: "novita/fp8", name: "Novita" },
+      { slug: "deepinfra", name: "DeepInfra" },
+      { slug: "novita", name: "Novita" },
     ]);
   });
 
@@ -144,12 +144,16 @@ describe("toProviderOptions", () => {
     expect(out).toEqual([{ slug: "deepinfra", name: "DeepInfra" }]);
   });
 
-  test("dedupes by slug, keeping the first occurrence", () => {
+  test("dedupes regions of one provider into a single base option", () => {
     const out = toProviderOptions([
-      slugged("DeepInfra", "deepinfra"),
-      slugged("DeepInfra (mirror)", "deepinfra"),
+      slugged("Amazon Bedrock", "amazon-bedrock/eu-west-1"),
+      slugged("Amazon Bedrock", "amazon-bedrock"),
+      slugged("Google", "google-vertex/global"),
     ]);
-    expect(out).toEqual([{ slug: "deepinfra", name: "DeepInfra" }]);
+    expect(out).toEqual([
+      { slug: "amazon-bedrock", name: "Amazon Bedrock" },
+      { slug: "google-vertex", name: "Google" },
+    ]);
   });
 
   test("returns an empty list for no endpoints", () => {
