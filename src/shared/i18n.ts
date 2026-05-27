@@ -50,9 +50,7 @@ type Strings = {
   ui_save: string;
   ui_saved: string;
   ui_updating: string;
-  ui_open: string;
   ui_remove: string;
-  ui_edit: string;
   ui_yes: string;
   ui_no: string;
   ui_dash: string;
@@ -350,9 +348,7 @@ const en: Strings = {
   ui_save: "Save",
   ui_saved: "Saved",
   ui_updating: "Updating…",
-  ui_open: "Open",
   ui_remove: "Remove",
-  ui_edit: "Edit",
   ui_yes: "yes",
   ui_no: "no",
   ui_dash: "—",
@@ -699,9 +695,7 @@ const ru: Strings = {
   ui_save: "Сохранить",
   ui_saved: "Сохранено",
   ui_updating: "Обновление…",
-  ui_open: "Открыть",
   ui_remove: "Удалить",
-  ui_edit: "Изменить",
   ui_yes: "да",
   ui_no: "нет",
   ui_dash: "—",
