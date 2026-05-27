@@ -149,6 +149,10 @@ type Strings = {
   ui_sort_throughput: string;
   ui_sort_latency: string;
 
+  ui_provider_label: string;
+  ui_provider_auto: string;
+  ui_provider_loading: string;
+
   ui_tier_default: string;
   ui_tier_flex: string;
   ui_tier_priority: string;
@@ -239,6 +243,9 @@ type Strings = {
   ui_chat_provider_routing: string;
   ui_chat_provider_routing_on_footer: string;
   ui_chat_provider_routing_off_footer: (sort: string) => string;
+  ui_chat_provider: string;
+  ui_chat_provider_on_footer: string;
+  ui_chat_provider_off_footer: (provider: string) => string;
   ui_chat_service_tier: string;
   ui_chat_service_tier_on_footer: string;
   ui_chat_service_tier_off_footer: (tier: string) => string;
@@ -445,7 +452,7 @@ const en: Strings = {
     "Primary OpenRouter model first; fallbacks are tried in order if it fails.",
   ui_prompt_provider_routing: "Provider Routing",
   ui_prompt_provider_routing_footer:
-    "How OpenRouter picks a provider for the model. Auto lets OpenRouter decide; the others sort by price, throughput, or latency.",
+    "How OpenRouter picks a provider for the model. Auto lets OpenRouter decide; the others sort by price, throughput, or latency. Pinning a specific provider overrides the sort and disables fallback.",
   ui_prompt_service_tier: "Service Tier",
   ui_prompt_service_tier_footer:
     "Processing tier for OpenRouter requests. Default uses standard processing; Flex is cheaper but slower with lower availability; Priority is faster at a higher cost.",
@@ -464,6 +471,10 @@ const en: Strings = {
   ui_sort_price: "Price",
   ui_sort_throughput: "Throughput",
   ui_sort_latency: "Latency",
+
+  ui_provider_label: "Provider",
+  ui_provider_auto: "Auto (use sort)",
+  ui_provider_loading: "Loading providers…",
 
   ui_tier_default: "Default",
   ui_tier_flex: "Flex",
@@ -567,6 +578,11 @@ const en: Strings = {
     "How OpenRouter picks a provider for the model in this chat.",
   ui_chat_provider_routing_off_footer: (sort) =>
     `Using global routing (${sort}).`,
+  ui_chat_provider: "Specific Provider",
+  ui_chat_provider_on_footer:
+    "Pin requests in this chat to one provider (no fallback), overriding the sort.",
+  ui_chat_provider_off_footer: (provider) =>
+    `Using global provider (${provider}).`,
   ui_chat_service_tier: "Service Tier",
   ui_chat_service_tier_on_footer:
     "Processing tier for OpenRouter requests in this chat.",
@@ -793,7 +809,7 @@ const ru: Strings = {
     "Сначала основная модель OpenRouter; запасные пробуются по очереди при ошибке.",
   ui_prompt_provider_routing: "Маршрутизация провайдеров",
   ui_prompt_provider_routing_footer:
-    "Как OpenRouter выбирает провайдера для модели. «Авто» — выбор OpenRouter; остальные сортируют по цене, скорости или задержке.",
+    "Как OpenRouter выбирает провайдера для модели. «Авто» — выбор OpenRouter; остальные сортируют по цене, скорости или задержке. Выбор конкретного провайдера отменяет сортировку и отключает запасные варианты.",
   ui_prompt_service_tier: "Тариф обслуживания",
   ui_prompt_service_tier_footer:
     "Тариф обработки запросов OpenRouter. «По умолчанию» — стандартная обработка; Flex дешевле, но медленнее и менее доступен; Priority быстрее, но дороже.",
@@ -812,6 +828,10 @@ const ru: Strings = {
   ui_sort_price: "Цена",
   ui_sort_throughput: "Скорость",
   ui_sort_latency: "Задержка",
+
+  ui_provider_label: "Провайдер",
+  ui_provider_auto: "Авто (по сортировке)",
+  ui_provider_loading: "Загрузка провайдеров…",
 
   ui_tier_default: "По умолчанию",
   ui_tier_flex: "Flex",
@@ -918,6 +938,11 @@ const ru: Strings = {
     "Как OpenRouter выбирает провайдера для модели в этом чате.",
   ui_chat_provider_routing_off_footer: (sort) =>
     `Используется глобальная маршрутизация (${sort}).`,
+  ui_chat_provider: "Конкретный провайдер",
+  ui_chat_provider_on_footer:
+    "Закрепить запросы этого чата за одним провайдером (без запасных), игнорируя сортировку.",
+  ui_chat_provider_off_footer: (provider) =>
+    `Используется глобальный провайдер (${provider}).`,
   ui_chat_service_tier: "Тариф обслуживания",
   ui_chat_service_tier_on_footer:
     "Тариф обработки запросов OpenRouter в этом чате.",

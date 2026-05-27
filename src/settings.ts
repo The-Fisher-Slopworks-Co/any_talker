@@ -6,6 +6,7 @@ import type { Settings, ChatSettings, RateLimitConfig } from "./shared/types";
 import {
   DEFAULT_SETTINGS,
   isValidProviderSort,
+  isValidProviderSlug,
   isValidServiceTier,
 } from "./shared/types";
 
@@ -44,6 +45,7 @@ function normalize(s: Settings): Settings {
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
   const providerSort = isValidProviderSort(s.providerSort) ? s.providerSort : null;
+  const provider = isValidProviderSlug(s.provider) ? s.provider : null;
   const serviceTier = isValidServiceTier(s.serviceTier) ? s.serviceTier : null;
   const rateLimit = normalizeRateLimit(s.rateLimit);
   const expandableBlockquoteThreshold =
@@ -57,6 +59,7 @@ function normalize(s: Settings): Settings {
     models,
     timezone,
     providerSort,
+    provider,
     serviceTier,
     rateLimit,
     expandableBlockquoteThreshold,
@@ -75,6 +78,7 @@ export function applyChatOverrides(
     timezone: chat.timezone ?? global.timezone,
     providerSort:
       chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
+    provider: chat.provider !== undefined ? chat.provider : global.provider,
     serviceTier:
       chat.serviceTier !== undefined ? chat.serviceTier : global.serviceTier,
     expandableBlockquoteThreshold: global.expandableBlockquoteThreshold,

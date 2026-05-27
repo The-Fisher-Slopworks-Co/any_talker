@@ -16,6 +16,7 @@ import type {
 import {
   isValidTimezone,
   isValidProviderSort,
+  isValidProviderSlug,
   isValidServiceTier,
   isValidGender,
 } from "../shared/types";
@@ -159,6 +160,11 @@ const BAD_PROVIDER_SORT: ApiResponse = {
   body: { error: "invalid providerSort" },
 };
 
+const BAD_PROVIDER: ApiResponse = {
+  status: 400,
+  body: { error: "invalid provider" },
+};
+
 const BAD_SERVICE_TIER: ApiResponse = {
   status: 400,
   body: { error: "invalid serviceTier" },
@@ -263,6 +269,7 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     botName?: unknown;
     timezone?: unknown;
     providerSort?: unknown;
+    provider?: unknown;
     serviceTier?: unknown;
     keywordFilter?: unknown;
   };
@@ -314,6 +321,11 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     out.providerSort = null;
   } else if (isValidProviderSort(body.providerSort)) {
     out.providerSort = body.providerSort;
+  }
+  if (body.provider === null) {
+    out.provider = null;
+  } else if (isValidProviderSlug(body.provider)) {
+    out.provider = body.provider;
   }
   if (body.serviceTier === null) {
     out.serviceTier = null;
@@ -523,6 +535,13 @@ export async function handleApi(
         !isValidProviderSort(patch.providerSort)
       ) {
         return BAD_PROVIDER_SORT;
+      }
+      if (
+        patch.provider !== undefined &&
+        patch.provider !== null &&
+        !isValidProviderSlug(patch.provider)
+      ) {
+        return BAD_PROVIDER;
       }
       if (
         patch.serviceTier !== undefined &&
