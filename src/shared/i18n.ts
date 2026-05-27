@@ -198,6 +198,7 @@ type Strings = {
   ui_user_last_seen: string;
   ui_user_open_in_tg: string;
   ui_user_display_name_footer: string;
+  ui_user_set_language: string;
   ui_user_bucket: string;
 
   ui_spending_title: string;
@@ -517,6 +518,7 @@ const en: Strings = {
   ui_user_open_in_tg: "Open in Telegram",
   ui_user_display_name_footer:
     "Override the name shown to the AI for this user.",
+  ui_user_set_language: "Set language",
   ui_user_bucket: "Rate Limit Buckets",
 
   ui_spending_title: "Spending",
@@ -866,6 +868,7 @@ const ru: Strings = {
   ui_user_open_in_tg: "Открыть в Telegram",
   ui_user_display_name_footer:
     "Переопределить имя, которое видит ИИ для этого пользователя.",
+  ui_user_set_language: "Задать язык",
   ui_user_bucket: "Бакеты лимита",
 
   ui_spending_title: "Расходы",
