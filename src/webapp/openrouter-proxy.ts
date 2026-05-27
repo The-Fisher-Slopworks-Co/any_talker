@@ -27,17 +27,96 @@ type Cached = { ts: number; data: ProxyResponse };
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, Cached>();
 
+// Public, documented endpoints API. Covers every catalogue model (including
+// ones the frontend stats endpoint 404s on, e.g. Anthropic) and carries the
+// routing slug as `tag`, the provider name, and pricing — but no throughput or
+// latency stats (those fields come back null).
+type PublicEndpoints = {
+  data?: {
+    endpoints?: Array<{
+      provider_name?: string;
+      tag?: string;
+      pricing?: { prompt?: string; completion?: string; image?: string };
+    }>;
+  };
+};
+
+// Internal frontend stats endpoint. Carries p50 throughput/latency keyed by
+// provider_slug but has spotty model coverage (404s for some models), so it's
+// only used to enrich the public list, never as the source of truth.
 type FrontendStats = {
   data?: Array<{
-    provider_name?: string;
     provider_slug?: string;
-    pricing?: { prompt?: string; completion?: string; image?: string };
     stats?: {
       p50_throughput?: number;
       p50_latency?: number;
     } | null;
   }>;
 };
+
+type LatencyThroughput = { throughput: number | null; latency: number | null };
+
+async function fetchPublicEndpoints(permaslug: string): Promise<ProxyEndpoint[]> {
+  // permaslug is validated to a URL-path-safe charset, so it's interpolated
+  // into the path directly — encodeURIComponent would mangle the author/slug
+  // slash into %2F and break resolution.
+  const url = `https://openrouter.ai/api/v1/models/${permaslug}/endpoints`;
+  const res = await fetchWithTimeout(
+    url,
+    { headers: { accept: "application/json" } },
+    OPENROUTER_TIMEOUT_MS,
+    "OpenRouter endpoints",
+  );
+  if (!res.ok) throw new Error(`OpenRouter endpoints: HTTP ${res.status}`);
+  const json = (await res.json()) as PublicEndpoints;
+  return (json.data?.endpoints ?? [])
+    .filter((e) => typeof e.provider_name === "string")
+    .map((e) => ({
+      provider_name: e.provider_name as string,
+      provider_slug: typeof e.tag === "string" ? e.tag : null,
+      pricing: {
+        prompt: e.pricing?.prompt,
+        completion: e.pricing?.completion,
+        image: e.pricing?.image,
+      },
+      throughput: null,
+      latency: null,
+    }));
+}
+
+// Best-effort p50 throughput/latency by provider slug. Returns an empty map on
+// any failure (e.g. the 404s this endpoint gives for some models) so a missing
+// stats source degrades to "no numbers" rather than failing the whole lookup.
+async function fetchSlugStats(
+  permaslug: string,
+): Promise<Map<string, LatencyThroughput>> {
+  const out = new Map<string, LatencyThroughput>();
+  try {
+    const url = `https://openrouter.ai/api/frontend/stats/endpoint?permaslug=${encodeURIComponent(permaslug)}`;
+    const res = await fetchWithTimeout(
+      url,
+      { headers: { accept: "application/json" } },
+      OPENROUTER_TIMEOUT_MS,
+      "OpenRouter stats",
+    );
+    if (!res.ok) return out;
+    const json = (await res.json()) as FrontendStats;
+    for (const e of json.data ?? []) {
+      if (typeof e.provider_slug !== "string") continue;
+      out.set(e.provider_slug, {
+        throughput:
+          typeof e.stats?.p50_throughput === "number"
+            ? e.stats.p50_throughput
+            : null,
+        latency:
+          typeof e.stats?.p50_latency === "number" ? e.stats.p50_latency : null,
+      });
+    }
+  } catch {
+    // Enrichment only; the public endpoints list stands on its own.
+  }
+  return out;
+}
 
 export const fetchOpenRouterStats: FetchOpenRouterStats = async (
   permaslug,
@@ -46,34 +125,17 @@ export const fetchOpenRouterStats: FetchOpenRouterStats = async (
   const cached = cache.get(permaslug);
   if (cached && now - cached.ts < TTL_MS) return cached.data;
 
-  const url = `https://openrouter.ai/api/frontend/stats/endpoint?permaslug=${encodeURIComponent(permaslug)}`;
-  const res = await fetchWithTimeout(
-    url,
-    { headers: { accept: "application/json" } },
-    OPENROUTER_TIMEOUT_MS,
-    "OpenRouter stats",
-  );
-  if (!res.ok) throw new Error(`OpenRouter stats: HTTP ${res.status}`);
-  const json = (await res.json()) as FrontendStats;
-  const endpoints: ProxyEndpoint[] = (json.data ?? [])
-    .filter((e) => typeof e.provider_name === "string")
-    .map((e) => ({
-      provider_name: e.provider_name as string,
-      provider_slug:
-        typeof e.provider_slug === "string" ? e.provider_slug : null,
-      pricing: {
-        prompt: e.pricing?.prompt,
-        completion: e.pricing?.completion,
-        image: e.pricing?.image,
-      },
-      throughput:
-        typeof e.stats?.p50_throughput === "number"
-          ? e.stats.p50_throughput
-          : null,
-      latency:
-        typeof e.stats?.p50_latency === "number" ? e.stats.p50_latency : null,
-    }));
-  const data: ProxyResponse = { endpoints };
+  const [endpoints, slugStats] = await Promise.all([
+    fetchPublicEndpoints(permaslug),
+    fetchSlugStats(permaslug),
+  ]);
+  const merged: ProxyEndpoint[] = endpoints.map((e) => {
+    const stat = e.provider_slug ? slugStats.get(e.provider_slug) : undefined;
+    return stat
+      ? { ...e, throughput: stat.throughput, latency: stat.latency }
+      : e;
+  });
+  const data: ProxyResponse = { endpoints: merged };
   cache.set(permaslug, { ts: now, data });
   return data;
 };
