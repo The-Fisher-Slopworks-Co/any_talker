@@ -18,6 +18,7 @@ import {
 import { SaveButton } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { ProviderSortField } from "../../components/provider-sort-field";
+import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
 import { TimezoneSelect } from "../../components/timezone-select";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
@@ -36,6 +37,7 @@ export function PromptTab({
   const [providerSort, setProviderSort] = useState<ProviderSort | null>(
     settings.providerSort,
   );
+  const [provider, setProvider] = useState<string | null>(settings.provider);
   const [serviceTier, setServiceTier] = useState<ServiceTier | null>(
     settings.serviceTier,
   );
@@ -61,6 +63,7 @@ export function PromptTab({
     prompt !== settings.systemPrompt ||
     timezone !== settings.timezone ||
     providerSort !== settings.providerSort ||
+    provider !== settings.provider ||
     serviceTier !== settings.serviceTier ||
     thresholdDirty;
   const canSave = dirty && trimmed.length > 0 && thresholdValid;
@@ -72,6 +75,7 @@ export function PromptTab({
       systemPrompt: prompt,
       timezone,
       providerSort,
+      provider,
       serviceTier,
       expandableBlockquoteThreshold: parsedThreshold,
     });
@@ -79,6 +83,7 @@ export function PromptTab({
     setModels(next.models);
     setTimezone(next.timezone);
     setProviderSort(next.providerSort);
+    setProvider(next.provider);
     setServiceTier(next.serviceTier);
     setThresholdInput(String(next.expandableBlockquoteThreshold));
     setSaving(false);
@@ -96,6 +101,11 @@ export function PromptTab({
 
       <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
       <ProviderSortField value={providerSort} onChange={setProviderSort} />
+      <ProviderSelectField
+        modelId={trimmed[0] ?? ""}
+        value={provider}
+        onChange={setProvider}
+      />
       <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>

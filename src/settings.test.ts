@@ -68,6 +68,7 @@ describe("applyChatOverrides", () => {
       },
       timezone: DEFAULT_SETTINGS.timezone,
       providerSort: DEFAULT_SETTINGS.providerSort,
+      provider: DEFAULT_SETTINGS.provider,
       serviceTier: DEFAULT_SETTINGS.serviceTier,
       expandableBlockquoteThreshold:
         DEFAULT_SETTINGS.expandableBlockquoteThreshold,
@@ -113,6 +114,23 @@ describe("applyChatOverrides", () => {
     );
   });
 
+  test("normalize keeps a valid stored provider slug", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({ ...DEFAULT_SETTINGS, provider: "deepinfra/fp4" });
+    const s = await getOrInitSettings(storage);
+    expect(s.provider).toBe("deepinfra/fp4");
+  });
+
+  test("normalize resets an invalid stored provider slug to null", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      provider: "not a slug!",
+    } as never);
+    const s = await getOrInitSettings(storage);
+    expect(s.provider).toBeNull();
+  });
+
   test("normalize fills defaults for missing multipliers in stored settings", async () => {
     const storage = new MemoryStorage();
     const legacy = {
@@ -146,6 +164,23 @@ describe("applyChatOverrides", () => {
   test("provider sort: chat string overrides global", () => {
     const r = applyChatOverrides(DEFAULT_SETTINGS, { providerSort: "latency" });
     expect(r.providerSort).toBe("latency");
+  });
+
+  test("provider: chat slug overrides global", () => {
+    const r = applyChatOverrides(DEFAULT_SETTINGS, { provider: "deepinfra/fp4" });
+    expect(r.provider).toBe("deepinfra/fp4");
+  });
+
+  test("provider: chat null overrides global value", () => {
+    const global = { ...DEFAULT_SETTINGS, provider: "deepinfra" };
+    const r = applyChatOverrides(global, { provider: null });
+    expect(r.provider).toBeNull();
+  });
+
+  test("provider: chat undefined inherits global value", () => {
+    const global = { ...DEFAULT_SETTINGS, provider: "novita" };
+    const r = applyChatOverrides(global, { systemPrompt: "x" });
+    expect(r.provider).toBe("novita");
   });
 
   test("service tier: chat null overrides global value", () => {
