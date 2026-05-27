@@ -71,6 +71,7 @@ export type UserSettingsResponse = {
   displayName: string | null;
   timezone: string | null;
   gender: Gender | null;
+  language: Lang | null;
   whitelisted: boolean;
 };
 export type ChatSettingsResponse = {
@@ -170,6 +171,7 @@ export const api = {
       displayName?: string | null;
       timezone?: string | null;
       gender?: Gender | null;
+      language?: Lang | null;
     },
   ) =>
     req<{
@@ -177,6 +179,7 @@ export const api = {
       displayName: string | null;
       timezone: string | null;
       gender: Gender | null;
+      language: Lang | null;
     }>("PUT", `/api/admin/users/${id}`, patch),
   listAdminChats: () => req<{ chats: Chat[] }>("GET", "/api/admin/chats"),
   getAdminChat: (id: string) =>
