@@ -6,6 +6,43 @@
 - After committing, ask the user whether it's time to merge the branch.
 - Once the branch has been merged, the worktree and the branch can be deleted.
 
+## Project
+
+Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
+See `README.md` for setup, running, deployment, observability, and the
+user-facing feature/metrics catalog. This file covers how to work in the code.
+
+### Commands
+
+```bash
+bun run dev        # long-polling + hot reload (src/main.ts)
+bun run check      # typecheck + tests — run before every commit
+bun run typecheck  # bunx tsc --noEmit
+bun test           # tests (co-located *.test.ts)
+```
+
+### Layout (`src/`)
+
+- `main.ts` — composition root: loads config, wires storage/ai/rateLimiter, registers tools, starts bot + HTTP server + schedulers.
+- `bot/` — grammY bot, handlers (`handlers/ask.ts`, `guest.ts`, …), middleware, Telegram formatting.
+- `ai/` — OpenRouter client, instruction builder, and `tools/` (registry + each tool).
+- `storage/` — `Storage` interface (`types.ts`); `KeyDBStorage` (prod) and `InMemoryStorage` (`memory.ts`, used by tests).
+- `webapp/` — admin Web App: HTTP API (`api.ts`, `auth.ts`) + React UI (`ui/`).
+- `reminders/`, `checks/`, `ratelimit/`, `spending/`, `metrics/`, `shared/` — supporting subsystems.
+
+### Conventions
+
+- **SPDX header on every new source file** (enforced via `REUSE.toml`; all current files comply):
+  ```ts
+  // SPDX-License-Identifier: AGPL-3.0-or-later
+  // Copyright (C) 2026 The Fisher Slopworks Co
+  ```
+- **i18n:** languages are `en` | `ru`. Never hardcode user-facing strings — add keys to `src/shared/i18n.ts` and use `ctx.t` in handlers.
+- **Dependency injection:** `createBot(deps)` / `startServer(deps)` take injected `storage`, `ai`, `rateLimiter`. Keep handlers as pure functions for testability.
+- **Tagged outcomes:** handlers return `{ kind: "answered" | "denied" | "rateLimited" | "error" | ... }` objects the dispatcher switches on, rather than sending replies themselves.
+- **Adding an AI tool:** define a `Tool` (Zod `parameters`, `execute(input, ctx)`), then `registerTool(withLogging(tool))` in `main.ts`. See `src/ai/tools/registry.ts`.
+- **Tests:** `bun test`, co-located as `*.test.ts`; use `InMemoryStorage` instead of KeyDB.
+
 ## Bun
 
 Default to using Bun instead of Node.js.
@@ -21,9 +58,7 @@ Default to using Bun instead of Node.js.
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
 - `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
 - `WebSocket` is built-in. Don't use `ws`.
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
 - Bun.$`ls` instead of execa.
@@ -40,76 +75,8 @@ test("hello world", () => {
 });
 ```
 
-## Frontend
+## Frontend (Web App)
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+The admin Web App (`src/webapp/ui/`) is React + Tailwind, bundled by Bun (no
+vite/webpack — HTML imports + `bun-plugin-tailwind`). For the underlying Bun
+HTML-import/`Bun.serve` API, see `node_modules/bun-types/docs/**.mdx`.
