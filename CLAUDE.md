@@ -4,6 +4,21 @@ Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
 See `README.md` for setup, running, deployment, observability, and the
 user-facing feature/metrics catalog. This file covers how to work in the code.
 
+### Architecture
+
+**`docs/ARCHITECTURE.md` is the source of truth for system structure** — the
+component map, runtime/data flow, data model, and key design decisions. **Read it
+before any work that touches the architecture, adds or removes a module, or
+crosses a component boundary.**
+
+Keep the two in sync: when a change alters the architecture — a new/removed/
+renamed module or service, a changed data or control flow, a new external
+integration, a new cross-cutting pattern, or a moved boundary — **update
+`docs/ARCHITECTURE.md` in the same change** so the doc never drifts from the code.
+
+Keep this file pointing to `docs/ARCHITECTURE.md` rather than duplicating it;
+the doc is the single source of truth for structure.
+
 ### Commands
 
 ```bash
@@ -18,7 +33,7 @@ bun test           # tests (co-located *.test.ts)
 - `main.ts` — composition root: loads config, wires storage/ai/rateLimiter, registers tools, starts bot + HTTP server + schedulers.
 - `bot/` — grammY bot, handlers (`handlers/ask.ts`, `guest.ts`, …), middleware, Telegram formatting.
 - `ai/` — OpenRouter client, instruction builder, and `tools/` (registry + each tool).
-- `storage/` — `Storage` interface (`types.ts`); `KeyDBStorage` (prod) and `InMemoryStorage` (`memory.ts`, used by tests).
+- `storage/` — `Storage` interface (`types.ts`); `KeyDBStorage` (prod) and `MemoryStorage` (`memory.ts`, used by tests).
 - `webapp/` — admin Web App: HTTP API (`api.ts`, `auth.ts`) + React UI (`ui/`).
 - `reminders/`, `checks/`, `ratelimit/`, `spending/`, `metrics/`, `shared/` — supporting subsystems.
 
@@ -33,7 +48,7 @@ bun test           # tests (co-located *.test.ts)
 - **Dependency injection:** `createBot(deps)` / `startServer(deps)` take injected `storage`, `ai`, `rateLimiter`. Keep handlers as pure functions for testability.
 - **Tagged outcomes:** handlers return `{ kind: "answered" | "denied" | "rateLimited" | "error" | ... }` objects the dispatcher switches on, rather than sending replies themselves.
 - **Adding an AI tool:** define a `Tool` (Zod `parameters`, `execute(input, ctx)`), then `registerTool(withLogging(tool))` in `main.ts`. See `src/ai/tools/registry.ts`.
-- **Tests:** `bun test`, co-located as `*.test.ts`; use `InMemoryStorage` instead of KeyDB.
+- **Tests:** `bun test`, co-located as `*.test.ts`; use `MemoryStorage` instead of KeyDB.
 
 ## Bun
 
