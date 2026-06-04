@@ -51,7 +51,7 @@ function createRememberFactTool(deps: {
       "value, and adding a new key past the 50-fact cap evicts the oldest fact to make room.",
     parameters: RememberSchema,
     execute: async ({ key, value }, ctx) => {
-      return deps.storage.rememberUserFact(ctx.userId, key, value);
+      return deps.storage.forBot(ctx.botId ?? null).rememberUserFact(ctx.userId, key, value);
     },
   };
 }
@@ -67,7 +67,7 @@ function createListFactsTool(deps: {
       "Call this when you want to recall what you already know about the user before answering.",
     parameters: ListSchema,
     execute: async (_input, ctx) => {
-      return deps.storage.listUserFacts(ctx.userId);
+      return deps.storage.forBot(ctx.botId ?? null).listUserFacts(ctx.userId);
     },
   };
 }
@@ -83,7 +83,7 @@ function createForgetFactTool(deps: {
       "{existed:false} if no fact existed under that key (not an error).",
     parameters: ForgetSchema,
     execute: async ({ key }, ctx) => {
-      return deps.storage.forgetUserFact(ctx.userId, key);
+      return deps.storage.forBot(ctx.botId ?? null).forgetUserFact(ctx.userId, key);
     },
   };
 }

@@ -5,7 +5,7 @@ import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
 import { buildUserEnvelope, type Sender } from "../context-builder";
-import { getEffectiveSettings } from "../../settings";
+import type { PersonaResolver } from "../../managed-bots/persona";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import { sanitizeHtml } from "../html";
@@ -17,6 +17,9 @@ export type GuestAskInput = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ai: AIClient;
+  resolver: PersonaResolver;
+  // null/undefined = main bot, a managed bot's id otherwise.
+  botId?: string | null;
   ownerId: string;
   now: number;
   chatId: string;
@@ -45,24 +48,26 @@ export type GuestAskOutcome =
 export async function guestAskHandler(
   input: GuestAskInput,
 ): Promise<GuestAskOutcome> {
+  // Per-character storage view (scoped facts, guest threads, private-chat flag);
+  // forBot(null) is the main bot.
+  const storage = input.storage.forBot(input.botId ?? null);
+
   const isOwner = input.userId === input.ownerId;
   const [isWhitelisted, byokKey, byokModels] = await Promise.all([
     isOwner
       ? Promise.resolve(true)
-      : input.storage.isWhitelisted("users", input.userId),
-    input.storage.getUserOpenrouterKey(input.userId),
-    input.storage.getUserOpenrouterModels(input.userId),
+      : storage.isWhitelisted("users", input.userId),
+    storage.getUserOpenrouterKey(input.userId),
+    storage.getUserOpenrouterModels(input.userId),
   ]);
   if (!isWhitelisted && byokKey === null) return { kind: "denied" };
 
   if (input.userText.trim() === "") return { kind: "denied" };
 
-  const [settings, chatSettings, userTimezone] = await Promise.all([
-    getEffectiveSettings(input.storage, input.chatId),
-    input.storage.getChatSettings(input.chatId),
-    input.storage.getUserTimezone(input.userId),
+  const [{ settings, botName }, userTimezone] = await Promise.all([
+    input.resolver(input.chatId),
+    storage.getUserTimezone(input.userId),
   ]);
-  const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;
 
   const skipRateLimit =
@@ -97,7 +102,7 @@ export async function guestAskHandler(
 
   input.onAIStart?.();
 
-  const facts = await input.storage.listUserFacts(input.userId);
+  const facts = await storage.listUserFacts(input.userId);
 
   const effects: ToolEffect[] = [];
   let result;
@@ -122,6 +127,7 @@ export async function guestAskHandler(
         source: "guest",
         chatId: input.chatId,
         userId: input.userId,
+        botId: input.botId ?? null,
         replyToMessageId: null,
         timezone,
         lang: input.lang,
@@ -148,7 +154,7 @@ export async function guestAskHandler(
   // Record spend regardless of rate-limit exemption — owner and BYOK usage is
   // still money this user spent through the bot. Best-effort: a storage hiccup
   // on this display-only accounting must not fail an answer already produced.
-  await input.storage
+  await storage
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));
 
@@ -166,7 +172,7 @@ export async function guestAskHandler(
         ...priorTurns,
         { userQuestion: envelope, botAnswer: sanitized },
       ].slice(-MAX_REPLY_CHAIN_DEPTH);
-      await input.storage.saveGuestThread(input.chatId, {
+      await storage.saveGuestThread(input.chatId, {
         chatId: input.chatId,
         turns,
         ts: input.now,

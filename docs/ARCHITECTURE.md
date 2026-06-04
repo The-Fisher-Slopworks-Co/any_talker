@@ -25,9 +25,12 @@ constructs the shared services — `KeyDBStorage`, `TokenBucketLimiter`,
 `OpenRouterAIClient` — registers the AI tools, then starts four long-lived
 things:
 
-1. **The grammY bot** in long-polling mode — receives Telegram updates, runs the
-   `/ask` and guest-mode flows, photo/voice/contact handlers, and the recurring
-   check inline-button callbacks.
+1. **The grammY bot(s)** in long-polling mode — receives Telegram updates, runs
+   the `/ask` and guest-mode flows, photo/voice/contact handlers, and the
+   recurring check inline-button callbacks. A `BotManager` (`managed-bots/`) runs
+   **additional character bots** the owner created via the Bot API 9.6 Managed
+   Bots flow — each its own token, avatar, name, system prompt, reminders and
+   per-character memory, answering only when addressed as `/ask@its_username`.
 2. **An HTTP server** (`Bun.serve`) — serves the React admin Mini App, a JSON
    `/api/*` surface, `GET /metrics` (Prometheus), and `GET /health`.
 3. **The reminder scheduler** — polls KeyDB for due reminders and delivers them.
@@ -119,7 +122,8 @@ flowchart TB
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenRouter client, system-prompt builder, message (de)serialization, AI types. | `openrouter.ts`, `instruction.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `reminders/` |
-| `src/storage/` | `Storage` interface + KeyDB impl (prod) + in-memory double (tests). | `types.ts`, `keydb.ts`, `memory.ts` |
+| `src/managed-bots/` | Owner-created character bots (Bot API 9.6): lifecycle manager, persona resolver, native-creation handling, avatar + input validation. | `manager.ts`, `persona.ts`, `avatar.ts`, `validate.ts`, `types.ts` |
+| `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests). | `types.ts`, `keydb.ts`, `memory.ts` |
 | `src/webapp/` | HTTP server, JSON API, Telegram initData auth, OpenRouter stats proxy. | `server.ts`, `api.ts`, `auth.ts`, `openrouter-proxy.ts` |
 | `src/webapp/ui/` | React + Tailwind admin Mini App (views, components, api client, i18n). | `app.tsx`, `api-client.ts`, `views/`, `components/`, `lib/` |
 | `src/reminders/` | One-shot reminder scheduling, delivery (re-runs the LLM), stored-record validation. | `scheduler.ts`, `delivery.ts`, `parse.ts`, `types.ts` |
@@ -159,9 +163,29 @@ into Telegram sends:
 Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
 bot-side authorization gate (owner / user-whitelist / chat-whitelist). Outgoing
 text goes through `html.ts` (whitelist HTML sanitizer) and `format.ts` (bot-name
-prefix, expandable blockquote, 4096-char truncation). **Depends on:** `ai`,
-`storage`, `ratelimit`, `settings`, `shared/i18n`, `metrics`, `checks/resolve`.
-**Depended on by:** `main.ts`.
+prefix, expandable blockquote, 4096-char truncation). `createBot` is
+parameterized by a `resolver` (the persona) and an optional `persona`
+(`{botId, selfUsername}`): when present it is a **managed bot** — it scopes
+per-character storage with `storage.forBot(botId)`, threads `botId` into the tool
+call context, and matches `/ask@selfUsername` strictly (never bare `/ask`).
+**Depends on:** `ai`, `storage`, `ratelimit`, `settings`, `managed-bots`
+(persona), `shared/i18n`, `metrics`, `checks/resolve`. **Depended on by:**
+`main.ts`, `managed-bots/manager`.
+
+### Managed bots — `src/managed-bots/`
+`BotManager` owns the lifecycle of every owner-created character bot: it loads
+them at boot, starts/stops individual long-polling loops as the owner creates
+(via the native `managed_bot` update → `getManagedBotToken`) or deletes them, and
+stops all on hot-reload. Each managed bot is a full `createBot` instance with its
+own token and update stream. `persona.ts` resolves the character per turn — for a
+managed bot the main bot's **global** settings with the character's own
+`systemPrompt`/name substituted in (per-chat overrides deliberately ignored);
+`avatar.ts` wraps `setMyProfilePhoto`; `validate.ts` mirrors the Checks input
+validator. The single reminder scheduler iterates `BotManager.reminderRuntimes()`
+(plus the main runtime) so each character's reminders fire from the right
+identity and persona. **Depends on:** `bot`, `storage`, `ratelimit`, `ai`,
+`reminders` (runtime type), `proxy`. **Depended on by:** `main.ts`, `webapp`
+(admin CRUD via a narrow `ManagedBotController`).
 
 ### AI layer — `src/ai/`
 `OpenRouterAIClient.ask(...)` wraps the Vercel AI SDK `generateText` + the
@@ -329,6 +353,20 @@ persisted entities:
 | Recurring checks | `at:checks` | hash | — | `RecurringCheck` per field |
 | User facts | `at:user_facts:{userId}` | hash | — | `key → value`, capped at 50 (Lua evicts oldest) |
 | Private-chat flag | `at:user_private_chat:{userId}` | string `"1"` | — | presence sentinel |
+| Managed-bot registry | `at:managed_bots` | hash | — | `ManagedBot` per `botId` (`{botId, ownerUserId, username, displayName, systemPrompt, createdAtMs}`) |
+| Managed-bot token | `at:managed_bot_token:{botId}` | string (raw) | — | bot token (**plaintext**, like BYOK); never returned to the UI |
+
+**Per-character scoping (`forBot`).** `Storage.forBot(botId)` returns a view that
+namespaces a bot's per-character data under an `at:mbot:{botId}:` segment, while
+leaving everything else (settings, whitelist, buckets, users/chats directory,
+spend, user attributes, photo cache, checks, the managed-bot registry) shared.
+`forBot(null)` is the main bot and yields the **legacy unprefixed keys verbatim**,
+so existing data and call sites are unaffected. The scoped entities are:
+conversation nodes, reminders (payload + indexes), user facts, guest threads,
+album buffers, and the private-chat flag — i.e. exactly the rows above whose keys
+become `at:mbot:{botId}:msg:…`, `:reminder:…`, `:user_facts:…`, etc. for a managed
+bot. (Critically, in DMs `chat.id == user.id`, so without this scoping two bots'
+DM conversations and reminders would collide.)
 
 Migration approach (schema-on-read): `settings.ts:normalize()` backfills/repairs
 settings (e.g. legacy scalar `model` → `models[]`); `reminders/parse.ts`
@@ -449,3 +487,15 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   duplicates over guaranteed delivery.
 - **Stateless Mini App auth** — `initData` is re-verified on every request (no
   sessions); simpler and tamper-evident, at the cost of per-request HMAC work.
+- **Managed bots as N independent `Bot` instances** — each character is a real
+  Telegram bot with its own token and update stream, driven by a shared
+  `createBot` parameterized by persona; the alternative (one token impersonating
+  many) is not possible in the Bot API. A `BotManager` owns their lifecycles.
+- **Per-character storage via a `forBot(botId)` facade, not migrations** — chosen
+  over threading a `botId` parameter through every storage method because the
+  facade leaves all existing call sites and tests byte-identical (`forBot(null)`
+  is the legacy keyspace); the one place scoping is manual — the global tool
+  registry's `reminders`/`user_facts` tools — is covered by a tool-level
+  isolation test. Persona is **per-bot** (name + prompt + memory + reminders);
+  configuration (models, limits, provider) is **inherited from the main bot's
+  global settings**, deliberately ignoring its per-chat overrides.

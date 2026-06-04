@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { handleApi, type ApiRequest } from "./api";
+import { handleApi, type ApiRequest, type ManagedBotController } from "./api";
 import { verifyInitData } from "./auth";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
@@ -21,6 +21,7 @@ export type ServerDeps = {
   ownerId: string;
   storage: Storage;
   rateLimiter: RateLimiter;
+  botManager: ManagedBotController;
 };
 
 export function startServer(deps: ServerDeps) {
@@ -29,6 +30,7 @@ export function startServer(deps: ServerDeps) {
     rateLimiter: deps.rateLimiter,
     ownerId: deps.ownerId,
     fetchOpenRouterStats,
+    managedBots: deps.botManager,
   };
 
   const handleDynamic = async (req: Request): Promise<Response> => {
