@@ -125,3 +125,7 @@ are supported as `host:port`).
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
   guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest
   invocations are silently ignored.
+
+## License
+
+AGPL-3.0-or-later. See [LICENSE](LICENSE).
