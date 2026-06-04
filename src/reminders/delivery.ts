@@ -8,7 +8,7 @@ import type { AIClient, AIMessage } from "../ai/types";
 import { deserializeMessages } from "../ai/serialize";
 import { getAllTools, type ToolEffect } from "../ai/tools/registry";
 import { buildInstruction } from "../ai/instruction";
-import { getEffectiveSettings } from "../settings";
+import type { PersonaResolver } from "../managed-bots/persona";
 import { sanitizeHtml } from "../bot/html";
 import { applyBotNamePrefix, buildEffectsTopBlock } from "../bot/format";
 import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
@@ -35,6 +35,14 @@ export type DeliveryDeps = {
   storage: Storage;
   api: ReminderApi;
   ai: AIClient;
+  // Resolves the character this reminder is delivered as. For a managed bot it
+  // yields that bot's persona over the global settings; for the main bot, the
+  // chat-derived persona (today's behavior).
+  resolver: PersonaResolver;
+  // Scope of the bot delivering this reminder: null = main, managed id
+  // otherwise. Threaded into the re-run's tool context so a follow-up reminder
+  // scheduled during delivery lands in the right character's namespace.
+  botId: string | null;
 };
 
 const PERMANENT_CODES = new Set([400, 403, 404]);
@@ -88,8 +96,7 @@ async function composeReminderMessage(
   nowMs: number,
 ): Promise<string> {
   const [
-    settings,
-    chatSettings,
+    { settings, botName },
     userTimezone,
     displayName,
     user,
@@ -97,8 +104,7 @@ async function composeReminderMessage(
     byokKey,
     byokModels,
   ] = await Promise.all([
-    getEffectiveSettings(deps.storage, reminder.chatId),
-    deps.storage.getChatSettings(reminder.chatId),
+    deps.resolver(reminder.chatId),
     deps.storage.getUserTimezone(reminder.userId),
     readValidDisplayName(deps.storage, reminder.userId),
     deps.storage.getUser(reminder.userId),
@@ -107,7 +113,6 @@ async function composeReminderMessage(
     deps.storage.getUserOpenrouterModels(reminder.userId),
   ]);
 
-  const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;
   const lang = reminder.lang;
 
@@ -148,6 +153,7 @@ async function composeReminderMessage(
       source: toolSource,
       chatId: reminder.chatId,
       userId: reminder.userId,
+      botId: deps.botId,
       replyToMessageId:
         reminder.target.kind === "ask_reply"
           ? reminder.target.replyToMessageId

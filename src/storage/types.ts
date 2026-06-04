@@ -17,9 +17,31 @@ import type {
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { ManagedBot } from "../managed-bots/types";
 import type { SpendSummary } from "../spending/window";
 
 export interface Storage {
+  // Returns a view of this storage scoped to a single bot's per-character data:
+  // the conversation graph, reminders, user facts, guest threads, album buffers
+  // and private-chat flags. `null` is the main bot and yields the original
+  // unprefixed keys — byte-identical to storage that never knew about scoping,
+  // so existing data and all current call sites are unaffected. A managed bot's
+  // id namespaces those entities under an `mbot:{botId}:` segment; every *other*
+  // method (settings, whitelist, rate buckets, users/chats directory, spend,
+  // user attributes, photo cache, checks, the managed-bot registry) is shared
+  // across all scopes regardless of which view it is called on.
+  forBot(botId: string | null): Storage;
+
+  // Managed-bot registry + token store. These are global (not affected by
+  // `forBot` scoping): the registry is owned by the main bot. Tokens are stored
+  // separately and never returned to the admin UI (mirrors the BYOK key model).
+  listManagedBots(): Promise<ManagedBot[]>;
+  getManagedBot(botId: string): Promise<ManagedBot | null>;
+  saveManagedBot(bot: ManagedBot): Promise<void>;
+  deleteManagedBot(botId: string): Promise<void>;
+  getManagedBotToken(botId: string): Promise<string | null>;
+  setManagedBotToken(botId: string, token: string | null): Promise<void>;
+
   getSettings(): Promise<Settings | null>;
   saveSettings(settings: Settings): Promise<void>;
 

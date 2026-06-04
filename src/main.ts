@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { API_CONSTANTS } from "grammy";
 import { loadConfig } from "./config";
 import { getEffectiveProxyForUrl } from "./proxy";
 import { KeyDBStorage } from "./storage/keydb";
@@ -22,12 +21,11 @@ import { startScheduler } from "./reminders/scheduler";
 import { startChecksScheduler } from "./checks/runner";
 import { createBot } from "./bot";
 import { syncBotCommands } from "./bot/commands";
+import { ALLOWED_UPDATES } from "./bot/allowed-updates";
 import { startServer } from "./webapp/server";
-
-const ALLOWED_UPDATES = [
-  ...API_CONSTANTS.DEFAULT_UPDATE_TYPES,
-  "guest_message",
-] as const;
+import { BotManager } from "./managed-bots/manager";
+import { createMainPersonaResolver } from "./managed-bots/persona";
+import type { ReminderRuntime } from "./reminders/scheduler";
 
 async function main() {
   const config = loadConfig();
@@ -60,15 +58,51 @@ async function main() {
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
   for (const t of createUserFactsTools({ storage })) registerTool(logged(t));
 
+  const mainResolver = createMainPersonaResolver(storage);
   const bot = createBot({
     botToken: config.botToken,
     ownerId: config.botOwnerId,
     storage,
     rateLimiter,
     ai,
+    resolver: mainResolver,
     logFormat: config.logFormat,
     logIncomingUpdates: config.logIncomingUpdates,
     logDebug: config.logDebug,
+  });
+
+  const botManager = new BotManager({
+    storage,
+    rateLimiter,
+    ai,
+    ownerId: config.botOwnerId,
+    mainApi: bot.api,
+    logFormat: config.logFormat,
+    logIncomingUpdates: config.logIncomingUpdates,
+    logDebug: config.logDebug,
+  });
+
+  // The owner created a managed bot via the native Bot API 9.6 flow: broker its
+  // token, persist it, and start its polling loop. Owner-gated inside the
+  // manager; non-owner creations are ignored.
+  bot.on("managed_bot", async (ctx) => {
+    const upd = ctx.update.managed_bot;
+    if (!upd) return;
+    const created = await botManager.handleManagedBotCreated(
+      String(upd.user.id),
+      {
+        id: upd.bot.id,
+        username: upd.bot.username,
+        first_name: upd.bot.first_name,
+      },
+    );
+    if (created) {
+      await ctx.api
+        .sendMessage(upd.user.id, ctx.t.bot_managed_bot_created(created.username))
+        .catch((err) =>
+          console.error("[managed-bots] owner notify failed:", err),
+        );
+    }
   });
 
   await bot.api.deleteWebhook();
@@ -81,22 +115,35 @@ async function main() {
   });
   console.log("Bot started in long-polling mode");
 
+  await botManager.loadAndStartAll();
+  console.log("Managed bots loaded");
+
   const server = startServer({
     port: config.port,
     botToken: config.botToken,
     ownerId: config.botOwnerId,
     storage,
     rateLimiter,
+    botManager,
   });
   console.log(`HTTP server listening on :${server.port}`);
 
-  const scheduler = startScheduler({ storage, api: bot.api, ai });
+  const mainReminderRuntime: ReminderRuntime = {
+    botId: null,
+    storage,
+    api: bot.api,
+    resolver: mainResolver,
+  };
+  const scheduler = startScheduler({
+    runtimes: () => [mainReminderRuntime, ...botManager.reminderRuntimes()],
+    ai,
+  });
   console.log("Reminder scheduler started");
 
   const checksScheduler = startChecksScheduler({ storage, api: bot.api });
   console.log("Checks scheduler started");
 
-  return { bot, server, scheduler, checksScheduler };
+  return { bot, server, scheduler, checksScheduler, botManager };
 }
 
 const handles = await main().catch((err) => {
@@ -109,6 +156,7 @@ if (import.meta.hot) {
     handles.scheduler.stop();
     handles.checksScheduler.stop();
     handles.server.stop();
+    await handles.botManager.stopAll();
     await handles.bot.stop().catch((err) => {
       console.error("bot.stop failed during hot-reload:", err);
     });

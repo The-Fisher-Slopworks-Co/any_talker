@@ -20,6 +20,7 @@ import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
 import { applyBotNamePrefix, buildEffectsTopBlock } from "./format";
+import type { PersonaResolver } from "../managed-bots/persona";
 import { readValidDisplayName } from "../shared/display-name";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import { makeIncomingUpdateLogger } from "./log-update";
@@ -38,23 +39,67 @@ type AnswerGuestQuery = (args: {
   result: InlineQueryResult;
 }) => Promise<SentGuestMessage>;
 
+// Identifies a managed (non-main) bot. Its presence switches `createBot` into
+// managed mode: `/ask` is matched ONLY when explicitly addressed as `@self`,
+// and the bot's id scopes per-character storage + the tool call context.
+export type BotPersona = {
+  botId: string;
+};
+
 export type BotDeps = {
   botToken: string;
   ownerId: string;
   storage: Storage;
   rateLimiter: RateLimiter;
   ai: AIClient;
+  // Resolves the character to answer as for a given chat (settings + name).
+  resolver: PersonaResolver;
+  // Present for managed bots only; absent ⇒ the main bot.
+  persona?: BotPersona;
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
   logDebug: boolean;
 };
 
-const ASK_CAPTION_RE = /^\/(ask|askwise)(?:@\w+)?(?:\s+([\s\S]*))?$/i;
+// `/ask`/`/askwise`, an optional `@username` (group 2, without the @), and the
+// optional text (group 3). The `g` flag is intentionally absent so `.match`
+// stays stateless and the instance is reusable.
+const ASK_RE = /^\/(ask|askwise)(?:@(\w+))?(?:\s+([\s\S]*))?$/i;
 
 const COMMAND_TO_DETAIL: Record<string, DetailLevel> = {
   ask: "short",
   askwise: "wise",
 };
+
+export type AskMatch = { detailLevel: DetailLevel; userText: string };
+
+// Match an `/ask(wise)` command or media caption addressed to THIS bot.
+// Matching is done against the bot's LIVE `ctx.me.username` so it can't go stale
+// and every bot only answers what is meant for it:
+//   - a `@mention` to a *different* bot is never ours (this is what stops the
+//     main bot from stealing a `/ask@CharacterBot` photo caption);
+//   - a bare `/ask` (no mention) is answered only when `requireMention` is false
+//     (the main bot) — managed bots answer solely when explicitly `@self`-ed.
+export function matchAsk(
+  raw: string,
+  selfUsername: string | undefined,
+  requireMention: boolean,
+): AskMatch | null {
+  const m = raw.match(ASK_RE);
+  if (!m) return null;
+  const mention = m[2];
+  if (mention) {
+    if (!selfUsername || mention.toLowerCase() !== selfUsername.toLowerCase()) {
+      return null;
+    }
+  } else if (requireMention) {
+    return null;
+  }
+  return {
+    detailLevel: COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short",
+    userText: (m[3] ?? "").trim(),
+  };
+}
 
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.botToken, {
@@ -65,6 +110,16 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     if (!deps.logDebug) return;
     console.log(formatLog({ level: "debug", msg, fields }, deps.logFormat));
   };
+
+  // Scope + routing mode for this bot. Managed bots respond only to `/ask@self`
+  // (require an explicit mention); the main bot also answers a bare `/ask`.
+  const botId = deps.persona?.botId ?? null;
+  const requireMention = deps.persona !== undefined;
+  // Storage scoped to this bot for the per-character calls made directly in this
+  // file (private-chat flag, album buffer, guest thread, reply-image album
+  // lookup). The pure handlers receive base storage + botId and scope
+  // themselves; everything else (user/chat directory, etc.) stays on base.
+  const scopedStorage = deps.storage.forBot(botId);
 
   bot.use(
     makeIncomingUpdateLogger({
@@ -103,7 +158,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         .catch((err) => console.error("upsertChat failed:", err));
     }
     if (ctx.chat?.type === "private" && from && !from.is_bot) {
-      void deps.storage
+      void scopedStorage
         .recordPrivateChat(String(from.id))
         .catch((err) => console.error("recordPrivateChat failed:", err));
     }
@@ -136,7 +191,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const replyToOurBot =
       msg.reply_to_message?.from?.id === ctx.me.id;
     const priorThread = replyToOurBot
-      ? await deps.storage.getGuestThread(chatId)
+      ? await scopedStorage.getGuestThread(chatId)
       : null;
 
     const startedAt = performance.now();
@@ -146,6 +201,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         storage: deps.storage,
         rateLimiter: deps.rateLimiter,
         ai: deps.ai,
+        resolver: deps.resolver,
+        botId,
         ownerId: deps.ownerId,
         now: Date.now(),
         chatId,
@@ -295,7 +352,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const reply = await resolveReplyImages({
         chatId: String(chatId),
         replyToMessage: args.replyToMessage,
-        storage: deps.storage,
+        storage: scopedStorage,
         fetchPhoto,
       });
       replyTarget.images = reply.images;
@@ -359,6 +416,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           storage: deps.storage,
           rateLimiter: deps.rateLimiter,
           ai: deps.ai,
+          resolver: deps.resolver,
+          botId,
           ownerId: deps.ownerId,
           now: Date.now(),
           chatId: String(chatId),
@@ -435,10 +494,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         captions: items.filter((it) => (it.caption ?? "").length > 0).length,
       });
 
-      const askItem = items.find((it) => {
-        const caption = it.caption ?? "";
-        return ASK_CAPTION_RE.test(caption);
-      });
+      const matchOf = (it: Message) =>
+        matchAsk(it.caption ?? "", ctx.me.username, requireMention);
+      const askItem = items.find((it) => matchOf(it) !== null);
       if (!askItem) {
         debugLog("media_group_dropped", { key, reason: "no_ask_caption" });
         return;
@@ -448,10 +506,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         return;
       }
 
-      const captionMatch = ASK_CAPTION_RE.exec(askItem.caption ?? "");
-      const detailLevel =
-        COMMAND_TO_DETAIL[(captionMatch?.[1] ?? "ask").toLowerCase()] ?? "short";
-      const userText = (captionMatch?.[2] ?? "").trim();
+      const captionMatch = matchOf(askItem)!;
+      const detailLevel = captionMatch.detailLevel;
+      const userText = captionMatch.userText;
       const askMessageId = items[0]!.message_id;
 
       const fileIds: string[] = [];
@@ -488,11 +545,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   const dispatchTextCommand = async (
     ctx: BotContext,
     detailLevel: DetailLevel,
+    // Managed bots match `/ask@self` by hand (not via grammY's command filter),
+    // so they pass the already-extracted text rather than relying on ctx.match.
+    userText?: string,
   ) => {
     const msg = ctx.message;
     if (!msg) return;
     await dispatchAsk(ctx, {
-      userText: (ctx.match ?? "").toString().trim(),
+      userText: userText ?? (ctx.match ?? "").toString().trim(),
       askMessageId: msg.message_id,
       images: [],
       imageFileIds: [],
@@ -504,8 +564,19 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     });
   };
 
-  bot.command("ask", (ctx) => dispatchTextCommand(ctx, "short"));
-  bot.command("askwise", (ctx) => dispatchTextCommand(ctx, "wise"));
+  if (requireMention) {
+    // Managed bot: only answer text commands explicitly addressed as `@self`.
+    // grammY's `bot.command` also fires on a bare `/ask` (which belongs to the
+    // main bot), so we match the raw text against `matchAsk` instead.
+    bot.on("message:text", async (ctx) => {
+      const match = matchAsk(ctx.message.text, ctx.me.username, true);
+      if (!match) return;
+      await dispatchTextCommand(ctx, match.detailLevel, match.userText);
+    });
+  } else {
+    bot.command("ask", (ctx) => dispatchTextCommand(ctx, "short"));
+    bot.command("askwise", (ctx) => dispatchTextCommand(ctx, "wise"));
+  }
 
   bot.on("message:photo", async (ctx) => {
     const msg = ctx.message;
@@ -513,19 +584,20 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     if (chatId === undefined) return;
 
     const captionRaw = msg.caption ?? "";
+    const match = matchAsk(captionRaw, ctx.me.username, requireMention);
     debugLog("photo_received", {
       chat_id: chatId,
       message_id: msg.message_id,
       media_group_id: msg.media_group_id ?? null,
       caption_len: captionRaw.length,
-      ask_caption: ASK_CAPTION_RE.test(captionRaw),
+      ask_caption: match !== null,
       photo_sizes: msg.photo.length,
     });
 
     if (msg.media_group_id !== undefined) {
       const picked = pickPhotoSize(msg.photo);
       if (picked) {
-        void deps.storage
+        void scopedStorage
           .appendAlbumPhoto(String(chatId), msg.media_group_id, {
             messageId: msg.message_id,
             fileId: picked.file_id,
@@ -548,10 +620,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       return;
     }
 
-    const m = captionRaw.match(ASK_CAPTION_RE);
-    if (!m) return;
-    const detailLevel = COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short";
-    const userText = (m[2] ?? "").trim();
+    if (!match) return;
+    const detailLevel = match.detailLevel;
+    const userText = match.userText;
 
     let image: Uint8Array | null = null;
     let imageFileId: string | null = null;
@@ -586,18 +657,18 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     if (chatId === undefined) return;
 
     const captionRaw = msg.caption ?? "";
-    const m = captionRaw.match(ASK_CAPTION_RE);
+    const match = matchAsk(captionRaw, ctx.me.username, requireMention);
     debugLog("voice_received", {
       chat_id: chatId,
       message_id: msg.message_id,
       caption_len: captionRaw.length,
-      ask_caption: m !== null,
+      ask_caption: match !== null,
       duration: msg.voice.duration,
     });
-    if (!m) return;
+    if (!match) return;
 
-    const detailLevel = COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short";
-    const userText = (m[2] ?? "").trim();
+    const detailLevel = match.detailLevel;
+    const userText = match.userText;
 
     let audio: Uint8Array;
     try {

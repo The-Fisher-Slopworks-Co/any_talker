@@ -16,7 +16,12 @@ import {
   Stack,
 } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { NumberInput, SaveButton, Toggle } from "../../components/controls";
+import {
+  DeleteButton,
+  NumberInput,
+  SaveButton,
+  Toggle,
+} from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { TimezoneSelect } from "../../components/timezone-select";
 import {
@@ -413,14 +418,9 @@ export function CheckEditView({
 
       {check && (
         <Card>
-          <button
-            type="button"
-            className="block w-full bg-tg-section text-tg-destructive border-0 text-center px-4 py-[13px] text-base font-medium cursor-pointer active:not-disabled:bg-[var(--tg-separator)] disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={saving || deleting}
-            onClick={remove}
-          >
+          <DeleteButton disabled={saving || deleting} onClick={remove}>
             {s.ui_check_delete}
-          </button>
+          </DeleteButton>
         </Card>
       )}
     </Stack>

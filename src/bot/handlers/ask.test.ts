@@ -6,6 +6,7 @@ import { MemoryStorage } from "../../storage/memory";
 import { TokenBucketLimiter } from "../../ratelimit/token-bucket";
 import type { AIClient, AskResult } from "../../ai/types";
 import { askHandler, type AskInput, type AskOutcome } from "./ask";
+import { createMainPersonaResolver } from "../../managed-bots/persona";
 import { DEFAULT_SETTINGS } from "../../shared/types";
 
 class FakeAI implements AIClient {
@@ -17,26 +18,30 @@ class FakeAI implements AIClient {
   }
 }
 
-const baseInput = (overrides: Partial<AskInput> = {}): AskInput => ({
-  storage: new MemoryStorage(),
-  rateLimiter: new TokenBucketLimiter(new MemoryStorage()),
-  ai: new FakeAI(),
-  ownerId: "1",
-  now: 1_000,
-  chatId: "c1",
-  userId: "42",
-  askMessageId: 1,
-  sender: { firstName: "John", lastName: "Doe", nameOverride: null, gender: null },
-  userText: "hello",
-  quote: null,
-  images: [],
-  imageFileIds: [],
-  replyImageFileIds: [],
-  replyTarget: null,
-  lang: "en",
-  detailLevel: "short",
-  ...overrides,
-});
+const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
+  const storage = overrides.storage ?? new MemoryStorage();
+  return {
+    storage,
+    rateLimiter: new TokenBucketLimiter(new MemoryStorage()),
+    ai: new FakeAI(),
+    resolver: createMainPersonaResolver(storage),
+    ownerId: "1",
+    now: 1_000,
+    chatId: "c1",
+    userId: "42",
+    askMessageId: 1,
+    sender: { firstName: "John", lastName: "Doe", nameOverride: null, gender: null },
+    userText: "hello",
+    quote: null,
+    images: [],
+    imageFileIds: [],
+    replyImageFileIds: [],
+    replyTarget: null,
+    lang: "en",
+    detailLevel: "short",
+    ...overrides,
+  };
+};
 
 describe("askHandler", () => {
   test("denied when not whitelisted and not owner", async () => {

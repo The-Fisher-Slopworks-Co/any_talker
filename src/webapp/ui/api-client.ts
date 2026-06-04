@@ -16,6 +16,8 @@ import type { Lang } from "../../shared/i18n";
 import type { Reminder } from "../../reminders/types";
 import type { RecurringCheck } from "../../checks/types";
 import type { CheckInputFields } from "../../checks/validate";
+import type { ManagedBot } from "../../managed-bots/types";
+import type { ManagedBotInput } from "../../managed-bots/validate";
 import type { SpendSummary } from "../../spending/window";
 
 export type { SpendSummary };
@@ -85,6 +87,12 @@ export type UserBucketEntry = {
 };
 export type SpendingResponse = {
   spending: SpendSummary;
+};
+export type ManagedBotRow = ManagedBot & { running: boolean };
+export type ManagedBotDetail = { bot: ManagedBot; running: boolean };
+export type ManagedBotNewInfo = {
+  username: string | null;
+  canManageBots: boolean;
 };
 
 function authHeader(): Record<string, string> {
@@ -204,6 +212,20 @@ export const api = {
     req<{ check: RecurringCheck }>("PUT", `/api/admin/checks/${id}`, input),
   deleteCheck: (id: string) =>
     req<{ ok: true }>("DELETE", `/api/admin/checks/${id}`),
+  listManagedBots: () =>
+    req<{ bots: ManagedBotRow[] }>("GET", "/api/admin/managed-bots"),
+  getManagedBotNewInfo: () =>
+    req<ManagedBotNewInfo>("GET", "/api/admin/managed-bots/new"),
+  getManagedBot: (id: string) =>
+    req<ManagedBotDetail>("GET", `/api/admin/managed-bots/${id}`),
+  updateManagedBot: (id: string, input: ManagedBotInput) =>
+    req<ManagedBotDetail>("PUT", `/api/admin/managed-bots/${id}`, input),
+  deleteManagedBot: (id: string) =>
+    req<{ ok: true }>("DELETE", `/api/admin/managed-bots/${id}`),
+  setManagedBotAvatar: (id: string, photoBase64: string) =>
+    req<{ ok: true }>("PUT", `/api/admin/managed-bots/${id}/avatar`, {
+      photoBase64,
+    }),
   getBuildInfo: async (): Promise<BuildInfoResponse> => {
     const res = await fetch("/api/build-info", { method: "GET" });
     if (!res.ok) return { commit: null, shortCommit: null };
