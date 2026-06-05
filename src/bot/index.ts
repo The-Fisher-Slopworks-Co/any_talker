@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { Bot, type Context } from "grammy";
-import type { InlineQueryResult, Message } from "grammy/types";
+import type { InlineQueryResult, Message, Update } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
@@ -150,6 +150,52 @@ export function computeAlone(
   });
 }
 
+// Message fields that carry genuine user content. A Telegram *service* message
+// (member joins/leaves, pins, migrations, …) has none of them. Missing an exotic
+// content type only makes presence refresh slightly conservative; it can never
+// reintroduce the bug below.
+const MESSAGE_CONTENT_KEYS = [
+  "text",
+  "animation",
+  "audio",
+  "document",
+  "photo",
+  "sticker",
+  "story",
+  "video",
+  "video_note",
+  "voice",
+  "contact",
+  "dice",
+  "game",
+  "poll",
+  "venue",
+  "location",
+  "invoice",
+] as const;
+
+function isContentMessage(message: Message | undefined): boolean {
+  if (!message) return false;
+  const fields = message as unknown as Record<string, unknown>;
+  return MESSAGE_CONTENT_KEYS.some((key) => fields[key] !== undefined);
+}
+
+// Whether an incoming update is ordinary activity that should refresh this bot's
+// group presence (TTL renewal + pre-feature backfill). It deliberately ignores:
+//   - `my_chat_member` — membership is owned authoritatively by its handler
+//     (which records on join), so refreshing here is redundant and racy;
+//   - service messages (no content) — including the `left_chat_member` broadcast
+//     of THIS bot's own removal.
+// Without this, a bot draining the burst of updates around its own removal would
+// re-`recordBotPresence` the presence its `my_chat_member` handler just cleared,
+// so a managed sibling would keep seeing it as "present" and stay silent on a
+// bare `/ask` until the 7-day TTL lapsed.
+export function shouldRefreshPresence(update: Update): boolean {
+  if (update.my_chat_member) return false;
+  if (update.callback_query) return true;
+  return isContentMessage(update.message ?? update.edited_message);
+}
+
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.botToken, {
     client: { fetch: proxiedFetch as unknown as typeof fetch },
@@ -242,8 +288,15 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     // Refresh this bot's presence in any group it is active in, so managed
     // siblings can tell who shares a chat (drives the bare-`/ask` alone-check).
     // `my_chat_member` is the authoritative add/remove; this activity refresh
-    // also backfills membership that predates the feature and renews the TTL.
-    if (ctx.chat && ctx.chat.type !== "private") {
+    // backfills membership that predates the feature and renews the TTL — but
+    // only on genuine activity (see `shouldRefreshPresence`), never on the
+    // service/membership burst a bot drains around its own removal, which would
+    // otherwise resurrect the presence its removal just cleared.
+    if (
+      ctx.chat &&
+      ctx.chat.type !== "private" &&
+      shouldRefreshPresence(ctx.update)
+    ) {
       void deps.storage
         .recordBotPresence(String(ctx.chat.id), String(ctx.me.id), now)
         .catch((err) => console.error("recordBotPresence failed:", err));
