@@ -6,7 +6,7 @@ import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
 import { isAllowed } from "../access";
 import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
-import { getEffectiveSettings } from "../../settings";
+import type { PersonaResolver } from "../../managed-bots/persona";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import {
   buildInstruction,
@@ -21,6 +21,11 @@ export type AskInput = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ai: AIClient;
+  // Resolves the character to answer as (settings + display name) for this chat.
+  resolver: PersonaResolver;
+  // Scope of the bot handling this turn: null/undefined = main bot, a managed
+  // bot's id otherwise. Scopes per-character storage and the tool call context.
+  botId?: string | null;
   ownerId: string;
   now: number;
   chatId: string;
@@ -56,15 +61,20 @@ export type AskOutcome =
   | { kind: "error"; message: string };
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
+  // Per-character storage view: scoped methods (conversation graph, user facts)
+  // hit this bot's namespace; every other method is shared. forBot(null) is the
+  // main bot and yields the original unprefixed keys.
+  const storage = input.storage.forBot(input.botId ?? null);
+
   const [allowed, byokKey, byokModels] = await Promise.all([
     isAllowed({
-      storage: input.storage,
+      storage,
       ownerId: input.ownerId,
       userId: input.userId,
       chatId: input.chatId,
     }),
-    input.storage.getUserOpenrouterKey(input.userId),
-    input.storage.getUserOpenrouterModels(input.userId),
+    storage.getUserOpenrouterKey(input.userId),
+    storage.getUserOpenrouterModels(input.userId),
   ]);
   if (!allowed && byokKey === null) return { kind: "denied" };
 
@@ -78,12 +88,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     return { kind: "usage" };
   }
 
-  const [settings, chatSettings, userTimezone] = await Promise.all([
-    getEffectiveSettings(input.storage, input.chatId),
-    input.storage.getChatSettings(input.chatId),
-    input.storage.getUserTimezone(input.userId),
+  const [{ settings, botName }, userTimezone] = await Promise.all([
+    input.resolver(input.chatId),
+    storage.getUserTimezone(input.userId),
   ]);
-  const botName = chatSettings?.botName?.trim() || null;
   const timezone = userTimezone ?? settings.timezone;
 
   const isOwner = input.userId === input.ownerId;
@@ -105,7 +113,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   }
 
   const messages = await buildContext({
-    storage: input.storage,
+    storage,
     chatId: input.chatId,
     sender: input.sender,
     userText: input.userText,
@@ -120,7 +128,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
 
   // Surface the user's remembered facts in the system prompt so the model can
   // use them without having to call list_facts on every turn.
-  const facts = await input.storage.listUserFacts(input.userId);
+  const facts = await storage.listUserFacts(input.userId);
 
   const effects: ToolEffect[] = [];
   let result;
@@ -147,6 +155,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         source: "ask",
         chatId: input.chatId,
         userId: input.userId,
+        botId: input.botId ?? null,
         replyToMessageId: input.askMessageId,
         timezone,
         lang: input.lang,
@@ -168,13 +177,13 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // Record spend regardless of rate-limit exemption — owner and BYOK usage is
   // still money this user spent through the bot. Best-effort: a storage hiccup
   // on this display-only accounting must not fail an answer already produced.
-  await input.storage
+  await storage
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));
 
   let parentBotMsgId: number | null = null;
   if (input.replyTarget) {
-    const existing = await input.storage.getConversation(
+    const existing = await storage.getConversation(
       input.chatId,
       input.replyTarget.messageId,
     );
@@ -201,7 +210,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         ...input.imageFileIds,
         ...input.replyImageFileIds,
       ];
-      await input.storage.saveConversation(input.chatId, botMsgId, {
+      await storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
         botAnswer: sanitized,
         parentBotMsgId,

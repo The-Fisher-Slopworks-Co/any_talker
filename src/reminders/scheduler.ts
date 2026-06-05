@@ -8,13 +8,26 @@ import {
   type IntervalScheduler,
 } from "../shared/interval-scheduler";
 import { deliverReminder, type ReminderApi } from "./delivery";
+import type { PersonaResolver } from "../managed-bots/persona";
 import { remindersDeliveredTotal } from "../metrics";
 
 export type Scheduler = IntervalScheduler;
 
-export type SchedulerDeps = {
+// One bot's reminder context: its scoped storage (so it only ever sees its own
+// reminders), its Telegram API (so deliveries come from the right identity),
+// its persona resolver, and its scope id. The main bot is `botId: null` with
+// the unscoped base storage.
+export type ReminderRuntime = {
+  botId: string | null;
   storage: Storage;
   api: ReminderApi;
+  resolver: PersonaResolver;
+};
+
+export type SchedulerDeps = {
+  // Resolved fresh each tick (a thunk) so newly-created managed bots join the
+  // loop and deleted ones drop out without restarting the scheduler.
+  runtimes: () => ReminderRuntime[];
   ai: AIClient;
   intervalMs?: number;
 };
@@ -22,19 +35,34 @@ export type SchedulerDeps = {
 const DEFAULT_INTERVAL_MS = 30_000;
 
 export async function runReminderTick(deps: {
-  storage: Storage;
-  api: ReminderApi;
+  runtimes: ReminderRuntime[];
   ai: AIClient;
   nowMs: number;
 }): Promise<void> {
-  const due = await deps.storage.fetchDueReminders(deps.nowMs);
+  await Promise.allSettled(
+    deps.runtimes.map((runtime) => runRuntimeTick(runtime, deps.ai, deps.nowMs)),
+  );
+}
+
+async function runRuntimeTick(
+  runtime: ReminderRuntime,
+  ai: AIClient,
+  nowMs: number,
+): Promise<void> {
+  const due = await runtime.storage.fetchDueReminders(nowMs);
   if (due.length === 0) return;
   await Promise.allSettled(
     due.map(async (reminder) => {
       const outcome = await deliverReminder(
-        { storage: deps.storage, api: deps.api, ai: deps.ai },
+        {
+          storage: runtime.storage,
+          api: runtime.api,
+          ai,
+          resolver: runtime.resolver,
+          botId: runtime.botId,
+        },
         reminder,
-        deps.nowMs,
+        nowMs,
       );
       if (outcome === "transient") {
         remindersDeliveredTotal.inc({ outcome: "transient" });
@@ -44,7 +72,7 @@ export async function runReminderTick(deps: {
         return;
       }
       try {
-        await deps.storage.deleteReminder(reminder.id, reminder.userId);
+        await runtime.storage.deleteReminder(reminder.id, reminder.userId);
       } catch (err) {
         console.error(
           `[scheduler] deleteReminder failed id=${reminder.id}:`,
@@ -72,8 +100,7 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
     logPrefix: "[scheduler]",
     tick: () =>
       runReminderTick({
-        storage: deps.storage,
-        api: deps.api,
+        runtimes: deps.runtimes(),
         ai: deps.ai,
         nowMs: Date.now(),
       }),

@@ -44,8 +44,13 @@ export async function persistReminder(
     };
   }
 
+  // Scope the reminder (and the private-chat check that gates guest DMs) to the
+  // bot this turn runs under, so each character keeps its own reminders and the
+  // right scheduler fires them.
+  const scoped = storage.forBot(ctx.botId ?? null);
+
   if (ctx.source === "guest") {
-    const allowed = await storage.userHasPrivateChat(ctx.userId);
+    const allowed = await scoped.userHasPrivateChat(ctx.userId);
     if (!allowed) {
       return {
         ok: false,
@@ -56,7 +61,7 @@ export async function persistReminder(
   }
 
   const reminderId = crypto.randomUUID();
-  await storage.saveReminder({
+  await scoped.saveReminder({
     id: reminderId,
     userId: ctx.userId,
     chatId: ctx.chatId,

@@ -5,6 +5,7 @@ import { test, expect, describe } from "bun:test";
 import { GrammyError } from "grammy";
 import { MemoryStorage } from "../storage/memory";
 import { deliverReminder, type ReminderApi } from "./delivery";
+import { createMainPersonaResolver } from "../managed-bots/persona";
 import type { Reminder } from "./types";
 import type { AIClient, AIMessage, AskResult } from "../ai/types";
 import type { Tool, ToolCallContext } from "../ai/tools/registry";
@@ -77,7 +78,7 @@ const grammyErr = (code: number) =>
   );
 
 const deps = (ai: AIClient, api: ReminderApi, storage = new MemoryStorage()) =>
-  ({ storage, api, ai });
+  ({ storage, api, ai, resolver: createMainPersonaResolver(storage), botId: null });
 
 describe("deliverReminder (AI-driven)", () => {
   test("ask_reply: builds reminder_fired envelope and sends AI output with reply_parameters", async () => {

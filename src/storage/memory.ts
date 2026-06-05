@@ -20,6 +20,7 @@ import { isEmptyChatSettings } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { ManagedBot } from "../managed-bots/types";
 import type { SpendSummary } from "../spending/window";
 import {
   SPEND_RETENTION_DAYS,
@@ -27,66 +28,187 @@ import {
   utcDateKey,
 } from "../spending/window";
 
-export class MemoryStorage implements Storage {
-  private settings: Settings | null = null;
-  private whitelist: Record<WhitelistKind, Map<string, WhitelistEntry>> = {
+// All mutable state lives in one object shared by reference across every
+// `forBot` view, so a managed bot's storage and the main bot's storage see the
+// same maps — they differ only by the scope prefix applied to per-character
+// keys. `settings` is wrapped in a holder so the scalar can be shared too.
+type Backing = {
+  settings: { value: Settings | null };
+  whitelist: Record<WhitelistKind, Map<string, WhitelistEntry>>;
+  buckets: Map<string, BucketState>;
+  conversations: Map<string, ConversationNode>;
+  guestThreads: Map<string, GuestThreadNode>;
+  userNames: Map<string, string>;
+  userTimezones: Map<string, string>;
+  userGenders: Map<string, Gender>;
+  userLangs: Map<string, Lang>;
+  userOpenrouterKeys: Map<string, string>;
+  userOpenrouterModels: Map<string, string[]>;
+  userSpend: Map<string, Map<string, number>>;
+  users: Map<string, User>;
+  chats: Map<string, Chat>;
+  chatSettings: Map<string, ChatSettings>;
+  reminders: Map<string, Reminder>;
+  privateChats: Set<string>;
+  checks: Map<string, RecurringCheck>;
+  photoCache: Map<string, Uint8Array>;
+  albums: Map<string, Map<number, string>>;
+  userFacts: Map<string, Map<string, string>>;
+  managedBots: Map<string, ManagedBot>;
+  managedBotTokens: Map<string, string>;
+  // chatId -> (botId -> last-seen epoch ms). Shared across all `forBot` views.
+  botPresence: Map<string, Map<string, number>>;
+};
+
+function createBacking(): Backing {
+  return {
+    settings: { value: null },
+    whitelist: { users: new Map(), chats: new Map() },
+    buckets: new Map(),
+    conversations: new Map(),
+    guestThreads: new Map(),
+    userNames: new Map(),
+    userTimezones: new Map(),
+    userGenders: new Map(),
+    userLangs: new Map(),
+    userOpenrouterKeys: new Map(),
+    userOpenrouterModels: new Map(),
+    userSpend: new Map(),
     users: new Map(),
     chats: new Map(),
+    chatSettings: new Map(),
+    reminders: new Map(),
+    privateChats: new Set(),
+    checks: new Map(),
+    photoCache: new Map(),
+    albums: new Map(),
+    userFacts: new Map(),
+    managedBots: new Map(),
+    managedBotTokens: new Map(),
+    botPresence: new Map(),
   };
-  private buckets = new Map<string, BucketState>();
-  private conversations = new Map<string, ConversationNode>();
-  private guestThreads = new Map<string, GuestThreadNode>();
-  private userNames = new Map<string, string>();
-  private userTimezones = new Map<string, string>();
-  private userGenders = new Map<string, Gender>();
-  private userLangs = new Map<string, Lang>();
-  private userOpenrouterKeys = new Map<string, string>();
-  private userOpenrouterModels = new Map<string, string[]>();
-  private userSpend = new Map<string, Map<string, number>>();
-  private users = new Map<string, User>();
-  private chats = new Map<string, Chat>();
-  private chatSettings = new Map<string, ChatSettings>();
-  private reminders = new Map<string, Reminder>();
-  private privateChats = new Set<string>();
-  private checks = new Map<string, RecurringCheck>();
-  private photoCache = new Map<string, Uint8Array>();
-  private albums = new Map<string, Map<number, string>>();
-  private userFacts = new Map<string, Map<string, string>>();
+}
+
+// Delimiter that cannot appear in any chat/user/message id, so the scope token
+// and the entity key can never be confused. The main bot's empty scope yields
+// keys starting with the delimiter; a managed bot's keys start with its id.
+const SCOPE_SEP = "\x00";
+
+export class MemoryStorage implements Storage {
+  private readonly b: Backing;
+  // "" for the main bot (legacy scope), the managed bot's id otherwise.
+  private readonly scope: string;
+
+  constructor(backing?: Backing, scope = "") {
+    this.b = backing ?? createBacking();
+    this.scope = scope;
+  }
+
+  forBot(botId: string | null): Storage {
+    const scope = botId ?? "";
+    if (scope === this.scope) return this;
+    return new MemoryStorage(this.b, scope);
+  }
+
+  // Per-character-scoped key. The main bot (`scope === ""`) and managed bots
+  // never collide because the scope token is fixed-width-delimited.
+  private sk(base: string): string {
+    return `${this.scope}${SCOPE_SEP}${base}`;
+  }
+
+  // True when a fully-built scoped key belongs to this view's scope. Used by
+  // the iteration-based reminder lookups (which scan the shared map).
+  private inScope(key: string): boolean {
+    return key.startsWith(`${this.scope}${SCOPE_SEP}`);
+  }
 
   private bucketKey(chatId: string, userId: string): string {
     return `${chatId}:${userId}`;
   }
 
   private convKey(chatId: string, botMsgId: number): string {
-    return `${chatId}:${botMsgId}`;
+    return this.sk(`${chatId}:${botMsgId}`);
+  }
+
+  async listManagedBots(): Promise<ManagedBot[]> {
+    return [...this.b.managedBots.values()]
+      .map((bot) => ({ ...bot }))
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  }
+
+  async getManagedBot(botId: string): Promise<ManagedBot | null> {
+    const bot = this.b.managedBots.get(botId);
+    return bot ? { ...bot } : null;
+  }
+
+  async saveManagedBot(bot: ManagedBot): Promise<void> {
+    this.b.managedBots.set(bot.botId, { ...bot });
+  }
+
+  async deleteManagedBot(botId: string): Promise<void> {
+    this.b.managedBots.delete(botId);
+  }
+
+  async getManagedBotToken(botId: string): Promise<string | null> {
+    return this.b.managedBotTokens.get(botId) ?? null;
+  }
+
+  async setManagedBotToken(botId: string, token: string | null): Promise<void> {
+    if (token === null) this.b.managedBotTokens.delete(botId);
+    else this.b.managedBotTokens.set(botId, token);
+  }
+
+  // Presence is a shared registry (unscoped): every `forBot` view writes to the
+  // same per-chat map keyed by bot id, so a managed bot can observe the main
+  // bot's (and siblings') presence regardless of which scope it is called on.
+  async recordBotPresence(
+    chatId: string,
+    botId: string,
+    atMs: number,
+  ): Promise<void> {
+    let m = this.b.botPresence.get(chatId);
+    if (!m) {
+      m = new Map();
+      this.b.botPresence.set(chatId, m);
+    }
+    m.set(botId, atMs);
+  }
+
+  async removeBotPresence(chatId: string, botId: string): Promise<void> {
+    this.b.botPresence.get(chatId)?.delete(botId);
+  }
+
+  async getBotPresence(chatId: string): Promise<Record<string, number>> {
+    const m = this.b.botPresence.get(chatId);
+    return m ? Object.fromEntries(m) : {};
   }
 
   async getSettings(): Promise<Settings | null> {
-    return this.settings ? structuredClone(this.settings) : null;
+    return this.b.settings.value ? structuredClone(this.b.settings.value) : null;
   }
 
   async saveSettings(settings: Settings): Promise<void> {
-    this.settings = structuredClone(settings);
+    this.b.settings.value = structuredClone(settings);
   }
 
   async listWhitelist(kind: WhitelistKind): Promise<WhitelistEntry[]> {
-    return [...this.whitelist[kind].values()];
+    return [...this.b.whitelist[kind].values()];
   }
 
   async addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void> {
-    this.whitelist[kind].set(entry.id, { ...entry });
+    this.b.whitelist[kind].set(entry.id, { ...entry });
   }
 
   async removeWhitelist(kind: WhitelistKind, id: string): Promise<void> {
-    this.whitelist[kind].delete(id);
+    this.b.whitelist[kind].delete(id);
   }
 
   async isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean> {
-    return this.whitelist[kind].has(id);
+    return this.b.whitelist[kind].has(id);
   }
 
   async getBucket(chatId: string, userId: string): Promise<BucketState | null> {
-    const v = this.buckets.get(this.bucketKey(chatId, userId));
+    const v = this.b.buckets.get(this.bucketKey(chatId, userId));
     return v ? { ...v } : null;
   }
 
@@ -95,11 +217,11 @@ export class MemoryStorage implements Storage {
     userId: string,
     state: BucketState,
   ): Promise<void> {
-    this.buckets.set(this.bucketKey(chatId, userId), { ...state });
+    this.b.buckets.set(this.bucketKey(chatId, userId), { ...state });
   }
 
   // Atomic by JS event-loop construction: there is no `await` between the
-  // read and write of `this.buckets`, so concurrent callers cannot interleave.
+  // read and write of `this.b.buckets`, so concurrent callers cannot interleave.
   // WARNING: do not introduce an `await` between the `.get(key)` and the
   // `.set(key, ...)` below — doing so silently breaks the atomicity invariant
   // and there is no test that catches it. If you need async work, do it
@@ -111,7 +233,7 @@ export class MemoryStorage implements Storage {
     now: number,
   ): Promise<BucketState> {
     const key = this.bucketKey(chatId, userId);
-    const current = this.buckets.get(key);
+    const current = this.b.buckets.get(key);
     let next: BucketState;
     if (!current) {
       next = { tokens: config.capacity, lastRefillTs: now };
@@ -131,7 +253,7 @@ export class MemoryStorage implements Storage {
         };
       }
     }
-    this.buckets.set(key, { ...next });
+    this.b.buckets.set(key, { ...next });
     return next;
   }
 
@@ -142,61 +264,61 @@ export class MemoryStorage implements Storage {
     nowMs: number,
   ): Promise<BucketState> {
     const key = this.bucketKey(chatId, userId);
-    const current = this.buckets.get(key);
+    const current = this.b.buckets.get(key);
     const next: BucketState = current
       ? { tokens: current.tokens - tokens, lastRefillTs: current.lastRefillTs }
       : { tokens: -tokens, lastRefillTs: nowMs };
-    this.buckets.set(key, { ...next });
+    this.b.buckets.set(key, { ...next });
     return next;
   }
 
   async getUserName(userId: string): Promise<string | null> {
-    return this.userNames.get(userId) ?? null;
+    return this.b.userNames.get(userId) ?? null;
   }
 
   async setUserName(userId: string, name: string | null): Promise<void> {
-    if (name === null) this.userNames.delete(userId);
-    else this.userNames.set(userId, name);
+    if (name === null) this.b.userNames.delete(userId);
+    else this.b.userNames.set(userId, name);
   }
 
   async getUserTimezone(userId: string): Promise<string | null> {
-    return this.userTimezones.get(userId) ?? null;
+    return this.b.userTimezones.get(userId) ?? null;
   }
 
   async setUserTimezone(userId: string, timezone: string | null): Promise<void> {
-    if (timezone === null) this.userTimezones.delete(userId);
-    else this.userTimezones.set(userId, timezone);
+    if (timezone === null) this.b.userTimezones.delete(userId);
+    else this.b.userTimezones.set(userId, timezone);
   }
 
   async getUserGender(userId: string): Promise<Gender | null> {
-    return this.userGenders.get(userId) ?? null;
+    return this.b.userGenders.get(userId) ?? null;
   }
 
   async setUserGender(userId: string, gender: Gender | null): Promise<void> {
-    if (gender === null) this.userGenders.delete(userId);
-    else this.userGenders.set(userId, gender);
+    if (gender === null) this.b.userGenders.delete(userId);
+    else this.b.userGenders.set(userId, gender);
   }
 
   async getUserLang(userId: string): Promise<Lang | null> {
-    return this.userLangs.get(userId) ?? null;
+    return this.b.userLangs.get(userId) ?? null;
   }
 
   async setUserLang(userId: string, lang: Lang | null): Promise<void> {
-    if (lang === null) this.userLangs.delete(userId);
-    else this.userLangs.set(userId, lang);
+    if (lang === null) this.b.userLangs.delete(userId);
+    else this.b.userLangs.set(userId, lang);
   }
 
   async getUserOpenrouterKey(userId: string): Promise<string | null> {
-    return this.userOpenrouterKeys.get(userId) ?? null;
+    return this.b.userOpenrouterKeys.get(userId) ?? null;
   }
 
   async setUserOpenrouterKey(userId: string, key: string | null): Promise<void> {
-    if (key === null) this.userOpenrouterKeys.delete(userId);
-    else this.userOpenrouterKeys.set(userId, key);
+    if (key === null) this.b.userOpenrouterKeys.delete(userId);
+    else this.b.userOpenrouterKeys.set(userId, key);
   }
 
   async getUserOpenrouterModels(userId: string): Promise<string[] | null> {
-    const v = this.userOpenrouterModels.get(userId);
+    const v = this.b.userOpenrouterModels.get(userId);
     return v ? [...v] : null;
   }
 
@@ -204,8 +326,8 @@ export class MemoryStorage implements Storage {
     userId: string,
     models: string[] | null,
   ): Promise<void> {
-    if (models === null) this.userOpenrouterModels.delete(userId);
-    else this.userOpenrouterModels.set(userId, [...models]);
+    if (models === null) this.b.userOpenrouterModels.delete(userId);
+    else this.b.userOpenrouterModels.set(userId, [...models]);
   }
 
   async addUserSpend(
@@ -214,10 +336,10 @@ export class MemoryStorage implements Storage {
     nowMs: number,
   ): Promise<void> {
     if (!(costUsd > 0)) return;
-    let byDate = this.userSpend.get(userId);
+    let byDate = this.b.userSpend.get(userId);
     if (!byDate) {
       byDate = new Map();
-      this.userSpend.set(userId, byDate);
+      this.b.userSpend.set(userId, byDate);
     }
     const key = utcDateKey(nowMs);
     byDate.set(key, (byDate.get(key) ?? 0) + costUsd);
@@ -230,54 +352,54 @@ export class MemoryStorage implements Storage {
   }
 
   async getUserSpend(userId: string, nowMs: number): Promise<SpendSummary> {
-    return summarizeSpend(this.userSpend.get(userId) ?? new Map(), nowMs);
+    return summarizeSpend(this.b.userSpend.get(userId) ?? new Map(), nowMs);
   }
 
   async listUsers(): Promise<User[]> {
-    return [...this.users.values()]
+    return [...this.b.users.values()]
       .map((u) => ({ ...u }))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
   async upsertUser(user: User): Promise<void> {
-    this.users.set(user.id, { ...user });
+    this.b.users.set(user.id, { ...user });
   }
 
   async getUser(id: string): Promise<User | null> {
-    const u = this.users.get(id);
+    const u = this.b.users.get(id);
     return u ? { ...u } : null;
   }
 
   async listChats(): Promise<Chat[]> {
-    return [...this.chats.values()]
+    return [...this.b.chats.values()]
       .map((c) => ({ ...c }))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
   async upsertChat(chat: Chat): Promise<void> {
-    this.chats.set(chat.id, { ...chat });
+    this.b.chats.set(chat.id, { ...chat });
   }
 
   async getChat(id: string): Promise<Chat | null> {
-    const c = this.chats.get(id);
+    const c = this.b.chats.get(id);
     return c ? { ...c } : null;
   }
 
   async getChatSettings(chatId: string): Promise<ChatSettings | null> {
-    const s = this.chatSettings.get(chatId);
+    const s = this.b.chatSettings.get(chatId);
     return s ? structuredClone(s) : null;
   }
 
   async saveChatSettings(chatId: string, settings: ChatSettings): Promise<void> {
     if (isEmptyChatSettings(settings)) {
-      this.chatSettings.delete(chatId);
+      this.b.chatSettings.delete(chatId);
       return;
     }
-    this.chatSettings.set(chatId, structuredClone(settings));
+    this.b.chatSettings.set(chatId, structuredClone(settings));
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {
-    const v = this.conversations.get(this.convKey(chatId, botMsgId));
+    const v = this.b.conversations.get(this.convKey(chatId, botMsgId));
     if (!v) return null;
     return {
       ...v,
@@ -290,7 +412,7 @@ export class MemoryStorage implements Storage {
     botMsgId: number,
     node: ConversationNode,
   ): Promise<void> {
-    this.conversations.set(this.convKey(chatId, botMsgId), {
+    this.b.conversations.set(this.convKey(chatId, botMsgId), {
       ...node,
       userImageFileIds: node.userImageFileIds
         ? [...node.userImageFileIds]
@@ -299,16 +421,16 @@ export class MemoryStorage implements Storage {
   }
 
   async getPhotoBytes(fileId: string): Promise<Uint8Array | null> {
-    const b = this.photoCache.get(fileId);
+    const b = this.b.photoCache.get(fileId);
     return b ? new Uint8Array(b) : null;
   }
 
   async savePhotoBytes(fileId: string, bytes: Uint8Array): Promise<void> {
-    this.photoCache.set(fileId, new Uint8Array(bytes));
+    this.b.photoCache.set(fileId, new Uint8Array(bytes));
   }
 
   private albumKey(chatId: string, mediaGroupId: string): string {
-    return `${chatId}:${mediaGroupId}`;
+    return this.sk(`${chatId}:${mediaGroupId}`);
   }
 
   async appendAlbumPhoto(
@@ -317,10 +439,10 @@ export class MemoryStorage implements Storage {
     photo: { messageId: number; fileId: string },
   ): Promise<void> {
     const key = this.albumKey(chatId, mediaGroupId);
-    let m = this.albums.get(key);
+    let m = this.b.albums.get(key);
     if (!m) {
       m = new Map();
-      this.albums.set(key, m);
+      this.b.albums.set(key, m);
     }
     m.set(photo.messageId, photo.fileId);
   }
@@ -329,7 +451,7 @@ export class MemoryStorage implements Storage {
     chatId: string,
     mediaGroupId: string,
   ): Promise<Array<{ messageId: number; fileId: string }>> {
-    const m = this.albums.get(this.albumKey(chatId, mediaGroupId));
+    const m = this.b.albums.get(this.albumKey(chatId, mediaGroupId));
     if (!m) return [];
     return [...m.entries()].map(([messageId, fileId]) => ({
       messageId,
@@ -338,69 +460,71 @@ export class MemoryStorage implements Storage {
   }
 
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {
-    const v = this.guestThreads.get(chatId);
+    const v = this.b.guestThreads.get(this.sk(chatId));
     return v ? structuredClone(v) : null;
   }
 
   async saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void> {
-    this.guestThreads.set(chatId, structuredClone(thread));
+    this.b.guestThreads.set(this.sk(chatId), structuredClone(thread));
   }
 
   async saveReminder(reminder: Reminder): Promise<void> {
-    this.reminders.set(reminder.id, structuredClone(reminder));
+    this.b.reminders.set(this.sk(reminder.id), structuredClone(reminder));
   }
 
   async fetchDueReminders(nowMs: number): Promise<Reminder[]> {
     const out: Reminder[] = [];
-    for (const r of this.reminders.values()) {
-      if (r.fireAtMs <= nowMs) out.push(structuredClone(r));
+    for (const [key, r] of this.b.reminders.entries()) {
+      if (this.inScope(key) && r.fireAtMs <= nowMs) out.push(structuredClone(r));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
   async listRemindersForUser(userId: string): Promise<Reminder[]> {
     const out: Reminder[] = [];
-    for (const r of this.reminders.values()) {
-      if (r.userId === userId) out.push(structuredClone(r));
+    for (const [key, r] of this.b.reminders.entries()) {
+      if (this.inScope(key) && r.userId === userId) out.push(structuredClone(r));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
   async listAllReminders(): Promise<Reminder[]> {
-    return [...this.reminders.values()]
-      .map((r) => structuredClone(r))
-      .sort((a, b) => a.fireAtMs - b.fireAtMs);
+    const out: Reminder[] = [];
+    for (const [key, r] of this.b.reminders.entries()) {
+      if (this.inScope(key)) out.push(structuredClone(r));
+    }
+    return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
   async deleteReminder(id: string, _userId: string): Promise<void> {
-    this.reminders.delete(id);
+    this.b.reminders.delete(this.sk(id));
   }
 
   async recordPrivateChat(userId: string): Promise<void> {
-    this.privateChats.add(userId);
+    this.b.privateChats.add(this.sk(userId));
   }
 
   async userHasPrivateChat(userId: string): Promise<boolean> {
-    return this.privateChats.has(userId);
+    return this.b.privateChats.has(this.sk(userId));
   }
 
   async saveCheck(check: RecurringCheck): Promise<void> {
-    this.checks.set(check.id, structuredClone(check));
+    this.b.checks.set(check.id, structuredClone(check));
   }
 
   async getCheck(id: string): Promise<RecurringCheck | null> {
-    const c = this.checks.get(id);
+    const c = this.b.checks.get(id);
     return c ? structuredClone(c) : null;
   }
 
   async listChecks(): Promise<RecurringCheck[]> {
-    return [...this.checks.values()]
+    return [...this.b.checks.values()]
       .map((c) => structuredClone(c))
       .sort((a, b) => a.createdAtMs - b.createdAtMs);
   }
 
   async deleteCheck(id: string): Promise<void> {
-    this.checks.delete(id);
+    this.b.checks.delete(id);
   }
 
   async rememberUserFact(
@@ -409,10 +533,11 @@ export class MemoryStorage implements Storage {
     value: string,
   ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }> {
     const normKey = key.toLowerCase();
-    let facts = this.userFacts.get(userId);
+    const factsKey = this.sk(userId);
+    let facts = this.b.userFacts.get(factsKey);
     if (!facts) {
       facts = new Map();
-      this.userFacts.set(userId, facts);
+      this.b.userFacts.set(factsKey, facts);
     }
     // Updates to existing keys never evict. A NEW key at the cap evicts the
     // oldest-inserted fact to make room — Map iterates in insertion order, so
@@ -429,7 +554,7 @@ export class MemoryStorage implements Storage {
   async listUserFacts(
     userId: string,
   ): Promise<Array<{ key: string; value: string }>> {
-    const facts = this.userFacts.get(userId);
+    const facts = this.b.userFacts.get(this.sk(userId));
     if (!facts) return [];
     return [...facts.entries()]
       .map(([key, value]) => ({ key, value }))
@@ -441,7 +566,7 @@ export class MemoryStorage implements Storage {
     key: string,
   ): Promise<{ existed: boolean }> {
     const normKey = key.toLowerCase();
-    const facts = this.userFacts.get(userId);
+    const facts = this.b.userFacts.get(this.sk(userId));
     if (!facts) return { existed: false };
     const existed = facts.delete(normKey);
     return { existed };
