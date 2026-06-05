@@ -30,10 +30,13 @@ export function createMainPersonaResolver(storage: Storage): PersonaResolver {
 }
 
 // Managed bot: settings are the main bot's GLOBAL defaults only (no per-chat
-// overrides) with the character's own system prompt substituted in, and the
-// name is the character's display name. The record is read fresh each turn so
-// owner edits take effect without restarting the bot. If the record vanishes
-// (bot deleted mid-flight), fall back to global settings with no override.
+// overrides) with the character's own system prompt substituted in. `botName`
+// is always null: a managed bot IS the character (its identity lives entirely
+// in the system prompt and its own Telegram profile name/avatar), so its
+// replies carry no bold name prefix — unlike the main bot, which prepends an
+// optional per-chat persona name. The record is read fresh each turn so owner
+// edits take effect without restarting the bot. If the record vanishes (bot
+// deleted mid-flight), fall back to global settings with no override.
 export function createManagedPersonaResolver(
   storage: Storage,
   botId: string,
@@ -46,7 +49,7 @@ export function createManagedPersonaResolver(
     if (!bot) return { settings: global, botName: null };
     return {
       settings: { ...global, systemPrompt: bot.systemPrompt },
-      botName: bot.displayName.trim() || null,
+      botName: null,
     };
   };
 }

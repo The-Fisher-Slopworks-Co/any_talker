@@ -213,6 +213,35 @@ export class KeyDBStorage implements Storage {
     else await this.client.set(key, token);
   }
 
+  // Presence is a shared registry (unscoped, like `managed_bots`): every bot —
+  // main and managed — records its own membership under the same per-chat hash,
+  // field = bot id, value = last-seen epoch ms. TTL pruning is the reader's job.
+  async recordBotPresence(
+    chatId: string,
+    botId: string,
+    atMs: number,
+  ): Promise<void> {
+    await this.client.hset(
+      `${PREFIX}bot_presence:${chatId}`,
+      botId,
+      String(atMs),
+    );
+  }
+
+  async removeBotPresence(chatId: string, botId: string): Promise<void> {
+    await this.client.hdel(`${PREFIX}bot_presence:${chatId}`, botId);
+  }
+
+  async getBotPresence(chatId: string): Promise<Record<string, number>> {
+    const raw = await this.client.hgetall(`${PREFIX}bot_presence:${chatId}`);
+    const out: Record<string, number> = {};
+    for (const [botId, ms] of Object.entries(raw)) {
+      const n = Number(ms);
+      if (Number.isFinite(n)) out[botId] = n;
+    }
+    return out;
+  }
+
   async getSettings(): Promise<Settings | null> {
     const raw = await this.client.get(`${PREFIX}settings`);
     return raw ? (JSON.parse(raw) as Settings) : null;

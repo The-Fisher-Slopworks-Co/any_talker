@@ -164,11 +164,25 @@ Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
 bot-side authorization gate (owner / user-whitelist / chat-whitelist). Outgoing
 text goes through `html.ts` (whitelist HTML sanitizer) and `format.ts` (bot-name
 prefix, expandable blockquote, 4096-char truncation). `createBot` is
-parameterized by a `resolver` (the persona) and an optional `persona`
-(`{botId, selfUsername}`): when present it is a **managed bot** — it scopes
-per-character storage with `storage.forBot(botId)`, threads `botId` into the tool
-call context, and matches `/ask@selfUsername` strictly (never bare `/ask`).
-**Depends on:** `ai`, `storage`, `ratelimit`, `settings`, `managed-bots`
+parameterized by a `resolver` (the persona), an optional `persona` (`{botId}`),
+and an optional `siblingBotIds`: when `persona` is present it is a **managed
+bot** — it scopes per-character storage with `storage.forBot(botId)` and threads
+`botId` into the tool call context.
+
+**Ask routing (`matchAsk` + `askGate`).** Both are pure and matched against the
+bot's live `ctx.me.username` (no stale username). `matchAsk` parses `/ask(wise)`
+and returns `{detailLevel, userText, explicit}` (or null for non-ask / a mention
+to a *different* bot — this is what stops the main bot stealing a
+`/ask@CharacterBot` caption). `askGate` then decides: an explicit `@self` is
+always answered; the main bot answers a bare `/ask` everywhere; a managed bot
+answers a bare `/ask` only in its **DM**, or in a group when it is the **only
+family bot present** (resolved via the presence registry, see below). Every bot
+(main and managed) records its own group membership — authoritatively on
+`my_chat_member`, and refreshed on activity — into a shared `bot_presence`
+registry; `computeAlone` reads it (TTL-pruned) to make the group decision.
+Managed bots also `syncBotCommands` for their own `/ask` menu, and carry **no
+bold name prefix** (a managed bot *is* the character — `resolver` returns a null
+`botName`). **Depends on:** `ai`, `storage`, `ratelimit`, `settings`, `managed-bots`
 (persona), `shared/i18n`, `metrics`, `checks/resolve`. **Depended on by:**
 `main.ts`, `managed-bots/manager`.
 
@@ -355,6 +369,7 @@ persisted entities:
 | Private-chat flag | `at:user_private_chat:{userId}` | string `"1"` | — | presence sentinel |
 | Managed-bot registry | `at:managed_bots` | hash | — | `ManagedBot` per `botId` (`{botId, ownerUserId, username, displayName, systemPrompt, createdAtMs}`) |
 | Managed-bot token | `at:managed_bot_token:{botId}` | string (raw) | — | bot token (**plaintext**, like BYOK); never returned to the UI |
+| Bot presence | `at:bot_presence:{chatId}` | hash | TTL-read (7 d) | `botId → last-seen ms` for every family bot in a group; drives the bare-`/ask` alone-check. Shared (unscoped), like the registry. |
 
 **Per-character scoping (`forBot`).** `Storage.forBot(botId)` returns a view that
 namespaces a bot's per-character data under an `at:mbot:{botId}:` segment, while
@@ -499,3 +514,13 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   isolation test. Persona is **per-bot** (name + prompt + memory + reminders);
   configuration (models, limits, provider) is **inherited from the main bot's
   global settings**, deliberately ignoring its per-chat overrides.
+- **Bare-`/ask` alone-check via presence tracking, not `getChatMember`** — a
+  managed bot answers a bare `/ask` in a group only when it is the sole family
+  bot there. `getChatMember` would be authoritative but Telegram only guarantees
+  it for *admin* bots, so a regular-member character bot couldn't probe its
+  siblings. Instead each bot records its own membership (authoritative on
+  `my_chat_member`, refreshed on activity) into a shared `bot_presence` registry,
+  which works without admin. Trade-off: a rare one-off double-answer at cold
+  start (a pre-existing chat right after deploy, before siblings re-register),
+  self-healing on first activity; the alone-check fails **closed** (a storage
+  error ⇒ stay silent) so it never double-answers the main bot.
