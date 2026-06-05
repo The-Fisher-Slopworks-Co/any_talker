@@ -178,8 +178,10 @@ always answered; the main bot answers a bare `/ask` everywhere; a managed bot
 answers a bare `/ask` only in its **DM**, or in a group when it is the **only
 family bot present** (resolved via the presence registry, see below). Every bot
 (main and managed) records its own group membership — authoritatively on
-`my_chat_member`, and refreshed on activity — into a shared `bot_presence`
-registry; `computeAlone` reads it (TTL-pruned) to make the group decision.
+`my_chat_member`, and refreshed on genuine activity (`shouldRefreshPresence`:
+content messages only, never the service/membership burst a bot drains around
+its own removal) — into a shared `bot_presence` registry; `computeAlone` reads it
+(TTL-pruned) to make the group decision.
 Managed bots also `syncBotCommands` for their own `/ask` menu, and carry **no
 bold name prefix** (a managed bot *is* the character — `resolver` returns a null
 `botName`). **Depends on:** `ai`, `storage`, `ratelimit`, `settings`, `managed-bots`
