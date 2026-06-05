@@ -6,6 +6,7 @@ import { MemoryStorage } from "../../storage/memory";
 import { TokenBucketLimiter } from "../../ratelimit/token-bucket";
 import type { AIClient, AskResult } from "../../ai/types";
 import { guestAskHandler, type GuestAskInput } from "./guest";
+import { createMainPersonaResolver } from "../../managed-bots/persona";
 import { DEFAULT_SETTINGS, MAX_REPLY_CHAIN_DEPTH } from "../../shared/types";
 
 class FakeAI implements AIClient {
@@ -17,20 +18,24 @@ class FakeAI implements AIClient {
   }
 }
 
-const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => ({
-  storage: new MemoryStorage(),
-  rateLimiter: new TokenBucketLimiter(new MemoryStorage()),
-  ai: new FakeAI(),
-  ownerId: "1",
-  now: 1_000,
-  chatId: "c1",
-  userId: "42",
-  sender: { firstName: "Jane", lastName: null, nameOverride: null, gender: null },
-  userText: "hello",
-  priorThread: null,
-  lang: "en",
-  ...overrides,
-});
+const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
+  const storage = overrides.storage ?? new MemoryStorage();
+  return {
+    storage,
+    rateLimiter: new TokenBucketLimiter(new MemoryStorage()),
+    ai: new FakeAI(),
+    resolver: createMainPersonaResolver(storage),
+    ownerId: "1",
+    now: 1_000,
+    chatId: "c1",
+    userId: "42",
+    sender: { firstName: "Jane", lastName: null, nameOverride: null, gender: null },
+    userText: "hello",
+    priorThread: null,
+    lang: "en",
+    ...overrides,
+  };
+};
 
 describe("guestAskHandler", () => {
   test("denied when not whitelisted and not owner", async () => {

@@ -17,6 +17,13 @@ export type ToolCallContext = {
   source: ToolCallSource;
   chatId: string;
   userId: string;
+  // Scope token of the bot this turn is running under: omitted/`null` for the
+  // main bot, the managed bot's id otherwise. Tools that persist per-character
+  // data (reminders, user facts) scope their writes with
+  // `storage.forBot(botId ?? null)` — this is the only place that identity is
+  // threaded into the tool layer, since the registry hands every tool the
+  // shared base storage.
+  botId?: string | null;
   replyToMessageId: number | null;
   timezone: string;
   lang: Lang;

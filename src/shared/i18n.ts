@@ -44,6 +44,7 @@ type Strings = {
   bot_contact_added: (label: string) => string;
   bot_check_wrong_user: string;
   bot_reminder_scheduled: (parts: ReminderTimeParts) => string;
+  bot_managed_bot_created: (username: string) => string;
 
   ui_loading: string;
   ui_saving: string;
@@ -328,6 +329,41 @@ type Strings = {
   ui_check_pending_yes: string;
   ui_check_pending_no: string;
   ui_check_save_validation_error: (code: string) => string;
+
+  ui_admin_bots: string;
+  ui_admin_bots_desc: string;
+  ui_route_bot_edit: string;
+  ui_route_bot_create: string;
+  ui_mbots_all: string;
+  ui_mbots_empty: string;
+  ui_mbots_footer: string;
+  ui_mbots_create: string;
+  ui_mbots_running: string;
+  ui_mbots_stopped: string;
+  ui_mbot_display_name: string;
+  ui_mbot_display_name_placeholder: string;
+  ui_mbot_username: string;
+  ui_mbot_system_prompt: string;
+  ui_mbot_system_prompt_placeholder: string;
+  ui_mbot_system_prompt_footer: string;
+  ui_mbot_status: string;
+  ui_mbot_avatar: string;
+  ui_mbot_avatar_upload: string;
+  ui_mbot_avatar_footer: string;
+  ui_mbot_avatar_saved: string;
+  ui_mbot_avatar_failed: string;
+  ui_mbot_delete: string;
+  ui_mbot_delete_confirm: string;
+  ui_mbot_not_found: string;
+  ui_mbot_save_error: (code: string) => string;
+  ui_mbot_create_intro: string;
+  ui_mbot_create_need_manage: string;
+  ui_mbot_create_name: string;
+  ui_mbot_create_name_placeholder: string;
+  ui_mbot_create_username: string;
+  ui_mbot_create_username_placeholder: string;
+  ui_mbot_create_open: string;
+  ui_mbot_create_footer: string;
 };
 
 const en: Strings = {
@@ -350,6 +386,8 @@ const en: Strings = {
     const pad = (n: number) => n.toString().padStart(2, "0");
     return `Reminder set for ${p.year}-${pad(p.month)}-${pad(p.day)} at ${pad(p.hour)}:${pad(p.minute)} (${p.offset})`;
   },
+  bot_managed_bot_created: (username) =>
+    `✅ Managed bot @${username} is now running.`,
 
   ui_loading: "Loading…",
   ui_saving: "Saving…",
@@ -685,6 +723,48 @@ const en: Strings = {
   ui_check_pending_yes: "Yes",
   ui_check_pending_no: "No",
   ui_check_save_validation_error: (code) => `Validation error: ${code}`,
+
+  ui_admin_bots: "Character Bots",
+  ui_admin_bots_desc: "Managed bots — extra characters with their own persona",
+  ui_route_bot_edit: "Edit Bot",
+  ui_route_bot_create: "New Bot",
+  ui_mbots_all: "Your character bots",
+  ui_mbots_empty: "No character bots yet.",
+  ui_mbots_footer:
+    "Each character is its own Telegram bot with its own avatar, prompt, reminders and memory. It answers only when addressed as /ask@its_username.",
+  ui_mbots_create: "New character bot",
+  ui_mbots_running: "running",
+  ui_mbots_stopped: "stopped",
+  ui_mbot_display_name: "Display name",
+  ui_mbot_display_name_placeholder: "e.g. Kitty",
+  ui_mbot_username: "Username",
+  ui_mbot_system_prompt: "System prompt",
+  ui_mbot_system_prompt_placeholder: "Describe this character's persona…",
+  ui_mbot_system_prompt_footer:
+    "Overrides the global prompt for this bot only. All other settings (models, limits, provider) are inherited from the main bot.",
+  ui_mbot_status: "Status",
+  ui_mbot_avatar: "Avatar",
+  ui_mbot_avatar_upload: "Upload image",
+  ui_mbot_avatar_footer:
+    "A static .jpg/.png. Applied immediately to the running bot via Telegram.",
+  ui_mbot_avatar_saved: "Avatar updated.",
+  ui_mbot_avatar_failed: "Couldn't set the avatar (is the bot running?).",
+  ui_mbot_delete: "Delete bot",
+  ui_mbot_delete_confirm:
+    "Delete this character bot? It will stop running. Its reminders and memory are left in storage.",
+  ui_mbot_not_found: "Bot not found.",
+  ui_mbot_save_error: (code) => `Couldn't save: ${code}`,
+  ui_mbot_create_intro:
+    "Creating a character bot opens @BotFather in Telegram to make a brand-new bot that this bot will manage. When it's done, it appears in the list above.",
+  ui_mbot_create_need_manage:
+    "First enable bot management for the main bot in the @BotFather Mini App, then come back here.",
+  ui_mbot_create_name: "Suggested name",
+  ui_mbot_create_name_placeholder: "e.g. Kitty",
+  ui_mbot_create_username: "Suggested username",
+  ui_mbot_create_username_placeholder: "must end in 'bot'",
+  ui_mbot_create_open: "Create in Telegram",
+  ui_mbot_create_footer:
+    "After Telegram finishes creating the bot, return here and pull to refresh — it will show up, then you can set its prompt and avatar.",
 };
 
 const ru: Strings = {
@@ -707,6 +787,8 @@ const ru: Strings = {
     const pad = (n: number) => n.toString().padStart(2, "0");
     return `Было создано напоминание на ${pad(p.day)}.${pad(p.month)}.${p.year} в ${pad(p.hour)}:${pad(p.minute)} (${p.offset})`;
   },
+  bot_managed_bot_created: (username) =>
+    `✅ Управляемый бот @${username} запущен.`,
 
   ui_loading: "Загрузка…",
   ui_saving: "Сохранение…",
@@ -1048,6 +1130,48 @@ const ru: Strings = {
   ui_check_pending_yes: "Да",
   ui_check_pending_no: "Нет",
   ui_check_save_validation_error: (code) => `Ошибка валидации: ${code}`,
+
+  ui_admin_bots: "Боты-персонажи",
+  ui_admin_bots_desc: "Управляемые боты — дополнительные персонажи со своей персоной",
+  ui_route_bot_edit: "Редактирование бота",
+  ui_route_bot_create: "Новый бот",
+  ui_mbots_all: "Ваши боты-персонажи",
+  ui_mbots_empty: "Пока нет ботов-персонажей.",
+  ui_mbots_footer:
+    "Каждый персонаж — это отдельный Telegram-бот со своей аватаркой, промптом, напоминаниями и памятью. Отвечает только при обращении /ask@его_username.",
+  ui_mbots_create: "Новый бот-персонаж",
+  ui_mbots_running: "запущен",
+  ui_mbots_stopped: "остановлен",
+  ui_mbot_display_name: "Отображаемое имя",
+  ui_mbot_display_name_placeholder: "напр. Кошечка",
+  ui_mbot_username: "Username",
+  ui_mbot_system_prompt: "Системный промпт",
+  ui_mbot_system_prompt_placeholder: "Опишите персону этого персонажа…",
+  ui_mbot_system_prompt_footer:
+    "Переопределяет глобальный промпт только для этого бота. Все остальные настройки (модели, лимиты, провайдер) наследуются от основного бота.",
+  ui_mbot_status: "Статус",
+  ui_mbot_avatar: "Аватар",
+  ui_mbot_avatar_upload: "Загрузить изображение",
+  ui_mbot_avatar_footer:
+    "Статичный .jpg/.png. Применяется к запущенному боту через Telegram немедленно.",
+  ui_mbot_avatar_saved: "Аватар обновлён.",
+  ui_mbot_avatar_failed: "Не удалось установить аватар (бот запущен?).",
+  ui_mbot_delete: "Удалить бота",
+  ui_mbot_delete_confirm:
+    "Удалить этого бота-персонажа? Он перестанет работать. Его напоминания и память останутся в хранилище.",
+  ui_mbot_not_found: "Бот не найден.",
+  ui_mbot_save_error: (code) => `Не удалось сохранить: ${code}`,
+  ui_mbot_create_intro:
+    "Создание бота-персонажа открывает @BotFather в Telegram, чтобы сделать нового бота, которым будет управлять этот бот. После создания он появится в списке выше.",
+  ui_mbot_create_need_manage:
+    "Сначала включите управление ботами для основного бота в Mini App @BotFather, затем вернитесь сюда.",
+  ui_mbot_create_name: "Предлагаемое имя",
+  ui_mbot_create_name_placeholder: "напр. Кошечка",
+  ui_mbot_create_username: "Предлагаемый username",
+  ui_mbot_create_username_placeholder: "должен оканчиваться на 'bot'",
+  ui_mbot_create_open: "Создать в Telegram",
+  ui_mbot_create_footer:
+    "После того как Telegram создаст бота, вернитесь сюда и обновите страницу — он появится, и вы сможете задать ему промпт и аватар.",
 };
 
 export const MESSAGES: Record<Lang, Strings> = { en, ru };

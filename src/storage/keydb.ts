@@ -31,6 +31,7 @@ import {
   type ReminderParseFailureReason,
 } from "../reminders/parse";
 import type { RecurringCheck } from "../checks/types";
+import type { ManagedBot } from "../managed-bots/types";
 import { photoCacheErrorsTotal, remindersParseFailuresTotal } from "../metrics";
 import type { SpendSummary } from "../spending/window";
 import {
@@ -151,12 +152,94 @@ export function parseRememberFactReply(
 }
 
 export class KeyDBStorage implements Storage {
-  constructor(private readonly client: RedisClient) {}
+  // `botPrefix` is "" for the main bot (legacy unprefixed keys) or
+  // `mbot:{botId}:` for a managed bot. It is interposed between the global
+  // `at:` prefix and the entity segment for per-character data only.
+  constructor(
+    private readonly client: RedisClient,
+    private readonly botPrefix: string = "",
+  ) {}
 
   static async connect(url: string): Promise<KeyDBStorage> {
     const client = new RedisClient(url);
     await client.connect();
     return new KeyDBStorage(client);
+  }
+
+  forBot(botId: string | null): Storage {
+    const prefix = botId ? `mbot:${botId}:` : "";
+    if (prefix === this.botPrefix) return this;
+    return new KeyDBStorage(this.client, prefix);
+  }
+
+  // Build a per-character-scoped key. `forBot(null)` keeps `botPrefix === ""`,
+  // so this is byte-identical to the original `${PREFIX}${base}` for the main
+  // bot; a managed bot inserts its `mbot:{botId}:` segment.
+  private sk(base: string): string {
+    return `${PREFIX}${this.botPrefix}${base}`;
+  }
+
+  async listManagedBots(): Promise<ManagedBot[]> {
+    const values = await this.client.hvals(`${PREFIX}managed_bots`);
+    return values
+      .map((raw) => JSON.parse(raw) as ManagedBot)
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  }
+
+  async getManagedBot(botId: string): Promise<ManagedBot | null> {
+    const raw = await this.client.hget(`${PREFIX}managed_bots`, botId);
+    return raw ? (JSON.parse(raw) as ManagedBot) : null;
+  }
+
+  async saveManagedBot(bot: ManagedBot): Promise<void> {
+    await this.client.hset(
+      `${PREFIX}managed_bots`,
+      bot.botId,
+      JSON.stringify(bot),
+    );
+  }
+
+  async deleteManagedBot(botId: string): Promise<void> {
+    await this.client.hdel(`${PREFIX}managed_bots`, botId);
+  }
+
+  async getManagedBotToken(botId: string): Promise<string | null> {
+    return await this.client.get(`${PREFIX}managed_bot_token:${botId}`);
+  }
+
+  async setManagedBotToken(botId: string, token: string | null): Promise<void> {
+    const key = `${PREFIX}managed_bot_token:${botId}`;
+    if (token === null) await this.client.del(key);
+    else await this.client.set(key, token);
+  }
+
+  // Presence is a shared registry (unscoped, like `managed_bots`): every bot —
+  // main and managed — records its own membership under the same per-chat hash,
+  // field = bot id, value = last-seen epoch ms. TTL pruning is the reader's job.
+  async recordBotPresence(
+    chatId: string,
+    botId: string,
+    atMs: number,
+  ): Promise<void> {
+    await this.client.hset(
+      `${PREFIX}bot_presence:${chatId}`,
+      botId,
+      String(atMs),
+    );
+  }
+
+  async removeBotPresence(chatId: string, botId: string): Promise<void> {
+    await this.client.hdel(`${PREFIX}bot_presence:${chatId}`, botId);
+  }
+
+  async getBotPresence(chatId: string): Promise<Record<string, number>> {
+    const raw = await this.client.hgetall(`${PREFIX}bot_presence:${chatId}`);
+    const out: Record<string, number> = {};
+    for (const [botId, ms] of Object.entries(raw)) {
+      const n = Number(ms);
+      if (Number.isFinite(n)) out[botId] = n;
+    }
+    return out;
   }
 
   async getSettings(): Promise<Settings | null> {
@@ -390,7 +473,7 @@ export class KeyDBStorage implements Storage {
   }
 
   async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {
-    const raw = await this.client.get(`${PREFIX}msg:${chatId}:${botMsgId}`);
+    const raw = await this.client.get(this.sk(`msg:${chatId}:${botMsgId}`));
     return raw ? (JSON.parse(raw) as ConversationNode) : null;
   }
 
@@ -399,7 +482,7 @@ export class KeyDBStorage implements Storage {
     botMsgId: number,
     node: ConversationNode,
   ): Promise<void> {
-    const key = `${PREFIX}msg:${chatId}:${botMsgId}`;
+    const key = this.sk(`msg:${chatId}:${botMsgId}`);
     await this.client.set(key, JSON.stringify(node));
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
@@ -431,7 +514,7 @@ export class KeyDBStorage implements Storage {
     mediaGroupId: string,
     photo: { messageId: number; fileId: string },
   ): Promise<void> {
-    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    const key = this.sk(`album:${chatId}:${mediaGroupId}`);
     await this.client.hset(key, String(photo.messageId), photo.fileId);
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
@@ -440,7 +523,7 @@ export class KeyDBStorage implements Storage {
     chatId: string,
     mediaGroupId: string,
   ): Promise<Array<{ messageId: number; fileId: string }>> {
-    const key = `${PREFIX}album:${chatId}:${mediaGroupId}`;
+    const key = this.sk(`album:${chatId}:${mediaGroupId}`);
     const all = await this.client.hgetall(key);
     const out: Array<{ messageId: number; fileId: string }> = [];
     for (const [field, value] of Object.entries(all)) {
@@ -451,12 +534,12 @@ export class KeyDBStorage implements Storage {
   }
 
   async getGuestThread(chatId: string): Promise<GuestThreadNode | null> {
-    const raw = await this.client.get(`${PREFIX}guest_thread:${chatId}`);
+    const raw = await this.client.get(this.sk(`guest_thread:${chatId}`));
     return raw ? (JSON.parse(raw) as GuestThreadNode) : null;
   }
 
   async saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void> {
-    const key = `${PREFIX}guest_thread:${chatId}`;
+    const key = this.sk(`guest_thread:${chatId}`);
     await this.client.set(key, JSON.stringify(thread));
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
@@ -465,16 +548,16 @@ export class KeyDBStorage implements Storage {
     // ZSET first so a crash leaves an orphan fetchDueReminders can GC;
     // payload-first would leak blobs no scheduler tick ever discovers.
     await this.client.zadd(
-      `${PREFIX}reminders:due`,
+      this.sk("reminders:due"),
       reminder.fireAtMs,
       reminder.id,
     );
     await this.client.set(
-      `${PREFIX}reminder:${reminder.id}`,
+      this.sk(`reminder:${reminder.id}`),
       JSON.stringify(reminder),
     );
     await this.client.sadd(
-      `${PREFIX}user_reminders:${reminder.userId}`,
+      this.sk(`user_reminders:${reminder.userId}`),
       reminder.id,
     );
   }
@@ -483,7 +566,7 @@ export class KeyDBStorage implements Storage {
     // Cap per-tick batch so a backlog after an outage drains over multiple
     // ticks instead of fanning out into one thundering Telegram-API herd.
     const ids = await this.client.zrangebyscore(
-      `${PREFIX}reminders:due`,
+      this.sk("reminders:due"),
       0,
       nowMs,
       "LIMIT",
@@ -491,7 +574,7 @@ export class KeyDBStorage implements Storage {
       FETCH_DUE_LIMIT,
     );
     if (ids.length === 0) return [];
-    const keys = ids.map((id) => `${PREFIX}reminder:${id}`);
+    const keys = ids.map((id) => this.sk(`reminder:${id}`));
     const raws = await this.client.mget(...keys);
     const out: Reminder[] = [];
     const orphans: string[] = [];
@@ -523,7 +606,7 @@ export class KeyDBStorage implements Storage {
     for (const { id, reason } of corrupted) {
       remindersParseFailuresTotal.inc({ reason });
       await this.client
-        .del(`${PREFIX}reminder:${id}`)
+        .del(this.sk(`reminder:${id}`))
         .catch((err) =>
           console.error("quarantine del payload failed:", err),
         );
@@ -531,7 +614,7 @@ export class KeyDBStorage implements Storage {
     }
     if (orphans.length > 0) {
       await this.client
-        .zrem(`${PREFIX}reminders:due`, orphans[0]!, ...orphans.slice(1))
+        .zrem(this.sk("reminders:due"), orphans[0]!, ...orphans.slice(1))
         .catch((err) =>
           console.error("zrem orphan reminders failed:", err),
         );
@@ -540,9 +623,9 @@ export class KeyDBStorage implements Storage {
   }
 
   async listRemindersForUser(userId: string): Promise<Reminder[]> {
-    const ids = await this.client.smembers(`${PREFIX}user_reminders:${userId}`);
+    const ids = await this.client.smembers(this.sk(`user_reminders:${userId}`));
     if (ids.length === 0) return [];
-    const keys = ids.map((id) => `${PREFIX}reminder:${id}`);
+    const keys = ids.map((id) => this.sk(`reminder:${id}`));
     const raws = await this.client.mget(...keys);
     const out: Reminder[] = [];
     for (let i = 0; i < ids.length; i++) {
@@ -567,12 +650,12 @@ export class KeyDBStorage implements Storage {
 
   async listAllReminders(): Promise<Reminder[]> {
     const ids = await this.client.zrange(
-      `${PREFIX}reminders:due`,
+      this.sk("reminders:due"),
       0,
       -1,
     );
     if (ids.length === 0) return [];
-    const keys = ids.map((id) => `${PREFIX}reminder:${id}`);
+    const keys = ids.map((id) => this.sk(`reminder:${id}`));
     const raws = await this.client.mget(...keys);
     const out: Reminder[] = [];
     for (let i = 0; i < ids.length; i++) {
@@ -599,17 +682,17 @@ export class KeyDBStorage implements Storage {
     // Payload first so a crash leaves a ZSET orphan fetchDueReminders can GC;
     // index-first would leak a payload key (no TTL). user_reminders may
     // briefly reference a deleted id; listRemindersForUser skips MGET nulls.
-    await this.client.del(`${PREFIX}reminder:${id}`);
-    await this.client.zrem(`${PREFIX}reminders:due`, id);
-    await this.client.srem(`${PREFIX}user_reminders:${userId}`, id);
+    await this.client.del(this.sk(`reminder:${id}`));
+    await this.client.zrem(this.sk("reminders:due"), id);
+    await this.client.srem(this.sk(`user_reminders:${userId}`), id);
   }
 
   async recordPrivateChat(userId: string): Promise<void> {
-    await this.client.set(`${PREFIX}user_private_chat:${userId}`, "1");
+    await this.client.set(this.sk(`user_private_chat:${userId}`), "1");
   }
 
   async userHasPrivateChat(userId: string): Promise<boolean> {
-    const v = await this.client.get(`${PREFIX}user_private_chat:${userId}`);
+    const v = await this.client.get(this.sk(`user_private_chat:${userId}`));
     return v !== null;
   }
 
@@ -646,7 +729,7 @@ export class KeyDBStorage implements Storage {
     const reply = await this.client.send("EVAL", [
       REMEMBER_FACT_LUA,
       "1",
-      `${PREFIX}user_facts:${userId}`,
+      this.sk(`user_facts:${userId}`),
       normKey,
       value,
       String(USER_FACTS_MAX_PER_USER),
@@ -657,7 +740,7 @@ export class KeyDBStorage implements Storage {
   async listUserFacts(
     userId: string,
   ): Promise<Array<{ key: string; value: string }>> {
-    const all = await this.client.hgetall(`${PREFIX}user_facts:${userId}`);
+    const all = await this.client.hgetall(this.sk(`user_facts:${userId}`));
     return Object.entries(all)
       .map(([key, value]) => ({ key, value }))
       .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
@@ -669,7 +752,7 @@ export class KeyDBStorage implements Storage {
   ): Promise<{ existed: boolean }> {
     const normKey = key.toLowerCase();
     const removed = await this.client.hdel(
-      `${PREFIX}user_facts:${userId}`,
+      this.sk(`user_facts:${userId}`),
       normKey,
     );
     return { existed: removed > 0 };

@@ -28,8 +28,10 @@ import {
 } from "../shared/display-name";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { ManagedBot } from "../managed-bots/types";
 import type { SpendSummary } from "../spending/window";
 import { normalizeCheckInput } from "../checks/validate";
+import { normalizeManagedBotInput } from "../managed-bots/validate";
 import { getOrInitSettings } from "../settings";
 import {
   isValidPermaslug,
@@ -49,14 +51,49 @@ export type ApiActor = {
   isOwner: boolean;
 };
 
+// The slice of the BotManager the API needs: enough to mutate a running bot's
+// live state (avatar, name), tear it down, and surface creation prerequisites.
+// Narrowed so api.ts stays decoupled from grammY and is testable with a stub.
+export type ManagedBotController = {
+  isRunning(botId: string): boolean;
+  setAvatar(botId: string, bytes: Uint8Array): Promise<boolean>;
+  deleteBot(botId: string): Promise<void>;
+  syncProfileName(botId: string): Promise<void>;
+  managerInfo(): Promise<{ username: string | null; canManageBots: boolean }>;
+};
+
 export type ApiDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ownerId: string;
   fetchOpenRouterStats?: FetchOpenRouterStats;
+  managedBots?: ManagedBotController;
 };
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
+
+const MANAGED_BOTS_UNAVAILABLE: ApiResponse = {
+  status: 503,
+  body: { error: "managed bots not available" },
+};
+
+// Avatars arrive as a base64 string (optionally a data URL) in the JSON body, so
+// the server stays JSON-only with no multipart handling. Capped to bound memory.
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+function decodeBase64Image(input: unknown): Uint8Array | null {
+  if (typeof input !== "string" || input.length === 0) return null;
+  const comma = input.indexOf(",");
+  const b64 =
+    input.startsWith("data:") && comma >= 0 ? input.slice(comma + 1) : input;
+  try {
+    const bytes = Uint8Array.from(Buffer.from(b64, "base64"));
+    if (bytes.length === 0 || bytes.length > MAX_AVATAR_BYTES) return null;
+    return bytes;
+  } catch {
+    return null;
+  }
+}
 
 function badDisplayName(reason: DisplayNameError): ApiResponse {
   return {
@@ -843,6 +880,79 @@ export async function handleApi(
       const next = normalizeChatSettings(req.body);
       await deps.storage.saveChatSettings(id, next);
       return { status: 200, body: { chat, settings: next } };
+    }
+  }
+
+  if (req.path === "/api/admin/managed-bots" && req.method === "GET") {
+    const bots = await deps.storage.listManagedBots();
+    const rows = bots.map((b) => ({
+      ...b,
+      running: deps.managedBots?.isRunning(b.botId) ?? false,
+    }));
+    return { status: 200, body: { bots: rows } };
+  }
+
+  // Prerequisites for the native creation flow: the main bot's username (to
+  // build the `t.me/newbot/{manager}/{suggested}` deep link) and whether bot
+  // management is enabled for it in @BotFather. Matched before the `/:id` route.
+  if (req.path === "/api/admin/managed-bots/new" && req.method === "GET") {
+    if (!deps.managedBots) return MANAGED_BOTS_UNAVAILABLE;
+    const info = await deps.managedBots.managerInfo();
+    return { status: 200, body: info };
+  }
+
+  const mbAvatarMatch = req.path.match(
+    /^\/api\/admin\/managed-bots\/([^/]+)\/avatar$/,
+  );
+  if (mbAvatarMatch && req.method === "PUT") {
+    const id = mbAvatarMatch[1]!;
+    if (!deps.managedBots) return MANAGED_BOTS_UNAVAILABLE;
+    const bytes = decodeBase64Image(
+      (req.body as { photoBase64?: unknown } | null)?.photoBase64,
+    );
+    if (!bytes) return { status: 400, body: { error: "invalid image" } };
+    const ok = await deps.managedBots.setAvatar(id, bytes);
+    if (!ok) {
+      return { status: 502, body: { error: "set_avatar_failed" } };
+    }
+    return { status: 200, body: { ok: true } };
+  }
+
+  const mbMatch = req.path.match(/^\/api\/admin\/managed-bots\/([^/]+)$/);
+  if (mbMatch) {
+    const id = mbMatch[1]!;
+    if (req.method === "GET") {
+      const bot = await deps.storage.getManagedBot(id);
+      if (!bot) return { status: 404, body: { error: "managed bot not found" } };
+      return {
+        status: 200,
+        body: { bot, running: deps.managedBots?.isRunning(id) ?? false },
+      };
+    }
+    if (req.method === "PUT") {
+      const existing = await deps.storage.getManagedBot(id);
+      if (!existing) {
+        return { status: 404, body: { error: "managed bot not found" } };
+      }
+      const parsed = normalizeManagedBotInput(req.body);
+      if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
+      const next: ManagedBot = { ...existing, ...parsed.value };
+      await deps.storage.saveManagedBot(next);
+      // Push the (possibly changed) display name to Telegram for the live bot.
+      await deps.managedBots?.syncProfileName(id);
+      return {
+        status: 200,
+        body: { bot: next, running: deps.managedBots?.isRunning(id) ?? false },
+      };
+    }
+    if (req.method === "DELETE") {
+      if (deps.managedBots) {
+        await deps.managedBots.deleteBot(id);
+      } else {
+        await deps.storage.deleteManagedBot(id);
+        await deps.storage.setManagedBotToken(id, null);
+      }
+      return { status: 200, body: { ok: true } };
     }
   }
 

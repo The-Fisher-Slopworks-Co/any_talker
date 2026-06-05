@@ -9,6 +9,7 @@ import { LoadingState } from "../../components/states";
 import { RemindersList } from "../reminders-list";
 import { ChatsTab } from "./chats-tab";
 import { ChecksTab } from "./checks-tab";
+import { ManagedBotsTab } from "./managed-bots-tab";
 import { PromptTab } from "./prompt-tab";
 import { RateLimitTab } from "./rate-limit-tab";
 import { UsersTab } from "./users-tab";
@@ -20,11 +21,13 @@ export function AdminSectionView({
   onEditUser,
   onEditChat,
   onEditCheck,
+  onEditManagedBot,
 }: {
   section: AdminSection;
   onEditUser: (id: string, from: AdminSection) => void;
   onEditChat: (id: string, from: AdminSection) => void;
   onEditCheck: (id: string | null) => void;
+  onEditManagedBot: (id: string | null) => void;
 }) {
   const { t: s } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -45,6 +48,13 @@ export function AdminSectionView({
       <ChecksTab
         onEdit={(id) => onEditCheck(id)}
         onCreate={() => onEditCheck(null)}
+      />
+    );
+  if (section === "bots")
+    return (
+      <ManagedBotsTab
+        onEdit={(id) => onEditManagedBot(id)}
+        onCreate={() => onEditManagedBot(null)}
       />
     );
   if (section === "reminders")
