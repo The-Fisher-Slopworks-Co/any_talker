@@ -28,6 +28,7 @@ function makeManager(storage: MemoryStorage) {
     ai: {} as unknown as AIClient,
     ownerId: "1",
     mainApi,
+    mainBotId: "1000",
     logFormat: "json",
     logIncomingUpdates: false,
     logDebug: false,

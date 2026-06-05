@@ -71,12 +71,16 @@ async function main() {
     logDebug: config.logDebug,
   });
 
+  // Resolve the main bot's id up front (deterministic, no startup race): managed
+  // bots treat it as a sibling for the bare-`/ask` alone-check.
+  const mainMe = await bot.api.getMe();
   const botManager = new BotManager({
     storage,
     rateLimiter,
     ai,
     ownerId: config.botOwnerId,
     mainApi: bot.api,
+    mainBotId: String(mainMe.id),
     logFormat: config.logFormat,
     logIncomingUpdates: config.logIncomingUpdates,
     logDebug: config.logDebug,

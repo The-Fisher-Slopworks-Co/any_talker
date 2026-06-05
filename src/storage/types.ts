@@ -42,6 +42,16 @@ export interface Storage {
   getManagedBotToken(botId: string): Promise<string | null>;
   setManagedBotToken(botId: string, token: string | null): Promise<void>;
 
+  // Cross-bot presence registry (global, not affected by `forBot`): tracks which
+  // "family" bots (main + managed) are members of each group chat, so a managed
+  // bot can tell whether it is alone there and may answer a bare `/ask`. Each
+  // entry maps a bot id to its last-seen epoch ms; the value is refreshed on
+  // membership changes and on activity, and the reader prunes stale entries by
+  // TTL. Private chats are never tracked (a DM is inherently one-bot).
+  recordBotPresence(chatId: string, botId: string, atMs: number): Promise<void>;
+  removeBotPresence(chatId: string, botId: string): Promise<void>;
+  getBotPresence(chatId: string): Promise<Record<string, number>>;
+
   getSettings(): Promise<Settings | null>;
   saveSettings(settings: Settings): Promise<void>;
 

@@ -8,6 +8,7 @@ import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
 import type { LogFormat } from "../log";
 import { createBot, type BotDeps } from "../bot";
+import { syncBotCommands } from "../bot/commands";
 import type { BotContext } from "../bot/middleware/lang";
 import { ALLOWED_UPDATES } from "../bot/allowed-updates";
 import { createManagedPersonaResolver } from "./persona";
@@ -35,6 +36,9 @@ export type BotManagerDeps = {
   ownerId: string;
   // The main bot's api — used to broker managed bot tokens (getManagedBotToken).
   mainApi: Api;
+  // The main bot's user id. A managed bot treats it as a sibling when deciding
+  // whether it is alone in a group (so a bare `/ask` defers to the main bot).
+  mainBotId: string;
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
   logDebug: boolean;
@@ -136,6 +140,7 @@ export class BotManager {
       ai: this.deps.ai,
       resolver: createManagedPersonaResolver(this.deps.storage, record.botId),
       persona: { botId: record.botId },
+      siblingBotIds: () => this.siblingBotIds(record.botId),
       logFormat: this.deps.logFormat,
       logIncomingUpdates: this.deps.logIncomingUpdates,
       logDebug: this.deps.logDebug,
@@ -148,6 +153,11 @@ export class BotManager {
     await bot.api
       .setMyName(record.displayName)
       .catch((err) => console.error(`[managed-bots] setMyName failed:`, err));
+    // Register the `/ask` command menu for this bot too (best-effort), so a
+    // managed bot exposes the same commands as the main bot in its own DMs.
+    await syncBotCommands(bot.api).catch((err) =>
+      console.error(`[managed-bots] syncBotCommands failed:`, err),
+    );
     bot.start({
       drop_pending_updates: true,
       allowed_updates: [...ALLOWED_UPDATES],
@@ -239,6 +249,18 @@ export class BotManager {
 
   isRunning(botId: string): boolean {
     return this.running.has(botId);
+  }
+
+  // The other family bots a managed bot shares chats with: the main bot plus
+  // every OTHER running managed bot (self excluded). Used by the bare-`/ask`
+  // alone-check — a managed bot stays silent on a bare `/ask` in a group while
+  // any of these is present there.
+  private siblingBotIds(selfBotId: string): string[] {
+    const ids = [this.deps.mainBotId];
+    for (const id of this.running.keys()) {
+      if (id !== selfBotId) ids.push(id);
+    }
+    return ids;
   }
 
   // Prerequisites for the native creation flow, read from the main bot: its

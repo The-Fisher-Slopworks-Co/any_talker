@@ -56,6 +56,11 @@ export type BotDeps = {
   resolver: PersonaResolver;
   // Present for managed bots only; absent ⇒ the main bot.
   persona?: BotPersona;
+  // The user ids of the OTHER family bots (the main bot + every other managed
+  // bot) this bot should consider when deciding whether it is alone in a group.
+  // Supplied by `BotManager` for managed bots; absent for the main bot (which
+  // never needs an alone-check — it always answers a bare `/ask`).
+  siblingBotIds?: () => string[];
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
   logDebug: boolean;
@@ -71,34 +76,78 @@ const COMMAND_TO_DETAIL: Record<string, DetailLevel> = {
   askwise: "wise",
 };
 
-export type AskMatch = { detailLevel: DetailLevel; userText: string };
+export type AskMatch = {
+  detailLevel: DetailLevel;
+  userText: string;
+  // True when the command explicitly mentioned this bot (`/ask@self`); false for
+  // a bare `/ask`. The caller decides whether a bare ask is answered (see
+  // `askGate`) — parsing stays pure and stateless.
+  explicit: boolean;
+};
 
-// Match an `/ask(wise)` command or media caption addressed to THIS bot.
-// Matching is done against the bot's LIVE `ctx.me.username` so it can't go stale
-// and every bot only answers what is meant for it:
-//   - a `@mention` to a *different* bot is never ours (this is what stops the
-//     main bot from stealing a `/ask@CharacterBot` photo caption);
-//   - a bare `/ask` (no mention) is answered only when `requireMention` is false
-//     (the main bot) — managed bots answer solely when explicitly `@self`-ed.
+// Parse an `/ask(wise)` command or media caption and decide whether it is even
+// addressed to THIS bot. Matching is done against the bot's LIVE `ctx.me.username`
+// so it can't go stale: a `@mention` to a *different* bot returns null (this is
+// what stops the main bot from stealing a `/ask@CharacterBot` photo caption). A
+// bare `/ask` or an explicit `@self` both return a match; the `explicit` flag
+// distinguishes them so the caller can gate bare asks.
 export function matchAsk(
   raw: string,
   selfUsername: string | undefined,
-  requireMention: boolean,
 ): AskMatch | null {
   const m = raw.match(ASK_RE);
   if (!m) return null;
   const mention = m[2];
-  if (mention) {
-    if (!selfUsername || mention.toLowerCase() !== selfUsername.toLowerCase()) {
-      return null;
-    }
-  } else if (requireMention) {
+  if (
+    mention &&
+    (!selfUsername || mention.toLowerCase() !== selfUsername.toLowerCase())
+  ) {
     return null;
   }
   return {
     detailLevel: COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short",
     userText: (m[3] ?? "").trim(),
+    explicit: mention !== undefined,
   };
+}
+
+// How long a recorded presence entry is trusted without a refresh. Presence is
+// refreshed on every group update a bot processes and on membership changes, so
+// this TTL only bounds staleness when a bot leaves a chat while the app is
+// offline (its `my_chat_member` is missed) — past it, the entry reads as absent.
+export const BOT_PRESENCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type AskDecision = "answer" | "check-alone";
+
+// Decide whether a parsed ask should be answered, from routing mode + chat type:
+//   - an explicit `@self` mention is always answered;
+//   - the main bot (`requireMention === false`) answers a bare `/ask` too;
+//   - a managed bot answers a bare `/ask` in its DM (it is inherently alone),
+//     and in a group only if it is the sole family bot there — which the caller
+//     resolves via presence ("check-alone").
+export function askGate(
+  match: AskMatch,
+  requireMention: boolean,
+  chatType: string | undefined,
+): AskDecision {
+  if (match.explicit) return "answer";
+  if (!requireMention) return "answer";
+  if (chatType === "private") return "answer";
+  return "check-alone";
+}
+
+// A managed bot is "alone" in a chat when none of its sibling family bots (the
+// main bot + other managed bots) have a fresh presence record there.
+export function computeAlone(
+  siblingIds: string[],
+  presence: Record<string, number>,
+  nowMs: number,
+  ttlMs: number,
+): boolean {
+  return !siblingIds.some((id) => {
+    const seen = presence[id];
+    return seen !== undefined && nowMs - seen <= ttlMs;
+  });
 }
 
 export function createBot(deps: BotDeps): Bot<BotContext> {
@@ -120,6 +169,34 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   // lookup). The pure handlers receive base storage + botId and scope
   // themselves; everything else (user/chat directory, etc.) stays on base.
   const scopedStorage = deps.storage.forBot(botId);
+
+  // A managed bot is alone in a group when none of its sibling family bots have
+  // a fresh presence record there. Fail-closed on a storage error (treat as NOT
+  // alone) so a transient hiccup can't make a managed bot double-answer a bare
+  // `/ask` alongside the main bot — at worst the user retries or `@`-mentions.
+  const isAloneInChat = async (chatId: string): Promise<boolean> => {
+    const siblings = deps.siblingBotIds?.() ?? [];
+    if (siblings.length === 0) return true;
+    try {
+      const presence = await deps.storage.getBotPresence(chatId);
+      return computeAlone(siblings, presence, Date.now(), BOT_PRESENCE_TTL_MS);
+    } catch (err) {
+      console.error("getBotPresence failed:", err);
+      return false;
+    }
+  };
+
+  // Whether to act on a matched ask. Bare asks for a managed bot in a group are
+  // gated on being the only family bot present; everything else answers outright.
+  const shouldAnswer = async (
+    ctx: BotContext,
+    match: AskMatch,
+  ): Promise<boolean> => {
+    if (askGate(match, requireMention, ctx.chat?.type) === "answer") return true;
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined) return false;
+    return await isAloneInChat(String(chatId));
+  };
 
   bot.use(
     makeIncomingUpdateLogger({
@@ -161,6 +238,15 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       void scopedStorage
         .recordPrivateChat(String(from.id))
         .catch((err) => console.error("recordPrivateChat failed:", err));
+    }
+    // Refresh this bot's presence in any group it is active in, so managed
+    // siblings can tell who shares a chat (drives the bare-`/ask` alone-check).
+    // `my_chat_member` is the authoritative add/remove; this activity refresh
+    // also backfills membership that predates the feature and renews the TTL.
+    if (ctx.chat && ctx.chat.type !== "private") {
+      void deps.storage
+        .recordBotPresence(String(ctx.chat.id), String(ctx.me.id), now)
+        .catch((err) => console.error("recordBotPresence failed:", err));
     }
     await next();
   });
@@ -495,7 +581,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       });
 
       const matchOf = (it: Message) =>
-        matchAsk(it.caption ?? "", ctx.me.username, requireMention);
+        matchAsk(it.caption ?? "", ctx.me.username);
       const askItem = items.find((it) => matchOf(it) !== null);
       if (!askItem) {
         debugLog("media_group_dropped", { key, reason: "no_ask_caption" });
@@ -507,6 +593,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
 
       const captionMatch = matchOf(askItem)!;
+      if (!(await shouldAnswer(ctx, captionMatch))) {
+        debugLog("media_group_dropped", { key, reason: "not_addressed" });
+        return;
+      }
       const detailLevel = captionMatch.detailLevel;
       const userText = captionMatch.userText;
       const askMessageId = items[0]!.message_id;
@@ -565,12 +655,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   };
 
   if (requireMention) {
-    // Managed bot: only answer text commands explicitly addressed as `@self`.
-    // grammY's `bot.command` also fires on a bare `/ask` (which belongs to the
-    // main bot), so we match the raw text against `matchAsk` instead.
+    // Managed bot: grammY's `bot.command` would also fire on a bare `/ask`
+    // (which usually belongs to the main bot), so we parse the raw text with
+    // `matchAsk` and let `shouldAnswer` decide — `@self` always, a bare `/ask`
+    // only in a DM or when alone in a group.
     bot.on("message:text", async (ctx) => {
-      const match = matchAsk(ctx.message.text, ctx.me.username, true);
+      const match = matchAsk(ctx.message.text, ctx.me.username);
       if (!match) return;
+      if (!(await shouldAnswer(ctx, match))) return;
       await dispatchTextCommand(ctx, match.detailLevel, match.userText);
     });
   } else {
@@ -584,7 +676,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     if (chatId === undefined) return;
 
     const captionRaw = msg.caption ?? "";
-    const match = matchAsk(captionRaw, ctx.me.username, requireMention);
+    const match = matchAsk(captionRaw, ctx.me.username);
     debugLog("photo_received", {
       chat_id: chatId,
       message_id: msg.message_id,
@@ -621,6 +713,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
 
     if (!match) return;
+    if (!(await shouldAnswer(ctx, match))) return;
     const detailLevel = match.detailLevel;
     const userText = match.userText;
 
@@ -657,7 +750,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     if (chatId === undefined) return;
 
     const captionRaw = msg.caption ?? "";
-    const match = matchAsk(captionRaw, ctx.me.username, requireMention);
+    const match = matchAsk(captionRaw, ctx.me.username);
     debugLog("voice_received", {
       chat_id: chatId,
       message_id: msg.message_id,
@@ -666,6 +759,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       duration: msg.voice.duration,
     });
     if (!match) return;
+    if (!(await shouldAnswer(ctx, match))) return;
 
     const detailLevel = match.detailLevel;
     const userText = match.userText;
@@ -690,6 +784,31 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       forwardOrigin: Boolean(msg.forward_origin),
       detailLevel,
     });
+  });
+
+  // Authoritative presence tracking: when THIS bot is added to / removed from a
+  // group, record or clear its presence so managed siblings can resolve the
+  // bare-`/ask` alone-check. Private chats are never tracked.
+  bot.on("my_chat_member", async (ctx) => {
+    const upd = ctx.myChatMember;
+    if (upd.chat.type === "private") return;
+    // Narrow on the member object directly so the `restricted` discriminant
+    // exposes `is_member`. A left/kicked bot (or a restricted non-member) is
+    // absent; everything else counts as present.
+    const member = upd.new_chat_member;
+    const present =
+      member.status === "member" ||
+      member.status === "administrator" ||
+      member.status === "creator" ||
+      (member.status === "restricted" && member.is_member);
+    const chatId = String(upd.chat.id);
+    const selfId = String(ctx.me.id);
+    try {
+      if (present) await deps.storage.recordBotPresence(chatId, selfId, Date.now());
+      else await deps.storage.removeBotPresence(chatId, selfId);
+    } catch (err) {
+      console.error("my_chat_member presence update failed:", err);
+    }
   });
 
   bot.on("message:contact", async (ctx) => {

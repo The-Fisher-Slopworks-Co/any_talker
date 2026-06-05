@@ -19,7 +19,7 @@ const bot: ManagedBot = {
   createdAtMs: 0,
 };
 
-test("managed resolver: global settings + character prompt/name, ignoring per-chat overrides", async () => {
+test("managed resolver: global settings + character prompt, no name prefix, ignoring per-chat overrides", async () => {
   const storage = new MemoryStorage();
   await storage.saveSettings({
     ...DEFAULT_SETTINGS,
@@ -42,7 +42,8 @@ test("managed resolver: global settings + character prompt/name, ignoring per-ch
 
   expect(settings.systemPrompt).toBe("cat prompt"); // from the record
   expect(settings.models).toEqual(["m-global"]); // global, not the chat override
-  expect(botName).toBe("Кошечка");
+  // A managed bot IS the character — its replies carry no bold name prefix.
+  expect(botName).toBeNull();
 });
 
 test("managed resolver: falls back to global settings if the record vanished", async () => {
