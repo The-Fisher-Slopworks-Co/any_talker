@@ -118,7 +118,7 @@ flowchart TB
 |---|---|---|
 | `src/main.ts` | Composition root: load config, wire services, register tools, start bot + HTTP + schedulers; hot-reload teardown. | `main.ts` |
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
-| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `format.ts`, `html.ts`, `media-group-buffer.ts` |
+| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenRouter client, system-prompt builder, message (de)serialization, AI types. | `openrouter.ts`, `instruction.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `reminders/` |
@@ -134,7 +134,7 @@ flowchart TB
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
 | `src/shared/` | i18n catalog, timezone math, display-name validation, interval scheduler, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `interval-scheduler.ts`, `types.ts` |
 | `src/log.ts` · `src/proxy.ts` · `src/build-info.ts` | Structured logging, HTTP-proxy resolution, version/git metadata. | — |
-| `src/types/` | Ambient declarations (Bot API 10.0 guest mode; HTML/CSS module imports). | `telegram-guest.d.ts`, `html-modules.d.ts` |
+| `src/types/` | Ambient declarations (Bot API 10.0 guest mode + 10.1 rich messages; HTML/CSS module imports). | `telegram-guest.d.ts`, `telegram-rich.d.ts`, `html-modules.d.ts` |
 
 ## 5. Core components
 
@@ -155,15 +155,23 @@ order is the request lifecycle (see §6). Two dispatchers convert handler outcom
 into Telegram sends:
 - `dispatchAsk` — the `/ask` (`short`) and `/askwise` (`wise`) flows; resolves
   reply context, downloads images/voice, starts a typing indicator, calls
-  `askHandler`, and on `"answered"` sends the formatted reply and persists the
+  `askHandler`, and on `"answered"` sends the Rich Markdown reply via Bot API
+  10.1 `sendRichMessage` (plain `sendMessage` fallback) and persists the
   conversation node.
 - `dispatchGuest` — Bot API 10.0 guest queries; replies once via the raw
-  `answerGuestQuery` API call.
+  `answerGuestQuery` API call, carrying the answer as a Bot API 10.1
+  `InputRichMessageContent` (Rich Markdown).
 
 Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
-bot-side authorization gate (owner / user-whitelist / chat-whitelist). Outgoing
-text goes through `html.ts` (whitelist HTML sanitizer) and `format.ts` (bot-name
-prefix, expandable blockquote, 4096-char truncation). `createBot` is
+bot-side authorization gate (owner / user-whitelist / chat-whitelist). AI replies
+are **Rich Markdown** (Bot API 10.1): the model emits Markdown (see
+`ai/instruction.ts`), `format.ts:buildRichMarkdown` assembles the payload
+(bot-name prefix + effects block as escaped Rich HTML, long answers collapsed
+into a `<details>` block, 32768-char truncation), and `rich.ts` sends it via
+`sendRichMessage` — reached through `api.raw` since it postdates the installed
+grammY — with a plain `sendMessage` fallback on error. `html.ts` now only
+HTML-escapes those controlled fragments (and the check-in mentions); there is no
+longer an output sanitizer because Telegram parses the Rich Markdown server-side. `createBot` is
 parameterized by a `resolver` (the persona), an optional `persona` (`{botId}`),
 and an optional `siblingBotIds`: when `persona` is present it is a **managed
 bot** — it scopes per-character storage with `storage.forBot(botId)` and threads
@@ -316,7 +324,7 @@ sequenceDiagram
     H->>RL: deduct(tokens × detail multiplier)  [after response]
     H->>S: addUserSpend (best-effort)
     H-->>D: { kind: "answered", text, persistConversation }
-    D->>TG: sendMessage (sanitized HTML, reply parameters)
+    D->>TG: sendRichMessage (Rich Markdown, reply parameters) · plain sendMessage fallback
     D->>S: persistConversation(botMessageId) → conversation node (TTL 30d)
 ```
 
@@ -399,7 +407,9 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
 - **Firecrawl** — powers `search_web` and `youtube_transcript` (optional; gated
   on `FIRECRAWL_API_KEY`).
 - **Telegram Bot API** — via grammY (long polling) plus raw calls for file
-  download and the Bot API 10.0 `answerGuestQuery`.
+  download, the Bot API 10.0 `answerGuestQuery`, and the Bot API 10.1
+  `sendRichMessage` used for all AI replies (`api.raw`, since both postdate the
+  installed grammY typings).
 - **KeyDB** — Redis-compatible primary datastore (Lua scripting relied upon).
 - **currency-api (jsDelivr)** — exchange rates for `currency_convert`.
 - **VictoriaMetrics / VictoriaLogs / Vector** — prod observability stack
@@ -434,9 +444,12 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   errors propagate and are caught at `bot.catch`, the scheduler tick guard, and
   the HTTP `fetch` wrapper. Side-effects (upserts, spend, photo cache) are
   fire-and-forget with `.catch` logging.
-- **Input safety** — `safeFetch` SSRF guard for tool fetches; `html.ts` output
-  sanitizer; `shared/display-name.ts` prompt-injection blocklist; fact values
-  whitespace-collapsed before prompt injection.
+- **Input safety** — `safeFetch` SSRF guard for tool fetches; AI replies are
+  Rich Markdown parsed server-side by Telegram (only supported tags and link
+  schemes — `http(s)`/`mailto`/`tel`/`tg://user`, never `javascript:` — are
+  honored), with the bot-injected fragments (name, effects line, `<details>`
+  summary) HTML-escaped via `html.ts`; `shared/display-name.ts` prompt-injection
+  blocklist; fact values whitespace-collapsed before prompt injection.
 - **i18n** — `en`/`ru` only; a compile-time-exhaustive catalog in
   `shared/i18n.ts`, resolved per-update by `bot/middleware/lang.ts` and used as
   `ctx.t`. Never hardcode user-facing strings.

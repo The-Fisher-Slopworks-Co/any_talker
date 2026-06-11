@@ -2,7 +2,12 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { Bot, type Context } from "grammy";
-import type { InlineQueryResult, Message, Update } from "grammy/types";
+import type {
+  InlineQueryResult,
+  InputMessageContent,
+  Message,
+  Update,
+} from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
@@ -19,10 +24,13 @@ import { pickPhotoSize, fetchTelegramPhoto, downloadTelegramFile } from "./photo
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
-import { applyBotNamePrefix, buildEffectsTopBlock } from "./format";
+import { buildRichMarkdown, buildEffectsTopBlock } from "./format";
+import { richApi } from "./rich";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { readValidDisplayName } from "../shared/display-name";
+import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
 import type { SentGuestMessage } from "../types/telegram-guest";
+import type { InputRichMessageContent } from "../types/telegram-rich";
 import { makeIncomingUpdateLogger } from "./log-update";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
 import { makeKeywordFilterMiddleware } from "./middleware/keyword-filter";
@@ -362,23 +370,23 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         topBlock?: string,
         expandableThreshold?: number,
       ) => {
-        const decorated = applyBotNamePrefix(
-          text,
-          botName,
+        const content = buildRichMarkdown(text, botName, {
           topBlock,
-          expandableThreshold,
-        );
+          collapseThreshold:
+            expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
+          detailsSummary: ctx.t.bot_details_summary,
+        });
+        const richContent: InputRichMessageContent = {
+          rich_message: { markdown: content.markdown },
+        };
         return answerGuestQuery({
           guest_query_id: guestQueryId,
           result: {
             type: "article",
             id: "1",
             title: "Reply",
-            input_message_content: {
-              message_text: decorated.text,
-              parse_mode: decorated.parseMode,
-              link_preview_options: { is_disabled: true },
-            },
+            input_message_content:
+              richContent as unknown as InputMessageContent,
           },
         });
       };
@@ -597,16 +605,28 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           return;
         case "answered": {
           const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
-          const decorated = applyBotNamePrefix(
-            outcome.text,
-            outcome.botName,
+          const content = buildRichMarkdown(outcome.text, outcome.botName, {
             topBlock,
-            outcome.expandableThreshold,
-          );
-          const sent = await ctx.api.sendMessage(chatId, decorated.text, {
-            parse_mode: decorated.parseMode,
-            reply_parameters: { message_id: args.askMessageId },
+            collapseThreshold: outcome.expandableThreshold,
+            detailsSummary: ctx.t.bot_details_summary,
           });
+          const replyParameters = { message_id: args.askMessageId };
+          let sent: Message;
+          try {
+            sent = await richApi(ctx.api).sendRichMessage({
+              chat_id: chatId,
+              rich_message: { markdown: content.markdown },
+              reply_parameters: replyParameters,
+            });
+          } catch (err) {
+            // Rich send failed (markdown Telegram rejected, or the method is
+            // unavailable on this server) — fall back to a plain message so the
+            // user still gets the answer.
+            console.error("sendRichMessage failed, sending plain:", err);
+            sent = await ctx.api.sendMessage(chatId, content.markdown, {
+              reply_parameters: replyParameters,
+            });
+          }
           await outcome.persistConversation(sent.message_id);
           if (outcome.totalTokens > 0) {
             askTokensTotal.inc({ source: "ask" }, outcome.totalTokens);

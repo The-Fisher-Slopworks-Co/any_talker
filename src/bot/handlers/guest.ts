@@ -8,7 +8,6 @@ import { buildUserEnvelope, type Sender } from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
-import { sanitizeHtml } from "../html";
 import type { AIMessage } from "../../ai/types";
 import { MAX_REPLY_CHAIN_DEPTH, type GuestThreadNode } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
@@ -158,11 +157,13 @@ export async function guestAskHandler(
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));
 
-  const sanitized = sanitizeHtml(result.text);
+  // Sent verbatim as Rich Markdown (parsed server-side by Telegram) — no HTML
+  // sanitization. The same text is persisted as the guest-thread context.
+  const body = result.text;
 
   return {
     kind: "answered",
-    text: sanitized,
+    text: body,
     botName,
     totalTokens: result.totalTokens,
     effects,
@@ -170,7 +171,7 @@ export async function guestAskHandler(
     persistThread: async () => {
       const turns = [
         ...priorTurns,
-        { userQuestion: envelope, botAnswer: sanitized },
+        { userQuestion: envelope, botAnswer: body },
       ].slice(-MAX_REPLY_CHAIN_DEPTH);
       await storage.saveGuestThread(input.chatId, {
         chatId: input.chatId,

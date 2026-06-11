@@ -18,6 +18,7 @@ import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
 import { createUserFactsTools } from "./ai/tools/user-facts";
 import { startScheduler } from "./reminders/scheduler";
+import { reminderApiFromGrammy } from "./reminders/delivery";
 import { startChecksScheduler } from "./checks/runner";
 import { createBot } from "./bot";
 import { syncBotCommands } from "./bot/commands";
@@ -135,7 +136,7 @@ async function main() {
   const mainReminderRuntime: ReminderRuntime = {
     botId: null,
     storage,
-    api: bot.api,
+    api: reminderApiFromGrammy(bot.api),
     resolver: mainResolver,
   };
   const scheduler = startScheduler({

@@ -38,6 +38,7 @@ type Strings = {
   bot_ask_usage: string;
   bot_rate_limited: (min: number) => string;
   bot_ai_error: string;
+  bot_details_summary: string;
   bot_contact_no_user_id: string;
   bot_contact_is_owner: string;
   bot_contact_already_whitelisted: (label: string) => string;
@@ -374,6 +375,7 @@ const en: Strings = {
   bot_rate_limited: (min) =>
     `Rate limit exceeded. Refilled in ~${min} min.`,
   bot_ai_error: "⚠️ AI error. Try again later.",
+  bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
     "This contact isn't on Telegram — nothing to whitelist.",
   bot_contact_is_owner:
@@ -775,6 +777,7 @@ const ru: Strings = {
   bot_rate_limited: (min) =>
     `Лимит запросов исчерпан. Восстановится примерно через ${min} мин.`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
+  bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:
     "Этот контакт не зарегистрирован в Telegram — добавлять в белый список нечего.",
   bot_contact_is_owner:

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { GrammyError } from "grammy";
+import { GrammyError, type Api } from "grammy";
 import type { Reminder } from "./types";
 import type { Storage } from "../storage/types";
 import type { AIClient, AIMessage } from "../ai/types";
@@ -9,27 +9,46 @@ import { deserializeMessages } from "../ai/serialize";
 import { getAllTools, type ToolEffect } from "../ai/tools/registry";
 import { buildInstruction } from "../ai/instruction";
 import type { PersonaResolver } from "../managed-bots/persona";
-import { sanitizeHtml } from "../bot/html";
-import { applyBotNamePrefix, buildEffectsTopBlock } from "../bot/format";
+import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
+import { richApi } from "../bot/rich";
 import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
 import { composeFullName } from "../shared/types";
 import { readValidDisplayName } from "../shared/display-name";
+import { t } from "../shared/i18n";
 
 export type DeliveryOutcome = "delivered" | "permanent" | "transient";
 
+export type ReminderReplyParameters = {
+  message_id: number;
+  allow_sending_without_reply?: boolean;
+};
+
+// Reminders are delivered via Bot API 10.1 rich messages, with a plain-text
+// sendMessage fallback. Kept narrow (not grammY's full Api) so the test double
+// stays small; wrap a real grammY Api with `reminderApiFromGrammy`.
 export type ReminderApi = {
+  sendRichMessage(params: {
+    chat_id: string | number;
+    rich_message: { markdown: string };
+    reply_parameters?: ReminderReplyParameters;
+  }): Promise<unknown>;
   sendMessage(
     chat_id: string | number,
     text: string,
-    other?: {
-      parse_mode?: "HTML";
-      reply_parameters?: {
-        message_id: number;
-        allow_sending_without_reply?: boolean;
-      };
-    },
+    other?: { reply_parameters?: ReminderReplyParameters },
   ): Promise<unknown>;
 };
+
+// Adapt a grammY Api into the narrow ReminderApi. sendRichMessage is reached
+// through the raw proxy because it is newer (Bot API 10.1) than the installed
+// grammY typings.
+export function reminderApiFromGrammy(api: Api): ReminderApi {
+  return {
+    sendRichMessage: (params) => richApi(api).sendRichMessage(params),
+    sendMessage: (chat_id, text, other) =>
+      api.sendMessage(chat_id, text, other),
+  };
+}
 
 export type DeliveryDeps = {
   storage: Storage;
@@ -67,26 +86,44 @@ export async function deliverReminder(
     return "transient";
   }
 
-  try {
-    if (reminder.target.kind === "ask_reply") {
-      await deps.api.sendMessage(reminder.target.chatId, body, {
-        parse_mode: "HTML",
-        reply_parameters: {
-          message_id: reminder.target.replyToMessageId,
+  const target = reminder.target;
+  const chatId = target.kind === "ask_reply" ? target.chatId : target.userId;
+  const replyParameters: ReminderReplyParameters | undefined =
+    target.kind === "ask_reply"
+      ? {
+          message_id: target.replyToMessageId,
           allow_sending_without_reply: true,
-        },
-      });
-    } else {
-      await deps.api.sendMessage(reminder.target.userId, body, {
-        parse_mode: "HTML",
-      });
-    }
+        }
+      : undefined;
+
+  try {
+    await deps.api.sendRichMessage({
+      chat_id: chatId,
+      rich_message: { markdown: body },
+      ...(replyParameters ? { reply_parameters: replyParameters } : {}),
+    });
     return "delivered";
-  } catch (err) {
-    if (err instanceof GrammyError && PERMANENT_CODES.has(err.error_code)) {
-      return "permanent";
+  } catch (errRich) {
+    // Rich send failed (markdown Telegram rejected, or the method is
+    // unavailable on this server) — fall back to a plain message so the
+    // reminder still lands.
+    console.error(
+      `[reminders] sendRichMessage failed id=${reminder.id}, sending plain:`,
+      errRich,
+    );
+    try {
+      await deps.api.sendMessage(
+        chatId,
+        body,
+        replyParameters ? { reply_parameters: replyParameters } : undefined,
+      );
+      return "delivered";
+    } catch (err) {
+      if (err instanceof GrammyError && PERMANENT_CODES.has(err.error_code)) {
+        return "permanent";
+      }
+      return "transient";
     }
-    return "transient";
   }
 }
 
@@ -165,18 +202,16 @@ async function composeReminderMessage(
     },
   });
 
-  const sanitized = sanitizeHtml(result.text);
-  const trimmed = sanitized.trim();
+  const trimmed = result.text.trim();
   // If the model produced nothing usable, fall back to the original note so
   // the reminder still surfaces something rather than a silent no-op delivery.
-  const body = trimmed.length === 0 ? sanitizeHtml(reminder.text) : sanitized;
+  const body = trimmed.length === 0 ? reminder.text : result.text;
   const topBlock = buildEffectsTopBlock(effects, lang);
-  return applyBotNamePrefix(
-    body,
-    botName,
+  return buildRichMarkdown(body, botName, {
     topBlock,
-    settings.expandableBlockquoteThreshold,
-  ).text;
+    collapseThreshold: settings.expandableBlockquoteThreshold,
+    detailsSummary: t(lang).bot_details_summary,
+  }).markdown;
 }
 
 type EnvelopeArgs = {

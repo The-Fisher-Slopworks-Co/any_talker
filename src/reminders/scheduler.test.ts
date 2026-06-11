@@ -36,6 +36,10 @@ class FakeAI implements AIClient {
 class FakeApi implements ReminderApi {
   calls: { chat_id: string | number }[] = [];
   constructor(private readonly impl: () => Promise<unknown> = async () => ({})) {}
+  async sendRichMessage(params: { chat_id: string | number }) {
+    this.calls.push({ chat_id: params.chat_id });
+    return this.impl();
+  }
   async sendMessage(chat_id: string | number) {
     this.calls.push({ chat_id });
     return this.impl();
