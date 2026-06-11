@@ -14,7 +14,6 @@ import {
   detailLevelReasoningEffort,
   type DetailLevel,
 } from "../../ai/instruction";
-import { sanitizeHtml } from "../html";
 import type { Lang } from "../../shared/i18n";
 
 export type AskInput = {
@@ -196,11 +195,15 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     text: input.userText,
   });
 
-  const sanitized = sanitizeHtml(result.text);
+  // The AI now emits Rich Markdown sent verbatim via sendRichMessage; Telegram
+  // parses it server-side (only supported tags/schemes are honored), so there
+  // is no HTML sanitization step. The same text is persisted as conversation
+  // context for later turns.
+  const body = result.text;
 
   return {
     kind: "answered",
-    text: sanitized,
+    text: body,
     botName,
     totalTokens: result.totalTokens,
     effects,
@@ -212,7 +215,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       ];
       await storage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
-        botAnswer: sanitized,
+        botAnswer: body,
         parentBotMsgId,
         ts: input.now,
         userImageFileIds:

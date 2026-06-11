@@ -14,6 +14,7 @@ import { ALLOWED_UPDATES } from "../bot/allowed-updates";
 import { createManagedPersonaResolver } from "./persona";
 import { setManagedBotAvatar } from "./avatar";
 import type { ReminderRuntime } from "../reminders/scheduler";
+import { reminderApiFromGrammy } from "../reminders/delivery";
 import type { ManagedBot } from "./types";
 
 // Minimal shape of the Telegram bot user carried by a `managed_bot` update /
@@ -285,7 +286,7 @@ export class BotManager {
     return [...this.running.values()].map((entry) => ({
       botId: entry.record.botId,
       storage: this.deps.storage.forBot(entry.record.botId),
-      api: entry.bot.api,
+      api: reminderApiFromGrammy(entry.bot.api),
       resolver: createManagedPersonaResolver(
         this.deps.storage,
         entry.record.botId,

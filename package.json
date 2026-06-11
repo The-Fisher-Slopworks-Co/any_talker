@@ -25,7 +25,7 @@
     "@openrouter/ai-sdk-provider": "latest",
     "ai": "latest",
     "bun-plugin-tailwind": "^0.1.2",
-    "grammy": "latest",
+    "grammy": "^1.43.0",
     "linkedom": "^0.18.12",
     "react": "latest",
     "react-dom": "latest",

@@ -3,192 +3,118 @@
 
 import { test, expect, describe } from "bun:test";
 import {
-  applyBotNamePrefix,
+  buildRichMarkdown,
   buildEffectsTopBlock,
-  TELEGRAM_TEXT_MAX,
+  RICH_MESSAGE_TEXT_MAX,
 } from "./format";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
 import type { ToolEffect } from "../ai/tools/registry";
 
-const EXPANDABLE_BLOCKQUOTE_THRESHOLD = DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD;
+const SUMMARY = "Expand";
+const md = (
+  body: string,
+  botName: string | null,
+  opts: { topBlock?: string; collapseThreshold?: number } = {},
+) => buildRichMarkdown(body, botName, { ...opts, detailsSummary: SUMMARY }).markdown;
 
-describe("applyBotNamePrefix", () => {
-  test("returns body unchanged when bot name is null (HTML mode)", () => {
-    expect(applyBotNamePrefix("hello", null)).toEqual({
-      text: "hello",
-      parseMode: "HTML",
-    });
+describe("buildRichMarkdown", () => {
+  test("returns the markdown body unchanged when bot name is null", () => {
+    expect(md("hello", null)).toBe("hello");
   });
 
   test("returns body unchanged when bot name is empty or whitespace", () => {
-    expect(applyBotNamePrefix("hi", "")).toEqual({
-      text: "hi",
-      parseMode: "HTML",
-    });
-    expect(applyBotNamePrefix("hi", "   ")).toEqual({
-      text: "hi",
-      parseMode: "HTML",
-    });
+    expect(md("hi", "")).toBe("hi");
+    expect(md("hi", "   ")).toBe("hi");
   });
 
-  test("prefixes name with <b> when set", () => {
-    expect(applyBotNamePrefix("hello there", "Helper")).toEqual({
-      text: "<b>Helper</b>\nhello there",
-      parseMode: "HTML",
-    });
+  test("prefixes the name as bold HTML separated by a blank line", () => {
+    expect(md("hello there", "Helper")).toBe("<b>Helper</b>\n\nhello there");
   });
 
-  test("trims surrounding whitespace from name", () => {
-    expect(applyBotNamePrefix("body", "  Bot  ")).toEqual({
-      text: "<b>Bot</b>\nbody",
-      parseMode: "HTML",
-    });
+  test("trims surrounding whitespace from the name", () => {
+    expect(md("body", "  Bot  ")).toBe("<b>Bot</b>\n\nbody");
   });
 
-  test("escapes HTML specials in the bot name", () => {
-    expect(applyBotNamePrefix("body", "A<B&C>")).toEqual({
-      text: "<b>A&lt;B&amp;C&gt;</b>\nbody",
-      parseMode: "HTML",
-    });
+  test("HTML-escapes the bot name so it can't inject formatting", () => {
+    expect(md("body", "A<B&C>")).toBe("<b>A&lt;B&amp;C&gt;</b>\n\nbody");
   });
 
-  test("does not re-escape body (caller passes already-sanitized HTML)", () => {
-    expect(applyBotNamePrefix("<b>x</b>", "N")).toEqual({
-      text: "<b>N</b>\n<b>x</b>",
-      parseMode: "HTML",
-    });
-  });
-
-  test("truncates body so prefix + body fits in Telegram's 4096-char limit", () => {
-    const longBody = "a".repeat(TELEGRAM_TEXT_MAX);
-    const result = applyBotNamePrefix(longBody, "Helper");
-    expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    expect(result.text.startsWith("<b>Helper</b>\n<blockquote expandable>")).toBe(true);
-    expect(result.text.endsWith("…</blockquote>")).toBe(true);
-  });
-
-  test("truncates without prefix when body alone exceeds the limit", () => {
-    const longBody = "a".repeat(TELEGRAM_TEXT_MAX + 100);
-    const result = applyBotNamePrefix(longBody, null);
-    expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    expect(result.text.endsWith("…</blockquote>")).toBe(true);
-  });
-
-  test("does not cut inside an HTML tag during truncation", () => {
-    const padding = "x".repeat(TELEGRAM_TEXT_MAX - 30);
-    const body = `${padding}<b>important content</b>`;
-    const result = applyBotNamePrefix(body, "Bot");
-    const openCount = (result.text.match(/</g) ?? []).length;
-    const closeCount = (result.text.match(/>/g) ?? []).length;
-    expect(openCount).toBe(closeCount);
-  });
-
-  test("does not cut inside an HTML entity during truncation", () => {
-    const padding = "x".repeat(TELEGRAM_TEXT_MAX - 20);
-    const body = `${padding}&amp;tail`;
-    const result = applyBotNamePrefix(body, "Bot");
-    expect(result.text).not.toContain("&am…");
-    expect(result.text).not.toContain("&amp…");
-  });
-
-  test("leaves short replies untouched", () => {
-    const result = applyBotNamePrefix("short body", "Helper");
-    expect(result.text).toBe("<b>Helper</b>\nshort body");
-    expect(result.text.endsWith("…")).toBe(false);
-  });
-
-  test("top block sits before bot name and body", () => {
-    const result = applyBotNamePrefix(
-      "body",
-      "Helper",
-      "<blockquote>note</blockquote>\n",
-    );
-    expect(result.text).toBe(
-      "<blockquote>note</blockquote>\n<b>Helper</b>\nbody",
+  test("passes the markdown body through untouched", () => {
+    expect(md("**bold** _italic_ ~~s~~", "N")).toBe(
+      "<b>N</b>\n\n**bold** _italic_ ~~s~~",
     );
   });
 
-  test("top block is retained when body is truncated", () => {
-    const longBody = "a".repeat(TELEGRAM_TEXT_MAX);
-    const top = "<blockquote>reminder</blockquote>\n";
-    const result = applyBotNamePrefix(longBody, "Helper", top);
-    expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    expect(
-      result.text.startsWith(top + "<b>Helper</b>\n<blockquote expandable>"),
-    ).toBe(true);
-    expect(result.text.endsWith("…</blockquote>")).toBe(true);
+  test("does not collapse a body at or below the threshold", () => {
+    const body = "a".repeat(10);
+    expect(md(body, null, { collapseThreshold: 10 })).toBe(body);
   });
 
-  test("top block + no bot name", () => {
-    const result = applyBotNamePrefix(
-      "body",
-      null,
-      "<blockquote>x</blockquote>\n",
-    );
-    expect(result.text).toBe("<blockquote>x</blockquote>\nbody");
-  });
-
-  test("does not wrap short bodies in an expandable blockquote", () => {
-    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD);
-    const result = applyBotNamePrefix(body, null);
-    expect(result.text).toBe(body);
-    expect(result.text).not.toContain("<blockquote");
-  });
-
-  test("wraps long bodies in an expandable blockquote", () => {
-    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1);
-    const result = applyBotNamePrefix(body, null);
-    expect(result.text).toBe(`<blockquote expandable>${body}</blockquote>`);
-  });
-
-  test("wraps body only, leaving bot name and top block outside", () => {
-    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1);
-    const top = "<blockquote>reminder</blockquote>\n";
-    const result = applyBotNamePrefix(body, "Helper", top);
-    expect(result.text).toBe(
-      `${top}<b>Helper</b>\n<blockquote expandable>${body}</blockquote>`,
-    );
-  });
-
-  test("does not wrap when body is exactly at the threshold", () => {
-    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD);
-    const result = applyBotNamePrefix(body, "Helper");
-    expect(result.text).toBe(`<b>Helper</b>\n${body}`);
-    expect(result.text).not.toContain("<blockquote");
-  });
-
-  test("respects a custom expandable threshold below the default", () => {
+  test("collapses a body over the threshold into a <details> block", () => {
     const body = "a".repeat(11);
-    const result = applyBotNamePrefix(body, null, undefined, 10);
-    expect(result.text).toBe(`<blockquote expandable>${body}</blockquote>`);
-  });
-
-  test("respects a custom expandable threshold above the default", () => {
-    const body = "a".repeat(EXPANDABLE_BLOCKQUOTE_THRESHOLD + 100);
-    const result = applyBotNamePrefix(
-      body,
-      null,
-      undefined,
-      EXPANDABLE_BLOCKQUOTE_THRESHOLD + 200,
+    expect(md(body, null, { collapseThreshold: 10 })).toBe(
+      `<details>\n<summary>${SUMMARY}</summary>\n\n${body}\n\n</details>`,
     );
-    expect(result.text).toBe(body);
-    expect(result.text).not.toContain("<blockquote");
   });
 
-  test("threshold of 0 wraps every non-empty body", () => {
-    const result = applyBotNamePrefix("hi", null, undefined, 0);
-    expect(result.text).toBe("<blockquote expandable>hi</blockquote>");
+  test("keeps the name prefix outside the collapsed <details> block", () => {
+    const body = "a".repeat(11);
+    expect(md(body, "N", { collapseThreshold: 10 })).toBe(
+      `<b>N</b>\n\n<details>\n<summary>${SUMMARY}</summary>\n\n${body}\n\n</details>`,
+    );
   });
 
-  test("expandable wrap is balanced when body truncation kicks in", () => {
-    const longBody = "a".repeat(TELEGRAM_TEXT_MAX);
-    const result = applyBotNamePrefix(longBody, "Helper");
-    expect(result.text.length).toBeLessThanOrEqual(TELEGRAM_TEXT_MAX);
-    const opens = (result.text.match(/<blockquote expandable>/g) ?? []).length;
-    const closes = (result.text.match(/<\/blockquote>/g) ?? []).length;
-    expect(opens).toBe(1);
-    expect(closes).toBe(1);
-    expect(result.text).toContain("…</blockquote>");
+  test("HTML-escapes the details summary", () => {
+    const body = "a".repeat(11);
+    const out = buildRichMarkdown(body, null, {
+      collapseThreshold: 10,
+      detailsSummary: "A<B>",
+    }).markdown;
+    expect(out).toContain("<summary>A&lt;B&gt;</summary>");
+  });
+
+  test("places the top block before the name and body", () => {
+    expect(md("body", "Helper", { topBlock: "<blockquote>note</blockquote>\n" })).toBe(
+      "<blockquote>note</blockquote>\n\n<b>Helper</b>\n\nbody",
+    );
+  });
+
+  test("top block with no bot name", () => {
+    expect(md("body", null, { topBlock: "<blockquote>x</blockquote>\n" })).toBe(
+      "<blockquote>x</blockquote>\n\nbody",
+    );
+  });
+
+  test("uses the default collapse threshold when none is given", () => {
+    const atThreshold = "a".repeat(DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD);
+    expect(md(atThreshold, null)).toBe(atThreshold);
+    const overThreshold = "a".repeat(DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1);
+    expect(md(overThreshold, null)).toContain("<details>");
+  });
+
+  test("truncates a body exceeding the 32768-char rich-message limit", () => {
+    const body = "a".repeat(RICH_MESSAGE_TEXT_MAX + 100);
+    const out = md(body, null, { collapseThreshold: RICH_MESSAGE_TEXT_MAX * 2 });
+    expect(out.length).toBeLessThanOrEqual(RICH_MESSAGE_TEXT_MAX);
+    expect(out.endsWith("…")).toBe(true);
+  });
+
+  test("truncation keeps the <details> wrapper balanced", () => {
+    const body = "a".repeat(RICH_MESSAGE_TEXT_MAX);
+    const out = md(body, "Helper");
+    expect(out.length).toBeLessThanOrEqual(RICH_MESSAGE_TEXT_MAX);
+    expect((out.match(/<details>/g) ?? []).length).toBe(1);
+    expect((out.match(/<\/details>/g) ?? []).length).toBe(1);
+    expect(out).toContain("…\n\n</details>");
+  });
+
+  test("truncation backs off to a whitespace boundary", () => {
+    const head = "x".repeat(RICH_MESSAGE_TEXT_MAX - 2 - 50);
+    const body = `${head} ${"y".repeat(100)}`;
+    const out = md(body, null, { collapseThreshold: RICH_MESSAGE_TEXT_MAX * 2 });
+    expect(out.length).toBeLessThanOrEqual(RICH_MESSAGE_TEXT_MAX);
+    expect(out).not.toContain("y");
+    expect(out.endsWith("…")).toBe(true);
   });
 });
 

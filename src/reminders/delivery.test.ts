@@ -29,11 +29,33 @@ class FakeAI implements AIClient {
 }
 
 class FakeTgApi implements ReminderApi {
+  richCalls: {
+    chat_id: string | number;
+    markdown: string;
+    reply_parameters?: unknown;
+  }[] = [];
   calls: { chat_id: string | number; text: string; other?: unknown }[] = [];
   constructor(
+    // Used by both methods so an `impl` that throws models Telegram failing the
+    // rich send AND the plain fallback (the permanent/transient classification
+    // is driven off the fallback). `richImpl` overrides just the rich send, to
+    // exercise the rich-fails-but-plain-succeeds fallback.
     private readonly impl: (...args: unknown[]) => Promise<unknown> = async () =>
       ({}),
+    private readonly richImpl?: (...args: unknown[]) => Promise<unknown>,
   ) {}
+  async sendRichMessage(params: {
+    chat_id: string | number;
+    rich_message: { markdown: string };
+    reply_parameters?: unknown;
+  }) {
+    this.richCalls.push({
+      chat_id: params.chat_id,
+      markdown: params.rich_message.markdown,
+      reply_parameters: params.reply_parameters,
+    });
+    return (this.richImpl ?? this.impl)(params);
+  }
   async sendMessage(chat_id: string | number, text: string, other?: unknown) {
     this.calls.push({ chat_id, text, other });
     return this.impl(chat_id, text, other);
@@ -110,13 +132,15 @@ describe("deliverReminder (AI-driven)", () => {
       lang: "ru",
     });
 
-    // Telegram was called with the AI output and reply_parameters
-    expect(api.calls).toHaveLength(1);
-    expect(api.calls[0]!.chat_id).toBe("c1");
-    expect(api.calls[0]!.text).toContain("hello <b>friend</b>");
-    expect(api.calls[0]!.other).toEqual({
-      parse_mode: "HTML",
-      reply_parameters: { message_id: 7, allow_sending_without_reply: true },
+    // Telegram was called via sendRichMessage with the AI output as markdown
+    // and reply_parameters
+    expect(api.richCalls).toHaveLength(1);
+    expect(api.calls).toEqual([]);
+    expect(api.richCalls[0]!.chat_id).toBe("c1");
+    expect(api.richCalls[0]!.markdown).toContain("hello <b>friend</b>");
+    expect(api.richCalls[0]!.reply_parameters).toEqual({
+      message_id: 7,
+      allow_sending_without_reply: true,
     });
   });
 
@@ -127,8 +151,8 @@ describe("deliverReminder (AI-driven)", () => {
     const r = reminderGuest();
     const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
     expect(out).toBe("delivered");
-    expect(api.calls[0]!.chat_id).toBe("u42");
-    expect(api.calls[0]!.other).toEqual({ parse_mode: "HTML" });
+    expect(api.richCalls[0]!.chat_id).toBe("u42");
+    expect(api.richCalls[0]!.reply_parameters).toBeUndefined();
     expect(ai.calls[0]!.toolCallContext).toMatchObject({
       source: "guest",
       chatId: "u42",
@@ -147,8 +171,8 @@ describe("deliverReminder (AI-driven)", () => {
 
     const r = reminderAsk();
     await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
-    expect(api.calls[0]!.text).toContain("<b>Capybara</b>");
-    expect(api.calls[0]!.text).toContain("body");
+    expect(api.richCalls[0]!.markdown).toContain("<b>Capybara</b>");
+    expect(api.richCalls[0]!.markdown).toContain("body");
   });
 
   test("envelope embeds user_name and user_gender when known", async () => {
@@ -190,7 +214,29 @@ describe("deliverReminder (AI-driven)", () => {
     const r = reminderAsk();
     const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
     expect(out).toBe("delivered");
-    expect(api.calls[0]!.text).toContain("купить молоко");
+    expect(api.richCalls[0]!.markdown).toContain("купить молоко");
+  });
+
+  test("rich send failure falls back to a plain message", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("plain me");
+    // sendRichMessage rejects; the plain sendMessage fallback succeeds.
+    const api = new FakeTgApi(
+      async () => ({}),
+      async () => {
+        throw new Error("rich rejected");
+      },
+    );
+    const r = reminderAsk();
+    const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
+    expect(out).toBe("delivered");
+    expect(api.richCalls).toHaveLength(1);
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]!.chat_id).toBe("c1");
+    expect(api.calls[0]!.text).toContain("plain me");
+    expect(api.calls[0]!.other).toEqual({
+      reply_parameters: { message_id: 7, allow_sending_without_reply: true },
+    });
   });
 
   test("AI throw -> transient (reminder not sent)", async () => {
@@ -202,6 +248,7 @@ describe("deliverReminder (AI-driven)", () => {
     const r = reminderAsk();
     const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
     expect(out).toBe("transient");
+    expect(api.richCalls).toEqual([]);
     expect(api.calls).toEqual([]);
   });
 

@@ -294,13 +294,13 @@ describe("guestAskHandler", () => {
     expect(out.botName).toBe("Helper");
   });
 
-  test("AI receives sanitized HTML in answered.text", async () => {
+  test("answered.text is the raw AI Rich Markdown (no HTML sanitization)", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "<b>bold</b> & raw <script>x</script>", totalTokens: 1 });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     if (out.kind !== "answered") throw new Error("expected answered");
-    expect(out.text).toBe("<b>bold</b> &amp; raw &lt;script&gt;x&lt;/script&gt;");
+    expect(out.text).toBe("<b>bold</b> & raw <script>x</script>");
   });
 
   test("AI is called with current settings (system, models, tools)", async () => {

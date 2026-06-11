@@ -125,6 +125,10 @@ are supported as `host:port`).
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
   guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest
   invocations are silently ignored.
+- **Rich Markdown replies** (Bot API 10.1) — AI answers are sent as rich messages via
+  `sendRichMessage`, so the model can use the full Rich Markdown set (headings, lists, tables,
+  blockquotes, code blocks, spoilers, strikethrough, footnotes, LaTeX, …). Long answers collapse
+  into a `<details>` block; a plain-text `sendMessage` is used as a fallback if a rich send fails.
 
 ## License
 
