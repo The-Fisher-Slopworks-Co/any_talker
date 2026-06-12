@@ -14,6 +14,33 @@ export type ReplyTarget = {
   audios?: Uint8Array[];
 };
 
+// Picks the storage view that holds a chat's conversation graph.
+//
+// Conversation nodes in a *group* chat are shared across the whole bot family
+// (the main bot + every managed bot) by keeping them in the main bot's
+// namespace (`forBot(null)`). That lets a reply to ANY family bot's message
+// carry the full conversation chain when a DIFFERENT bot answers — cross-bot
+// context — and links the answering bot's new node to the replied-to one across
+// the bot boundary. Within a single group, Telegram message ids are unique
+// across all senders, so there is no key collision.
+//
+// Private chats stay per-character (`forBot(botId)`): a DM's `chat.id` equals
+// the user id, so two bots' DMs with the same user share a chat id while having
+// independent message-id sequences — a shared namespace would collide (and leak
+// one character's DM into another's). Cross-bot context is also moot in a DM,
+// since each bot's DM is a separate physical chat.
+//
+// Telegram group/supergroup/channel ids are negative; a private chat id is the
+// (positive) user id — which is what distinguishes the two cases here.
+export function conversationStorage(
+  base: Storage,
+  botId: string | null,
+  chatId: string,
+): Storage {
+  const isGroupChat = chatId.startsWith("-");
+  return base.forBot(isGroupChat ? null : botId);
+}
+
 // Telegram voice notes are always OGG/OPUS; OpenRouter accepts the `ogg` format.
 const VOICE_MEDIA_TYPE = "audio/ogg";
 

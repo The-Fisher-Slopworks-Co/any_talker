@@ -5,7 +5,13 @@ import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
 import { isAllowed } from "../access";
-import { buildContext, buildUserEnvelope, type ReplyTarget, type Sender } from "../context-builder";
+import {
+  buildContext,
+  buildUserEnvelope,
+  conversationStorage,
+  type ReplyTarget,
+  type Sender,
+} from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import {
@@ -60,10 +66,17 @@ export type AskOutcome =
   | { kind: "error"; message: string };
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
-  // Per-character storage view: scoped methods (conversation graph, user facts)
-  // hit this bot's namespace; every other method is shared. forBot(null) is the
-  // main bot and yields the original unprefixed keys.
+  // Per-character storage view: scoped methods (user facts, this bot's own
+  // reminders) hit this bot's namespace; every other method is shared.
+  // forBot(null) is the main bot and yields the original unprefixed keys.
   const storage = input.storage.forBot(input.botId ?? null);
+  // The conversation graph is family-shared in group chats so a reply across
+  // bots carries context, and per-character in DMs (see `conversationStorage`).
+  const convStorage = conversationStorage(
+    input.storage,
+    input.botId ?? null,
+    input.chatId,
+  );
 
   const [allowed, byokKey, byokModels] = await Promise.all([
     isAllowed({
@@ -112,7 +125,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   }
 
   const messages = await buildContext({
-    storage,
+    storage: convStorage,
     chatId: input.chatId,
     sender: input.sender,
     userText: input.userText,
@@ -182,7 +195,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
 
   let parentBotMsgId: number | null = null;
   if (input.replyTarget) {
-    const existing = await storage.getConversation(
+    const existing = await convStorage.getConversation(
       input.chatId,
       input.replyTarget.messageId,
     );
@@ -213,7 +226,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         ...input.imageFileIds,
         ...input.replyImageFileIds,
       ];
-      await storage.saveConversation(input.chatId, botMsgId, {
+      await convStorage.saveConversation(input.chatId, botMsgId, {
         userQuestion: envelope,
         botAnswer: body,
         parentBotMsgId,

@@ -338,7 +338,10 @@ Notes that matter:
   limiter entirely.
 - **Conversation context** is a reply-chain graph: each answer is stored as a
   `ConversationNode` keyed by the bot's message id with a `parentBotMsgId`
-  pointer; replying to a bot message walks the chain to rebuild context.
+  pointer; replying to a bot message walks the chain to rebuild context. In group
+  chats the graph is **shared across the whole bot family**, so a reply across
+  bots (`/ask@OtherBot` on another character's message) carries the full chain;
+  DMs stay per-character (see §7, "Cross-bot conversation context").
 
 ### Scheduler tick (reminders)
 
@@ -368,7 +371,7 @@ persisted entities:
 | BYOK key / models | `at:user_or_key:{userId}` · `at:user_or_models:{userId}` | string / JSON | — | API key (**plaintext**) · `string[]` |
 | Per-user spend | `at:spend:{userId}:{YYYY-MM-DD}` | float counter | 35 days | USD per UTC day (`INCRBYFLOAT`); summarized to day/week/month |
 | Users / chats directory | `at:users` · `at:chats` | hash | — | `User` / `Chat` per field |
-| Conversation node | `at:msg:{chatId}:{botMsgId}` | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }` |
+| Conversation node | `at:msg:{chatId}:{botMsgId}` (DMs add the `mbot:{botId}:` scope; groups stay shared) | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }` |
 | Photo cache | `at:photo_cache:{fileId}` | base64 string | 7 days | raw bytes (TTL renewed on read) |
 | Album photos | `at:album:{chatId}:{mediaGroupId}` | hash | 30 days | `messageId → fileId` |
 | Guest thread | `at:guest_thread:{chatId}` | string | 30 days | `{ turns: [{userQuestion, botAnswer}], ts }` |
@@ -392,6 +395,21 @@ album buffers, and the private-chat flag — i.e. exactly the rows above whose k
 become `at:mbot:{botId}:msg:…`, `:reminder:…`, `:user_facts:…`, etc. for a managed
 bot. (Critically, in DMs `chat.id == user.id`, so without this scoping two bots'
 DM conversations and reminders would collide.)
+
+**Cross-bot conversation context (group chats).** The conversation graph is the
+one scoped entity with a deliberate exception: in a **group** chat it is
+**family-shared** — stored in the main bot's namespace (`forBot(null)`)
+regardless of which bot answers — so replying to *any* family bot's message and
+addressing a *different* one (`/ask@OtherBot`) carries the full reply chain, and
+the answering bot's new node links to the replied-to one across the bot boundary.
+This is safe because Telegram message ids are unique across all senders within a
+group. **DMs keep per-character scoping** (there `chat.id == user.id`, so two
+bots' DMs share a chat id with independent message-id sequences and would
+collide). The bot layer picks the right view via
+`bot/context-builder.ts:conversationStorage(base, botId, chatId)`, which routes
+group chats (negative `chatId`) to `forBot(null)` and private chats to
+`forBot(botId)`; `askHandler` uses it for every conversation read/write while
+keeping facts/reminders on the per-character view.
 
 Migration approach (schema-on-read): `settings.ts:normalize()` backfills/repairs
 settings (e.g. legacy scalar `model` → `models[]`); `reminders/parse.ts`

@@ -705,6 +705,116 @@ describe("askHandler", () => {
     expect(node?.userImageFileIds).toBeUndefined();
   });
 
+  test("cross-bot context: a managed bot replays the chain when replying to the main bot's group message", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const groupChat = "-1001"; // negative id => group chat
+
+    // The main bot answered earlier in the group (its message id is 100).
+    const mainAi = new FakeAI({ text: "Main answer", totalTokens: 10 });
+    const first = await askHandler(
+      baseInput({
+        storage,
+        ai: mainAi,
+        chatId: groupChat,
+        askMessageId: 1,
+        userText: "Q to main",
+      }),
+    );
+    if (first.kind !== "answered") throw new Error("expected answered");
+    await first.persistConversation(100);
+
+    // The user replies to the main bot's message (id 100) with /ask@cat-bot.
+    const managedAi = new FakeAI({ text: "Managed answer", totalTokens: 10 });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai: managedAi,
+        botId: "cat-bot",
+        chatId: groupChat,
+        askMessageId: 2,
+        userText: "follow-up",
+        replyTarget: {
+          messageId: 100,
+          text: "Main answer",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+
+    // The managed bot's AI call carries the prior (main-bot) turn as context.
+    const sent = (managedAi.calls[0] as { messages: unknown[] }).messages;
+    expect(sent[0]).toEqual({
+      role: "user",
+      content: JSON.stringify({ author: "John Doe", text: "Q to main" }),
+    });
+    expect(sent[1]).toEqual({ role: "assistant", content: "Main answer" });
+    expect(sent[2]).toEqual({
+      role: "user",
+      content: JSON.stringify({ author: "John Doe", text: "follow-up" }),
+    });
+
+    // The managed answer is stored in the shared (group) namespace and links its
+    // parent across the bot boundary.
+    await out.persistConversation(200);
+    expect(await storage.getConversation(groupChat, 200)).toMatchObject({
+      parentBotMsgId: 100,
+    });
+  });
+
+  test("DM conversations stay per-character: cross-bot context does NOT leak in a private chat", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const dm = "42"; // private chat id == user id (positive)
+
+    const mainAi = new FakeAI({ text: "Main DM answer", totalTokens: 10 });
+    const first = await askHandler(
+      baseInput({
+        storage,
+        ai: mainAi,
+        chatId: dm,
+        askMessageId: 1,
+        userText: "hi main",
+      }),
+    );
+    if (first.kind !== "answered") throw new Error("expected answered");
+    await first.persistConversation(100);
+
+    const managedAi = new FakeAI({ text: "Managed DM answer", totalTokens: 10 });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai: managedAi,
+        botId: "cat-bot",
+        chatId: dm,
+        askMessageId: 2,
+        userText: "follow",
+        replyTarget: {
+          messageId: 100,
+          text: "Main DM answer",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+
+    // No cross-bot chain replay in a DM: the main bot's turn is not surfaced as a
+    // prior assistant message (separate physical chats).
+    const sent = (managedAi.calls[0] as { messages: { role: string }[] }).messages;
+    expect(sent.some((m) => m.role === "assistant")).toBe(false);
+
+    // The managed answer is scoped to the managed bot, not the shared namespace,
+    // and is not linked to the main bot's node.
+    await out.persistConversation(200);
+    expect(await storage.forBot(null).getConversation(dm, 200)).toBeNull();
+    expect(
+      await storage.forBot("cat-bot").getConversation(dm, 200),
+    ).toMatchObject({ parentBotMsgId: null });
+  });
+
   test("forwards fetchPhoto to buildContext for chain image replay", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
