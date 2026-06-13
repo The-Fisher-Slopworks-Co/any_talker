@@ -200,6 +200,9 @@ describe("askHandler", () => {
         parentBotMsgId: null,
         ts: 1000,
       });
+      // The turn is also keyed by the user's ask message id, so replying to
+      // one's own question resolves the chain too.
+      expect(await storage.getConversation("c1", 1)).toEqual(node!);
     }
   });
 
@@ -226,6 +229,120 @@ describe("askHandler", () => {
     } else {
       throw new Error("expected answered");
     }
+  });
+
+  test("rateLimited: persistConversation saves the turn under the notice and ask message ids", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveConversation("c1", 2, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+    });
+    const rlStorage = new MemoryStorage();
+    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        rateLimiter: new TokenBucketLimiter(rlStorage),
+        askMessageId: 3,
+        userText: "How was your day?",
+        replyTarget: { messageId: 2, text: "A1", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    if (out.kind !== "rateLimited") throw new Error("expected rateLimited");
+    await out.persistConversation(4, "You are rate-limited");
+    const expected = {
+      userQuestion: JSON.stringify({ author: "John Doe", text: "How was your day?" }),
+      botAnswer: "You are rate-limited",
+      parentBotMsgId: 2,
+      ts: 1000,
+    };
+    expect(await storage.getConversation("c1", 4)).toEqual(expected);
+    expect(await storage.getConversation("c1", 3)).toEqual(expected);
+  });
+
+  test("error: persistConversation saves the turn so the chain survives provider failures", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    class ThrowingAI implements AIClient {
+      async ask(): Promise<AskResult> {
+        throw new Error("provider down");
+      }
+    }
+    const out = await askHandler(
+      baseInput({ storage, ai: new ThrowingAI(), askMessageId: 3 }),
+    );
+    if (out.kind !== "error") throw new Error("expected error");
+    await out.persistConversation(4, "AI error");
+    const expected = {
+      userQuestion: JSON.stringify({ author: "John Doe", text: "hello" }),
+      botAnswer: "AI error",
+      parentBotMsgId: null,
+      ts: 1000,
+    };
+    expect(await storage.getConversation("c1", 4)).toEqual(expected);
+    expect(await storage.getConversation("c1", 3)).toEqual(expected);
+  });
+
+  test("a rate-limited turn does not sever the chain: reply to own ask message carries full history", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+
+    // Turn 1: "/ask hello" (msg 1) → answered "Hi!" (msg 2).
+    const first = await askHandler(
+      baseInput({
+        storage,
+        askMessageId: 1,
+        userText: "hello",
+        ai: new FakeAI({ text: "Hi!", totalTokens: 1 }),
+      }),
+    );
+    if (first.kind !== "answered") throw new Error("expected answered");
+    await first.persistConversation(2);
+
+    // Turn 2: reply to msg 2 (msg 3) → rate-limit notice (msg 4).
+    const rlStorage = new MemoryStorage();
+    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
+    const second = await askHandler(
+      baseInput({
+        storage,
+        rateLimiter: new TokenBucketLimiter(rlStorage),
+        askMessageId: 3,
+        userText: "How was your day?",
+        replyTarget: { messageId: 2, text: "Hi!", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    if (second.kind !== "rateLimited") throw new Error("expected rateLimited");
+    await second.persistConversation(4, "You are rate-limited");
+
+    // Turn 3: reply to the user's OWN msg 3 — the AI must see the whole chain
+    // 3 → 2, i.e. turns 1 and 2 including the rate-limit notice.
+    const ai = new FakeAI();
+    const third = await askHandler(
+      baseInput({
+        storage,
+        ai,
+        askMessageId: 50,
+        userText: "What is my first ever message?",
+        replyTarget: {
+          messageId: 3,
+          text: "/ask How was your day?",
+          authorFirstName: "John",
+          images: [],
+        },
+      }),
+    );
+    expect(third.kind).toBe("answered");
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    expect(sent.map((m) => m.content)).toEqual([
+      JSON.stringify({ author: "John Doe", text: "hello" }),
+      "Hi!",
+      JSON.stringify({ author: "John Doe", text: "How was your day?" }),
+      "You are rate-limited",
+      JSON.stringify({ author: "John Doe", text: "What is my first ever message?" }),
+    ]);
   });
 
   test("onAIStart fires immediately before the AI call", async () => {

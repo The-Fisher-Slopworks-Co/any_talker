@@ -325,7 +325,7 @@ sequenceDiagram
     H->>S: addUserSpend (best-effort)
     H-->>D: { kind: "answered", text, persistConversation }
     D->>TG: sendRichMessage (Rich Markdown, reply parameters) · plain sendMessage fallback
-    D->>S: persistConversation(botMessageId) → conversation node (TTL 30d)
+    D->>S: persistConversation → conversation node under both message ids (TTL 30d)
 ```
 
 Notes that matter:
@@ -336,9 +336,13 @@ Notes that matter:
   zero, so one request can overshoot into a negative balance
   (at-least-one-more-request semantics). Owner-exempt and BYOK requests skip the
   limiter entirely.
-- **Conversation context** is a reply-chain graph: each answer is stored as a
-  `ConversationNode` keyed by the bot's message id with a `parentBotMsgId`
-  pointer; replying to a bot message walks the chain to rebuild context. In group
+- **Conversation context** is a reply-chain graph: each turn is stored as a
+  `ConversationNode` with a `parentBotMsgId` pointer, written under **both** the
+  bot's reply message id and the user's ask message id (unique within a chat),
+  so replying to either side's message walks the chain to rebuild context.
+  Turns the AI never answered — rate-limited or provider-error — are persisted
+  too, with the failure notice that was sent as the stored answer, so a failed
+  turn never severs the chain. In group
   chats the graph is **shared across the whole bot family**, so a reply across
   bots (`/ask@OtherBot` on another character's message) carries the full chain;
   DMs stay per-character (see §7, "Cross-bot conversation context").
@@ -371,7 +375,7 @@ persisted entities:
 | BYOK key / models | `at:user_or_key:{userId}` · `at:user_or_models:{userId}` | string / JSON | — | API key (**plaintext**) · `string[]` |
 | Per-user spend | `at:spend:{userId}:{YYYY-MM-DD}` | float counter | 35 days | USD per UTC day (`INCRBYFLOAT`); summarized to day/week/month |
 | Users / chats directory | `at:users` · `at:chats` | hash | — | `User` / `Chat` per field |
-| Conversation node | `at:msg:{chatId}:{botMsgId}` (DMs add the `mbot:{botId}:` scope; groups stay shared) | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }` |
+| Conversation node | `at:msg:{chatId}:{msgId}` — one node per turn, written under both the bot-reply id and the user's ask message id (DMs add the `mbot:{botId}:` scope; groups stay shared) | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }`; failed turns store the rate-limit/error notice as `botAnswer` |
 | Photo cache | `at:photo_cache:{fileId}` | base64 string | 7 days | raw bytes (TTL renewed on read) |
 | Album photos | `at:album:{chatId}:{mediaGroupId}` | hash | 30 days | `messageId → fileId` |
 | Guest thread | `at:guest_thread:{chatId}` | string | 30 days | `{ turns: [{userQuestion, botAnswer}], ts }` |
