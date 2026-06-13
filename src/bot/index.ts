@@ -594,15 +594,21 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         case "usage":
           await ctx.reply(ctx.t.bot_ask_usage);
           return;
-        case "rateLimited":
-          await ctx.reply(
-            ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
-          );
+        // Failure notices are still part of the conversation: persist the turn
+        // (question + the notice actually sent) so a later reply to either the
+        // notice or the user's own ask message carries the full chain.
+        case "rateLimited": {
+          const text = ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill);
+          const sent = await ctx.reply(text);
+          await outcome.persistConversation(sent.message_id, text);
           return;
-        case "error":
+        }
+        case "error": {
           console.error("ask error:", outcome.message);
-          await ctx.reply(ctx.t.bot_ai_error);
+          const sent = await ctx.reply(ctx.t.bot_ai_error);
+          await outcome.persistConversation(sent.message_id, ctx.t.bot_ai_error);
           return;
+        }
         case "answered": {
           const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
           const content = buildRichMarkdown(outcome.text, outcome.botName, {

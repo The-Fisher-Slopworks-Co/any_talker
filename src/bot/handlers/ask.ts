@@ -53,7 +53,11 @@ export type AskInput = {
 export type AskOutcome =
   | { kind: "denied" }
   | { kind: "usage" }
-  | { kind: "rateLimited"; minutesUntilNextRefill: number }
+  | {
+      kind: "rateLimited";
+      minutesUntilNextRefill: number;
+      persistConversation: PersistFailedTurn;
+    }
   | {
       kind: "answered";
       text: string;
@@ -63,7 +67,15 @@ export type AskOutcome =
       expandableThreshold: number;
       persistConversation: (botMsgId: number) => Promise<void>;
     }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; persistConversation: PersistFailedTurn };
+
+// Persists a turn the AI never answered (rate limit, provider error). The
+// dispatcher passes the notice it actually sent so the stored transcript stays
+// truthful — and so a later reply to either message still carries the chain.
+export type PersistFailedTurn = (
+  botMsgId: number,
+  botAnswer: string,
+) => Promise<void>;
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // Per-character storage view: scoped methods (user facts, this bot's own
@@ -106,6 +118,40 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   ]);
   const timezone = userTimezone ?? settings.timezone;
 
+  // Persist this turn into the conversation graph under BOTH the bot's reply
+  // message id and the user's ask message id (unique within a chat, so no
+  // collision): a Telegram reply chain can pass through either side's message,
+  // and both must resolve the chain. Runs for every outcome that sent a reply —
+  // including rate-limited/error turns, where `botAnswer` is the failure notice
+  // — so a failed turn never severs the chain.
+  const persistTurn = async (botMsgId: number, botAnswer: string) => {
+    let parentBotMsgId: number | null = null;
+    if (input.replyTarget) {
+      const existing = await convStorage.getConversation(
+        input.chatId,
+        input.replyTarget.messageId,
+      );
+      if (existing) parentBotMsgId = input.replyTarget.messageId;
+    }
+    const allImageFileIds = [...input.imageFileIds, ...input.replyImageFileIds];
+    const node = {
+      userQuestion: buildUserEnvelope({
+        sender: input.sender,
+        quote: input.quote,
+        text: input.userText,
+      }),
+      botAnswer,
+      parentBotMsgId,
+      ts: input.now,
+      userImageFileIds:
+        allImageFileIds.length > 0 ? allImageFileIds : undefined,
+    };
+    await Promise.all([
+      convStorage.saveConversation(input.chatId, botMsgId, node),
+      convStorage.saveConversation(input.chatId, input.askMessageId, node),
+    ]);
+  };
+
   const isOwner = input.userId === input.ownerId;
   const skipRateLimit =
     byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
@@ -120,6 +166,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       return {
         kind: "rateLimited",
         minutesUntilNextRefill: Math.ceil(r.msUntilNextRefill / 60_000),
+        persistConversation: persistTurn,
       };
     }
   }
@@ -177,7 +224,11 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       },
     });
   } catch (err) {
-    return { kind: "error", message: err instanceof Error ? err.message : String(err) };
+    return {
+      kind: "error",
+      message: err instanceof Error ? err.message : String(err),
+      persistConversation: persistTurn,
+    };
   }
 
   if (!skipRateLimit) {
@@ -193,21 +244,6 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));
 
-  let parentBotMsgId: number | null = null;
-  if (input.replyTarget) {
-    const existing = await convStorage.getConversation(
-      input.chatId,
-      input.replyTarget.messageId,
-    );
-    if (existing) parentBotMsgId = input.replyTarget.messageId;
-  }
-
-  const envelope = buildUserEnvelope({
-    sender: input.sender,
-    quote: input.quote,
-    text: input.userText,
-  });
-
   // The AI now emits Rich Markdown sent verbatim via sendRichMessage; Telegram
   // parses it server-side (only supported tags/schemes are honored), so there
   // is no HTML sanitization step. The same text is persisted as conversation
@@ -221,19 +257,6 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     totalTokens: result.totalTokens,
     effects,
     expandableThreshold: settings.expandableBlockquoteThreshold,
-    persistConversation: async (botMsgId) => {
-      const allImageFileIds = [
-        ...input.imageFileIds,
-        ...input.replyImageFileIds,
-      ];
-      await convStorage.saveConversation(input.chatId, botMsgId, {
-        userQuestion: envelope,
-        botAnswer: body,
-        parentBotMsgId,
-        ts: input.now,
-        userImageFileIds:
-          allImageFileIds.length > 0 ? allImageFileIds : undefined,
-      });
-    },
+    persistConversation: (botMsgId) => persistTurn(botMsgId, body),
   };
 }
