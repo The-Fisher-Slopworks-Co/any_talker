@@ -252,14 +252,6 @@ export class BotManager {
     return this.running.has(botId);
   }
 
-  // Every running managed (character) bot's id — the main bot's family siblings.
-  // The main bot uses these to recognize a bare `/ask` sent in reply to a
-  // character bot's message and defer to that character. (A managed bot instead
-  // uses `siblingBotIds`, which also includes the main bot and excludes itself.)
-  managedBotIds(): string[] {
-    return [...this.running.keys()];
-  }
-
   // The other family bots a managed bot shares chats with: the main bot plus
   // every OTHER running managed bot (self excluded). Used by the bare-`/ask`
   // alone-check — a managed bot stays silent on a bare `/ask` in a group while
