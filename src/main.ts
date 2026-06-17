@@ -60,10 +60,6 @@ async function main() {
   for (const t of createUserFactsTools({ storage })) registerTool(logged(t));
 
   const mainResolver = createMainPersonaResolver(storage);
-  // Forward-declared so the main bot's `siblingBotIds` can read the live set of
-  // managed bot ids. The closure only runs per-update (long after the manager is
-  // constructed below), and the bot does not start polling until later still.
-  let botManager: BotManager;
   const bot = createBot({
     botToken: config.botToken,
     ownerId: config.botOwnerId,
@@ -71,11 +67,6 @@ async function main() {
     rateLimiter,
     ai,
     resolver: mainResolver,
-    // The main bot's family siblings are exactly the managed (character) bots. It
-    // never needs the alone-check (it always owns a plain bare `/ask`), but it
-    // uses this to recognize a bare `/ask` replying to a character bot's message
-    // and defer to that character instead of answering itself.
-    siblingBotIds: () => botManager.managedBotIds(),
     logFormat: config.logFormat,
     logIncomingUpdates: config.logIncomingUpdates,
     logDebug: config.logDebug,
@@ -84,7 +75,7 @@ async function main() {
   // Resolve the main bot's id up front (deterministic, no startup race): managed
   // bots treat it as a sibling for the bare-`/ask` alone-check.
   const mainMe = await bot.api.getMe();
-  botManager = new BotManager({
+  const botManager = new BotManager({
     storage,
     rateLimiter,
     ai,
