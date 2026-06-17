@@ -5,7 +5,6 @@ import { test, expect } from "bun:test";
 import {
   matchAsk,
   askGate,
-  classifyReplyTarget,
   computeAlone,
   BOT_PRESENCE_TTL_MS,
   type AskMatch,
@@ -45,74 +44,21 @@ const bare: AskMatch = { detailLevel: "short", userText: "", explicit: false };
 const explicit: AskMatch = { detailLevel: "short", userText: "", explicit: true };
 
 test("askGate: an explicit @self mention is always answered", () => {
-  expect(askGate(explicit, true, "group", "other")).toBe("answer");
-  expect(askGate(explicit, true, "private", "other")).toBe("answer");
-  expect(askGate(explicit, false, "supergroup", "other")).toBe("answer");
-  // An explicit mention wins even over a reply to a sibling's message.
-  expect(askGate(explicit, true, "group", "sibling")).toBe("answer");
+  expect(askGate(explicit, true, "group")).toBe("answer");
+  expect(askGate(explicit, true, "private")).toBe("answer");
+  expect(askGate(explicit, false, "supergroup")).toBe("answer");
 });
 
 test("askGate: the main bot answers a bare /ask everywhere", () => {
-  expect(askGate(bare, false, "group", "other")).toBe("answer");
-  expect(askGate(bare, false, "private", "other")).toBe("answer");
+  expect(askGate(bare, false, "group")).toBe("answer");
+  expect(askGate(bare, false, "private")).toBe("answer");
 });
 
 test("askGate: a managed bot answers a bare /ask in its DM, checks alone in a group", () => {
-  expect(askGate(bare, true, "private", "other")).toBe("answer");
-  expect(askGate(bare, true, "group", "other")).toBe("check-alone");
-  expect(askGate(bare, true, "supergroup", "other")).toBe("check-alone");
-  expect(askGate(bare, true, undefined, "other")).toBe("check-alone");
-});
-
-test("askGate: a bare /ask replying to THIS bot's own message is always answered", () => {
-  // The user replied to this bot's message — they are addressing it directly, so
-  // it answers even in a group with siblings present (managed) or by default (main).
-  expect(askGate(bare, true, "group", "self")).toBe("answer");
-  expect(askGate(bare, true, "supergroup", "self")).toBe("answer");
-  expect(askGate(bare, false, "group", "self")).toBe("answer");
-});
-
-test("askGate: a bare /ask replying to a SIBLING family bot's message is skipped", () => {
-  // The bug fix: the main bot must NOT answer a bare /ask sent in reply to a
-  // character bot's message — it defers ("skip") so that character answers; and a
-  // managed bot likewise defers when the reply is to a different family bot.
-  expect(askGate(bare, false, "group", "sibling")).toBe("skip");
-  expect(askGate(bare, false, "supergroup", "sibling")).toBe("skip");
-  expect(askGate(bare, true, "group", "sibling")).toBe("skip");
-  expect(askGate(bare, true, "private", "sibling")).toBe("skip");
-});
-
-test("classifyReplyTarget: own message ⇒ self, family sibling ⇒ sibling, else other", () => {
-  const SELF_ID = 42;
-  const SIBLINGS = ["100", "200"];
-  expect(classifyReplyTarget(42, SELF_ID, SIBLINGS)).toBe("self");
-  expect(classifyReplyTarget(100, SELF_ID, SIBLINGS)).toBe("sibling");
-  expect(classifyReplyTarget(200, SELF_ID, SIBLINGS)).toBe("sibling");
-  // A human or an unrelated third-party bot is "other".
-  expect(classifyReplyTarget(999, SELF_ID, SIBLINGS)).toBe("other");
-  // No reply at all.
-  expect(classifyReplyTarget(undefined, SELF_ID, SIBLINGS)).toBe("other");
-  // No siblings configured (a main bot before any character bot exists): a reply
-  // to a human stays "other" (main still answers), own message still "self".
-  expect(classifyReplyTarget(100, SELF_ID, [])).toBe("other");
-  expect(classifyReplyTarget(42, SELF_ID, [])).toBe("self");
-});
-
-test("regression: a bare /ask replying to a character bot routes to that character only", () => {
-  const MAIN_ID = 10;
-  const CHAR_ID = 20;
-  // The replied-to message was sent by the character bot.
-  const repliedFrom = CHAR_ID;
-
-  // Main bot's view: its family siblings are the character bots → defer.
-  const mainReply = classifyReplyTarget(repliedFrom, MAIN_ID, [String(CHAR_ID)]);
-  expect(mainReply).toBe("sibling");
-  expect(askGate(bare, false, "supergroup", mainReply)).toBe("skip");
-
-  // Character bot's view: the reply is to its own message → it answers.
-  const charReply = classifyReplyTarget(repliedFrom, CHAR_ID, [String(MAIN_ID)]);
-  expect(charReply).toBe("self");
-  expect(askGate(bare, true, "supergroup", charReply)).toBe("answer");
+  expect(askGate(bare, true, "private")).toBe("answer");
+  expect(askGate(bare, true, "group")).toBe("check-alone");
+  expect(askGate(bare, true, "supergroup")).toBe("check-alone");
+  expect(askGate(bare, true, undefined)).toBe("check-alone");
 });
 
 test("computeAlone: alone when no sibling has a fresh presence record", () => {

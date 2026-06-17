@@ -125,21 +125,11 @@ export function matchAsk(
 // offline (its `my_chat_member` is missed) — past it, the entry reads as absent.
 export const BOT_PRESENCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type AskDecision = "answer" | "check-alone" | "skip";
+export type AskDecision = "answer" | "check-alone";
 
-// Where the message a bare `/ask` is replying to was sent from, relative to this
-// bot's family (see `classifyReplyTarget`): this bot's own message, a different
-// family bot's message, or anything else (human / unrelated bot / no reply).
-export type ReplyRouting = "self" | "sibling" | "other";
-
-// Decide whether a parsed ask should be answered, from routing mode + chat type
-// + who (if anyone) the ask replies to:
+// Decide whether a parsed ask should be answered, from routing mode + chat type:
 //   - an explicit `@self` mention is always answered;
-//   - a bare `/ask` sent in reply to a family bot's message is routed to THAT
-//     bot — the replied-to bot answers ("self"), every other bot defers
-//     ("sibling" ⇒ "skip"); this is what stops the main bot from stealing a bare
-//     `/ask` aimed at a character bot by replying to that character's message;
-//   - otherwise the main bot (`requireMention === false`) answers a bare `/ask`;
+//   - the main bot (`requireMention === false`) answers a bare `/ask` too;
 //   - a managed bot answers a bare `/ask` in its DM (it is inherently alone),
 //     and in a group only if it is the sole family bot there — which the caller
 //     resolves via presence ("check-alone").
@@ -147,30 +137,11 @@ export function askGate(
   match: AskMatch,
   requireMention: boolean,
   chatType: string | undefined,
-  reply: ReplyRouting,
 ): AskDecision {
   if (match.explicit) return "answer";
-  if (reply === "self") return "answer";
-  if (reply === "sibling") return "skip";
   if (!requireMention) return "answer";
   if (chatType === "private") return "answer";
   return "check-alone";
-}
-
-// Classify the sender of the message a bare `/ask` is replying to, so the ask
-// can be routed to the bot the user addressed. `siblingBotIds` are the OTHER
-// family bots (the main bot + every other managed bot) — exactly the set the
-// alone-check uses; this bot's own id is matched separately. A reply to a
-// non-family sender (human or unrelated bot) or no reply at all is "other".
-export function classifyReplyTarget(
-  replyFromId: number | undefined,
-  selfId: number,
-  siblingBotIds: string[],
-): ReplyRouting {
-  if (replyFromId === undefined) return "other";
-  const id = String(replyFromId);
-  if (id === String(selfId)) return "self";
-  return siblingBotIds.includes(id) ? "sibling" : "other";
 }
 
 // A managed bot is "alone" in a chat when none of its sibling family bots (the
@@ -269,23 +240,13 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
   };
 
-  // Whether to act on a matched ask. A bare `/ask` replying to a family bot's
-  // message is routed to that bot (the replied-to bot answers, the others defer);
-  // otherwise a managed bot's bare ask in a group is gated on being the only
-  // family bot present, and everything else answers outright.
+  // Whether to act on a matched ask. Bare asks for a managed bot in a group are
+  // gated on being the only family bot present; everything else answers outright.
   const shouldAnswer = async (
     ctx: BotContext,
     match: AskMatch,
-    replyToMessage: Message | undefined,
   ): Promise<boolean> => {
-    const reply = classifyReplyTarget(
-      replyToMessage?.from?.id,
-      ctx.me.id,
-      deps.siblingBotIds?.() ?? [],
-    );
-    const decision = askGate(match, requireMention, ctx.chat?.type, reply);
-    if (decision === "answer") return true;
-    if (decision === "skip") return false;
+    if (askGate(match, requireMention, ctx.chat?.type) === "answer") return true;
     const chatId = ctx.chat?.id;
     if (chatId === undefined) return false;
     return await isAloneInChat(String(chatId));
@@ -711,7 +672,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
 
       const captionMatch = matchOf(askItem)!;
-      if (!(await shouldAnswer(ctx, captionMatch, askItem.reply_to_message))) {
+      if (!(await shouldAnswer(ctx, captionMatch))) {
         debugLog("media_group_dropped", { key, reason: "not_addressed" });
         return;
       }
@@ -753,14 +714,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   const dispatchTextCommand = async (
     ctx: BotContext,
     detailLevel: DetailLevel,
-    // Every bot extracts the text via `matchAsk` and passes it in, so this never
-    // relies on grammY's `ctx.match` (the command filter is unused for asks).
-    userText: string,
+    // Managed bots match `/ask@self` by hand (not via grammY's command filter),
+    // so they pass the already-extracted text rather than relying on ctx.match.
+    userText?: string,
   ) => {
     const msg = ctx.message;
     if (!msg) return;
     await dispatchAsk(ctx, {
-      userText,
+      userText: userText ?? (ctx.match ?? "").toString().trim(),
       askMessageId: msg.message_id,
       images: [],
       imageFileIds: [],
@@ -772,17 +733,21 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     });
   };
 
-  // Both the main and managed bots parse `/ask(wise)` from the raw text with
-  // `matchAsk` (not grammY's command filter) so the same reply-aware routing in
-  // `shouldAnswer` applies to every bot: an explicit `@self` is always answered,
-  // a bare `/ask` replying to a family bot's message is answered by THAT bot, and
-  // a managed bot otherwise answers only in a DM or when alone in a group.
-  bot.on("message:text", async (ctx) => {
-    const match = matchAsk(ctx.message.text, ctx.me.username);
-    if (!match) return;
-    if (!(await shouldAnswer(ctx, match, ctx.message.reply_to_message))) return;
-    await dispatchTextCommand(ctx, match.detailLevel, match.userText);
-  });
+  if (requireMention) {
+    // Managed bot: grammY's `bot.command` would also fire on a bare `/ask`
+    // (which usually belongs to the main bot), so we parse the raw text with
+    // `matchAsk` and let `shouldAnswer` decide — `@self` always, a bare `/ask`
+    // only in a DM or when alone in a group.
+    bot.on("message:text", async (ctx) => {
+      const match = matchAsk(ctx.message.text, ctx.me.username);
+      if (!match) return;
+      if (!(await shouldAnswer(ctx, match))) return;
+      await dispatchTextCommand(ctx, match.detailLevel, match.userText);
+    });
+  } else {
+    bot.command("ask", (ctx) => dispatchTextCommand(ctx, "short"));
+    bot.command("askwise", (ctx) => dispatchTextCommand(ctx, "wise"));
+  }
 
   bot.on("message:photo", async (ctx) => {
     const msg = ctx.message;
@@ -827,7 +792,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
 
     if (!match) return;
-    if (!(await shouldAnswer(ctx, match, msg.reply_to_message))) return;
+    if (!(await shouldAnswer(ctx, match))) return;
     const detailLevel = match.detailLevel;
     const userText = match.userText;
 
@@ -873,7 +838,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       duration: msg.voice.duration,
     });
     if (!match) return;
-    if (!(await shouldAnswer(ctx, match, msg.reply_to_message))) return;
+    if (!(await shouldAnswer(ctx, match))) return;
 
     const detailLevel = match.detailLevel;
     const userText = match.userText;
