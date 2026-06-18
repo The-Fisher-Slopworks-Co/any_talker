@@ -177,19 +177,35 @@ and an optional `siblingBotIds`: when `persona` is present it is a **managed
 bot** — it scopes per-character storage with `storage.forBot(botId)` and threads
 `botId` into the tool call context.
 
-**Ask routing (`matchAsk` + `askGate`).** Both are pure and matched against the
-bot's live `ctx.me.username` (no stale username). `matchAsk` parses `/ask(wise)`
-and returns `{detailLevel, userText, explicit}` (or null for non-ask / a mention
-to a *different* bot — this is what stops the main bot stealing a
-`/ask@CharacterBot` caption). `askGate` then decides: an explicit `@self` is
-always answered; the main bot answers a bare `/ask` everywhere; a managed bot
-answers a bare `/ask` only in its **DM**, or in a group when it is the **only
-family bot present** (resolved via the presence registry, see below). Every bot
-(main and managed) records its own group membership — authoritatively on
-`my_chat_member`, and refreshed on genuine activity (`shouldRefreshPresence`:
-content messages only, never the service/membership burst a bot drains around
-its own removal) — into a shared `bot_presence` registry; `computeAlone` reads it
-(TTL-pruned) to make the group decision.
+**Ask routing (`matchAsk` + `askGate` + `classifyReplyTarget`).** All three are
+pure. `matchAsk` (matched against the bot's live `ctx.me.username`, never a stale
+one) parses `/ask(wise)` and returns `{detailLevel, userText, explicit}` — or
+null for non-ask text / a mention to a *different* bot (this is what stops the
+main bot stealing a `/ask@CharacterBot` caption). **Every** bot (main and
+managed) parses text asks this way through a single `message:text` handler rather
+than grammY's command filter, so the routing below is uniform across all bots.
+`askGate` then decides from `explicit`, the bot's mode (`requireMention`), the
+chat type, and where the ask *replies* (`classifyReplyTarget` → `self` |
+`sibling` | `other`): an explicit `@self` is always answered; a bare `/ask`
+**replying to a *present* family bot's message is routed to that bot** — the
+replied-to bot answers (`self`), every other bot defers (`sibling` ⇒ `skip`), so
+a bare `/ask` sent in reply to a character bot no longer falls through to the
+main bot; otherwise the main bot answers a bare `/ask` everywhere, and a managed
+bot answers a bare `/ask` only in its **DM** or in a group when it is the **only
+family bot present** (`check-alone`).
+`classifyReplyTarget` recognizes a family bot by the replied-to message's sender
+id against this bot's `siblingBotIds` (the main bot is handed the managed-bot ids
+by `BotManager.managedBotIds()`; a managed bot gets the main bot + its other
+siblings), with its own id matched separately — **but only counts it as a
+`sibling` when that bot is actually *present* in this chat** (a fresh
+`bot_presence` record). A reply to a family bot that has left / been removed / is
+down reads as `other`, so the ask falls back to normal routing (the main bot
+answers) instead of being deferred into silence. Every bot (main and managed)
+records its own group membership — authoritatively on `my_chat_member`, and
+refreshed on genuine activity (`shouldRefreshPresence`: content messages only,
+never the service/membership burst a bot drains around its own removal) — into a
+shared `bot_presence` registry; `shouldAnswer` reads it once per ask and reuses
+it for both the reply classification and `computeAlone`'s `check-alone` decision.
 Managed bots also `syncBotCommands` for their own `/ask` menu, and carry **no
 bold name prefix** (a managed bot *is* the character — `resolver` returns a null
 `botName`). **Depends on:** `ai`, `storage`, `ratelimit`, `settings`, `managed-bots`
@@ -386,7 +402,7 @@ persisted entities:
 | Private-chat flag | `at:user_private_chat:{userId}` | string `"1"` | — | presence sentinel |
 | Managed-bot registry | `at:managed_bots` | hash | — | `ManagedBot` per `botId` (`{botId, ownerUserId, username, displayName, systemPrompt, createdAtMs}`) |
 | Managed-bot token | `at:managed_bot_token:{botId}` | string (raw) | — | bot token (**plaintext**, like BYOK); never returned to the UI |
-| Bot presence | `at:bot_presence:{chatId}` | hash | TTL-read (7 d) | `botId → last-seen ms` for every family bot in a group; drives the bare-`/ask` alone-check. Shared (unscoped), like the registry. |
+| Bot presence | `at:bot_presence:{chatId}` | hash | TTL-read (7 d) | `botId → last-seen ms` for every family bot in a group; drives the bare-`/ask` alone-check **and** reply-to-a-bot routing (defer only to a *present* bot). Shared (unscoped), like the registry. |
 
 **Per-character scoping (`forBot`).** `Storage.forBot(botId)` returns a view that
 namespaces a bot's per-character data under an `at:mbot:{botId}:` segment, while
@@ -551,13 +567,28 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   isolation test. Persona is **per-bot** (name + prompt + memory + reminders);
   configuration (models, limits, provider) is **inherited from the main bot's
   global settings**, deliberately ignoring its per-chat overrides.
-- **Bare-`/ask` alone-check via presence tracking, not `getChatMember`** — a
-  managed bot answers a bare `/ask` in a group only when it is the sole family
-  bot there. `getChatMember` would be authoritative but Telegram only guarantees
-  it for *admin* bots, so a regular-member character bot couldn't probe its
-  siblings. Instead each bot records its own membership (authoritative on
-  `my_chat_member`, refreshed on activity) into a shared `bot_presence` registry,
-  which works without admin. Trade-off: a rare one-off double-answer at cold
-  start (a pre-existing chat right after deploy, before siblings re-register),
-  self-healing on first activity; the alone-check fails **closed** (a storage
-  error ⇒ stay silent) so it never double-answers the main bot.
+- **Reply-to-a-bot routing is gated on presence, and fails *open*** — a bare
+  `/ask` sent *in reply to* a particular family bot's message is routed to that
+  bot (the replied-to bot answers, every other family bot defers), so a user can
+  address a specific character — or the main bot — by replying to one of its
+  messages. The deferral is only taken when the replied-to bot is **present in
+  this chat** (a fresh `bot_presence` record): a reply to a family bot that has
+  left / been removed / is down reads as `other`, so the main bot still answers
+  rather than deferring to a bot that will never see the update (the precise bug
+  that made an earlier, presence-blind version go silent — it deferred on the
+  *global* set of running bots regardless of chat membership). Hence this path
+  fails **open** (unknown presence ⇒ the main bot answers), the deliberate
+  *inverse* of the alone-check below: the failure it guards is silence, so its
+  worst case is a rare one-off double-answer (a member bot whose presence has gone
+  stale), self-healing on the next activity.
+- **Bare-`/ask` alone-check via presence tracking, not `getChatMember`** — for a
+  bare `/ask` that is *not* a reply to a present family bot, a managed bot answers
+  in a group only when it is the sole family bot there. `getChatMember` would be
+  authoritative but Telegram only guarantees it for *admin* bots, so a
+  regular-member character bot couldn't probe its siblings. Instead each bot
+  records its own membership (authoritative on `my_chat_member`, refreshed on
+  activity) into a shared `bot_presence` registry, which works without admin.
+  Trade-off: a rare one-off double-answer at cold start (a pre-existing chat right
+  after deploy, before siblings re-register), self-healing on first activity; the
+  alone-check fails **closed** (a storage error ⇒ stay silent) so it never
+  double-answers the main bot.

@@ -64,10 +64,12 @@ export type BotDeps = {
   resolver: PersonaResolver;
   // Present for managed bots only; absent ⇒ the main bot.
   persona?: BotPersona;
-  // The user ids of the OTHER family bots (the main bot + every other managed
-  // bot) this bot should consider when deciding whether it is alone in a group.
-  // Supplied by `BotManager` for managed bots; absent for the main bot (which
-  // never needs an alone-check — it always answers a bare `/ask`).
+  // The user ids of the OTHER family bots this bot should consider for routing.
+  // For a managed bot: the main bot + every other managed bot — used both for
+  // the alone-check and to recognize a bare `/ask` replying to a sibling. For
+  // the main bot: the managed (character) bots (`BotManager.managedBotIds()`) —
+  // it never needs the alone-check, but uses these to recognize a bare `/ask`
+  // replying to a *present* character's message and defer to that character.
   siblingBotIds?: () => string[];
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
@@ -125,11 +127,23 @@ export function matchAsk(
 // offline (its `my_chat_member` is missed) — past it, the entry reads as absent.
 export const BOT_PRESENCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type AskDecision = "answer" | "check-alone";
+export type AskDecision = "answer" | "check-alone" | "skip";
 
-// Decide whether a parsed ask should be answered, from routing mode + chat type:
+// Where the message a bare `/ask` is replying to was sent from, relative to this
+// bot's family (see `classifyReplyTarget`): this bot's own message ("self"), a
+// *present* sibling family bot's message ("sibling" — the reply is routed to
+// that bot), or anything else ("other": a human, an unrelated bot, no reply, or
+// a family bot that is NOT currently in this chat).
+export type ReplyRouting = "self" | "sibling" | "other";
+
+// Decide whether a parsed ask should be answered, from routing mode + chat type
+// + who (if anyone) the ask replies to:
 //   - an explicit `@self` mention is always answered;
-//   - the main bot (`requireMention === false`) answers a bare `/ask` too;
+//   - a bare `/ask` replying to a present family bot's message is routed to THAT
+//     bot — the replied-to bot answers ("self"), every other bot defers
+//     ("sibling" ⇒ "skip"); this stops the main bot from stealing a bare `/ask`
+//     aimed at a character by replying to that character's message;
+//   - otherwise the main bot (`requireMention === false`) answers a bare `/ask`;
 //   - a managed bot answers a bare `/ask` in its DM (it is inherently alone),
 //     and in a group only if it is the sole family bot there — which the caller
 //     resolves via presence ("check-alone").
@@ -137,11 +151,51 @@ export function askGate(
   match: AskMatch,
   requireMention: boolean,
   chatType: string | undefined,
+  reply: ReplyRouting,
 ): AskDecision {
   if (match.explicit) return "answer";
+  if (reply === "self") return "answer";
+  if (reply === "sibling") return "skip";
   if (!requireMention) return "answer";
   if (chatType === "private") return "answer";
   return "check-alone";
+}
+
+// Classify the sender of the message a bare `/ask` is replying to, so the ask
+// can be routed to the bot the user addressed. `siblingBotIds` are the OTHER
+// family bots (for the main bot: the managed bots; for a managed bot: the main
+// bot + every other managed bot); this bot's own id is matched separately.
+//
+// A reply is only "sibling" when that family bot is *actually present in this
+// chat* (`isSiblingPresent`) — a family bot that has left, was removed, or is
+// down never receives the update, so deferring to it would leave the ask
+// unanswered. Such an absent sibling (and any human / unrelated bot / no reply)
+// is "other", which falls back to normal routing so the main bot still answers.
+// `isSiblingPresent` is only consulted for ids in `siblingBotIds`; "self" is
+// always present (this bot just received the update).
+export function classifyReplyTarget(
+  replyFromId: number | undefined,
+  selfId: number,
+  siblingBotIds: string[],
+  isSiblingPresent: (botId: string) => boolean,
+): ReplyRouting {
+  if (replyFromId === undefined) return "other";
+  const id = String(replyFromId);
+  if (id === String(selfId)) return "self";
+  if (siblingBotIds.includes(id) && isSiblingPresent(id)) return "sibling";
+  return "other";
+}
+
+// Whether a recorded presence timestamp is still fresh (a bot was seen within
+// the TTL). `seenMs === undefined` — no record at all — is never fresh. Shared by
+// the alone-check (`computeAlone`) and the reply-routing presence probe in
+// `shouldAnswer` so both read "present in this chat" by exactly the same rule.
+export function isPresenceFresh(
+  seenMs: number | undefined,
+  nowMs: number,
+  ttlMs: number,
+): boolean {
+  return seenMs !== undefined && nowMs - seenMs <= ttlMs;
 }
 
 // A managed bot is "alone" in a chat when none of its sibling family bots (the
@@ -152,10 +206,7 @@ export function computeAlone(
   nowMs: number,
   ttlMs: number,
 ): boolean {
-  return !siblingIds.some((id) => {
-    const seen = presence[id];
-    return seen !== undefined && nowMs - seen <= ttlMs;
-  });
+  return !siblingIds.some((id) => isPresenceFresh(presence[id], nowMs, ttlMs));
 }
 
 // Message fields that carry genuine user content. A Telegram *service* message
@@ -224,32 +275,57 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   // themselves; everything else (user/chat directory, etc.) stays on base.
   const scopedStorage = deps.storage.forBot(botId);
 
-  // A managed bot is alone in a group when none of its sibling family bots have
-  // a fresh presence record there. Fail-closed on a storage error (treat as NOT
-  // alone) so a transient hiccup can't make a managed bot double-answer a bare
-  // `/ask` alongside the main bot — at worst the user retries or `@`-mentions.
-  const isAloneInChat = async (chatId: string): Promise<boolean> => {
-    const siblings = deps.siblingBotIds?.() ?? [];
-    if (siblings.length === 0) return true;
-    try {
-      const presence = await deps.storage.getBotPresence(chatId);
-      return computeAlone(siblings, presence, Date.now(), BOT_PRESENCE_TTL_MS);
-    } catch (err) {
-      console.error("getBotPresence failed:", err);
-      return false;
-    }
-  };
-
-  // Whether to act on a matched ask. Bare asks for a managed bot in a group are
-  // gated on being the only family bot present; everything else answers outright.
+  // Whether to act on a matched ask. The chat's family-bot presence map is
+  // fetched once and reused for both the reply routing and the alone-check:
+  //   - a bare `/ask` replying to a *present* family bot's message is routed to
+  //     that bot (the replied-to bot answers, the others defer) — a reply to an
+  //     absent family bot falls back to normal routing so it is never left
+  //     unanswered;
+  //   - otherwise a managed bot's bare ask in a group is gated on being the only
+  //     family bot present, and everything else answers outright.
+  //
+  // Two deliberately *opposite* biases on a storage error / no presence data,
+  // because the failure modes they guard differ: reply routing fails OPEN (an
+  // unknown sibling reads as absent ⇒ "other" ⇒ the main bot still answers, so a
+  // reply can't go silent), while the alone-check fails CLOSED (treat as NOT
+  // alone ⇒ a managed bot stays quiet, so it can't double-answer the main bot).
   const shouldAnswer = async (
     ctx: BotContext,
     match: AskMatch,
+    replyToMessage: Message | undefined,
   ): Promise<boolean> => {
-    if (askGate(match, requireMention, ctx.chat?.type) === "answer") return true;
     const chatId = ctx.chat?.id;
+    const siblings = deps.siblingBotIds?.() ?? [];
+
+    // Fetch presence once; null distinguishes "couldn't read" (fail-closed for
+    // the alone-check) from a successfully-read empty map.
+    let presence: Record<string, number> | null = null;
+    if (chatId !== undefined) {
+      try {
+        presence = await deps.storage.getBotPresence(String(chatId));
+      } catch (err) {
+        console.error("getBotPresence failed:", err);
+      }
+    }
+    const now = Date.now();
+    const isSiblingPresent = (id: string): boolean =>
+      isPresenceFresh(presence?.[id], now, BOT_PRESENCE_TTL_MS);
+
+    const reply = classifyReplyTarget(
+      replyToMessage?.from?.id,
+      ctx.me.id,
+      siblings,
+      isSiblingPresent,
+    );
+    const decision = askGate(match, requireMention, ctx.chat?.type, reply);
+    if (decision === "answer") return true;
+    if (decision === "skip") return false;
+
+    // check-alone: a managed bot answers only when no sibling is present.
     if (chatId === undefined) return false;
-    return await isAloneInChat(String(chatId));
+    if (siblings.length === 0) return true;
+    if (presence === null) return false; // fail-closed: couldn't read presence
+    return computeAlone(siblings, presence, now, BOT_PRESENCE_TTL_MS);
   };
 
   bot.use(
@@ -672,7 +748,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
 
       const captionMatch = matchOf(askItem)!;
-      if (!(await shouldAnswer(ctx, captionMatch))) {
+      if (!(await shouldAnswer(ctx, captionMatch, askItem.reply_to_message))) {
         debugLog("media_group_dropped", { key, reason: "not_addressed" });
         return;
       }
@@ -714,14 +790,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   const dispatchTextCommand = async (
     ctx: BotContext,
     detailLevel: DetailLevel,
-    // Managed bots match `/ask@self` by hand (not via grammY's command filter),
-    // so they pass the already-extracted text rather than relying on ctx.match.
-    userText?: string,
+    // Every bot extracts the text via `matchAsk` and passes it in, so this never
+    // relies on grammY's `ctx.match` (the command filter is unused for asks).
+    userText: string,
   ) => {
     const msg = ctx.message;
     if (!msg) return;
     await dispatchAsk(ctx, {
-      userText: userText ?? (ctx.match ?? "").toString().trim(),
+      userText,
       askMessageId: msg.message_id,
       images: [],
       imageFileIds: [],
@@ -733,21 +809,22 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     });
   };
 
-  if (requireMention) {
-    // Managed bot: grammY's `bot.command` would also fire on a bare `/ask`
-    // (which usually belongs to the main bot), so we parse the raw text with
-    // `matchAsk` and let `shouldAnswer` decide — `@self` always, a bare `/ask`
-    // only in a DM or when alone in a group.
-    bot.on("message:text", async (ctx) => {
-      const match = matchAsk(ctx.message.text, ctx.me.username);
-      if (!match) return;
-      if (!(await shouldAnswer(ctx, match))) return;
-      await dispatchTextCommand(ctx, match.detailLevel, match.userText);
-    });
-  } else {
-    bot.command("ask", (ctx) => dispatchTextCommand(ctx, "short"));
-    bot.command("askwise", (ctx) => dispatchTextCommand(ctx, "wise"));
-  }
+  // Both the main and managed bots parse `/ask(wise)` from the raw text with
+  // `matchAsk` (not grammY's command filter) so the same reply-aware routing in
+  // `shouldAnswer` applies to every bot: an explicit `@self` is always answered,
+  // a bare `/ask` replying to a present family bot's message is answered by THAT
+  // bot, and a managed bot otherwise answers only in a DM or when alone in a
+  // group. Dropping the main bot's `bot.command` loses no behavior: `bot.command`
+  // also fires on channel/business posts, but those populate `ctx.channelPost`/
+  // `ctx.businessMessage` (not `ctx.message`), and the whole ask flow keys off
+  // `ctx.message` — like the `message:photo`/`message:voice` handlers — so a
+  // `/ask` there already no-op'd before this change.
+  bot.on("message:text", async (ctx) => {
+    const match = matchAsk(ctx.message.text, ctx.me.username);
+    if (!match) return;
+    if (!(await shouldAnswer(ctx, match, ctx.message.reply_to_message))) return;
+    await dispatchTextCommand(ctx, match.detailLevel, match.userText);
+  });
 
   bot.on("message:photo", async (ctx) => {
     const msg = ctx.message;
@@ -792,7 +869,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
 
     if (!match) return;
-    if (!(await shouldAnswer(ctx, match))) return;
+    if (!(await shouldAnswer(ctx, match, msg.reply_to_message))) return;
     const detailLevel = match.detailLevel;
     const userText = match.userText;
 
@@ -838,7 +915,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       duration: msg.voice.duration,
     });
     if (!match) return;
-    if (!(await shouldAnswer(ctx, match))) return;
+    if (!(await shouldAnswer(ctx, match, msg.reply_to_message))) return;
 
     const detailLevel = match.detailLevel;
     const userText = match.userText;
