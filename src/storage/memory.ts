@@ -7,14 +7,13 @@ import type {
   Settings,
   WhitelistEntry,
   WhitelistKind,
-  BucketState,
+  UserUsage,
   ConversationNode,
   GuestThreadNode,
   User,
   Chat,
   ChatSettings,
   Gender,
-  RateLimitConfig,
 } from "../shared/types";
 import { isEmptyChatSettings } from "../shared/types";
 import type { Lang } from "../shared/i18n";
@@ -35,7 +34,8 @@ import {
 type Backing = {
   settings: { value: Settings | null };
   whitelist: Record<WhitelistKind, Map<string, WhitelistEntry>>;
-  buckets: Map<string, BucketState>;
+  // Per-user usage, keyed by userId (global — not affected by `forBot` scope).
+  usage: Map<string, UserUsage>;
   conversations: Map<string, ConversationNode>;
   guestThreads: Map<string, GuestThreadNode>;
   userNames: Map<string, string>;
@@ -64,7 +64,7 @@ function createBacking(): Backing {
   return {
     settings: { value: null },
     whitelist: { users: new Map(), chats: new Map() },
-    buckets: new Map(),
+    usage: new Map(),
     conversations: new Map(),
     guestThreads: new Map(),
     userNames: new Map(),
@@ -120,10 +120,6 @@ export class MemoryStorage implements Storage {
   // the iteration-based reminder lookups (which scan the shared map).
   private inScope(key: string): boolean {
     return key.startsWith(`${this.scope}${SCOPE_SEP}`);
-  }
-
-  private bucketKey(chatId: string, userId: string): string {
-    return `${chatId}:${userId}`;
   }
 
   private convKey(chatId: string, botMsgId: number): string {
@@ -207,69 +203,44 @@ export class MemoryStorage implements Storage {
     return this.b.whitelist[kind].has(id);
   }
 
-  async getBucket(chatId: string, userId: string): Promise<BucketState | null> {
-    const v = this.b.buckets.get(this.bucketKey(chatId, userId));
-    return v ? { ...v } : null;
+  async getUserUsage(userId: string): Promise<UserUsage | null> {
+    const v = this.b.usage.get(userId);
+    return v
+      ? { fiveHour: { ...v.fiveHour }, weekly: { ...v.weekly } }
+      : null;
   }
 
-  async saveBucket(
-    chatId: string,
-    userId: string,
-    state: BucketState,
-  ): Promise<void> {
-    this.b.buckets.set(this.bucketKey(chatId, userId), { ...state });
-  }
-
-  // Atomic by JS event-loop construction: there is no `await` between the
-  // read and write of `this.b.buckets`, so concurrent callers cannot interleave.
-  // WARNING: do not introduce an `await` between the `.get(key)` and the
-  // `.set(key, ...)` below — doing so silently breaks the atomicity invariant
-  // and there is no test that catches it. If you need async work, do it
-  // before the read or after the write.
-  async refillBucket(
-    chatId: string,
-    userId: string,
-    config: RateLimitConfig,
-    now: number,
-  ): Promise<BucketState> {
-    const key = this.bucketKey(chatId, userId);
-    const current = this.b.buckets.get(key);
-    let next: BucketState;
-    if (!current) {
-      next = { tokens: config.capacity, lastRefillTs: now };
-    } else {
-      const elapsed = now - current.lastRefillTs;
-      if (elapsed < config.refillIntervalMs) {
-        next = { ...current };
-      } else {
-        const periods = Math.floor(elapsed / config.refillIntervalMs);
-        next = {
-          tokens: Math.min(
-            config.capacity,
-            current.tokens + periods * config.refillAmount,
-          ),
-          lastRefillTs:
-            current.lastRefillTs + periods * config.refillIntervalMs,
-        };
-      }
-    }
-    this.b.buckets.set(key, { ...next });
-    return next;
-  }
-
-  async deductBucket(
-    chatId: string,
+  // Atomic by JS event-loop construction: there is no `await` between the read
+  // and write of `this.b.usage`, so concurrent callers cannot interleave — the
+  // same guarantee the KeyDB Lua script gives. WARNING: do not introduce an
+  // `await` between the `.get(userId)` and the `.set(userId, ...)` below; doing
+  // so silently breaks the atomicity invariant and no test catches it. If you
+  // need async work, do it before the read or after the write.
+  async addUserUsage(
     userId: string,
     tokens: number,
-    nowMs: number,
-  ): Promise<BucketState> {
-    const key = this.bucketKey(chatId, userId);
-    const current = this.b.buckets.get(key);
-    const next: BucketState = current
-      ? { tokens: current.tokens - tokens, lastRefillTs: current.lastRefillTs }
-      : { tokens: -tokens, lastRefillTs: nowMs };
-    this.b.buckets.set(key, { ...next });
-    return next;
+    fiveHourWindowStart: number,
+    weeklyWindowStart: number,
+  ): Promise<UserUsage> {
+    const current = this.b.usage.get(userId);
+    const fiveUsed =
+      current && current.fiveHour.windowStart === fiveHourWindowStart
+        ? current.fiveHour.used + tokens
+        : tokens;
+    const weeklyUsed =
+      current && current.weekly.windowStart === weeklyWindowStart
+        ? current.weekly.used + tokens
+        : tokens;
+    const next: UserUsage = {
+      fiveHour: { windowStart: fiveHourWindowStart, used: fiveUsed },
+      weekly: { windowStart: weeklyWindowStart, used: weeklyUsed },
+    };
+    this.b.usage.set(userId, next);
+    return { fiveHour: { ...next.fiveHour }, weekly: { ...next.weekly } };
+  }
+
+  async resetUserUsage(userId: string): Promise<void> {
+    this.b.usage.delete(userId);
   }
 
   async getUserName(userId: string): Promise<string | null> {

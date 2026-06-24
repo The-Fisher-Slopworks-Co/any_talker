@@ -6,7 +6,6 @@ import type {
   Settings,
   WhitelistEntry,
   WhitelistKind,
-  BucketState,
   User,
   Chat,
   ChatSettings,
@@ -19,8 +18,9 @@ import type { CheckInputFields } from "../../checks/validate";
 import type { ManagedBot } from "../../managed-bots/types";
 import type { ManagedBotInput } from "../../managed-bots/validate";
 import type { SpendSummary } from "../../spending/window";
+import type { UsageStatus } from "../../ratelimit/window";
 
-export type { SpendSummary };
+export type { SpendSummary, UsageStatus };
 
 declare global {
   interface Window {
@@ -81,10 +81,6 @@ export type ChatSettingsResponse = {
   settings: ChatSettings;
   whitelisted: boolean;
 };
-export type UserBucketEntry = {
-  chat: Chat;
-  bucket: BucketState;
-};
 export type SpendingResponse = {
   spending: SpendSummary;
 };
@@ -135,14 +131,13 @@ export const api = {
     req<WhitelistEntry[]>("POST", `/api/whitelist/${kind}`, entry),
   removeWhitelist: (kind: WhitelistKind, id: string) =>
     req<WhitelistEntry[]>("DELETE", `/api/whitelist/${kind}/${id}`),
-  getMyBucket: () => req<{ bucket: BucketState | null }>("GET", "/api/ratelimit/me"),
-  resetMyBucket: () =>
-    req<{ bucket: BucketState | null }>("PUT", "/api/ratelimit/me", { reset: true }),
-  getUserBuckets: (id: string) =>
-    req<{ buckets: UserBucketEntry[] }>("GET", `/api/ratelimit/user/${id}`),
-  resetUserBucket: (id: string, chatId: string) =>
-    req<{ buckets: UserBucketEntry[] }>("PUT", `/api/ratelimit/user/${id}`, {
-      chatId,
+  getMyUsage: () => req<{ usage: UsageStatus }>("GET", "/api/ratelimit/me"),
+  resetMyUsage: () =>
+    req<{ usage: UsageStatus }>("PUT", "/api/ratelimit/me", { reset: true }),
+  getUserUsage: (id: string) =>
+    req<{ usage: UsageStatus }>("GET", `/api/ratelimit/user/${id}`),
+  resetUserUsage: (id: string) =>
+    req<{ usage: UsageStatus }>("PUT", `/api/ratelimit/user/${id}`, {
       reset: true,
     }),
   getMySpending: () => req<SpendingResponse>("GET", "/api/me/spending"),

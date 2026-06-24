@@ -21,6 +21,7 @@ import {
   type DetailLevel,
 } from "../../ai/instruction";
 import type { Lang } from "../../shared/i18n";
+import type { WindowKind } from "../../shared/types";
 
 export type AskInput = {
   storage: Storage;
@@ -55,7 +56,8 @@ export type AskOutcome =
   | { kind: "usage" }
   | {
       kind: "rateLimited";
-      minutesUntilNextRefill: number;
+      limitedBy: WindowKind;
+      msUntilReset: number;
       persistConversation: PersistFailedTurn;
     }
   | {
@@ -157,7 +159,6 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
-      input.chatId,
       input.userId,
       settings.rateLimit,
       input.now,
@@ -165,7 +166,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     if (!r.allowed) {
       return {
         kind: "rateLimited",
-        minutesUntilNextRefill: Math.ceil(r.msUntilNextRefill / 60_000),
+        limitedBy: r.limitedBy,
+        msUntilReset: r.msUntilReset,
         persistConversation: persistTurn,
       };
     }
@@ -234,7 +236,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   if (!skipRateLimit) {
     const multiplier = detailLevelMultiplier(input.detailLevel, settings.rateLimit);
     const deduction = Math.round(result.totalTokens * multiplier);
-    await input.rateLimiter.deduct(input.chatId, input.userId, deduction);
+    await input.rateLimiter.deduct(input.userId, deduction, input.now);
   }
 
   // Record spend regardless of rate-limit exemption — owner and BYOK usage is

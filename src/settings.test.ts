@@ -48,24 +48,12 @@ describe("applyChatOverrides", () => {
     const r = applyChatOverrides(DEFAULT_SETTINGS, {
       systemPrompt: "p",
       models: ["x"],
-      rateLimit: {
-        capacity: 1,
-        refillAmount: 1,
-        refillIntervalMs: 1000,
-        ownerExempt: false,
-        wiseMultiplier: 2,
-      },
     });
     expect(r).toEqual({
       systemPrompt: "p",
       models: ["x"],
-      rateLimit: {
-        capacity: 1,
-        refillAmount: 1,
-        refillIntervalMs: 1000,
-        ownerExempt: false,
-        wiseMultiplier: 2,
-      },
+      // Rate limit is per-user and global — chat settings never override it.
+      rateLimit: DEFAULT_SETTINGS.rateLimit,
       timezone: DEFAULT_SETTINGS.timezone,
       providerSort: DEFAULT_SETTINGS.providerSort,
       provider: DEFAULT_SETTINGS.provider,
@@ -75,18 +63,13 @@ describe("applyChatOverrides", () => {
     });
   });
 
-  test("normalizes chat rateLimit override when multipliers are missing", () => {
-    const r = applyChatOverrides(DEFAULT_SETTINGS, {
-      rateLimit: {
-        capacity: 1,
-        refillAmount: 1,
-        refillIntervalMs: 1000,
-        ownerExempt: false,
-      } as never,
-    });
-    expect(r.rateLimit.wiseMultiplier).toBe(
-      DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
-    );
+  test("chat settings never override the global rate limit", () => {
+    const global = {
+      ...DEFAULT_SETTINGS,
+      rateLimit: { ...DEFAULT_SETTINGS.rateLimit, fiveHourTokens: 12345 },
+    };
+    const r = applyChatOverrides(global, { systemPrompt: "x" });
+    expect(r.rateLimit).toBe(global.rateLimit);
   });
 
   test("normalize fills default expandableBlockquoteThreshold when missing", async () => {
@@ -131,12 +114,12 @@ describe("applyChatOverrides", () => {
     expect(s.provider).toBeNull();
   });
 
-  test("normalize fills defaults for missing multipliers in stored settings", async () => {
+  test("normalize backfills the dual-window config from a legacy token-bucket shape", async () => {
     const storage = new MemoryStorage();
     const legacy = {
       ...DEFAULT_SETTINGS,
       rateLimit: {
-        capacity: 1,
+        capacity: 12345,
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
@@ -144,6 +127,12 @@ describe("applyChatOverrides", () => {
     };
     await storage.saveSettings(legacy);
     const s = await getOrInitSettings(storage);
+    // Legacy burst capacity maps to the 5-hour budget; the rest defaults in.
+    expect(s.rateLimit.fiveHourTokens).toBe(12345);
+    expect(s.rateLimit.weeklyTokens).toBe(
+      DEFAULT_SETTINGS.rateLimit.weeklyTokens,
+    );
+    expect(s.rateLimit.ownerExempt).toBe(false);
     expect(s.rateLimit.wiseMultiplier).toBe(
       DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
     );

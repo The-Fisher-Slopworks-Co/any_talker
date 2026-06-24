@@ -472,7 +472,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           return;
         case "rateLimited":
           await answer(
-            ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill),
+            ctx.t.bot_rate_limited(outcome.limitedBy, outcome.msUntilReset),
             null,
           ).catch((err) => console.error("answerGuestQuery failed:", err));
           return;
@@ -674,7 +674,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         // (question + the notice actually sent) so a later reply to either the
         // notice or the user's own ask message carries the full chain.
         case "rateLimited": {
-          const text = ctx.t.bot_rate_limited(outcome.minutesUntilNextRefill);
+          const text = ctx.t.bot_rate_limited(
+            outcome.limitedBy,
+            outcome.msUntilReset,
+          );
           const sent = await ctx.reply(text);
           await outcome.persistConversation(sent.message_id, text);
           return;

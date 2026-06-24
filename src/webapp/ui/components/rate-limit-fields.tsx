@@ -15,43 +15,27 @@ export function RateLimitFields({
   onChange: (next: RateLimitConfig) => void;
 }) {
   const { t: s } = useI18n();
-  const intervalMin = Math.round(value.refillIntervalMs / 60000);
   return (
     <Card>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_capacity}</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_5h_tokens}</span>
         <NumberInput
           className={INPUT_CLS}
           integer
           min={0}
-          value={value.capacity}
-          onChange={(n) => onChange({ ...value, capacity: n })}
+          value={value.fiveHourTokens}
+          onChange={(n) => onChange({ ...value, fiveHourTokens: n })}
         />
       </label>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_refill_amount}</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_weekly_tokens}</span>
         <NumberInput
           className={INPUT_CLS}
           integer
           min={0}
-          value={value.refillAmount}
-          onChange={(n) => onChange({ ...value, refillAmount: n })}
+          value={value.weeklyTokens}
+          onChange={(n) => onChange({ ...value, weeklyTokens: n })}
         />
-      </label>
-      <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_refill_every}</span>
-        <NumberInput
-          className={INPUT_CLS}
-          integer
-          min={0}
-          value={intervalMin}
-          onChange={(n) =>
-            onChange({ ...value, refillIntervalMs: n * 60_000 })
-          }
-        />
-        <span className="shrink-0 text-tg-hint text-[15px]">
-          {s.ui_ratelimit_min_unit}
-        </span>
       </label>
       <div className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_owner_exempt}</span>
@@ -68,7 +52,7 @@ export function RateLimitFields({
         <NumberInput
           className={INPUT_CLS}
           step="0.1"
-          min={0}
+          min={1}
           value={value.wiseMultiplier}
           onChange={(n) => onChange({ ...value, wiseMultiplier: n })}
         />

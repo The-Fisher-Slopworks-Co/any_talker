@@ -9,7 +9,11 @@ import type { PersonaResolver } from "../../managed-bots/persona";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
 import type { AIMessage } from "../../ai/types";
-import { MAX_REPLY_CHAIN_DEPTH, type GuestThreadNode } from "../../shared/types";
+import {
+  MAX_REPLY_CHAIN_DEPTH,
+  type GuestThreadNode,
+  type WindowKind,
+} from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
 
 export type GuestAskInput = {
@@ -32,7 +36,7 @@ export type GuestAskInput = {
 
 export type GuestAskOutcome =
   | { kind: "denied" }
-  | { kind: "rateLimited"; minutesUntilNextRefill: number }
+  | { kind: "rateLimited"; limitedBy: WindowKind; msUntilReset: number }
   | {
       kind: "answered";
       text: string;
@@ -73,7 +77,6 @@ export async function guestAskHandler(
     byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
-      input.chatId,
       input.userId,
       settings.rateLimit,
       input.now,
@@ -81,7 +84,8 @@ export async function guestAskHandler(
     if (!r.allowed) {
       return {
         kind: "rateLimited",
-        minutesUntilNextRefill: Math.ceil(r.msUntilNextRefill / 60_000),
+        limitedBy: r.limitedBy,
+        msUntilReset: r.msUntilReset,
       };
     }
   }
@@ -143,11 +147,9 @@ export async function guestAskHandler(
   }
 
   if (!skipRateLimit) {
-    await input.rateLimiter.deduct(
-      input.chatId,
-      input.userId,
-      result.totalTokens,
-    );
+    // Guest queries are always single-turn "short" asks (no /askwise), so the
+    // raw token total is the deduction — same as the main path with multiplier 1.
+    await input.rateLimiter.deduct(input.userId, result.totalTokens, input.now);
   }
 
   // Record spend regardless of rate-limit exemption — owner and BYOK usage is

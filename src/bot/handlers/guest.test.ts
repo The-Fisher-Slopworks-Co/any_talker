@@ -3,11 +3,27 @@
 
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../../storage/memory";
-import { TokenBucketLimiter } from "../../ratelimit/token-bucket";
+import { DualWindowLimiter } from "../../ratelimit/dual-window";
+import { currentWindowStarts } from "../../ratelimit/window";
 import type { AIClient, AskResult } from "../../ai/types";
 import { guestAskHandler, type GuestAskInput } from "./guest";
 import { createMainPersonaResolver } from "../../managed-bots/persona";
 import { DEFAULT_SETTINGS, MAX_REPLY_CHAIN_DEPTH } from "../../shared/types";
+
+// Exhausts a user's 5-hour budget at `now` so the next `check` denies.
+async function exhaustUsage(
+  storage: MemoryStorage,
+  userId: string,
+  now: number,
+): Promise<void> {
+  const starts = currentWindowStarts(userId, now);
+  await storage.addUserUsage(
+    userId,
+    DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
+    starts.fiveHour,
+    starts.weekly,
+  );
+}
 
 class FakeAI implements AIClient {
   constructor(public reply: AskResult = { text: "guest reply", totalTokens: 50 }) {}
@@ -22,7 +38,7 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
   const storage = overrides.storage ?? new MemoryStorage();
   return {
     storage,
-    rateLimiter: new TokenBucketLimiter(new MemoryStorage()),
+    rateLimiter: new DualWindowLimiter(new MemoryStorage()),
     ai: new FakeAI(),
     resolver: createMainPersonaResolver(storage),
     ownerId: "1",
@@ -73,8 +89,8 @@ describe("guestAskHandler", () => {
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: true },
     });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("c1", "1", { tokens: 0, lastRefillTs: 1000 });
-    const rl = new TokenBucketLimiter(rlStorage);
+    await exhaustUsage(rlStorage, "1", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
     const out = await guestAskHandler(
       baseInput({ storage, userId: "1", rateLimiter: rl }),
     );
@@ -88,8 +104,8 @@ describe("guestAskHandler", () => {
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
     });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("c1", "1", { tokens: 0, lastRefillTs: 1000 });
-    const rl = new TokenBucketLimiter(rlStorage);
+    await exhaustUsage(rlStorage, "1", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
     const out = await guestAskHandler(
       baseInput({ storage, userId: "1", rateLimiter: rl }),
     );
@@ -100,14 +116,14 @@ describe("guestAskHandler", () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
-    const rl = new TokenBucketLimiter(rlStorage);
+    await exhaustUsage(rlStorage, "42", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
     const out = await guestAskHandler(
       baseInput({ storage, rateLimiter: rl }),
     );
     expect(out.kind).toBe("rateLimited");
     if (out.kind === "rateLimited")
-      expect(out.minutesUntilNextRefill).toBeGreaterThan(0);
+      expect(out.msUntilReset).toBeGreaterThan(0);
   });
 
   test("user with BYOK key skips rate limit and passes key to AI", async () => {
@@ -115,8 +131,8 @@ describe("guestAskHandler", () => {
     await storage.addWhitelist("users", { id: "42" });
     await storage.setUserOpenrouterKey("42", "sk-or-byok");
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
-    const rl = new TokenBucketLimiter(rlStorage);
+    await exhaustUsage(rlStorage, "42", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
     const ai = new FakeAI({ text: "ok", totalTokens: 500 });
     const out = await guestAskHandler(
       baseInput({ storage, ai, rateLimiter: rl }),
@@ -124,8 +140,11 @@ describe("guestAskHandler", () => {
     expect(out.kind).toBe("answered");
     const call = ai.calls[0] as { apiKey?: string | null };
     expect(call.apiKey).toBe("sk-or-byok");
-    const bucketAfter = await rlStorage.getBucket("c1", "42");
-    expect(bucketAfter?.tokens).toBe(0);
+    // BYOK skips deduct, so usage stays as it was (still exhausted, not topped up).
+    const usageAfter = await rlStorage.getUserUsage("42");
+    expect(usageAfter?.fiveHour.used).toBe(
+      DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
+    );
   });
 
   test("user with BYOK key bypasses the whitelist", async () => {
@@ -274,15 +293,13 @@ describe("guestAskHandler", () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
-    const rl = new TokenBucketLimiter(rlStorage);
+    const rl = new DualWindowLimiter(rlStorage);
     const ai = new FakeAI({ text: "ok", totalTokens: 777 });
     const out = await guestAskHandler(
       baseInput({ storage, rateLimiter: rl, ai }),
     );
     expect(out.kind).toBe("answered");
-    expect((await rlStorage.getBucket("c1", "42"))?.tokens).toBe(
-      DEFAULT_SETTINGS.rateLimit.capacity - 777,
-    );
+    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(777);
   });
 
   test("answered: returns botName from chat settings", async () => {
@@ -354,8 +371,8 @@ describe("guestAskHandler", () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
-    await rlStorage.saveBucket("c1", "42", { tokens: 0, lastRefillTs: 1000 });
-    const rl = new TokenBucketLimiter(rlStorage);
+    await exhaustUsage(rlStorage, "42", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
     out = await guestAskHandler(
       baseInput({
         storage,

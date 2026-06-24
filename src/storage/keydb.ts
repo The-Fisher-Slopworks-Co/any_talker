@@ -8,14 +8,13 @@ import type {
   Settings,
   WhitelistEntry,
   WhitelistKind,
-  BucketState,
+  UserUsage,
   ConversationNode,
   GuestThreadNode,
   User,
   Chat,
   ChatSettings,
   Gender,
-  RateLimitConfig,
 } from "../shared/types";
 import {
   CONVERSATION_TTL_SECONDS,
@@ -23,6 +22,7 @@ import {
   isEmptyChatSettings,
   isValidGender,
 } from "../shared/types";
+import { USAGE_RETENTION_SECONDS } from "../ratelimit/window";
 import { isValidLang, type Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
 import {
@@ -45,56 +45,35 @@ import {
 const PREFIX = "at:";
 const FETCH_DUE_LIMIT = 100;
 
-// Atomic refill: lazy refill identical to the in-process algorithm, but
-// executed server-side so concurrent callers cannot interleave the
-// read-modify-write cycle. Returns [tokens, lastRefillTs] as strings.
-const REFILL_BUCKET_LUA = `
+// Atomic usage accrual for the dual fixed-window limiter. The caller passes the
+// current start of each window (computed from the user's deterministic phase
+// offset); a stored window whose start differs has rolled over, so its `used`
+// restarts at the new tokens instead of accumulating. Runs server-side so
+// concurrent requests can't interleave the read-modify-write. Returns
+// [fiveUsed, weeklyUsed, fiveStart, weeklyStart] as strings.
+const ADD_USAGE_LUA = `
 local raw = redis.call('GET', KEYS[1])
-local capacity = tonumber(ARGV[1])
-local refillAmount = tonumber(ARGV[2])
-local refillIntervalMs = tonumber(ARGV[3])
-local now = tonumber(ARGV[4])
-local tokens
-local lastRefillTs
+local fiveStart = tonumber(ARGV[1])
+local weekStart = tonumber(ARGV[2])
+local tokens = tonumber(ARGV[3])
+local ttl = tonumber(ARGV[4])
+local fiveUsed = tokens
+local weekUsed = tokens
 if raw then
   local s = cjson.decode(raw)
-  tokens = s.tokens
-  lastRefillTs = s.lastRefillTs
-  local elapsed = now - lastRefillTs
-  if elapsed >= refillIntervalMs then
-    local periods = math.floor(elapsed / refillIntervalMs)
-    local refilled = tokens + periods * refillAmount
-    if refilled > capacity then refilled = capacity end
-    tokens = refilled
-    lastRefillTs = lastRefillTs + periods * refillIntervalMs
+  if s.fiveHour and s.fiveHour.windowStart == fiveStart then
+    fiveUsed = s.fiveHour.used + tokens
   end
-else
-  tokens = capacity
-  lastRefillTs = now
+  if s.weekly and s.weekly.windowStart == weekStart then
+    weekUsed = s.weekly.used + tokens
+  end
 end
-redis.call('SET', KEYS[1], cjson.encode({tokens = tokens, lastRefillTs = lastRefillTs}))
-return {tostring(tokens), tostring(lastRefillTs)}
-`;
-
-// Atomic deduction: subtract `delta` tokens from the bucket in a single
-// server-side step. Seeds a deficit bucket if no key exists, matching the
-// behavior of the previous in-process implementation.
-const DEDUCT_BUCKET_LUA = `
-local raw = redis.call('GET', KEYS[1])
-local delta = tonumber(ARGV[1])
-local nowMs = tonumber(ARGV[2])
-local tokens
-local lastRefillTs
-if raw then
-  local s = cjson.decode(raw)
-  tokens = s.tokens - delta
-  lastRefillTs = s.lastRefillTs
-else
-  tokens = -delta
-  lastRefillTs = nowMs
-end
-redis.call('SET', KEYS[1], cjson.encode({tokens = tokens, lastRefillTs = lastRefillTs}))
-return {tostring(tokens), tostring(lastRefillTs)}
+redis.call('SET', KEYS[1], cjson.encode({
+  fiveHour = {windowStart = fiveStart, used = fiveUsed},
+  weekly = {windowStart = weekStart, used = weekUsed}
+}))
+if ttl > 0 then redis.call('EXPIRE', KEYS[1], ttl) end
+return {tostring(fiveUsed), tostring(weekUsed), tostring(fiveStart), tostring(weekStart)}
 `;
 
 // Atomic upsert with cap check: HSET if the field already exists or the
@@ -118,20 +97,30 @@ redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 return '1'
 `;
 
-function parseBucketEvalReply(reply: unknown): BucketState {
-  if (!Array.isArray(reply) || reply.length !== 2) {
+function parseUsageEvalReply(reply: unknown): UserUsage {
+  if (!Array.isArray(reply) || reply.length !== 4) {
     throw new Error(
-      `bucket EVAL returned unexpected shape: ${JSON.stringify(reply)}`,
+      `usage EVAL returned unexpected shape: ${JSON.stringify(reply)}`,
     );
   }
-  const tokens = Number(reply[0]);
-  const lastRefillTs = Number(reply[1]);
-  if (!Number.isFinite(tokens) || !Number.isFinite(lastRefillTs)) {
+  const fiveUsed = Number(reply[0]);
+  const weekUsed = Number(reply[1]);
+  const fiveStart = Number(reply[2]);
+  const weekStart = Number(reply[3]);
+  if (
+    !Number.isFinite(fiveUsed) ||
+    !Number.isFinite(weekUsed) ||
+    !Number.isFinite(fiveStart) ||
+    !Number.isFinite(weekStart)
+  ) {
     throw new Error(
-      `bucket EVAL returned non-numeric values: ${JSON.stringify(reply)}`,
+      `usage EVAL returned non-numeric values: ${JSON.stringify(reply)}`,
     );
   }
-  return { tokens, lastRefillTs };
+  return {
+    fiveHour: { windowStart: fiveStart, used: fiveUsed },
+    weekly: { windowStart: weekStart, used: weekUsed },
+  };
 }
 
 // REMEMBER_FACT_LUA now always returns the bulk string '1' (a new key at the
@@ -273,54 +262,33 @@ export class KeyDBStorage implements Storage {
     return list.some((e) => e.id === id);
   }
 
-  async getBucket(chatId: string, userId: string): Promise<BucketState | null> {
-    const raw = await this.client.get(`${PREFIX}bucket:${chatId}:${userId}`);
-    return raw ? (JSON.parse(raw) as BucketState) : null;
+  // Usage is a shared per-user key (unscoped, like spend): the budget is global,
+  // not per chat or per character bot.
+  async getUserUsage(userId: string): Promise<UserUsage | null> {
+    const raw = await this.client.get(`${PREFIX}usage:${userId}`);
+    return raw ? (JSON.parse(raw) as UserUsage) : null;
   }
 
-  async saveBucket(
-    chatId: string,
-    userId: string,
-    state: BucketState,
-  ): Promise<void> {
-    await this.client.set(
-      `${PREFIX}bucket:${chatId}:${userId}`,
-      JSON.stringify(state),
-    );
-  }
-
-  async refillBucket(
-    chatId: string,
-    userId: string,
-    config: RateLimitConfig,
-    now: number,
-  ): Promise<BucketState> {
-    const reply = await this.client.send("EVAL", [
-      REFILL_BUCKET_LUA,
-      "1",
-      `${PREFIX}bucket:${chatId}:${userId}`,
-      String(config.capacity),
-      String(config.refillAmount),
-      String(config.refillIntervalMs),
-      String(now),
-    ]);
-    return parseBucketEvalReply(reply);
-  }
-
-  async deductBucket(
-    chatId: string,
+  async addUserUsage(
     userId: string,
     tokens: number,
-    nowMs: number,
-  ): Promise<BucketState> {
+    fiveHourWindowStart: number,
+    weeklyWindowStart: number,
+  ): Promise<UserUsage> {
     const reply = await this.client.send("EVAL", [
-      DEDUCT_BUCKET_LUA,
+      ADD_USAGE_LUA,
       "1",
-      `${PREFIX}bucket:${chatId}:${userId}`,
+      `${PREFIX}usage:${userId}`,
+      String(fiveHourWindowStart),
+      String(weeklyWindowStart),
       String(tokens),
-      String(nowMs),
+      String(USAGE_RETENTION_SECONDS),
     ]);
-    return parseBucketEvalReply(reply);
+    return parseUsageEvalReply(reply);
+  }
+
+  async resetUserUsage(userId: string): Promise<void> {
+    await this.client.del(`${PREFIX}usage:${userId}`);
   }
 
   async getUserName(userId: string): Promise<string | null> {

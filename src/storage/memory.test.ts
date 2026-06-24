@@ -50,13 +50,33 @@ describe("MemoryStorage whitelist", () => {
   });
 });
 
-describe("MemoryStorage bucket", () => {
-  test("round-trips per (chat, user)", async () => {
+describe("MemoryStorage usage", () => {
+  test("accrues to both windows, rolling a window over on a new start", async () => {
     const s = new MemoryStorage();
-    await s.saveBucket("c1", "u1", { tokens: 100, lastRefillTs: 12345 });
-    expect(await s.getBucket("c1", "u1")).toEqual({ tokens: 100, lastRefillTs: 12345 });
-    expect(await s.getBucket("c2", "u1")).toBeNull();
-    expect(await s.getBucket("c1", "u2")).toBeNull();
+    // First write seeds both windows at the given starts.
+    await s.addUserUsage("u1", 100, 1000, 5000);
+    expect(await s.getUserUsage("u1")).toEqual({
+      fiveHour: { windowStart: 1000, used: 100 },
+      weekly: { windowStart: 5000, used: 100 },
+    });
+    // Same starts accumulate.
+    await s.addUserUsage("u1", 50, 1000, 5000);
+    expect((await s.getUserUsage("u1"))?.fiveHour.used).toBe(150);
+    // A new 5-hour start resets that window's used; the weekly start is
+    // unchanged, so it keeps accumulating.
+    await s.addUserUsage("u1", 30, 2000, 5000);
+    expect(await s.getUserUsage("u1")).toEqual({
+      fiveHour: { windowStart: 2000, used: 30 },
+      weekly: { windowStart: 5000, used: 180 },
+    });
+  });
+
+  test("is per user and cleared by reset", async () => {
+    const s = new MemoryStorage();
+    await s.addUserUsage("u1", 100, 1000, 5000);
+    expect(await s.getUserUsage("u2")).toBeNull();
+    await s.resetUserUsage("u1");
+    expect(await s.getUserUsage("u1")).toBeNull();
   });
 });
 

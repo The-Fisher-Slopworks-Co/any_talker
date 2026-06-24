@@ -21,7 +21,7 @@ is done from a Telegram Mini App served by the bot itself.
 ## 2. Overview
 
 A single Bun process (`src/main.ts`) is the composition root. It loads config,
-constructs the shared services — `KeyDBStorage`, `TokenBucketLimiter`,
+constructs the shared services — `KeyDBStorage`, `DualWindowLimiter`,
 `OpenRouterAIClient` — registers the AI tools, then starts four long-lived
 things:
 
@@ -75,7 +75,7 @@ flowchart TB
         CS[Checks scheduler<br/>checks/]
         AI[OpenRouterAIClient<br/>ai/openrouter.ts]
         Tools[Tool registry<br/>ai/tools/]
-        RL[TokenBucketLimiter<br/>ratelimit/]
+        RL[DualWindowLimiter<br/>ratelimit/]
         API[JSON API<br/>webapp/api.ts]
         Metrics[Metrics registry<br/>metrics/]
     end
@@ -128,7 +128,7 @@ flowchart TB
 | `src/webapp/ui/` | React + Tailwind admin Mini App (views, components, api client, i18n). | `app.tsx`, `api-client.ts`, `views/`, `components/`, `lib/` |
 | `src/reminders/` | One-shot reminder scheduling, delivery (re-runs the LLM), stored-record validation. | `scheduler.ts`, `delivery.ts`, `parse.ts`, `types.ts` |
 | `src/checks/` | Recurring daily check-ins: schedule math, firing, resolution, counters. | `runner.ts`, `schedule.ts`, `resolve.ts`, `counter.ts`, `validate.ts`, `format.ts`, `callback-data.ts` |
-| `src/ratelimit/` | Per-user token-bucket rate limiter. | `token-bucket.ts`, `types.ts` |
+| `src/ratelimit/` | Per-user dual fixed-window rate limiter (5-hour + weekly token budgets, per-user phase-shifted). | `dual-window.ts`, `window.ts`, `types.ts` |
 | `src/spending/` | UTC-day-bucketed per-user spend windows (day/week/month). | `window.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
@@ -140,7 +140,7 @@ flowchart TB
 
 ### Composition root — `src/main.ts`
 Wires everything in order: `loadConfig()` → `KeyDBStorage.connect()` →
-`TokenBucketLimiter` → `OpenRouterAIClient` → register tools (each wrapped in
+`DualWindowLimiter` → `OpenRouterAIClient` → register tools (each wrapped in
 `withLogging`) → `createBot()` → `deleteWebhook` + `syncBotCommands` →
 `bot.start()` (long polling, `allowed_updates` extended with the custom
 `guest_message`) → `startServer()` → `startScheduler()` + `startChecksScheduler()`.
@@ -256,12 +256,12 @@ tools (which **create** reminders; firing lives in `src/reminders/`).
 **Depended on by:** `ai/openrouter` (via `getAllTools()`), `main.ts` (registration).
 
 ### Storage — `src/storage/`
-`types.ts` is the single `Storage` interface (settings, whitelist, rate-limit
-buckets, per-user attributes, BYOK, spending, users/chats directories, chat
-settings, conversation graph, photo cache, albums, guest threads, reminders,
+`types.ts` is the single `Storage` interface (settings, whitelist, per-user
+rate-limit usage, per-user attributes, BYOK, spending, users/chats directories,
+chat settings, conversation graph, photo cache, albums, guest threads, reminders,
 checks, user facts). `keydb.ts` implements it over Bun's `RedisClient`, with all
-keys under the `at:` prefix and **server-side Lua (`EVAL`)** for the three
-race-prone operations (bucket refill, bucket deduct, fact upsert+evict).
+keys under the `at:` prefix and **server-side Lua (`EVAL`)** for the two
+race-prone operations (usage accrual, fact upsert+evict).
 `memory.ts` (`MemoryStorage`) mirrors the interface for tests. **Depended on by:**
 essentially everything.
 
@@ -318,7 +318,7 @@ sequenceDiagram
     participant D as dispatchAsk
     participant H as askHandler
     participant ACC as access.ts
-    participant RL as TokenBucketLimiter
+    participant RL as DualWindowLimiter
     participant AI as OpenRouterAIClient
     participant T as Tools
     participant S as Storage / KeyDB
@@ -348,10 +348,15 @@ Notes that matter:
 - The **middleware order is the lifecycle**: log → language → user/chat upsert →
   guest short-circuit → keyword-filter short-circuit → handlers. Guest and
   keyword-filtered messages never reach the normal handlers.
-- Rate-limit **deduction happens after** the AI responds and is not floored at
-  zero, so one request can overshoot into a negative balance
-  (at-least-one-more-request semantics). Owner-exempt and BYOK requests skip the
-  limiter entirely.
+- Rate limiting is **per user and global** (one budget across all chats and
+  family bots), enforced as **two fixed windows** — a 5-hour and a weekly token
+  budget; a request is allowed only while **both** have budget left. Each user's
+  window boundaries are **phase-shifted** by a deterministic offset (quantized to
+  10-minute slots) derived from the user id, so resets are staggered across users
+  rather than all landing on the same wall-clock boundary. **Deduction happens
+  after** the AI responds and is not floored, so one request can overshoot a
+  window's budget (at-least-one-more-request semantics). Owner-exempt and BYOK
+  requests skip the limiter entirely.
 - **Conversation context** is a reply-chain graph: each turn is stored as a
   `ConversationNode` with a `parentBotMsgId` pointer, written under **both** the
   bot's reply message id and the user's ask message id (unique within a chat),
@@ -386,7 +391,7 @@ persisted entities:
 | Global settings | `at:settings` | string | — | `Settings` (systemPrompt, models[], rateLimit, timezone, provider routing, …) |
 | Chat settings | `at:chat_settings:{chatId}` | string | — | partial `ChatSettings` overrides; key deleted when empty |
 | Whitelist | `at:whitelist:{users\|chats}` | string | — | `WhitelistEntry[]` (`{id, label?}`) |
-| Rate-limit bucket | `at:bucket:{chatId}:{userId}` | string | — | `{ tokens, lastRefillTs }` |
+| Per-user rate-limit usage | `at:usage:{userId}` | string | ~9 days (week + slack) | `{ fiveHour: {windowStart, used}, weekly: {windowStart, used} }` (per-user, global; window phase derived from the user id) |
 | User attributes | `at:user_{name,tz,gender,lang}:{userId}` | string (raw) | — | scalar strings, validated on read |
 | BYOK key / models | `at:user_or_key:{userId}` · `at:user_or_models:{userId}` | string / JSON | — | API key (**plaintext**) · `string[]` |
 | Per-user spend | `at:spend:{userId}:{YYYY-MM-DD}` | float counter | 35 days | USD per UTC day (`INCRBYFLOAT`); summarized to day/week/month |
@@ -406,10 +411,13 @@ persisted entities:
 
 **Per-character scoping (`forBot`).** `Storage.forBot(botId)` returns a view that
 namespaces a bot's per-character data under an `at:mbot:{botId}:` segment, while
-leaving everything else (settings, whitelist, buckets, users/chats directory,
-spend, user attributes, photo cache, checks, the managed-bot registry) shared.
+leaving everything else (settings, whitelist, per-user rate-limit usage,
+users/chats directory, spend, user attributes, photo cache, checks, the
+managed-bot registry) shared.
 `forBot(null)` is the main bot and yields the **legacy unprefixed keys verbatim**,
-so existing data and call sites are unaffected. The scoped entities are:
+so existing data and call sites are unaffected. (Per-user rate-limit usage, like
+settings/whitelist/spend, is **not** scoped — one budget per user across the
+whole family.) The scoped entities are:
 conversation nodes, reminders (payload + indexes), user facts, guest threads,
 album buffers, and the private-chat flag — i.e. exactly the rows above whose keys
 become `at:mbot:{botId}:msg:…`, `:reminder:…`, `:user_facts:…`, etc. for a managed
@@ -541,9 +549,16 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   code and the absence of any migration files) — new fields are tolerated on old
   records at read time; trade-off is that compatibility logic accumulates in the
   read paths.
-- **Server-side Lua for atomic ops** — bucket refill/deduct and fact eviction run
-  as `EVAL` scripts so concurrent updates can't race; the in-memory double
-  reproduces the same math.
+- **Server-side Lua for atomic ops** — per-user usage accrual (with per-window
+  roll-over) and fact eviction run as `EVAL` scripts so concurrent updates can't
+  race; the in-memory double reproduces the same math.
+- **Per-user dual fixed-window rate limit, phase-shifted per user** — chosen over
+  the old per-(chat,user) token bucket so the weekly cap can't be sidestepped by
+  switching chats. Window phase is a deterministic hash of the user id (quantized
+  to 10-minute slots), so resets are staggered with **no stored offset** and no
+  migration; `check` is a pure read and `deduct` is the only writer. Trade-off:
+  there is no longer a per-chat rate-limit override (it can't compose with a
+  global per-user budget).
 - **Custom Prometheus implementation** — `metrics/registry.ts` explicitly avoids
   `prom-client` (hand-rolled exposition + cardinality guards); fewer deps, more
   in-house code to maintain.

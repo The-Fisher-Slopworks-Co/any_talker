@@ -115,7 +115,7 @@ export const toolCallDurationSeconds = registry.register(
 export const rateLimitChecksTotal = registry.register(
   new Counter(
     "bot_rate_limit_checks_total",
-    "Token-bucket rate-limit checks, by result (allowed / denied).",
+    "Rate-limit checks, by result (allowed / denied).",
     ["result"],
   ),
 );
@@ -123,7 +123,7 @@ export const rateLimitChecksTotal = registry.register(
 export const rateLimitTokensDeductedTotal = registry.register(
   new Counter(
     "bot_rate_limit_tokens_deducted_total",
-    "Sum of tokens deducted from rate-limit buckets after AI replies.",
+    "Sum of tokens charged to per-user rate-limit windows after AI replies.",
   ),
 );
 

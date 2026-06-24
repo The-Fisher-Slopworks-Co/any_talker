@@ -3,12 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
-import { api } from "../../api-client";
-import type {
-  BucketState,
-  RateLimitConfig,
-  Settings,
-} from "../../../../shared/types";
+import { api, type UsageStatus } from "../../api-client";
+import type { RateLimitConfig, Settings } from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
@@ -16,13 +12,8 @@ import {
   Stack,
 } from "../../components/layout";
 import { RowButton, SaveButton } from "../../components/controls";
-import { EmptyState } from "../../components/states";
 import { RateLimitFields } from "../../components/rate-limit-fields";
-import {
-  ROW_CLS,
-  ROW_LABEL_CLS,
-  ROW_VALUE_CLS,
-} from "../../components/row";
+import { UsageCard } from "../../components/usage-card";
 
 export function RateLimitTab({
   settings,
@@ -33,11 +24,11 @@ export function RateLimitTab({
 }) {
   const { t: s } = useI18n();
   const [config, setConfig] = useState<RateLimitConfig>(settings.rateLimit);
-  const [bucket, setBucket] = useState<BucketState | null>(null);
+  const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.getMyBucket().then((r) => setBucket(r.bucket));
+    api.getMyUsage().then((r) => setUsage(r.usage));
   }, []);
 
   const dirty =
@@ -51,8 +42,8 @@ export function RateLimitTab({
   };
 
   const reset = async () => {
-    const r = await api.resetMyBucket();
-    setBucket(r.bucket);
+    const r = await api.resetMyUsage();
+    setUsage(r.usage);
   };
 
   return (
@@ -63,31 +54,15 @@ export function RateLimitTab({
 
       <SaveButton saving={saving} dirty={dirty} onClick={save} />
 
-      <SectionHeader>{s.ui_ratelimit_my_bucket}</SectionHeader>
-      <Card>
-        {bucket ? (
-          <>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_tokens}</span>
-              <span className={ROW_VALUE_CLS}>
-                {bucket.tokens.toLocaleString()} /{" "}
-                {config.capacity.toLocaleString()}
-              </span>
-            </div>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>
-                {s.ui_ratelimit_last_refill}
-              </span>
-              <span className={ROW_VALUE_CLS}>
-                {new Date(bucket.lastRefillTs).toLocaleString()}
-              </span>
-            </div>
+      <SectionHeader>{s.ui_ratelimit_my_usage}</SectionHeader>
+      {usage ? (
+        <>
+          <UsageCard usage={usage} />
+          <Card>
             <RowButton onClick={reset}>{s.ui_ratelimit_reset}</RowButton>
-          </>
-        ) : (
-          <EmptyState>{s.ui_ratelimit_no_bucket}</EmptyState>
-        )}
-      </Card>
+          </Card>
+        </>
+      ) : null}
     </Stack>
   );
 }

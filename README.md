@@ -91,8 +91,8 @@ following metric families:
 | `bot_ai_request_duration_seconds` | histogram | `outcome` | OpenRouter call latency |
 | `bot_tool_calls_total` | counter | `tool`, `outcome` | Tool invocations by the model |
 | `bot_tool_call_duration_seconds` | histogram | `tool` | Tool execution latency |
-| `bot_rate_limit_checks_total` | counter | `result` | Token-bucket allow/deny |
-| `bot_rate_limit_tokens_deducted_total` | counter | — | Total tokens charged to buckets |
+| `bot_rate_limit_checks_total` | counter | `result` | Rate-limit allow/deny |
+| `bot_rate_limit_tokens_deducted_total` | counter | — | Total tokens charged to usage windows |
 | `bot_reminders_delivered_total` | counter | `outcome` | Reminder scheduler results |
 | `bot_checks_processed_total` | counter | `outcome` | Recurring-check fires/timeouts/answers |
 | `http_requests_total` | counter | `method`, `route`, `status` | Web App / API traffic |
@@ -116,7 +116,9 @@ are supported as `host:port`).
 
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
 - Tool calling — built-in `random_number` tool; add new tools via `registerTool()`.
-- Per-user token-bucket rate limit (defaults: 30k capacity, +3k every 40 min). Configurable in admin UI.
+- Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
+  (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
+  are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
 - BYOK — each user can store their own OpenRouter API key in the Web App. When set, the user's
   AI calls go through their key and the bot's rate limit no longer applies to them.
 - Whitelist (chats and users). Owner bypasses whitelist.

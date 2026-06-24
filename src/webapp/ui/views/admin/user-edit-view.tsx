@@ -6,10 +6,11 @@ import { useI18n } from "../../i18n-context";
 import {
   api,
   type SpendSummary,
-  type UserBucketEntry,
+  type UsageStatus,
   type UserSettingsResponse,
 } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
+import { UsageCard } from "../../components/usage-card";
 import type { Gender } from "../../../../shared/types";
 import {
   SUPPORTED_LANGS,
@@ -22,7 +23,7 @@ import {
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { EmptyState, LoadingState } from "../../components/states";
+import { LoadingState } from "../../components/states";
 import { RowButton, SaveButton, Toggle } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { TimezoneSelect } from "../../components/timezone-select";
@@ -34,8 +35,6 @@ import {
   ROW_VALUE_CLS,
 } from "../../components/row";
 import {
-  chatSubtitle,
-  chatTitle,
   DISPLAY_NAME_ERR_KEY,
   LANG_LABEL_KEY,
   userDisplayName,
@@ -55,8 +54,7 @@ export function UserEditView({ userId }: { userId: string }) {
   const [langValue, setLangValue] = useState<Lang>(DEFAULT_LANG);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [buckets, setBuckets] = useState<UserBucketEntry[] | null>(null);
-  const [capacity, setCapacity] = useState<number | null>(null);
+  const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
 
   useEffect(() => {
@@ -73,14 +71,13 @@ export function UserEditView({ userId }: { userId: string }) {
         setLangValue(d.language ?? DEFAULT_LANG);
       })
       .catch(() => setNotFound(true));
-    api.getUserBuckets(userId).then((r) => setBuckets(r.buckets));
+    api.getUserUsage(userId).then((r) => setUsage(r.usage));
     api.getUserSpending(userId).then((r) => setSpending(r.spending));
-    api.getSettings().then((s) => setCapacity(s.rateLimit.capacity));
   }, [userId]);
 
-  const resetBucket = async (chatId: string) => {
-    const r = await api.resetUserBucket(userId, chatId);
-    setBuckets(r.buckets);
+  const resetUsage = async () => {
+    const r = await api.resetUserUsage(userId);
+    setUsage(r.usage);
   };
 
   if (notFound) return <LoadingState text={s.ui_user_not_found} />;
@@ -247,39 +244,15 @@ export function UserEditView({ userId }: { userId: string }) {
 
       {spending && <SpendingCard spending={spending} />}
 
-      <SectionHeader>{s.ui_user_bucket}</SectionHeader>
-      {buckets === null ? null : buckets.length === 0 ? (
-        <Card>
-          <EmptyState>{s.ui_ratelimit_no_bucket}</EmptyState>
-        </Card>
-      ) : (
-        buckets.map(({ chat, bucket }) => (
-          <Card key={chat.id}>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>{chatTitle(s, chat)}</span>
-              <span className={ROW_VALUE_CLS}>{chatSubtitle(chat)}</span>
-            </div>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_tokens}</span>
-              <span className={ROW_VALUE_CLS}>
-                {bucket.tokens.toLocaleString()}
-                {capacity !== null ? ` / ${capacity.toLocaleString()}` : ""}
-              </span>
-            </div>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>
-                {s.ui_ratelimit_last_refill}
-              </span>
-              <span className={ROW_VALUE_CLS}>
-                {new Date(bucket.lastRefillTs).toLocaleString()}
-              </span>
-            </div>
-            <RowButton onClick={() => resetBucket(chat.id)}>
-              {s.ui_ratelimit_reset}
-            </RowButton>
+      <SectionHeader>{s.ui_user_usage}</SectionHeader>
+      {usage ? (
+        <>
+          <UsageCard usage={usage} />
+          <Card>
+            <RowButton onClick={resetUsage}>{s.ui_ratelimit_reset}</RowButton>
           </Card>
-        ))
-      )}
+        </>
+      ) : null}
     </Stack>
   );
 }
