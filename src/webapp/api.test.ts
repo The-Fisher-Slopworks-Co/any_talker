@@ -3,15 +3,16 @@
 
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
-import { TokenBucketLimiter } from "../ratelimit/token-bucket";
+import { DualWindowLimiter } from "../ratelimit/dual-window";
+import { currentWindowStarts } from "../ratelimit/window";
 import { handleApi } from "./api";
 import { DEFAULT_SETTINGS } from "../shared/types";
-import type { Chat } from "../shared/types";
+import type { UsageStatus } from "../ratelimit/window";
 
 const ownerId = "1";
 function deps() {
   const storage = new MemoryStorage();
-  const rateLimiter = new TokenBucketLimiter(storage);
+  const rateLimiter = new DualWindowLimiter(storage);
   return { storage, rateLimiter, ownerId };
 }
 const owner = { userId: ownerId, isOwner: true };
@@ -345,9 +346,8 @@ describe("PUT /api/settings", () => {
         path: "/api/settings",
         body: {
           rateLimit: {
-            capacity: 50000,
-            refillAmount: 1000,
-            refillIntervalMs: 60000,
+            fiveHourTokens: 50000,
+            weeklyTokens: 400000,
             ownerExempt: false,
             wiseMultiplier: 2.2,
           },
@@ -358,7 +358,8 @@ describe("PUT /api/settings", () => {
     );
     expect(res.status).toBe(200);
     const saved = await d.storage.getSettings();
-    expect(saved?.rateLimit.capacity).toBe(50000);
+    expect(saved?.rateLimit.fiveHourTokens).toBe(50000);
+    expect(saved?.rateLimit.weeklyTokens).toBe(400000);
     expect(saved?.rateLimit.ownerExempt).toBe(false);
     expect(saved?.rateLimit.wiseMultiplier).toBe(2.2);
   });
@@ -490,105 +491,68 @@ describe("whitelist endpoints", () => {
 });
 
 describe("ratelimit endpoints", () => {
-  test("GET /api/ratelimit/me returns null bucket initially", async () => {
+  test("GET /api/ratelimit/me returns zeroed usage with the configured limits", async () => {
     const r = await handleApi(
       { method: "GET", path: "/api/ratelimit/me", body: null },
       deps(),
       owner,
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ bucket: null });
+    const { usage } = r.body as { usage: UsageStatus };
+    expect(usage.fiveHour.used).toBe(0);
+    expect(usage.fiveHour.limit).toBe(DEFAULT_SETTINGS.rateLimit.fiveHourTokens);
+    expect(usage.weekly.used).toBe(0);
+    expect(usage.weekly.limit).toBe(DEFAULT_SETTINGS.rateLimit.weeklyTokens);
   });
 
-  test("PUT /api/ratelimit/me { reset: true } resets owner bucket to capacity", async () => {
+  test("PUT /api/ratelimit/me { reset: true } clears the owner's usage", async () => {
     const d = deps();
-    await d.storage.saveBucket(ownerId, ownerId, { tokens: -100, lastRefillTs: 1 });
+    const starts = currentWindowStarts(ownerId, Date.now());
+    await d.storage.addUserUsage(ownerId, 100, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       { method: "PUT", path: "/api/ratelimit/me", body: { reset: true } },
       d,
       owner,
     );
     expect(r.status).toBe(200);
-    const b = await d.storage.getBucket(ownerId, ownerId);
-    expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
+    expect((r.body as { usage: UsageStatus }).usage.fiveHour.used).toBe(0);
+    expect(await d.storage.getUserUsage(ownerId)).toBeNull();
   });
 
-  test("GET /api/ratelimit/user/:id lists the user's buckets across chats", async () => {
+  test("GET /api/ratelimit/user/:id returns that user's usage", async () => {
     const d = deps();
-    const group: Chat = {
-      id: "-100",
-      type: "supergroup",
-      title: "Group",
-      username: null,
-      lastSeenAt: 20,
-    };
-    const dm: Chat = {
-      id: "42",
-      type: "private",
-      title: null,
-      username: null,
-      lastSeenAt: 10,
-    };
-    await d.storage.upsertChat(group);
-    await d.storage.upsertChat(dm);
-    await d.storage.saveBucket("-100", "42", { tokens: 7, lastRefillTs: 123 });
-    await d.storage.saveBucket("42", "42", { tokens: 3, lastRefillTs: 456 });
+    const starts = currentWindowStarts("42", Date.now());
+    await d.storage.addUserUsage("42", 1234, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       { method: "GET", path: "/api/ratelimit/user/42", body: null },
       d,
       owner,
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({
-      buckets: [
-        { chat: group, bucket: { tokens: 7, lastRefillTs: 123 } },
-        { chat: dm, bucket: { tokens: 3, lastRefillTs: 456 } },
-      ],
-    });
-  });
-
-  test("GET /api/ratelimit/user/:id omits chats where the user has no bucket", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "supergroup",
-      title: "Group",
-      username: null,
-      lastSeenAt: 1,
-    });
-    // A bucket for a different user in the same chat must not leak through.
-    await d.storage.saveBucket("-100", "99", { tokens: 5, lastRefillTs: 1 });
-    const r = await handleApi(
-      { method: "GET", path: "/api/ratelimit/user/42", body: null },
-      d,
-      owner,
+    const { usage } = r.body as { usage: UsageStatus };
+    expect(usage.fiveHour.used).toBe(1234);
+    expect(usage.weekly.used).toBe(1234);
+    expect(usage.fiveHour.remaining).toBe(
+      DEFAULT_SETTINGS.rateLimit.fiveHourTokens - 1234,
     );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ buckets: [] });
   });
 
-  test("PUT /api/ratelimit/user/:id resets the bucket for the given chat", async () => {
+  test("PUT /api/ratelimit/user/:id { reset: true } clears that user's usage", async () => {
     const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "supergroup",
-      title: "Group",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await d.storage.saveBucket("-100", "42", { tokens: -100, lastRefillTs: 1 });
+    const starts = currentWindowStarts("42", Date.now());
+    await d.storage.addUserUsage("42", 5000, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       {
         method: "PUT",
         path: "/api/ratelimit/user/42",
-        body: { chatId: "-100", reset: true },
+        body: { reset: true },
       },
       d,
       owner,
     );
     expect(r.status).toBe(200);
-    const b = await d.storage.getBucket("-100", "42");
-    expect(b?.tokens).toBe(DEFAULT_SETTINGS.rateLimit.capacity);
+    expect((r.body as { usage: UsageStatus }).usage.fiveHour.used).toBe(0);
+    expect(await d.storage.getUserUsage("42")).toBeNull();
   });
 
   test("non-owner gets 403 from /api/ratelimit/user/:id", async () => {
@@ -1704,10 +1668,11 @@ describe("/api/admin/chats", () => {
         body: {
           systemPrompt: "p",
           models: ["openai/gpt-4o"],
+          // Rate limit is global/per-user now: even if sent, it is not a chat
+          // override and must be dropped from the stored chat settings.
           rateLimit: {
-            capacity: 1,
-            refillAmount: 1,
-            refillIntervalMs: 1000,
+            fiveHourTokens: 1,
+            weeklyTokens: 1,
             ownerExempt: false,
             wiseMultiplier: 2.1,
           },
@@ -1720,13 +1685,6 @@ describe("/api/admin/chats", () => {
     expect(saved).toEqual({
       systemPrompt: "p",
       models: ["openai/gpt-4o"],
-      rateLimit: {
-        capacity: 1,
-        refillAmount: 1,
-        refillIntervalMs: 1000,
-        ownerExempt: false,
-        wiseMultiplier: 2.1,
-      },
     });
   });
 

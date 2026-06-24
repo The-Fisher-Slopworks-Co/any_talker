@@ -11,7 +11,6 @@ import type {
   ChatSettings,
   RateLimitConfig,
   Gender,
-  BucketState,
 } from "../shared/types";
 import {
   isValidTimezone,
@@ -33,6 +32,7 @@ import type { SpendSummary } from "../spending/window";
 import { normalizeCheckInput } from "../checks/validate";
 import { normalizeManagedBotInput } from "../managed-bots/validate";
 import { getOrInitSettings } from "../settings";
+import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
 import {
   isValidPermaslug,
   type FetchOpenRouterStats,
@@ -102,23 +102,16 @@ function badDisplayName(reason: DisplayNameError): ApiResponse {
   };
 }
 
-export type UserBucketEntry = { chat: Chat; bucket: BucketState };
-
-// Rate-limit buckets are keyed per (chat, user), so a user has a distinct
-// bucket in every chat they talk in. Walk the known chats and collect the
-// ones where this user has a bucket.
-async function listUserBuckets(
+// The dual-window usage is per user and global, so a single record describes a
+// user everywhere. Resolved against the current config + windows for display.
+async function userUsageStatus(
   storage: Storage,
   userId: string,
-): Promise<UserBucketEntry[]> {
-  const chats = await storage.listChats();
-  const entries = await Promise.all(
-    chats.map(async (chat) => {
-      const bucket = await storage.getBucket(chat.id, userId);
-      return bucket ? { chat, bucket } : null;
-    }),
-  );
-  return entries.filter((e): e is UserBucketEntry => e !== null);
+  config: RateLimitConfig,
+  now: number,
+): Promise<UsageStatus> {
+  const stored = await storage.getUserUsage(userId);
+  return summarizeUsage(userId, config, stored, now);
 }
 
 function normalizeTimezoneOrNull(input: unknown): string | null {
@@ -214,7 +207,12 @@ const BAD_MODELS: ApiResponse = {
 
 const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
   status: 400,
-  body: { error: "rate-limit multipliers must be positive numbers" },
+  body: { error: "the /askwise multiplier must be a number >= 1" },
+};
+
+const BAD_RATE_LIMIT_TOKENS: ApiResponse = {
+  status: 400,
+  body: { error: "rate-limit token budgets must be non-negative numbers" },
 };
 
 const BAD_EXPANDABLE_THRESHOLD: ApiResponse = {
@@ -302,7 +300,6 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
   const body = (raw ?? {}) as {
     systemPrompt?: unknown;
     models?: unknown;
-    rateLimit?: unknown;
     botName?: unknown;
     timezone?: unknown;
     providerSort?: unknown;
@@ -320,29 +317,6 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     body.models.length > 0
   ) {
     out.models = body.models as string[];
-  }
-  if (
-    body.rateLimit &&
-    typeof body.rateLimit === "object" &&
-    !Array.isArray(body.rateLimit)
-  ) {
-    const r = body.rateLimit as Partial<RateLimitConfig>;
-    if (
-      typeof r.capacity === "number" &&
-      typeof r.refillAmount === "number" &&
-      typeof r.refillIntervalMs === "number" &&
-      typeof r.ownerExempt === "boolean" &&
-      typeof r.wiseMultiplier === "number" &&
-      r.wiseMultiplier > 0
-    ) {
-      out.rateLimit = {
-        capacity: r.capacity,
-        refillAmount: r.refillAmount,
-        refillIntervalMs: r.refillIntervalMs,
-        ownerExempt: r.ownerExempt,
-        wiseMultiplier: r.wiseMultiplier,
-      };
-    }
   }
   if (typeof body.botName === "string") {
     const trimmed = body.botName.trim();
@@ -594,9 +568,17 @@ export async function handleApi(
         const rl = patch.rateLimit as Partial<RateLimitConfig>;
         if (
           rl.wiseMultiplier !== undefined &&
-          (typeof rl.wiseMultiplier !== "number" || !(rl.wiseMultiplier > 0))
+          (typeof rl.wiseMultiplier !== "number" || !(rl.wiseMultiplier >= 1))
         ) {
           return BAD_RATE_LIMIT_MULTIPLIER;
+        }
+        for (const v of [rl.fiveHourTokens, rl.weeklyTokens]) {
+          if (
+            v !== undefined &&
+            (typeof v !== "number" || !Number.isFinite(v) || v < 0)
+          ) {
+            return BAD_RATE_LIMIT_TOKENS;
+          }
         }
       }
       if (patch.expandableBlockquoteThreshold !== undefined) {
@@ -761,22 +743,26 @@ export async function handleApi(
 
   if (req.path === "/api/ratelimit/me") {
     if (req.method === "GET") {
-      const bucket = await deps.storage.getBucket(deps.ownerId, deps.ownerId);
-      return { status: 200, body: { bucket } };
+      const settings = await getOrInitSettings(deps.storage);
+      const usage = await userUsageStatus(
+        deps.storage,
+        deps.ownerId,
+        settings.rateLimit,
+        Date.now(),
+      );
+      return { status: 200, body: { usage } };
     }
     if (req.method === "PUT") {
       const settings = await getOrInitSettings(deps.storage);
       const body = (req.body ?? {}) as { reset?: boolean };
-      if (body.reset) {
-        await deps.rateLimiter.reset(
-          deps.ownerId,
-          deps.ownerId,
-          settings.rateLimit,
-          Date.now(),
-        );
-      }
-      const bucket = await deps.storage.getBucket(deps.ownerId, deps.ownerId);
-      return { status: 200, body: { bucket } };
+      if (body.reset) await deps.rateLimiter.reset(deps.ownerId);
+      const usage = await userUsageStatus(
+        deps.storage,
+        deps.ownerId,
+        settings.rateLimit,
+        Date.now(),
+      );
+      return { status: 200, body: { usage } };
     }
   }
 
@@ -784,22 +770,26 @@ export async function handleApi(
   if (rlUserMatch) {
     const id = rlUserMatch[1]!;
     if (req.method === "GET") {
-      const buckets = await listUserBuckets(deps.storage, id);
-      return { status: 200, body: { buckets } };
+      const settings = await getOrInitSettings(deps.storage);
+      const usage = await userUsageStatus(
+        deps.storage,
+        id,
+        settings.rateLimit,
+        Date.now(),
+      );
+      return { status: 200, body: { usage } };
     }
     if (req.method === "PUT") {
-      const body = (req.body ?? {}) as { chatId?: string; reset?: boolean };
-      if (body.reset && typeof body.chatId === "string") {
-        const settings = await getOrInitSettings(deps.storage);
-        await deps.rateLimiter.reset(
-          body.chatId,
-          id,
-          settings.rateLimit,
-          Date.now(),
-        );
-      }
-      const buckets = await listUserBuckets(deps.storage, id);
-      return { status: 200, body: { buckets } };
+      const body = (req.body ?? {}) as { reset?: boolean };
+      if (body.reset) await deps.rateLimiter.reset(id);
+      const settings = await getOrInitSettings(deps.storage);
+      const usage = await userUsageStatus(
+        deps.storage,
+        id,
+        settings.rateLimit,
+        Date.now(),
+      );
+      return { status: 200, body: { usage } };
     }
   }
 

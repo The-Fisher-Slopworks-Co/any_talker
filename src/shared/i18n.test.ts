@@ -68,8 +68,8 @@ describe("MESSAGES parity", () => {
   });
 
   test("interpolations match argument shape across locales", () => {
-    expect(t("en").bot_rate_limited(3)).toContain("3");
-    expect(t("ru").bot_rate_limited(3)).toContain("3");
+    expect(t("en").bot_rate_limited("fiveHour", 3 * 60_000)).toContain("3");
+    expect(t("ru").bot_rate_limited("fiveHour", 3 * 60_000)).toContain("3");
     expect(t("en").bot_contact_added("Alice")).toContain("Alice");
     expect(t("ru").bot_contact_added("Alice")).toContain("Alice");
   });

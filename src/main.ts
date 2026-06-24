@@ -4,7 +4,7 @@
 import { loadConfig } from "./config";
 import { getEffectiveProxyForUrl } from "./proxy";
 import { KeyDBStorage } from "./storage/keydb";
-import { TokenBucketLimiter } from "./ratelimit/token-bucket";
+import { DualWindowLimiter } from "./ratelimit/dual-window";
 import { OpenRouterAIClient } from "./ai/openrouter";
 import { registerTool, type Tool } from "./ai/tools/registry";
 import { withLogging } from "./ai/tools/logging";
@@ -37,7 +37,7 @@ async function main() {
   }
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
-  const rateLimiter = new TokenBucketLimiter(storage);
+  const rateLimiter = new DualWindowLimiter(storage);
   const ai = new OpenRouterAIClient(config.openrouterApiKey, {
     url: config.openrouterAppUrl,
     title: config.openrouterAppTitle,

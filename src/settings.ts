@@ -17,18 +17,33 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   return DEFAULT_SETTINGS;
 }
 
-function normalizeRateLimit(rl: RateLimitConfig): RateLimitConfig {
+// Backfills the dual-window config from possibly-legacy stored shapes. A legacy
+// token-bucket `capacity` (the old burst budget) maps to the 5-hour budget;
+// everything else falls back to defaults. Tolerant of missing/invalid fields so
+// old `at:settings` rows load without a migration (schema-on-read).
+function normalizeRateLimit(
+  rl: RateLimitConfig | undefined,
+): RateLimitConfig {
+  const def = DEFAULT_SETTINGS.rateLimit;
+  const legacy = (rl ?? {}) as Partial<RateLimitConfig> & { capacity?: number };
+  const fiveHourTokens =
+    typeof legacy.fiveHourTokens === "number" && legacy.fiveHourTokens >= 0
+      ? legacy.fiveHourTokens
+      : typeof legacy.capacity === "number" && legacy.capacity >= 0
+        ? legacy.capacity
+        : def.fiveHourTokens;
+  const weeklyTokens =
+    typeof legacy.weeklyTokens === "number" && legacy.weeklyTokens >= 0
+      ? legacy.weeklyTokens
+      : def.weeklyTokens;
+  const ownerExempt =
+    typeof legacy.ownerExempt === "boolean" ? legacy.ownerExempt : def.ownerExempt;
+  // /askwise must never cost less than /ask, so the multiplier is floored at 1.
   const wiseMultiplier =
-    typeof rl.wiseMultiplier === "number" && rl.wiseMultiplier > 0
-      ? rl.wiseMultiplier
-      : DEFAULT_SETTINGS.rateLimit.wiseMultiplier;
-  return {
-    capacity: rl.capacity,
-    refillAmount: rl.refillAmount,
-    refillIntervalMs: rl.refillIntervalMs,
-    ownerExempt: rl.ownerExempt,
-    wiseMultiplier,
-  };
+    typeof legacy.wiseMultiplier === "number" && legacy.wiseMultiplier >= 1
+      ? legacy.wiseMultiplier
+      : def.wiseMultiplier;
+  return { fiveHourTokens, weeklyTokens, ownerExempt, wiseMultiplier };
 }
 
 function normalize(s: Settings): Settings {
@@ -74,7 +89,8 @@ export function applyChatOverrides(
   return {
     systemPrompt: chat.systemPrompt ?? global.systemPrompt,
     models: chat.models ?? global.models,
-    rateLimit: chat.rateLimit ? normalizeRateLimit(chat.rateLimit) : global.rateLimit,
+    // Rate limit is per-user and global; there is no per-chat override.
+    rateLimit: global.rateLimit,
     timezone: chat.timezone ?? global.timezone,
     providerSort:
       chat.providerSort !== undefined ? chat.providerSort : global.providerSort,

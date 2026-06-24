@@ -9,7 +9,6 @@ import type {
   ChatSettings,
   ProviderSort,
   ServiceTier,
-  RateLimitConfig,
   Settings,
 } from "../../../../shared/types";
 import {
@@ -25,7 +24,6 @@ import { OverrideSection } from "../../components/override-section";
 import { ProviderSortField } from "../../components/provider-sort-field";
 import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
-import { RateLimitFields } from "../../components/rate-limit-fields";
 import { TimezoneSelect } from "../../components/timezone-select";
 import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
 import {
@@ -46,8 +44,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   const [promptValue, setPromptValue] = useState("");
   const [modelsOverride, setModelsOverride] = useState(false);
   const [modelsValue, setModelsValue] = useState<string[]>([]);
-  const [rlOverride, setRlOverride] = useState(false);
-  const [rlValue, setRlValue] = useState<RateLimitConfig | null>(null);
   const [botNameValue, setBotNameValue] = useState("");
   const [tzOverride, setTzOverride] = useState(false);
   const [tzValue, setTzValue] = useState("UTC");
@@ -75,8 +71,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         setPromptValue(d.settings.systemPrompt ?? g.systemPrompt);
         setModelsOverride(d.settings.models !== undefined);
         setModelsValue(d.settings.models ?? g.models);
-        setRlOverride(d.settings.rateLimit !== undefined);
-        setRlValue(d.settings.rateLimit ?? g.rateLimit);
         setBotNameValue(d.settings.botName ?? "");
         setTzOverride(d.settings.timezone !== undefined);
         setTzValue(d.settings.timezone ?? g.timezone);
@@ -103,7 +97,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   }, [chatId]);
 
   if (notFound) return <LoadingState text={s.ui_chat_not_found} />;
-  if (!chat || !global || !original || !rlValue) return <LoadingState />;
+  if (!chat || !global || !original) return <LoadingState />;
 
   const trimmedModels = modelsValue
     .map((m) => m.trim())
@@ -118,7 +112,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     const next: ChatSettings = {};
     if (promptOverride) next.systemPrompt = promptValue;
     if (modelsOverride && trimmedModels.length > 0) next.models = trimmedModels;
-    if (rlOverride) next.rateLimit = rlValue;
     if (trimmedBotName.length > 0) next.botName = trimmedBotName;
     if (tzOverride) next.timezone = tzValue;
     if (psOverride) next.providerSort = psValue;
@@ -138,7 +131,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   const dirty =
     promptOverride !== wasOverridden("systemPrompt") ||
     modelsOverride !== wasOverridden("models") ||
-    rlOverride !== wasOverridden("rateLimit") ||
     tzOverride !== wasOverridden("timezone") ||
     psOverride !== wasOverridden("providerSort") ||
     provOverride !== wasOverridden("provider") ||
@@ -146,8 +138,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
     (modelsOverride &&
       JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
-    (rlOverride &&
-      JSON.stringify(payload.rateLimit) !== JSON.stringify(original.rateLimit)) ||
     (tzOverride && payload.timezone !== original.timezone) ||
     (psOverride && payload.providerSort !== original.providerSort) ||
     (provOverride && payload.provider !== original.provider) ||
@@ -167,8 +157,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       setPromptValue(result.settings.systemPrompt ?? global.systemPrompt);
       setModelsOverride(result.settings.models !== undefined);
       setModelsValue(result.settings.models ?? global.models);
-      setRlOverride(result.settings.rateLimit !== undefined);
-      setRlValue(result.settings.rateLimit ?? global.rateLimit);
       setBotNameValue(result.settings.botName ?? "");
       setTzOverride(result.settings.timezone !== undefined);
       setTzValue(result.settings.timezone ?? global.timezone);
@@ -283,19 +271,6 @@ export function ChatEditView({ chatId }: { chatId: string }) {
           onChange={setModelsValue}
           providerSort={psOverride ? psValue : global.providerSort}
         />
-      </OverrideSection>
-
-      <OverrideSection
-        title={s.ui_chat_rate_limit}
-        override={rlOverride}
-        onToggle={setRlOverride}
-        footer={
-          rlOverride
-            ? s.ui_chat_rate_limit_on_footer
-            : s.ui_chat_rate_limit_off_footer
-        }
-      >
-        <RateLimitFields value={rlValue} onChange={setRlValue} />
       </OverrideSection>
 
       <OverrideSection

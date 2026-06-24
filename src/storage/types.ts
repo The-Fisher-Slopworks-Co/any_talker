@@ -5,14 +5,13 @@ import type {
   Settings,
   WhitelistEntry,
   WhitelistKind,
-  BucketState,
+  UserUsage,
   ConversationNode,
   GuestThreadNode,
   User,
   Chat,
   ChatSettings,
   Gender,
-  RateLimitConfig,
 } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { Reminder } from "../reminders/types";
@@ -27,9 +26,9 @@ export interface Storage {
   // unprefixed keys — byte-identical to storage that never knew about scoping,
   // so existing data and all current call sites are unaffected. A managed bot's
   // id namespaces those entities under an `mbot:{botId}:` segment; every *other*
-  // method (settings, whitelist, rate buckets, users/chats directory, spend,
-  // user attributes, photo cache, checks, the managed-bot registry) is shared
-  // across all scopes regardless of which view it is called on.
+  // method (settings, whitelist, per-user rate-limit usage, users/chats
+  // directory, spend, user attributes, photo cache, checks, the managed-bot
+  // registry) is shared across all scopes regardless of which view it is called on.
   forBot(botId: string | null): Storage;
 
   // Managed-bot registry + token store. These are global (not affected by
@@ -60,20 +59,21 @@ export interface Storage {
   removeWhitelist(kind: WhitelistKind, id: string): Promise<void>;
   isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean>;
 
-  getBucket(chatId: string, userId: string): Promise<BucketState | null>;
-  saveBucket(chatId: string, userId: string, state: BucketState): Promise<void>;
-  refillBucket(
-    chatId: string,
-    userId: string,
-    config: RateLimitConfig,
-    now: number,
-  ): Promise<BucketState>;
-  deductBucket(
-    chatId: string,
+  // Per-user dual-window token usage (5-hour + weekly). Global (not affected by
+  // `forBot`): one budget per user, shared across all chats and family bots.
+  getUserUsage(userId: string): Promise<UserUsage | null>;
+  // Atomically accrues `tokens` to both windows. The caller passes the current
+  // start of each window (computed from the user's deterministic phase offset);
+  // a stored window whose start differs has rolled over, so its `used` is reset
+  // to 0 before the tokens are added. Returns the updated record.
+  addUserUsage(
     userId: string,
     tokens: number,
-    nowMs: number,
-  ): Promise<BucketState>;
+    fiveHourWindowStart: number,
+    weeklyWindowStart: number,
+  ): Promise<UserUsage>;
+  // Clears the user's usage (admin reset): both windows drop to 0.
+  resetUserUsage(userId: string): Promise<void>;
 
   getUserName(userId: string): Promise<string | null>;
   setUserName(userId: string, name: string | null): Promise<void>;

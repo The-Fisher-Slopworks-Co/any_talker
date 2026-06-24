@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { WindowKind } from "./types";
+
 export type Lang = "en" | "ru";
 
 export const SUPPORTED_LANGS: readonly Lang[] = ["en", "ru"];
@@ -36,7 +38,7 @@ type Strings = {
   bot_photo_cant_fetch: string;
   bot_voice_cant_fetch: string;
   bot_ask_usage: string;
-  bot_rate_limited: (min: number) => string;
+  bot_rate_limited: (limitedBy: WindowKind, msUntilReset: number) => string;
   bot_ai_error: string;
   bot_details_summary: string;
   bot_contact_no_user_id: string;
@@ -179,18 +181,16 @@ type Strings = {
   ui_modelinfo_caching: string;
 
   ui_ratelimit_limits: string;
-  ui_ratelimit_capacity: string;
-  ui_ratelimit_refill_amount: string;
-  ui_ratelimit_refill_every: string;
-  ui_ratelimit_min_unit: string;
+  ui_ratelimit_5h_tokens: string;
+  ui_ratelimit_weekly_tokens: string;
   ui_ratelimit_owner_exempt: string;
   ui_ratelimit_wise_multiplier: string;
   ui_ratelimit_footer: string;
-  ui_ratelimit_my_bucket: string;
-  ui_ratelimit_tokens: string;
-  ui_ratelimit_last_refill: string;
+  ui_ratelimit_my_usage: string;
+  ui_ratelimit_5h_window: string;
+  ui_ratelimit_weekly_window: string;
+  ui_ratelimit_resets: string;
   ui_ratelimit_reset: string;
-  ui_ratelimit_no_bucket: string;
 
   ui_users_all: string;
   ui_users_empty: string;
@@ -205,7 +205,7 @@ type Strings = {
   ui_user_open_in_tg: string;
   ui_user_display_name_footer: string;
   ui_user_set_language: string;
-  ui_user_bucket: string;
+  ui_user_usage: string;
 
   ui_spending_title: string;
   ui_spending_day: string;
@@ -236,9 +236,6 @@ type Strings = {
   ui_chat_models: string;
   ui_chat_models_on_footer: string;
   ui_chat_models_off_footer: (list: string) => string;
-  ui_chat_rate_limit: string;
-  ui_chat_rate_limit_on_footer: string;
-  ui_chat_rate_limit_off_footer: string;
   ui_chat_tz: string;
   ui_chat_tz_on_footer: string;
   ui_chat_tz_off_footer: (tz: string) => string;
@@ -367,13 +364,33 @@ type Strings = {
   ui_mbot_create_footer: string;
 };
 
+// Human-readable "time until reset" for rate-limit notices, in adaptive units:
+// a 5-hour-window wait reads in minutes/hours, a weekly one in hours/days.
+function etaEn(ms: number): string {
+  const min = Math.max(1, Math.ceil(ms / 60_000));
+  if (min < 90) return `${min} min`;
+  const hours = Math.ceil(min / 60);
+  if (hours < 48) return `${hours} h`;
+  return `${Math.ceil(hours / 24)} d`;
+}
+
+function etaRu(ms: number): string {
+  const min = Math.max(1, Math.ceil(ms / 60_000));
+  if (min < 90) return `${min} мин`;
+  const hours = Math.ceil(min / 60);
+  if (hours < 48) return `${hours} ч`;
+  return `${Math.ceil(hours / 24)} дн`;
+}
+
 const en: Strings = {
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
   bot_voice_cant_fetch: "⚠️ Couldn't fetch the voice message.",
   bot_ask_usage:
     "Usage: /ask <text> (short), /askwise <text> (detailed) — or reply to a message with either.",
-  bot_rate_limited: (min) =>
-    `Rate limit exceeded. Refilled in ~${min} min.`,
+  bot_rate_limited: (limitedBy, ms) =>
+    limitedBy === "weekly"
+      ? `Weekly token limit reached. Resets in ~${etaEn(ms)}.`
+      : `5-hour token limit reached. Resets in ~${etaEn(ms)}.`,
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -411,7 +428,7 @@ const en: Strings = {
   ui_admin_prompt: "Prompt",
   ui_admin_prompt_desc: "Models, character, timezone, provider routing",
   ui_admin_limits: "Limits",
-  ui_admin_limits_desc: "Token-bucket capacity and refill",
+  ui_admin_limits_desc: "5-hour and weekly token budgets",
   ui_admin_whitelist: "Whitelist",
   ui_admin_whitelist_desc: "Allowed users and chats",
   ui_admin_users: "Users",
@@ -541,19 +558,17 @@ const en: Strings = {
   ui_modelinfo_caching: "Caching",
 
   ui_ratelimit_limits: "Limits",
-  ui_ratelimit_capacity: "Capacity",
-  ui_ratelimit_refill_amount: "Refill amount",
-  ui_ratelimit_refill_every: "Refill every",
-  ui_ratelimit_min_unit: "min",
+  ui_ratelimit_5h_tokens: "5-hour limit",
+  ui_ratelimit_weekly_tokens: "Weekly limit",
   ui_ratelimit_owner_exempt: "Owner exempt",
   ui_ratelimit_wise_multiplier: "/askwise multiplier",
   ui_ratelimit_footer:
-    "Tokens are deducted from each user's bucket per /ask. /askwise spends the deduction times the multiplier. The bucket lazily refills based on the interval.",
-  ui_ratelimit_my_bucket: "My Bucket",
-  ui_ratelimit_tokens: "Tokens",
-  ui_ratelimit_last_refill: "Last refill",
-  ui_ratelimit_reset: "Reset to capacity",
-  ui_ratelimit_no_bucket: "No bucket yet — will be seeded on first /ask.",
+    "Each user has two token budgets — one per rolling 5-hour window and one per week — spent per /ask (/askwise costs the multiplier times more). A request is allowed while both have budget left. Window start times are staggered per user.",
+  ui_ratelimit_my_usage: "My Usage",
+  ui_ratelimit_5h_window: "5-hour window",
+  ui_ratelimit_weekly_window: "Weekly window",
+  ui_ratelimit_resets: "Resets",
+  ui_ratelimit_reset: "Reset usage",
 
   ui_users_all: "All Users",
   ui_users_empty: "No users yet — they appear after their first message.",
@@ -570,7 +585,7 @@ const en: Strings = {
   ui_user_display_name_footer:
     "Override the name shown to the AI for this user.",
   ui_user_set_language: "Set language",
-  ui_user_bucket: "Rate Limit Buckets",
+  ui_user_usage: "Rate Limit Usage",
 
   ui_spending_title: "Spending",
   ui_spending_day: "Today",
@@ -606,10 +621,6 @@ const en: Strings = {
   ui_chat_models_on_footer:
     "Primary first; fallbacks used in order if it fails.",
   ui_chat_models_off_footer: (list) => `Using global: ${list}`,
-  ui_chat_rate_limit: "Rate Limit",
-  ui_chat_rate_limit_on_footer:
-    "These limits apply to this chat instead of the global config.",
-  ui_chat_rate_limit_off_footer: "Using global limits.",
   ui_chat_tz: "Timezone",
   ui_chat_tz_on_footer: "Used unless a user has set their own timezone.",
   ui_chat_tz_off_footer: (tz) => `Using global timezone (${tz}).`,
@@ -774,8 +785,10 @@ const ru: Strings = {
   bot_voice_cant_fetch: "⚠️ Не удалось загрузить голосовое сообщение.",
   bot_ask_usage:
     "Использование: /ask <текст> (коротко), /askwise <текст> (подробно) — или ответь на сообщение любой из этих команд.",
-  bot_rate_limited: (min) =>
-    `Лимит запросов исчерпан. Восстановится примерно через ${min} мин.`,
+  bot_rate_limited: (limitedBy, ms) =>
+    limitedBy === "weekly"
+      ? `Недельный лимит токенов исчерпан. Восстановится примерно через ${etaRu(ms)}.`
+      : `Лимит токенов за 5 часов исчерпан. Восстановится примерно через ${etaRu(ms)}.`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:
@@ -813,7 +826,7 @@ const ru: Strings = {
   ui_admin_prompt: "Промпт",
   ui_admin_prompt_desc: "Модели, персонаж, часовой пояс, провайдеры",
   ui_admin_limits: "Лимиты",
-  ui_admin_limits_desc: "Ёмкость и пополнение токен-бакета",
+  ui_admin_limits_desc: "Бюджеты токенов за 5 часов и за неделю",
   ui_admin_whitelist: "Белый список",
   ui_admin_whitelist_desc: "Разрешённые пользователи и чаты",
   ui_admin_users: "Пользователи",
@@ -943,20 +956,17 @@ const ru: Strings = {
   ui_modelinfo_caching: "Кэширование",
 
   ui_ratelimit_limits: "Лимиты",
-  ui_ratelimit_capacity: "Ёмкость",
-  ui_ratelimit_refill_amount: "Объём пополнения",
-  ui_ratelimit_refill_every: "Пополнять каждые",
-  ui_ratelimit_min_unit: "мин",
+  ui_ratelimit_5h_tokens: "Лимит за 5 часов",
+  ui_ratelimit_weekly_tokens: "Недельный лимит",
   ui_ratelimit_owner_exempt: "Владелец без лимита",
   ui_ratelimit_wise_multiplier: "Коэффициент /askwise",
   ui_ratelimit_footer:
-    "Токены списываются из бакета каждого пользователя за /ask. Для /askwise списание умножается на коэффициент. Бакет лениво пополняется по интервалу.",
-  ui_ratelimit_my_bucket: "Мой бакет",
-  ui_ratelimit_tokens: "Токены",
-  ui_ratelimit_last_refill: "Последнее пополнение",
-  ui_ratelimit_reset: "Сбросить до полного",
-  ui_ratelimit_no_bucket:
-    "Бакета пока нет — он создастся при первом /ask.",
+    "У каждого пользователя два бюджета токенов — на скользящее окно 5 часов и на неделю — списываются за /ask (для /askwise — в коэффициент раз больше). Запрос разрешён, пока в обоих окнах есть бюджет. Начала окон сдвинуты у каждого пользователя по-своему.",
+  ui_ratelimit_my_usage: "Моё использование",
+  ui_ratelimit_5h_window: "Окно 5 часов",
+  ui_ratelimit_weekly_window: "Недельное окно",
+  ui_ratelimit_resets: "Сброс",
+  ui_ratelimit_reset: "Сбросить использование",
 
   ui_users_all: "Все пользователи",
   ui_users_empty:
@@ -974,7 +984,7 @@ const ru: Strings = {
   ui_user_display_name_footer:
     "Переопределить имя, которое видит ИИ для этого пользователя.",
   ui_user_set_language: "Задать язык",
-  ui_user_bucket: "Бакеты лимита",
+  ui_user_usage: "Использование лимита",
 
   ui_spending_title: "Расходы",
   ui_spending_day: "Сегодня",
@@ -1010,10 +1020,6 @@ const ru: Strings = {
   ui_chat_models_on_footer:
     "Сначала основная; запасные пробуются по очереди при ошибке.",
   ui_chat_models_off_footer: (list) => `Используется глобально: ${list}`,
-  ui_chat_rate_limit: "Лимит запросов",
-  ui_chat_rate_limit_on_footer:
-    "Эти лимиты применяются к этому чату вместо глобальных.",
-  ui_chat_rate_limit_off_footer: "Используются глобальные лимиты.",
   ui_chat_tz: "Часовой пояс",
   ui_chat_tz_on_footer:
     "Используется, если у пользователя нет своего пояса.",
