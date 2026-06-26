@@ -42,8 +42,6 @@ type Backing = {
   userTimezones: Map<string, string>;
   userGenders: Map<string, Gender>;
   userLangs: Map<string, Lang>;
-  userOpenrouterKeys: Map<string, string>;
-  userOpenrouterModels: Map<string, string[]>;
   userSpend: Map<string, Map<string, number>>;
   users: Map<string, User>;
   chats: Map<string, Chat>;
@@ -71,8 +69,6 @@ function createBacking(): Backing {
     userTimezones: new Map(),
     userGenders: new Map(),
     userLangs: new Map(),
-    userOpenrouterKeys: new Map(),
-    userOpenrouterModels: new Map(),
     userSpend: new Map(),
     users: new Map(),
     chats: new Map(),
@@ -277,28 +273,6 @@ export class MemoryStorage implements Storage {
   async setUserLang(userId: string, lang: Lang | null): Promise<void> {
     if (lang === null) this.b.userLangs.delete(userId);
     else this.b.userLangs.set(userId, lang);
-  }
-
-  async getUserOpenrouterKey(userId: string): Promise<string | null> {
-    return this.b.userOpenrouterKeys.get(userId) ?? null;
-  }
-
-  async setUserOpenrouterKey(userId: string, key: string | null): Promise<void> {
-    if (key === null) this.b.userOpenrouterKeys.delete(userId);
-    else this.b.userOpenrouterKeys.set(userId, key);
-  }
-
-  async getUserOpenrouterModels(userId: string): Promise<string[] | null> {
-    const v = this.b.userOpenrouterModels.get(userId);
-    return v ? [...v] : null;
-  }
-
-  async setUserOpenrouterModels(
-    userId: string,
-    models: string[] | null,
-  ): Promise<void> {
-    if (models === null) this.b.userOpenrouterModels.delete(userId);
-    else this.b.userOpenrouterModels.set(userId, [...models]);
   }
 
   async addUserSpend(

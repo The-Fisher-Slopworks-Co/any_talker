@@ -12,13 +12,7 @@ import type {
   RateLimitConfig,
   Gender,
 } from "../shared/types";
-import {
-  isValidTimezone,
-  isValidProviderSort,
-  isValidProviderSlug,
-  isValidServiceTier,
-  isValidGender,
-} from "../shared/types";
+import { isValidTimezone, isValidGender } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
 import {
   validateDisplayName,
@@ -33,10 +27,7 @@ import { normalizeCheckInput } from "../checks/validate";
 import { normalizeManagedBotInput } from "../managed-bots/validate";
 import { getOrInitSettings } from "../settings";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
-import {
-  isValidPermaslug,
-  type FetchOpenRouterStats,
-} from "./openrouter-proxy";
+import type { ModelCatalog } from "../ai/model-catalog";
 
 export type ApiRequest = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -66,7 +57,7 @@ export type ApiDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ownerId: string;
-  fetchOpenRouterStats?: FetchOpenRouterStats;
+  modelCatalog?: ModelCatalog;
   managedBots?: ManagedBotController;
 };
 
@@ -136,44 +127,6 @@ const BAD_LANG: ApiResponse = {
   body: { error: "invalid language" },
 };
 
-const BAD_OPENROUTER_KEY: ApiResponse = {
-  status: 400,
-  body: { error: "invalid openrouter key" },
-};
-
-const BAD_OPENROUTER_MODELS: ApiResponse = {
-  status: 400,
-  body: {
-    error: "models must be null or an array of non-empty strings",
-  },
-};
-
-const MAX_OPENROUTER_KEY_LENGTH = 256;
-const MAX_OPENROUTER_USER_MODELS = 10;
-
-function openrouterKeyResponse(
-  key: string | null,
-): { hasKey: boolean; last4: string | null } {
-  if (key === null) return { hasKey: false, last4: null };
-  return { hasKey: true, last4: key.slice(-4) };
-}
-
-function normalizeUserModelsPatch(
-  input: unknown,
-): { ok: true; value: string[] | null } | { ok: false } {
-  if (input === null || input === undefined) return { ok: true, value: null };
-  if (!Array.isArray(input)) return { ok: false };
-  if (input.length > MAX_OPENROUTER_USER_MODELS) return { ok: false };
-  const trimmed: string[] = [];
-  for (const m of input) {
-    if (typeof m !== "string") return { ok: false };
-    const t = m.trim();
-    if (t.length === 0) continue;
-    trimmed.push(t);
-  }
-  return { ok: true, value: trimmed.length > 0 ? trimmed : null };
-}
-
 function normalizeEnumInput<T extends string>(
   input: unknown,
   isValid: (v: string) => v is T,
@@ -184,21 +137,6 @@ function normalizeEnumInput<T extends string>(
   if (trimmed === "") return null;
   return isValid(trimmed) ? trimmed : "invalid";
 }
-
-const BAD_PROVIDER_SORT: ApiResponse = {
-  status: 400,
-  body: { error: "invalid providerSort" },
-};
-
-const BAD_PROVIDER: ApiResponse = {
-  status: 400,
-  body: { error: "invalid provider" },
-};
-
-const BAD_SERVICE_TIER: ApiResponse = {
-  status: 400,
-  body: { error: "invalid serviceTier" },
-};
 
 const BAD_MODELS: ApiResponse = {
   status: 400,
@@ -228,6 +166,20 @@ function isValidModelsList(value: unknown): value is string[] {
     value.length > 0 &&
     value.every((m) => typeof m === "string" && m.trim().length > 0)
   );
+}
+
+// Rejects models absent from the configured `/v1/models` catalogue. Returns null
+// (allow) when no catalogue is configured or when every id is known; the
+// catalogue itself returns "all allowed" when its list is empty/unavailable, so
+// saves never get trapped just because the endpoint exposes no model list.
+async function unknownModelsError(
+  catalog: ModelCatalog | undefined,
+  models: string[],
+): Promise<ApiResponse | null> {
+  if (!catalog) return null;
+  const unknown = await catalog.unknownModels(models);
+  if (unknown.length === 0) return null;
+  return { status: 400, body: { error: "unknown model", models: unknown } };
 }
 
 async function collectReminderChats(
@@ -302,9 +254,6 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     models?: unknown;
     botName?: unknown;
     timezone?: unknown;
-    providerSort?: unknown;
-    provider?: unknown;
-    serviceTier?: unknown;
     keywordFilter?: unknown;
   };
   const out: ChatSettings = {};
@@ -327,21 +276,6 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     if (trimmed.length > 0 && isValidTimezone(trimmed)) {
       out.timezone = trimmed;
     }
-  }
-  if (body.providerSort === null) {
-    out.providerSort = null;
-  } else if (isValidProviderSort(body.providerSort)) {
-    out.providerSort = body.providerSort;
-  }
-  if (body.provider === null) {
-    out.provider = null;
-  } else if (isValidProviderSlug(body.provider)) {
-    out.provider = body.provider;
-  }
-  if (body.serviceTier === null) {
-    out.serviceTier = null;
-  } else if (isValidServiceTier(body.serviceTier)) {
-    out.serviceTier = body.serviceTier;
   }
   if (
     body.keywordFilter &&
@@ -455,79 +389,27 @@ export async function handleApi(
     }
   }
 
-  if (req.path === "/api/me/openrouter-key") {
-    if (req.method === "GET") {
-      const key = await deps.storage.getUserOpenrouterKey(actor.userId);
-      return { status: 200, body: openrouterKeyResponse(key) };
-    }
-    if (req.method === "PUT") {
-      const body = (req.body ?? {}) as { key?: unknown };
-      let next: string | null;
-      if (body.key === null || body.key === undefined) {
-        next = null;
-      } else if (typeof body.key === "string") {
-        const trimmed = body.key.trim();
-        if (trimmed === "") {
-          next = null;
-        } else if (trimmed.length > MAX_OPENROUTER_KEY_LENGTH) {
-          return BAD_OPENROUTER_KEY;
-        } else {
-          next = trimmed;
-        }
-      } else {
-        return BAD_OPENROUTER_KEY;
-      }
-      await deps.storage.setUserOpenrouterKey(actor.userId, next);
-      return { status: 200, body: openrouterKeyResponse(next) };
-    }
-  }
-
-  if (req.path === "/api/me/openrouter-models") {
-    if (req.method === "GET") {
-      const models = await deps.storage.getUserOpenrouterModels(actor.userId);
-      return { status: 200, body: { models } };
-    }
-    if (req.method === "PUT") {
-      const body = (req.body ?? {}) as { models?: unknown };
-      const parsed = normalizeUserModelsPatch(body.models);
-      if (!parsed.ok) return BAD_OPENROUTER_MODELS;
-      await deps.storage.setUserOpenrouterModels(actor.userId, parsed.value);
-      return { status: 200, body: { models: parsed.value } };
-    }
-  }
-
   if (req.path === "/api/me/spending" && req.method === "GET") {
     const spending = await deps.storage.getUserSpend(actor.userId, Date.now());
     return { status: 200, body: { spending } };
   }
 
-  // OpenRouter endpoint metadata is read by the BYOK model picker (non-admin
-  // users) as well as the admin views, so this handler intentionally sits
-  // above the owner gate below. Anything added here must stay safe to expose
-  // to any authenticated Telegram Mini App user.
-  const orMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);
-  if (orMatch && req.method === "GET") {
-    const permaslug = decodeURIComponent(orMatch[1]!);
-    if (!isValidPermaslug(permaslug)) {
-      return { status: 400, body: { error: "invalid permaslug" } };
-    }
-    if (!deps.fetchOpenRouterStats) {
-      return { status: 503, body: { error: "stats fetcher not configured" } };
-    }
-    try {
-      const data = await deps.fetchOpenRouterStats(permaslug);
-      return { status: 200, body: data };
-    } catch (err) {
-      // Log the upstream error but return a generic code: the message can
-      // contain internal paths / stack fragments that we shouldn't expose
-      // through the Mini App to non-admin users.
-      console.error("openrouter stats fetch failed:", err);
-      return { status: 502, body: { error: "openrouter_stats_failed" } };
-    }
-  }
-
   // Everything below this line is admin-only.
   if (!actor.isOwner) return FORBIDDEN;
+
+  // The model catalogue feeds the admin model picker (global + per-chat).
+  if (req.path === "/api/models" && req.method === "GET") {
+    if (!deps.modelCatalog) {
+      return { status: 503, body: { error: "model catalogue not configured" } };
+    }
+    try {
+      const models = await deps.modelCatalog.list();
+      return { status: 200, body: { models } };
+    } catch (err) {
+      console.error("model catalogue fetch failed:", err);
+      return { status: 502, body: { error: "model_catalogue_failed" } };
+    }
+  }
 
   if (req.path === "/api/settings") {
     if (req.method === "GET") {
@@ -540,29 +422,12 @@ export async function handleApi(
       if (patch.timezone !== undefined && !isValidTimezone(patch.timezone)) {
         return BAD_TIMEZONE;
       }
-      if (
-        patch.providerSort !== undefined &&
-        patch.providerSort !== null &&
-        !isValidProviderSort(patch.providerSort)
-      ) {
-        return BAD_PROVIDER_SORT;
-      }
-      if (
-        patch.provider !== undefined &&
-        patch.provider !== null &&
-        !isValidProviderSlug(patch.provider)
-      ) {
-        return BAD_PROVIDER;
-      }
-      if (
-        patch.serviceTier !== undefined &&
-        patch.serviceTier !== null &&
-        !isValidServiceTier(patch.serviceTier)
-      ) {
-        return BAD_SERVICE_TIER;
-      }
       if (patch.models !== undefined && !isValidModelsList(patch.models)) {
         return BAD_MODELS;
+      }
+      if (patch.models !== undefined) {
+        const bad = await unknownModelsError(deps.modelCatalog, patch.models);
+        if (bad) return bad;
       }
       if (patch.rateLimit !== undefined) {
         const rl = patch.rateLimit as Partial<RateLimitConfig>;
@@ -868,6 +733,10 @@ export async function handleApi(
       const chat = await deps.storage.getChat(id);
       if (!chat) return { status: 404, body: { error: "chat not found" } };
       const next = normalizeChatSettings(req.body);
+      if (next.models) {
+        const bad = await unknownModelsError(deps.modelCatalog, next.models);
+        if (bad) return bad;
+      }
       await deps.storage.saveChatSettings(id, next);
       return { status: 200, body: { chat, settings: next } };
     }

@@ -56,14 +56,10 @@ export async function guestAskHandler(
   const storage = input.storage.forBot(input.botId ?? null);
 
   const isOwner = input.userId === input.ownerId;
-  const [isWhitelisted, byokKey, byokModels] = await Promise.all([
-    isOwner
-      ? Promise.resolve(true)
-      : storage.isWhitelisted("users", input.userId),
-    storage.getUserOpenrouterKey(input.userId),
-    storage.getUserOpenrouterModels(input.userId),
-  ]);
-  if (!isWhitelisted && byokKey === null) return { kind: "denied" };
+  const isWhitelisted = isOwner
+    ? true
+    : await storage.isWhitelisted("users", input.userId);
+  if (!isWhitelisted) return { kind: "denied" };
 
   if (input.userText.trim() === "") return { kind: "denied" };
 
@@ -73,8 +69,7 @@ export async function guestAskHandler(
   ]);
   const timezone = userTimezone ?? settings.timezone;
 
-  const skipRateLimit =
-    byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
+  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
       input.userId,
@@ -111,10 +106,7 @@ export async function guestAskHandler(
   let result;
   try {
     result = await input.ai.ask({
-      models:
-        byokKey !== null && byokModels !== null && byokModels.length > 0
-          ? byokModels
-          : settings.models,
+      models: settings.models,
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,
@@ -122,10 +114,6 @@ export async function guestAskHandler(
       }),
       messages,
       tools: getAllTools(),
-      providerSort: settings.providerSort,
-      provider: settings.provider,
-      serviceTier: settings.serviceTier,
-      apiKey: byokKey,
       toolCallContext: {
         source: "guest",
         chatId: input.chatId,
@@ -152,9 +140,9 @@ export async function guestAskHandler(
     await input.rateLimiter.deduct(input.userId, result.totalTokens, input.now);
   }
 
-  // Record spend regardless of rate-limit exemption — owner and BYOK usage is
-  // still money this user spent through the bot. Best-effort: a storage hiccup
-  // on this display-only accounting must not fail an answer already produced.
+  // Record spend regardless of rate-limit exemption — an exempt owner's usage is
+  // still money spent through the bot. Best-effort: a storage hiccup on this
+  // display-only accounting must not fail an answer already produced.
   await storage
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));

@@ -21,8 +21,8 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.51",
     "@mozilla/readability": "^0.6.0",
-    "@openrouter/ai-sdk-provider": "latest",
     "ai": "latest",
     "bun-plugin-tailwind": "^0.1.2",
     "grammy": "^1.43.0",

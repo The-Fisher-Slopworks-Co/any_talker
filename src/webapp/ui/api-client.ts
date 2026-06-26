@@ -57,13 +57,6 @@ export type MeResponse = {
   gender: Gender | null;
   language: Lang | null;
 };
-export type OpenrouterKeyResponse = {
-  hasKey: boolean;
-  last4: string | null;
-};
-export type OpenrouterModelsResponse = {
-  models: string[] | null;
-};
 export type BuildInfoResponse = {
   commit: string | null;
   shortCommit: string | null;
@@ -150,16 +143,6 @@ export const api = {
     gender?: Gender | null;
     language?: Lang | null;
   }) => req<MeResponse>("PUT", "/api/me", patch),
-  getMyOpenrouterKey: () =>
-    req<OpenrouterKeyResponse>("GET", "/api/me/openrouter-key"),
-  putMyOpenrouterKey: (key: string | null) =>
-    req<OpenrouterKeyResponse>("PUT", "/api/me/openrouter-key", { key }),
-  getMyOpenrouterModels: () =>
-    req<OpenrouterModelsResponse>("GET", "/api/me/openrouter-models"),
-  putMyOpenrouterModels: (models: string[] | null) =>
-    req<OpenrouterModelsResponse>("PUT", "/api/me/openrouter-models", {
-      models,
-    }),
   listAdminUsers: () =>
     req<{
       users: User[];

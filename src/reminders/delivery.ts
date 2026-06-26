@@ -132,23 +132,14 @@ async function composeReminderMessage(
   reminder: Reminder,
   nowMs: number,
 ): Promise<string> {
-  const [
-    { settings, botName },
-    userTimezone,
-    displayName,
-    user,
-    gender,
-    byokKey,
-    byokModels,
-  ] = await Promise.all([
-    deps.resolver(reminder.chatId),
-    deps.storage.getUserTimezone(reminder.userId),
-    readValidDisplayName(deps.storage, reminder.userId),
-    deps.storage.getUser(reminder.userId),
-    deps.storage.getUserGender(reminder.userId),
-    deps.storage.getUserOpenrouterKey(reminder.userId),
-    deps.storage.getUserOpenrouterModels(reminder.userId),
-  ]);
+  const [{ settings, botName }, userTimezone, displayName, user, gender] =
+    await Promise.all([
+      deps.resolver(reminder.chatId),
+      deps.storage.getUserTimezone(reminder.userId),
+      readValidDisplayName(deps.storage, reminder.userId),
+      deps.storage.getUser(reminder.userId),
+      deps.storage.getUserGender(reminder.userId),
+    ]);
 
   const timezone = userTimezone ?? settings.timezone;
   const lang = reminder.lang;
@@ -175,17 +166,10 @@ async function composeReminderMessage(
   const toolSource: "ask" | "guest" =
     reminder.target.kind === "ask_reply" ? "ask" : "guest";
   const result = await deps.ai.ask({
-    models:
-      byokKey !== null && byokModels !== null && byokModels.length > 0
-        ? byokModels
-        : settings.models,
+    models: settings.models,
     system: buildInstruction(settings.systemPrompt, { timezone, lang }),
     messages,
     tools: getAllTools(),
-    providerSort: settings.providerSort,
-    provider: settings.provider,
-    serviceTier: settings.serviceTier,
-    apiKey: byokKey,
     toolCallContext: {
       source: toolSource,
       chatId: reminder.chatId,

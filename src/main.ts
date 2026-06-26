@@ -2,10 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { loadConfig } from "./config";
-import { getEffectiveProxyForUrl } from "./proxy";
+import { getEffectiveProxyForUrl, proxiedFetch } from "./proxy";
 import { KeyDBStorage } from "./storage/keydb";
 import { DualWindowLimiter } from "./ratelimit/dual-window";
-import { OpenRouterAIClient } from "./ai/openrouter";
+import { OpenAICompatClient } from "./ai/compat-client";
+import { createModelCatalog } from "./ai/model-catalog";
 import { registerTool, type Tool } from "./ai/tools/registry";
 import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
@@ -38,10 +39,23 @@ async function main() {
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
   const rateLimiter = new DualWindowLimiter(storage);
-  const ai = new OpenRouterAIClient(config.openrouterApiKey, {
-    url: config.openrouterAppUrl,
-    title: config.openrouterAppTitle,
+  // One catalogue object serves two roles: pricing source for cost computation
+  // in the AI client, and the model list behind the Mini App's `/api/models`.
+  const modelCatalog = createModelCatalog({
+    baseURL: config.openaiBaseUrl,
+    apiKey: config.openaiApiKey,
+    fetch: proxiedFetch,
   });
+  // Warm the cache so the first ask can price its tokens; best-effort, the
+  // catalogue self-heals on the next `/api/models` hit if this fails.
+  await modelCatalog
+    .refresh()
+    .catch((err) => console.warn("model catalogue prefetch failed:", err));
+  const ai = new OpenAICompatClient(
+    config.openaiBaseUrl,
+    config.openaiApiKey,
+    modelCatalog,
+  );
 
   const logged = <TIn, TOut>(t: Tool<TIn, TOut>) =>
     withLogging(t, config.logFormat);
@@ -139,6 +153,7 @@ async function main() {
     storage,
     rateLimiter,
     botManager,
+    modelCatalog,
   });
   console.log(`HTTP server listening on :${server.port}`);
 

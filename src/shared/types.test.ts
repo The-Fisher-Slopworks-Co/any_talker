@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { messageMatchesKeyword, isValidProviderSlug } from "./types";
+import { messageMatchesKeyword } from "./types";
 
 describe("messageMatchesKeyword", () => {
   test("returns false for empty text or empty keywords", () => {
@@ -30,32 +30,5 @@ describe("messageMatchesKeyword", () => {
   test("ignores empty keyword entries", () => {
     expect(messageMatchesKeyword("anything", [""])).toBe(false);
     expect(messageMatchesKeyword("anything", ["", "thing"])).toBe(true);
-  });
-});
-
-describe("isValidProviderSlug", () => {
-  test("accepts plain and variant slugs", () => {
-    expect(isValidProviderSlug("deepinfra")).toBe(true);
-    expect(isValidProviderSlug("deepinfra/fp4")).toBe(true);
-    expect(isValidProviderSlug("google-vertex/us-east5")).toBe(true);
-    expect(isValidProviderSlug("openai")).toBe(true);
-  });
-
-  test("rejects non-strings and empty strings", () => {
-    expect(isValidProviderSlug(null)).toBe(false);
-    expect(isValidProviderSlug(undefined)).toBe(false);
-    expect(isValidProviderSlug(123)).toBe(false);
-    expect(isValidProviderSlug("")).toBe(false);
-  });
-
-  test("rejects slugs with whitespace or stray punctuation", () => {
-    expect(isValidProviderSlug("not a slug")).toBe(false);
-    expect(isValidProviderSlug("deepinfra!")).toBe(false);
-    expect(isValidProviderSlug("/leading")).toBe(false);
-    expect(isValidProviderSlug("trailing/")).toBe(false);
-  });
-
-  test("rejects an over-long slug", () => {
-    expect(isValidProviderSlug("a".repeat(101))).toBe(false);
   });
 });

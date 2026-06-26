@@ -21,13 +21,11 @@ export function MainView({
   onMe,
   onOpenAdmin,
   onOpenMyReminders,
-  onOpenByok,
 }: {
   me: MeResponse;
   onMe: (m: MeResponse) => void;
   onOpenAdmin: () => void;
   onOpenMyReminders: () => void;
-  onOpenByok: () => void;
 }) {
   const { t: s, lang: resolvedLang } = useI18n();
   const [name, setName] = useState(me.displayName ?? "");
@@ -162,12 +160,6 @@ export function MainView({
       />
 
       {spending && <SpendingCard spending={spending} />}
-
-      <SectionHeader>{s.ui_main_byok}</SectionHeader>
-      <Card>
-        <RowButton onClick={onOpenByok}>{s.ui_main_byok_open}</RowButton>
-      </Card>
-      <SectionFooter>{s.ui_main_byok_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_main_reminders}</SectionHeader>
       <Card>

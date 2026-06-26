@@ -23,7 +23,7 @@ describe("getOrInitSettings", () => {
     const custom = {
       ...DEFAULT_SETTINGS,
       systemPrompt: "custom",
-      model: "openai/gpt-4o-mini",
+      models: ["openai/gpt-4o-mini"],
     };
     await storage.saveSettings(custom);
     expect(await getOrInitSettings(storage)).toEqual(custom);
@@ -55,9 +55,6 @@ describe("applyChatOverrides", () => {
       // Rate limit is per-user and global — chat settings never override it.
       rateLimit: DEFAULT_SETTINGS.rateLimit,
       timezone: DEFAULT_SETTINGS.timezone,
-      providerSort: DEFAULT_SETTINGS.providerSort,
-      provider: DEFAULT_SETTINGS.provider,
-      serviceTier: DEFAULT_SETTINGS.serviceTier,
       expandableBlockquoteThreshold:
         DEFAULT_SETTINGS.expandableBlockquoteThreshold,
     });
@@ -97,21 +94,18 @@ describe("applyChatOverrides", () => {
     );
   });
 
-  test("normalize keeps a valid stored provider slug", async () => {
-    const storage = new MemoryStorage();
-    await storage.saveSettings({ ...DEFAULT_SETTINGS, provider: "deepinfra/fp4" });
-    const s = await getOrInitSettings(storage);
-    expect(s.provider).toBe("deepinfra/fp4");
-  });
-
-  test("normalize resets an invalid stored provider slug to null", async () => {
+  test("normalize drops legacy OpenRouter-era fields on read", async () => {
     const storage = new MemoryStorage();
     await storage.saveSettings({
       ...DEFAULT_SETTINGS,
-      provider: "not a slug!",
+      providerSort: "throughput",
+      provider: "deepinfra/fp4",
+      serviceTier: "flex",
     } as never);
-    const s = await getOrInitSettings(storage);
-    expect(s.provider).toBeNull();
+    const s = (await getOrInitSettings(storage)) as Record<string, unknown>;
+    expect(s.providerSort).toBeUndefined();
+    expect(s.provider).toBeUndefined();
+    expect(s.serviceTier).toBeUndefined();
   });
 
   test("normalize backfills the dual-window config from a legacy token-bucket shape", async () => {
@@ -138,55 +132,16 @@ describe("applyChatOverrides", () => {
     );
   });
 
-  test("provider sort: chat null overrides global value", () => {
-    const global = { ...DEFAULT_SETTINGS, providerSort: "throughput" as const };
-    const r = applyChatOverrides(global, { providerSort: null });
-    expect(r.providerSort).toBeNull();
+  test("chat timezone null overrides the global value", () => {
+    const global = { ...DEFAULT_SETTINGS, timezone: "Europe/Moscow" };
+    const r = applyChatOverrides(global, { timezone: "UTC" });
+    expect(r.timezone).toBe("UTC");
   });
 
-  test("provider sort: chat undefined inherits global value", () => {
-    const global = { ...DEFAULT_SETTINGS, providerSort: "price" as const };
+  test("chat undefined inherits the global timezone", () => {
+    const global = { ...DEFAULT_SETTINGS, timezone: "Europe/Moscow" };
     const r = applyChatOverrides(global, { systemPrompt: "x" });
-    expect(r.providerSort).toBe("price");
-  });
-
-  test("provider sort: chat string overrides global", () => {
-    const r = applyChatOverrides(DEFAULT_SETTINGS, { providerSort: "latency" });
-    expect(r.providerSort).toBe("latency");
-  });
-
-  test("provider: chat slug overrides global", () => {
-    const r = applyChatOverrides(DEFAULT_SETTINGS, { provider: "deepinfra/fp4" });
-    expect(r.provider).toBe("deepinfra/fp4");
-  });
-
-  test("provider: chat null overrides global value", () => {
-    const global = { ...DEFAULT_SETTINGS, provider: "deepinfra" };
-    const r = applyChatOverrides(global, { provider: null });
-    expect(r.provider).toBeNull();
-  });
-
-  test("provider: chat undefined inherits global value", () => {
-    const global = { ...DEFAULT_SETTINGS, provider: "novita" };
-    const r = applyChatOverrides(global, { systemPrompt: "x" });
-    expect(r.provider).toBe("novita");
-  });
-
-  test("service tier: chat null overrides global value", () => {
-    const global = { ...DEFAULT_SETTINGS, serviceTier: "flex" as const };
-    const r = applyChatOverrides(global, { serviceTier: null });
-    expect(r.serviceTier).toBeNull();
-  });
-
-  test("service tier: chat undefined inherits global value", () => {
-    const global = { ...DEFAULT_SETTINGS, serviceTier: "priority" as const };
-    const r = applyChatOverrides(global, { systemPrompt: "x" });
-    expect(r.serviceTier).toBe("priority");
-  });
-
-  test("service tier: chat string overrides global", () => {
-    const r = applyChatOverrides(DEFAULT_SETTINGS, { serviceTier: "flex" });
-    expect(r.serviceTier).toBe("flex");
+    expect(r.timezone).toBe("Europe/Moscow");
   });
 });
 

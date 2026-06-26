@@ -3,8 +3,8 @@
 
 // Bun's native fetch honours HTTP_PROXY, HTTPS_PROXY, and NO_PROXY at process
 // startup (https://bun.com/docs/guides/http/proxy). Everything that calls the
-// global fetch — our http.ts utilities, the AI SDK / OpenRouter provider, the
-// webapp UI — therefore picks up these env vars for free.
+// global fetch — our http.ts utilities, the AI SDK provider, the webapp UI —
+// therefore picks up these env vars for free.
 //
 // grammY is the one exception: its node-platform shim resolves `fetch` to
 // `node-fetch`, which has no idea about HTTP_PROXY. Passing this wrapper as the

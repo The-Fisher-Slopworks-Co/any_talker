@@ -126,34 +126,6 @@ describe("guestAskHandler", () => {
       expect(out.msUntilReset).toBeGreaterThan(0);
   });
 
-  test("user with BYOK key skips rate limit and passes key to AI", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.setUserOpenrouterKey("42", "sk-or-byok");
-    const rlStorage = new MemoryStorage();
-    await exhaustUsage(rlStorage, "42", 1000);
-    const rl = new DualWindowLimiter(rlStorage);
-    const ai = new FakeAI({ text: "ok", totalTokens: 500 });
-    const out = await guestAskHandler(
-      baseInput({ storage, ai, rateLimiter: rl }),
-    );
-    expect(out.kind).toBe("answered");
-    const call = ai.calls[0] as { apiKey?: string | null };
-    expect(call.apiKey).toBe("sk-or-byok");
-    // BYOK skips deduct, so usage stays as it was (still exhausted, not topped up).
-    const usageAfter = await rlStorage.getUserUsage("42");
-    expect(usageAfter?.fiveHour.used).toBe(
-      DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
-    );
-  });
-
-  test("user with BYOK key bypasses the whitelist", async () => {
-    const storage = new MemoryStorage();
-    await storage.setUserOpenrouterKey("42", "sk-or-byok");
-    const out = await guestAskHandler(baseInput({ storage }));
-    expect(out.kind).toBe("answered");
-  });
-
   test("answered: records reported costUsd to the user's spend", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
@@ -171,21 +143,9 @@ describe("guestAskHandler", () => {
     expect((await storage.getUserSpend("42", 1000)).month).toBe(0);
   });
 
-  test("user with BYOK key + custom models passes the custom models", async () => {
-    const storage = new MemoryStorage();
-    await storage.setUserOpenrouterKey("42", "sk-or-byok");
-    await storage.setUserOpenrouterModels("42", ["openai/gpt-4o-mini"]);
-    const ai = new FakeAI();
-    const out = await guestAskHandler(baseInput({ storage, ai }));
-    expect(out.kind).toBe("answered");
-    const call = ai.calls[0] as { models: string[] };
-    expect(call.models).toEqual(["openai/gpt-4o-mini"]);
-  });
-
-  test("custom models without a BYOK key fall back to the bot's models", async () => {
+  test("passes the configured models to the AI", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    await storage.setUserOpenrouterModels("42", ["openai/gpt-4o-mini"]);
     const ai = new FakeAI();
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");

@@ -21,6 +21,7 @@ import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, fetchTelegramPhoto, downloadTelegramFile } from "./photo";
+import { transcodeOggToMp3 } from "./transcode";
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
@@ -593,13 +594,19 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const replyVoice = args.replyToMessage?.voice;
     if (replyTarget && replyVoice) {
       try {
-        replyTarget.audios = [
-          await downloadTelegramFile(deps.botToken, replyVoice.file_id),
-        ];
-        debugLog("reply_voice_resolved", {
-          chat_id: chatId,
-          reply_message_id: args.replyToMessage?.message_id,
-        });
+        const raw = await downloadTelegramFile(deps.botToken, replyVoice.file_id);
+        // Transcode ogg → mp3; on failure drop the reply audio (it's only
+        // supplementary context, and raw ogg would crash the request).
+        const mp3 = await transcodeOggToMp3(raw);
+        if (mp3) {
+          replyTarget.audios = [mp3];
+          debugLog("reply_voice_resolved", {
+            chat_id: chatId,
+            reply_message_id: args.replyToMessage?.message_id,
+          });
+        } else {
+          console.error("reply voice transcode failed, dropping audio");
+        }
       } catch (err) {
         console.error("reply voice download failed:", err);
       }
@@ -932,12 +939,22 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       return;
     }
 
+    // The OpenAI-compatible API accepts only wav/mp3 audio, so transcode the
+    // ogg/opus voice note before sending. A transcode failure is surfaced like
+    // a fetch failure rather than sending unusable ogg.
+    const mp3 = await transcodeOggToMp3(audio);
+    if (!mp3) {
+      console.error("voice transcode failed");
+      await ctx.reply(ctx.t.bot_voice_cant_fetch);
+      return;
+    }
+
     await dispatchAsk(ctx, {
       userText,
       askMessageId: msg.message_id,
       images: [],
       imageFileIds: [],
-      audios: [audio],
+      audios: [mp3],
       replyToMessage: msg.reply_to_message,
       quote: msg.quote?.text ?? null,
       forwardOrigin: Boolean(msg.forward_origin),

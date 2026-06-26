@@ -64,7 +64,6 @@ type Strings = {
   ui_route_user_settings: string;
   ui_route_chat_settings: string;
   ui_route_my_reminders: string;
-  ui_route_byok: string;
 
   ui_admin_prompt: string;
   ui_admin_prompt_desc: string;
@@ -108,24 +107,6 @@ type Strings = {
   ui_main_bot_config: string;
   ui_main_admin_panel: string;
 
-  ui_main_byok: string;
-  ui_main_byok_footer: string;
-  ui_main_byok_key_label: string;
-  ui_main_byok_placeholder: string;
-  ui_main_byok_save: string;
-  ui_main_byok_clear: string;
-  ui_main_byok_replace: string;
-  ui_main_byok_cancel: string;
-  ui_main_byok_open: string;
-
-  ui_byok_key_section: string;
-  ui_byok_key_footer: string;
-  ui_byok_models_section: string;
-  ui_byok_models_footer_inactive: string;
-  ui_byok_models_override: string;
-  ui_byok_models_on_footer: string;
-  ui_byok_models_off_footer: string;
-
   ui_whitelist_remove: string;
   ui_whitelist_add: string;
   ui_whitelist_allowed_users: string;
@@ -136,10 +117,6 @@ type Strings = {
 
   ui_prompt_models: string;
   ui_prompt_models_footer: string;
-  ui_prompt_provider_routing: string;
-  ui_prompt_provider_routing_footer: string;
-  ui_prompt_service_tier: string;
-  ui_prompt_service_tier_footer: string;
   ui_prompt_system_prompt: string;
   ui_prompt_system_prompt_footer: string;
   ui_prompt_placeholder: string;
@@ -148,37 +125,15 @@ type Strings = {
   ui_prompt_expandable_threshold: string;
   ui_prompt_expandable_threshold_footer: string;
 
-  ui_sort_default: string;
-  ui_sort_price: string;
-  ui_sort_throughput: string;
-  ui_sort_latency: string;
-
-  ui_provider_label: string;
-  ui_provider_auto: string;
-  ui_provider_loading: string;
-
-  ui_tier_default: string;
-  ui_tier_flex: string;
-  ui_tier_priority: string;
-
-  ui_models_fallback_n: (n: number) => string;
   ui_models_model_id: string;
-  ui_models_remove_fallback: string;
-  ui_models_add_fallback: string;
+  ui_models_not_in_catalog: string;
 
   ui_modelinfo_loading: string;
-  ui_modelinfo_unknown: string;
-  ui_modelinfo_resolving_provider: string;
-  ui_modelinfo_no_provider_data: (sort: string) => string;
-  ui_modelinfo_provider_prefix: string;
-  ui_modelinfo_tokps: string;
-  ui_modelinfo_ms: string;
   ui_modelinfo_input: string;
   ui_modelinfo_output: string;
   ui_modelinfo_image: string;
   ui_modelinfo_modalities: string;
   ui_modelinfo_tools: string;
-  ui_modelinfo_caching: string;
 
   ui_ratelimit_limits: string;
   ui_ratelimit_5h_tokens: string;
@@ -239,15 +194,6 @@ type Strings = {
   ui_chat_tz: string;
   ui_chat_tz_on_footer: string;
   ui_chat_tz_off_footer: (tz: string) => string;
-  ui_chat_provider_routing: string;
-  ui_chat_provider_routing_on_footer: string;
-  ui_chat_provider_routing_off_footer: (sort: string) => string;
-  ui_chat_provider: string;
-  ui_chat_provider_on_footer: string;
-  ui_chat_provider_off_footer: (provider: string) => string;
-  ui_chat_service_tier: string;
-  ui_chat_service_tier_on_footer: string;
-  ui_chat_service_tier_off_footer: (tier: string) => string;
   ui_chat_prompt_placeholder: string;
   ui_chat_keyword_filter: string;
   ui_chat_keyword_filter_enabled: string;
@@ -423,10 +369,9 @@ const en: Strings = {
   ui_route_user_settings: "User Settings",
   ui_route_chat_settings: "Chat Settings",
   ui_route_my_reminders: "My Reminders",
-  ui_route_byok: "OpenRouter",
 
   ui_admin_prompt: "Prompt",
-  ui_admin_prompt_desc: "Models, character, timezone, provider routing",
+  ui_admin_prompt_desc: "Models, character, timezone, collapse threshold",
   ui_admin_limits: "Limits",
   ui_admin_limits_desc: "5-hour and weekly token budgets",
   ui_admin_whitelist: "Whitelist",
@@ -471,29 +416,6 @@ const en: Strings = {
   ui_main_bot_config: "Bot Configuration",
   ui_main_admin_panel: "Admin panel",
 
-  ui_main_byok: "OpenRouter API Key",
-  ui_main_byok_footer:
-    "Use your own OpenRouter key for AI calls. When set, the bot's rate limit doesn't apply to you. The key is stored on the server and used only for your /ask requests.",
-  ui_main_byok_key_label: "Key",
-  ui_main_byok_placeholder: "sk-or-…",
-  ui_main_byok_save: "Save",
-  ui_main_byok_clear: "Remove",
-  ui_main_byok_replace: "Replace",
-  ui_main_byok_cancel: "Cancel",
-  ui_main_byok_open: "OpenRouter (BYOK)",
-
-  ui_byok_key_section: "API Key",
-  ui_byok_key_footer:
-    "Use your own OpenRouter key for AI calls. When set, the bot's rate limit doesn't apply to you. The key is stored on the server and used only for your /ask requests.",
-  ui_byok_models_section: "Models",
-  ui_byok_models_footer_inactive:
-    "Add an API key above to choose your own models.",
-  ui_byok_models_override: "Use my models",
-  ui_byok_models_on_footer:
-    "Primary OpenRouter model first; fallbacks are tried in order if it fails. Applied only to your own requests.",
-  ui_byok_models_off_footer:
-    "Using the bot's default models.",
-
   ui_whitelist_remove: "Remove from whitelist",
   ui_whitelist_add: "Add to whitelist",
   ui_whitelist_allowed_users: "Allowed Users",
@@ -506,13 +428,7 @@ const en: Strings = {
 
   ui_prompt_models: "Models",
   ui_prompt_models_footer:
-    "Primary OpenRouter model first; fallbacks are tried in order if it fails.",
-  ui_prompt_provider_routing: "Provider Routing",
-  ui_prompt_provider_routing_footer:
-    "How OpenRouter picks a provider for the model. Auto lets OpenRouter decide; the others sort by price, throughput, or latency. Pinning a specific provider overrides the sort and disables fallback.",
-  ui_prompt_service_tier: "Service Tier",
-  ui_prompt_service_tier_footer:
-    "Processing tier for OpenRouter requests. Default uses standard processing; Flex is cheaper but slower with lower availability; Priority is faster at a higher cost.",
+    "The model the bot uses. Only the first model is sent; the endpoint has no server-side fallback.",
   ui_prompt_system_prompt: "System Prompt",
   ui_prompt_system_prompt_footer:
     "Character description embedded into the system instruction.",
@@ -524,38 +440,15 @@ const en: Strings = {
   ui_prompt_expandable_threshold_footer:
     "Replies longer than this many characters are hidden under an expandable quote. Set to 0 to collapse everything.",
 
-  ui_sort_default: "Auto",
-  ui_sort_price: "Price",
-  ui_sort_throughput: "Throughput",
-  ui_sort_latency: "Latency",
-
-  ui_provider_label: "Provider",
-  ui_provider_auto: "Auto (use sort)",
-  ui_provider_loading: "Loading providers…",
-
-  ui_tier_default: "Default",
-  ui_tier_flex: "Flex",
-  ui_tier_priority: "Priority",
-
-  ui_models_fallback_n: (n) => `#${n}`,
   ui_models_model_id: "Model ID",
-  ui_models_remove_fallback: "Remove fallback",
-  ui_models_add_fallback: "Add fallback",
+  ui_models_not_in_catalog: "This model isn’t in /v1/models.",
 
   ui_modelinfo_loading: "Loading model info…",
-  ui_modelinfo_unknown: "Unknown model ID.",
-  ui_modelinfo_resolving_provider: "Resolving provider…",
-  ui_modelinfo_no_provider_data: (sort) =>
-    `No provider data for sort=${sort}; showing catalog values.`,
-  ui_modelinfo_provider_prefix: "Provider: ",
-  ui_modelinfo_tokps: "tok/s",
-  ui_modelinfo_ms: "ms",
   ui_modelinfo_input: "Input",
   ui_modelinfo_output: "Output",
   ui_modelinfo_image: "Image",
   ui_modelinfo_modalities: "Modalities",
   ui_modelinfo_tools: "Tools",
-  ui_modelinfo_caching: "Caching",
 
   ui_ratelimit_limits: "Limits",
   ui_ratelimit_5h_tokens: "5-hour limit",
@@ -593,7 +486,7 @@ const en: Strings = {
   ui_spending_month: "Last 30 days",
   ui_spending_month_short: (amount) => `30d: ${amount}`,
   ui_spending_footer:
-    "Money spent on AI requests, in USD, as reported by OpenRouter. Periods are trailing windows by UTC date.",
+    "Money spent on AI requests, in USD, computed from model pricing. Periods are trailing windows by UTC date.",
 
   ui_chats_all: "All Chats",
   ui_chats_empty: "No chats yet — they appear after the first message.",
@@ -618,26 +511,11 @@ const en: Strings = {
   ui_chat_system_prompt_off_footer: (chars) =>
     `Using global character (${chars} chars).`,
   ui_chat_models: "Models",
-  ui_chat_models_on_footer:
-    "Primary first; fallbacks used in order if it fails.",
+  ui_chat_models_on_footer: "Model used for this chat.",
   ui_chat_models_off_footer: (list) => `Using global: ${list}`,
   ui_chat_tz: "Timezone",
   ui_chat_tz_on_footer: "Used unless a user has set their own timezone.",
   ui_chat_tz_off_footer: (tz) => `Using global timezone (${tz}).`,
-  ui_chat_provider_routing: "Provider Routing",
-  ui_chat_provider_routing_on_footer:
-    "How OpenRouter picks a provider for the model in this chat.",
-  ui_chat_provider_routing_off_footer: (sort) =>
-    `Using global routing (${sort}).`,
-  ui_chat_provider: "Specific Provider",
-  ui_chat_provider_on_footer:
-    "Pin requests in this chat to one provider (no fallback), overriding the sort.",
-  ui_chat_provider_off_footer: (provider) =>
-    `Using global provider (${provider}).`,
-  ui_chat_service_tier: "Service Tier",
-  ui_chat_service_tier_on_footer:
-    "Processing tier for OpenRouter requests in this chat.",
-  ui_chat_service_tier_off_footer: (tier) => `Using global tier (${tier}).`,
   ui_chat_prompt_placeholder:
     "Describe how the bot should behave in this chat",
   ui_chat_keyword_filter: "Keyword Filter",
@@ -821,10 +699,9 @@ const ru: Strings = {
   ui_route_user_settings: "Настройки пользователя",
   ui_route_chat_settings: "Настройки чата",
   ui_route_my_reminders: "Мои напоминания",
-  ui_route_byok: "OpenRouter",
 
   ui_admin_prompt: "Промпт",
-  ui_admin_prompt_desc: "Модели, персонаж, часовой пояс, провайдеры",
+  ui_admin_prompt_desc: "Модели, персонаж, часовой пояс, порог сворачивания",
   ui_admin_limits: "Лимиты",
   ui_admin_limits_desc: "Бюджеты токенов за 5 часов и за неделю",
   ui_admin_whitelist: "Белый список",
@@ -869,29 +746,6 @@ const ru: Strings = {
   ui_main_bot_config: "Настройки бота",
   ui_main_admin_panel: "Админ-панель",
 
-  ui_main_byok: "Ключ OpenRouter API",
-  ui_main_byok_footer:
-    "Используйте свой ключ OpenRouter для вызовов ИИ. Когда ключ задан, лимит запросов бота на вас не действует. Ключ хранится на сервере и применяется только к вашим запросам /ask.",
-  ui_main_byok_key_label: "Ключ",
-  ui_main_byok_placeholder: "sk-or-…",
-  ui_main_byok_save: "Сохранить",
-  ui_main_byok_clear: "Удалить",
-  ui_main_byok_replace: "Заменить",
-  ui_main_byok_cancel: "Отмена",
-  ui_main_byok_open: "OpenRouter (BYOK)",
-
-  ui_byok_key_section: "API-ключ",
-  ui_byok_key_footer:
-    "Используйте свой ключ OpenRouter для вызовов ИИ. Когда ключ задан, лимит запросов бота на вас не действует. Ключ хранится на сервере и применяется только к вашим запросам /ask.",
-  ui_byok_models_section: "Модели",
-  ui_byok_models_footer_inactive:
-    "Чтобы выбрать свои модели, сначала добавьте API-ключ выше.",
-  ui_byok_models_override: "Использовать свои модели",
-  ui_byok_models_on_footer:
-    "Сначала основная модель OpenRouter; запасные пробуются по очереди при ошибке. Применяется только к вашим запросам.",
-  ui_byok_models_off_footer:
-    "Используются модели бота по умолчанию.",
-
   ui_whitelist_remove: "Убрать из белого списка",
   ui_whitelist_add: "Добавить в белый список",
   ui_whitelist_allowed_users: "Разрешённые пользователи",
@@ -904,13 +758,7 @@ const ru: Strings = {
 
   ui_prompt_models: "Модели",
   ui_prompt_models_footer:
-    "Сначала основная модель OpenRouter; запасные пробуются по очереди при ошибке.",
-  ui_prompt_provider_routing: "Маршрутизация провайдеров",
-  ui_prompt_provider_routing_footer:
-    "Как OpenRouter выбирает провайдера для модели. «Авто» — выбор OpenRouter; остальные сортируют по цене, скорости или задержке. Выбор конкретного провайдера отменяет сортировку и отключает запасные варианты.",
-  ui_prompt_service_tier: "Тариф обслуживания",
-  ui_prompt_service_tier_footer:
-    "Тариф обработки запросов OpenRouter. «По умолчанию» — стандартная обработка; Flex дешевле, но медленнее и менее доступен; Priority быстрее, но дороже.",
+    "Модель, которую использует бот. Отправляется только первая — у эндпоинта нет серверных запасных вариантов.",
   ui_prompt_system_prompt: "Системный промпт",
   ui_prompt_system_prompt_footer:
     "Описание персонажа, встраиваемое в системную инструкцию.",
@@ -922,38 +770,15 @@ const ru: Strings = {
   ui_prompt_expandable_threshold_footer:
     "Ответы длиннее указанного числа символов прячутся под раскрывающуюся цитату. 0 — сворачивать всегда.",
 
-  ui_sort_default: "Авто",
-  ui_sort_price: "Цена",
-  ui_sort_throughput: "Скорость",
-  ui_sort_latency: "Задержка",
-
-  ui_provider_label: "Провайдер",
-  ui_provider_auto: "Авто (по сортировке)",
-  ui_provider_loading: "Загрузка провайдеров…",
-
-  ui_tier_default: "По умолчанию",
-  ui_tier_flex: "Flex",
-  ui_tier_priority: "Priority",
-
-  ui_models_fallback_n: (n) => `#${n}`,
   ui_models_model_id: "ID модели",
-  ui_models_remove_fallback: "Удалить запасную",
-  ui_models_add_fallback: "Добавить запасную",
+  ui_models_not_in_catalog: "Этой модели нет в /v1/models.",
 
   ui_modelinfo_loading: "Загрузка информации о модели…",
-  ui_modelinfo_unknown: "Неизвестный ID модели.",
-  ui_modelinfo_resolving_provider: "Определяем провайдера…",
-  ui_modelinfo_no_provider_data: (sort) =>
-    `Нет данных провайдера для сортировки sort=${sort}; показаны значения каталога.`,
-  ui_modelinfo_provider_prefix: "Провайдер: ",
-  ui_modelinfo_tokps: "ток/с",
-  ui_modelinfo_ms: "мс",
   ui_modelinfo_input: "Ввод",
   ui_modelinfo_output: "Вывод",
   ui_modelinfo_image: "Изображение",
   ui_modelinfo_modalities: "Модальности",
   ui_modelinfo_tools: "Инструменты",
-  ui_modelinfo_caching: "Кэширование",
 
   ui_ratelimit_limits: "Лимиты",
   ui_ratelimit_5h_tokens: "Лимит за 5 часов",
@@ -992,7 +817,7 @@ const ru: Strings = {
   ui_spending_month: "За 30 дней",
   ui_spending_month_short: (amount) => `30д: ${amount}`,
   ui_spending_footer:
-    "Деньги, потраченные на запросы к ИИ, в USD, по данным OpenRouter. Периоды — скользящие окна по датам UTC.",
+    "Деньги, потраченные на запросы к ИИ, в USD, рассчитанные по ценам моделей. Периоды — скользящие окна по датам UTC.",
 
   ui_chats_all: "Все чаты",
   ui_chats_empty: "Чатов пока нет — они появятся после первого сообщения.",
@@ -1017,28 +842,12 @@ const ru: Strings = {
   ui_chat_system_prompt_off_footer: (chars) =>
     `Используется глобальный персонаж (${chars} симв.).`,
   ui_chat_models: "Модели",
-  ui_chat_models_on_footer:
-    "Сначала основная; запасные пробуются по очереди при ошибке.",
+  ui_chat_models_on_footer: "Модель, используемая для этого чата.",
   ui_chat_models_off_footer: (list) => `Используется глобально: ${list}`,
   ui_chat_tz: "Часовой пояс",
   ui_chat_tz_on_footer:
     "Используется, если у пользователя нет своего пояса.",
   ui_chat_tz_off_footer: (tz) => `Используется глобальный пояс (${tz}).`,
-  ui_chat_provider_routing: "Маршрутизация провайдеров",
-  ui_chat_provider_routing_on_footer:
-    "Как OpenRouter выбирает провайдера для модели в этом чате.",
-  ui_chat_provider_routing_off_footer: (sort) =>
-    `Используется глобальная маршрутизация (${sort}).`,
-  ui_chat_provider: "Конкретный провайдер",
-  ui_chat_provider_on_footer:
-    "Закрепить запросы этого чата за одним провайдером (без запасных), игнорируя сортировку.",
-  ui_chat_provider_off_footer: (provider) =>
-    `Используется глобальный провайдер (${provider}).`,
-  ui_chat_service_tier: "Тариф обслуживания",
-  ui_chat_service_tier_on_footer:
-    "Тариф обработки запросов OpenRouter в этом чате.",
-  ui_chat_service_tier_off_footer: (tier) =>
-    `Используется глобальный тариф (${tier}).`,
   ui_chat_prompt_placeholder: "Опиши, как должен вести себя бот в этом чате",
   ui_chat_keyword_filter: "Фильтр по ключевым словам",
   ui_chat_keyword_filter_enabled: "Включён",

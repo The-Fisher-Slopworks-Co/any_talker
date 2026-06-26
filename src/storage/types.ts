@@ -33,7 +33,7 @@ export interface Storage {
 
   // Managed-bot registry + token store. These are global (not affected by
   // `forBot` scoping): the registry is owned by the main bot. Tokens are stored
-  // separately and never returned to the admin UI (mirrors the BYOK key model).
+  // separately and never returned to the admin UI (write-only, like a secret).
   listManagedBots(): Promise<ManagedBot[]>;
   getManagedBot(botId: string): Promise<ManagedBot | null>;
   saveManagedBot(bot: ManagedBot): Promise<void>;
@@ -86,12 +86,6 @@ export interface Storage {
 
   getUserLang(userId: string): Promise<Lang | null>;
   setUserLang(userId: string, lang: Lang | null): Promise<void>;
-
-  getUserOpenrouterKey(userId: string): Promise<string | null>;
-  setUserOpenrouterKey(userId: string, key: string | null): Promise<void>;
-
-  getUserOpenrouterModels(userId: string): Promise<string[] | null>;
-  setUserOpenrouterModels(userId: string, models: string[] | null): Promise<void>;
 
   // Accrues `costUsd` to the user's spend for the UTC date of `nowMs`. A
   // non-positive cost is a no-op so free/uncosted replies don't create buckets.

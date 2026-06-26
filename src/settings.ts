@@ -3,12 +3,7 @@
 
 import type { Storage } from "./storage/types";
 import type { Settings, ChatSettings, RateLimitConfig } from "./shared/types";
-import {
-  DEFAULT_SETTINGS,
-  isValidProviderSort,
-  isValidProviderSlug,
-  isValidServiceTier,
-} from "./shared/types";
+import { DEFAULT_SETTINGS } from "./shared/types";
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   const existing = await storage.getSettings();
@@ -59,9 +54,6 @@ function normalize(s: Settings): Settings {
     typeof s.timezone === "string" && s.timezone.length > 0
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
-  const providerSort = isValidProviderSort(s.providerSort) ? s.providerSort : null;
-  const provider = isValidProviderSlug(s.provider) ? s.provider : null;
-  const serviceTier = isValidServiceTier(s.serviceTier) ? s.serviceTier : null;
   const rateLimit = normalizeRateLimit(s.rateLimit);
   const expandableBlockquoteThreshold =
     typeof s.expandableBlockquoteThreshold === "number" &&
@@ -69,14 +61,17 @@ function normalize(s: Settings): Settings {
     s.expandableBlockquoteThreshold >= 0
       ? Math.floor(s.expandableBlockquoteThreshold)
       : DEFAULT_SETTINGS.expandableBlockquoteThreshold;
+  // Field-by-field return (no `...s` spread) so legacy OpenRouter-era fields
+  // (providerSort / provider / serviceTier) are dropped on read and never
+  // re-persisted — schema-on-read, no migration.
   return {
-    ...s,
+    systemPrompt:
+      typeof s.systemPrompt === "string"
+        ? s.systemPrompt
+        : DEFAULT_SETTINGS.systemPrompt,
     models,
-    timezone,
-    providerSort,
-    provider,
-    serviceTier,
     rateLimit,
+    timezone,
     expandableBlockquoteThreshold,
   };
 }
@@ -92,11 +87,6 @@ export function applyChatOverrides(
     // Rate limit is per-user and global; there is no per-chat override.
     rateLimit: global.rateLimit,
     timezone: chat.timezone ?? global.timezone,
-    providerSort:
-      chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
-    provider: chat.provider !== undefined ? chat.provider : global.provider,
-    serviceTier:
-      chat.serviceTier !== undefined ? chat.serviceTier : global.serviceTier,
     expandableBlockquoteThreshold: global.expandableBlockquoteThreshold,
   };
 }
