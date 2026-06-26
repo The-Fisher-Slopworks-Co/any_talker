@@ -92,17 +92,13 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     input.chatId,
   );
 
-  const [allowed, byokKey, byokModels] = await Promise.all([
-    isAllowed({
-      storage,
-      ownerId: input.ownerId,
-      userId: input.userId,
-      chatId: input.chatId,
-    }),
-    storage.getUserOpenrouterKey(input.userId),
-    storage.getUserOpenrouterModels(input.userId),
-  ]);
-  if (!allowed && byokKey === null) return { kind: "denied" };
+  const allowed = await isAllowed({
+    storage,
+    ownerId: input.ownerId,
+    userId: input.userId,
+    chatId: input.chatId,
+  });
+  if (!allowed) return { kind: "denied" };
 
   const audios = input.audios ?? [];
   if (
@@ -155,8 +151,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   };
 
   const isOwner = input.userId === input.ownerId;
-  const skipRateLimit =
-    byokKey !== null || (isOwner && settings.rateLimit.ownerExempt);
+  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
       input.userId,
@@ -195,10 +190,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   let result;
   try {
     result = await input.ai.ask({
-      models:
-        byokKey !== null && byokModels !== null && byokModels.length > 0
-          ? byokModels
-          : settings.models,
+      models: settings.models,
       system: buildInstruction(settings.systemPrompt, {
         timezone,
         lang: input.lang,
@@ -207,11 +199,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       }),
       messages,
       tools: getAllTools(),
-      providerSort: settings.providerSort,
-      provider: settings.provider,
-      serviceTier: settings.serviceTier,
       reasoningEffort: detailLevelReasoningEffort(input.detailLevel),
-      apiKey: byokKey,
       toolCallContext: {
         source: "ask",
         chatId: input.chatId,
@@ -239,9 +227,9 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     await input.rateLimiter.deduct(input.userId, deduction, input.now);
   }
 
-  // Record spend regardless of rate-limit exemption — owner and BYOK usage is
-  // still money this user spent through the bot. Best-effort: a storage hiccup
-  // on this display-only accounting must not fail an answer already produced.
+  // Record spend regardless of rate-limit exemption — an exempt owner's usage is
+  // still money spent through the bot. Best-effort: a storage hiccup on this
+  // display-only accounting must not fail an answer already produced.
   await storage
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));

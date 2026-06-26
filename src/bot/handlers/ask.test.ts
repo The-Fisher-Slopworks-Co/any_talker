@@ -93,7 +93,7 @@ describe("askHandler", () => {
       {
         type: "audio",
         audio: new Uint8Array([0x4f, 0x67, 0x67, 0x53]),
-        mediaType: "audio/ogg",
+        mediaType: "audio/mp3",
       },
     ]);
   });
@@ -135,66 +135,9 @@ describe("askHandler", () => {
     expect(out.kind).toBe("rateLimited");
   });
 
-  test("user with BYOK key skips rate limit and passes key to AI", async () => {
+  test("passes the configured models to the AI", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    await storage.setUserOpenrouterKey("42", "sk-or-byok");
-    const rlStorage = new MemoryStorage();
-    await exhaustUsage(rlStorage, "42", 1000);
-    const rl = new DualWindowLimiter(rlStorage);
-    const ai = new FakeAI({ text: "ok", totalTokens: 500 });
-    const out = await askHandler(
-      baseInput({ storage, ai, rateLimiter: rl }),
-    );
-    expect(out.kind).toBe("answered");
-    expect(ai.calls.length).toBe(1);
-    const call = ai.calls[0] as { apiKey?: string | null };
-    expect(call.apiKey).toBe("sk-or-byok");
-    // BYOK skips deduct, so usage stays as it was (still exhausted, not topped up).
-    const usageAfter = await rlStorage.getUserUsage("42");
-    expect(usageAfter?.fiveHour.used).toBe(
-      DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
-    );
-  });
-
-  test("user with BYOK key bypasses the whitelist", async () => {
-    const storage = new MemoryStorage();
-    await storage.setUserOpenrouterKey("42", "sk-or-byok");
-    const out = await askHandler(baseInput({ storage }));
-    expect(out.kind).toBe("answered");
-  });
-
-  test("user without BYOK key and not whitelisted is denied", async () => {
-    const storage = new MemoryStorage();
-    const out = await askHandler(baseInput({ storage }));
-    expect(out.kind).toBe("denied");
-  });
-
-  test("user without BYOK key passes null apiKey to AI", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI();
-    const rl = new DualWindowLimiter(new MemoryStorage());
-    await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
-    const call = ai.calls[0] as { apiKey?: string | null };
-    expect(call.apiKey).toBeNull();
-  });
-
-  test("user with BYOK key + custom models passes the custom models", async () => {
-    const storage = new MemoryStorage();
-    await storage.setUserOpenrouterKey("42", "sk-or-byok");
-    await storage.setUserOpenrouterModels("42", ["openai/gpt-4o-mini"]);
-    const ai = new FakeAI();
-    const rl = new DualWindowLimiter(new MemoryStorage());
-    await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
-    const call = ai.calls[0] as { models: string[] };
-    expect(call.models).toEqual(["openai/gpt-4o-mini"]);
-  });
-
-  test("custom models without a BYOK key fall back to the bot's models", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.setUserOpenrouterModels("42", ["openai/gpt-4o-mini"]);
     const ai = new FakeAI();
     const rl = new DualWindowLimiter(new MemoryStorage());
     await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
@@ -510,95 +453,6 @@ describe("askHandler", () => {
     const out = await askHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.botName).toBe(null);
-  });
-
-  test("provider sort: forwards global setting to the AI client", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      providerSort: "throughput",
-    });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBe(
-      "throughput",
-    );
-  });
-
-  test("provider sort: chat override beats global", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      providerSort: "throughput",
-    });
-    await storage.saveChatSettings("c1", { providerSort: "price" });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBe("price");
-  });
-
-  test("provider sort: chat null override turns off global sort", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      providerSort: "latency",
-    });
-    await storage.saveChatSettings("c1", { providerSort: null });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { providerSort: unknown }).providerSort).toBeNull();
-  });
-
-  test("provider: forwards the pinned provider slug to the AI client", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      provider: "deepinfra/fp4",
-    });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { provider: unknown }).provider).toBe("deepinfra/fp4");
-  });
-
-  test("provider: chat override beats global", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({ ...DEFAULT_SETTINGS, provider: "deepinfra" });
-    await storage.saveChatSettings("c1", { provider: "novita" });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { provider: unknown }).provider).toBe("novita");
-  });
-
-  test("service tier: forwards global setting to the AI client", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      serviceTier: "flex",
-    });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { serviceTier: unknown }).serviceTier).toBe("flex");
-  });
-
-  test("service tier: chat override beats global", async () => {
-    const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      serviceTier: "flex",
-    });
-    await storage.saveChatSettings("c1", { serviceTier: "priority" });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai }));
-    expect((ai.calls[0] as { serviceTier: unknown }).serviceTier).toBe(
-      "priority",
-    );
   });
 
   test("answered: deducts tokens from bucket", async () => {

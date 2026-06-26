@@ -15,39 +15,21 @@ export type RateLimitConfig = {
 // Which of the two windows is being referred to (denial reason, UI labels).
 export type WindowKind = "fiveHour" | "weekly";
 
-export type ProviderSort = "price" | "throughput" | "latency";
-
-// Reasoning effort passed through to the model per request.
-// https://openrouter.ai/docs/use-cases/reasoning-tokens
+// Reasoning effort passed through to the model per request, mapped to the
+// standard `reasoning_effort` chat-completions field (honored by reasoning
+// models, ignored by others).
 export type ReasoningEffort = "low" | "high";
-
-export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
-  "price",
-  "throughput",
-  "latency",
-];
-
-// OpenRouter service tiers trade cost against latency/availability. Omitting
-// the field (null) uses the standard tier; "flex" is cheaper but slower, and
-// "priority" is faster at a higher price.
-// https://openrouter.ai/docs/guides/features/service-tiers
-export type ServiceTier = "flex" | "priority";
-
-export const SERVICE_TIER_VALUES: readonly ServiceTier[] = ["flex", "priority"];
 
 export type Gender = "male" | "female";
 
 export type Settings = {
   systemPrompt: string;
+  // Model ids to try, most-preferred first. A generic OpenAI-compatible endpoint
+  // has no server-side fallback chain, so only `models[0]` is sent per request;
+  // the rest are retained for the admin UI / future client-side fallback.
   models: string[];
   rateLimit: RateLimitConfig;
   timezone: string;
-  providerSort: ProviderSort | null;
-  // OpenRouter provider slug to pin routing to (e.g. "deepinfra/fp4"). When set
-  // it takes precedence over providerSort: the request goes only to this
-  // provider with no fallback. null lets providerSort (or OpenRouter) decide.
-  provider: string | null;
-  serviceTier: ServiceTier | null;
   expandableBlockquoteThreshold: number;
 };
 
@@ -107,9 +89,6 @@ export type ChatSettings = {
   models?: string[];
   botName?: string;
   timezone?: string;
-  providerSort?: ProviderSort | null;
-  provider?: string | null;
-  serviceTier?: ServiceTier | null;
   keywordFilter?: KeywordFilter;
 };
 
@@ -142,9 +121,6 @@ export const DEFAULT_SETTINGS: Settings = {
     wiseMultiplier: 1.8,
   },
   timezone: "UTC",
-  providerSort: null,
-  provider: null,
-  serviceTier: null,
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
 };
 
@@ -177,9 +153,6 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.models === undefined &&
     s.botName === undefined &&
     s.timezone === undefined &&
-    s.providerSort === undefined &&
-    s.provider === undefined &&
-    s.serviceTier === undefined &&
     s.keywordFilter === undefined
   );
 }
@@ -196,25 +169,6 @@ export function messageMatchesKeyword(
     const needle = kw.normalize("NFC").toLowerCase();
     return needle.length > 0 && haystack.includes(needle);
   });
-}
-
-export function isValidProviderSort(v: unknown): v is ProviderSort {
-  return v === "price" || v === "throughput" || v === "latency";
-}
-
-// OpenRouter provider slugs are lowercase identifiers, optionally with a
-// variant segment after a slash (e.g. "deepinfra", "deepinfra/fp4",
-// "google-vertex/us-east5"). Validate the shape rather than an allow-list so we
-// don't have to track OpenRouter's evolving provider catalogue; the value is
-// only ever placed in a JSON body field, so there's no injection surface.
-const PROVIDER_SLUG_RE = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)*$/i;
-
-export function isValidProviderSlug(v: unknown): v is string {
-  return typeof v === "string" && v.length <= 100 && PROVIDER_SLUG_RE.test(v);
-}
-
-export function isValidServiceTier(v: unknown): v is ServiceTier {
-  return v === "flex" || v === "priority";
 }
 
 export function isValidGender(v: unknown): v is Gender {

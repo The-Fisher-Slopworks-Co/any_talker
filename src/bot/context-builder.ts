@@ -5,6 +5,7 @@ import type { Storage } from "../storage/types";
 import type { AIMessage, AIUserContentPart } from "../ai/types";
 import type { Gender } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
+import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
 
 export type ReplyTarget = {
   messageId: number;
@@ -41,8 +42,10 @@ export function conversationStorage(
   return base.forBot(isGroupChat ? null : botId);
 }
 
-// Telegram voice notes are always OGG/OPUS; OpenRouter accepts the `ogg` format.
-const VOICE_MEDIA_TYPE = "audio/ogg";
+// Telegram voice notes are ogg/opus; they're transcoded to mp3 at the download
+// boundary (see `bot/transcode.ts`) before reaching here, because the
+// OpenAI-compatible `input_audio` field accepts only wav/mp3.
+const VOICE_MEDIA_TYPE = TRANSCODED_AUDIO_MEDIA_TYPE;
 
 export type Sender = {
   firstName: string | null;

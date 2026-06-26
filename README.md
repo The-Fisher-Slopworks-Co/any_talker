@@ -1,20 +1,23 @@
 # any_talker
 
-Telegram bot with AI integration via OpenRouter.
+Telegram bot with AI integration via any OpenAI-compatible API.
 
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill required vars:
    - `BOT_TOKEN` — from @BotFather
-   - `OPENROUTER_API_KEY` — from openrouter.ai
+   - `OPENAI_API_KEY` — API key for your chosen endpoint
+   - `OPENAI_BASE_URL` — any OpenAI-compatible chat-completions endpoint,
+     including the version segment (e.g. `https://api.openai.com/v1`, or a
+     self-hosted gateway like LiteLLM / vLLM). Per-request USD cost is computed
+     from the pricing this endpoint's `GET /v1/models` returns (0 if it
+     returns none). See [`docs/ai-provider.md`](docs/ai-provider.md).
    - `BOT_OWNER_ID` — your Telegram user ID
-   - `OPENROUTER_APP_URL` / `OPENROUTER_APP_TITLE` (optional) — sent as
-     `HTTP-Referer` / `X-Title` headers so the bot shows up on
-     [openrouter.ai/rankings](https://openrouter.ai/rankings) and in your
-     OpenRouter dashboard. See
-     [App Attribution](https://openrouter.ai/docs/app-attribution).
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
+
+> Voice-note understanding requires `ffmpeg` on the host (the Docker image
+> installs it): Telegram ogg/opus is transcoded to mp3 before being sent.
 
 ## Run
 
@@ -34,8 +37,8 @@ and bundles a small observability stack (VictoriaMetrics + VictoriaLogs +
 Vector). On a fresh server with DNS pointed at it:
 
 ```bash
-cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY, BOT_OWNER_ID,
-                              # DOMAIN, LETSENCRYPT_EMAIL
+cp .env.example .env          # fill BOT_TOKEN, OPENAI_API_KEY, OPENAI_BASE_URL,
+                              # BOT_OWNER_ID, DOMAIN, LETSENCRYPT_EMAIL
 cp Caddyfile.example Caddyfile
 docker compose -f docker-compose.prod.yml up -d
 ```
@@ -87,8 +90,8 @@ following metric families:
 | `bot_ask_total` | counter | `source`, `outcome` | `/ask` and guest-mode outcomes |
 | `bot_ask_duration_seconds` | histogram | `source`, `outcome` | End-to-end handler latency |
 | `bot_ask_tokens_total` | counter | `source` | Tokens billed by the provider |
-| `bot_ai_requests_total` | counter | `outcome` | OpenRouter call success/error |
-| `bot_ai_request_duration_seconds` | histogram | `outcome` | OpenRouter call latency |
+| `bot_ai_requests_total` | counter | `outcome` | AI endpoint call success/error |
+| `bot_ai_request_duration_seconds` | histogram | `outcome` | AI endpoint call latency |
 | `bot_tool_calls_total` | counter | `tool`, `outcome` | Tool invocations by the model |
 | `bot_tool_call_duration_seconds` | histogram | `tool` | Tool execution latency |
 | `bot_rate_limit_checks_total` | counter | `result` | Rate-limit allow/deny |
@@ -107,7 +110,7 @@ following metric families:
 The bot honours the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`
 environment variables (lowercase variants are also recognised). They apply
 to every outbound fetch: the Telegram Bot API (via grammY, which we route
-through Bun's native `fetch`), OpenRouter, the `fetch_page` / `search_web`
+through Bun's native `fetch`), the AI endpoint, the `fetch_page` / `search_web`
 tools, and Telegram file downloads. `NO_PROXY` is a comma-separated list of
 exact hostnames to bypass (`*` disables the proxy entirely; per-entry ports
 are supported as `host:port`).
@@ -119,8 +122,6 @@ are supported as `host:port`).
 - Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
   (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
-- BYOK — each user can store their own OpenRouter API key in the Web App. When set, the user's
-  AI calls go through their key and the bot's rate limit no longer applies to them.
 - Whitelist (chats and users). Owner bypasses whitelist.
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.

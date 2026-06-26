@@ -5,7 +5,7 @@ import { handleApi, type ApiRequest, type ManagedBotController } from "./api";
 import { verifyInitData } from "./auth";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
-import { fetchOpenRouterStats } from "./openrouter-proxy";
+import type { ModelCatalog } from "../ai/model-catalog";
 import indexHtml from "./ui/index.html";
 import { getBuildInfo } from "../build-info";
 import {
@@ -22,6 +22,7 @@ export type ServerDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   botManager: ManagedBotController;
+  modelCatalog?: ModelCatalog;
 };
 
 export function startServer(deps: ServerDeps) {
@@ -29,7 +30,7 @@ export function startServer(deps: ServerDeps) {
     storage: deps.storage,
     rateLimiter: deps.rateLimiter,
     ownerId: deps.ownerId,
-    fetchOpenRouterStats,
+    modelCatalog: deps.modelCatalog,
     managedBots: deps.botManager,
   };
 

@@ -5,9 +5,8 @@ import { resolveLogFormat, type LogFormat } from "./log";
 
 export type Config = {
   botToken: string;
-  openrouterApiKey: string;
-  openrouterAppUrl: string | undefined;
-  openrouterAppTitle: string | undefined;
+  openaiApiKey: string;
+  openaiBaseUrl: string;
   firecrawlApiKey: string | undefined;
   firecrawlConcurrency: number;
   botOwnerId: string;
@@ -30,9 +29,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 
   return {
     botToken: required("BOT_TOKEN"),
-    openrouterApiKey: required("OPENROUTER_API_KEY"),
-    openrouterAppUrl: nonEmptyOrUndefined(env.OPENROUTER_APP_URL),
-    openrouterAppTitle: nonEmptyOrUndefined(env.OPENROUTER_APP_TITLE),
+    openaiApiKey: required("OPENAI_API_KEY"),
+    openaiBaseUrl: required("OPENAI_BASE_URL"),
     firecrawlApiKey: nonEmptyOrUndefined(env.FIRECRAWL_API_KEY),
     firecrawlConcurrency: parsePositiveInt("FIRECRAWL_CONCURRENCY", env.FIRECRAWL_CONCURRENCY, 2),
     botOwnerId: required("BOT_OWNER_ID"),

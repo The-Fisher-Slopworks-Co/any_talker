@@ -8,6 +8,29 @@ import { currentWindowStarts } from "../ratelimit/window";
 import { handleApi } from "./api";
 import { DEFAULT_SETTINGS } from "../shared/types";
 import type { UsageStatus } from "../ratelimit/window";
+import type { ModelCatalog, ModelInfo } from "../ai/model-catalog";
+
+function fakeCatalog(
+  list: () => Promise<ModelInfo[]>,
+  unknown?: (ids: string[]) => Promise<string[]>,
+): ModelCatalog {
+  return {
+    list,
+    refresh: async () => {},
+    getPricing: () => null,
+    // By default, derive "unknown" from the same list the catalogue exposes, so
+    // a test only has to declare the catalogue once. An empty list means the
+    // catalogue is unavailable, which the real implementation treats as
+    // "all allowed" — mirror that here.
+    unknownModels:
+      unknown ??
+      (async (ids) => {
+        const known = new Set((await list()).map((m) => m.id));
+        if (known.size === 0) return [];
+        return ids.filter((id) => !known.has(id.trim()));
+      }),
+  };
+}
 
 const ownerId = "1";
 function deps() {
@@ -18,90 +41,107 @@ function deps() {
 const owner = { userId: ownerId, isOwner: true };
 const guest = (id: string) => ({ userId: id, isOwner: false });
 
-describe("GET /api/openrouter/endpoints/:permaslug", () => {
-  test("calls fetcher and returns endpoints", async () => {
-    const calls: string[] = [];
-    const fetchOpenRouterStats = async (permaslug: string) => {
-      calls.push(permaslug);
-      return {
-        endpoints: [
-          {
-            provider_name: "DeepInfra",
-            provider_slug: "deepinfra/fp4",
-            pricing: { prompt: "0.000000039", completion: "0.00000019" },
-            throughput: 36,
-            latency: 343,
-          },
-        ],
-      };
-    };
+describe("GET /api/models", () => {
+  test("returns the catalogue for the owner", async () => {
     const r = await handleApi(
-      {
-        method: "GET",
-        path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
-        body: null,
-      },
-      { ...deps(), fetchOpenRouterStats },
+      { method: "GET", path: "/api/models", body: null },
+      { ...deps(), modelCatalog: fakeCatalog(async () => [{ id: "gpt-4o" }]) },
       owner,
     );
     expect(r.status).toBe(200);
-    expect(calls).toEqual(["openai/gpt-oss-120b"]);
-    expect(r.body).toEqual({
-      endpoints: [
-        {
-          provider_name: "DeepInfra",
-          provider_slug: "deepinfra/fp4",
-          pricing: { prompt: "0.000000039", completion: "0.00000019" },
-          throughput: 36,
-          latency: 343,
-        },
-      ],
-    });
+    expect(r.body).toEqual({ models: [{ id: "gpt-4o" }] });
   });
 
-  test("non-owner can call the endpoint (needed for BYOK model picker)", async () => {
-    const fetchOpenRouterStats = async () => ({ endpoints: [] });
+  test("is admin-only: a non-owner gets 403", async () => {
     const r = await handleApi(
-      {
-        method: "GET",
-        path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
-        body: null,
-      },
-      { ...deps(), fetchOpenRouterStats },
+      { method: "GET", path: "/api/models", body: null },
+      { ...deps(), modelCatalog: fakeCatalog(async () => [{ id: "gpt-4o" }]) },
       guest("99"),
     );
-    expect(r.status).toBe(200);
+    expect(r.status).toBe(403);
   });
 
-  test("rejects an invalid permaslug with 400", async () => {
+  test("returns 503 when no catalogue is configured", async () => {
     const r = await handleApi(
-      {
-        method: "GET",
-        path: "/api/openrouter/endpoints/<bad>",
-        body: null,
-      },
-      { ...deps(), fetchOpenRouterStats: async () => ({ endpoints: [] }) },
+      { method: "GET", path: "/api/models", body: null },
+      deps(),
       owner,
     );
-    expect(r.status).toBe(400);
+    expect(r.status).toBe(503);
   });
 
-  test("returns 502 when the fetcher throws", async () => {
+  test("returns 502 when the catalogue fetch throws", async () => {
     const r = await handleApi(
-      {
-        method: "GET",
-        path: "/api/openrouter/endpoints/openai/gpt-oss-120b",
-        body: null,
-      },
+      { method: "GET", path: "/api/models", body: null },
       {
         ...deps(),
-        fetchOpenRouterStats: async () => {
+        modelCatalog: fakeCatalog(async () => {
           throw new Error("upstream down");
-        },
+        }),
       },
       owner,
     );
     expect(r.status).toBe(502);
+  });
+});
+
+describe("model validation against the catalogue", () => {
+  const catalogOf = (...ids: string[]) =>
+    fakeCatalog(async () => ids.map((id) => ({ id })));
+
+  test("PUT /api/settings rejects a model absent from /v1/models", async () => {
+    const d = { ...deps(), modelCatalog: catalogOf("gpt-4o") };
+    const r = await handleApi(
+      { method: "PUT", path: "/api/settings", body: { models: ["made-up"] } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+    expect(r.body).toEqual({ error: "unknown model", models: ["made-up"] });
+    // A rejected write must not touch storage.
+    expect((await d.storage.getSettings())?.models).toEqual(
+      DEFAULT_SETTINGS.models,
+    );
+  });
+
+  test("PUT /api/settings accepts a model present in /v1/models", async () => {
+    const d = { ...deps(), modelCatalog: catalogOf("gpt-4o", "gpt-4o-mini") };
+    const r = await handleApi(
+      { method: "PUT", path: "/api/settings", body: { models: ["gpt-4o"] } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect((await d.storage.getSettings())?.models).toEqual(["gpt-4o"]);
+  });
+
+  test("PUT /api/settings allows any model when the catalogue is empty", async () => {
+    const d = { ...deps(), modelCatalog: catalogOf() };
+    const r = await handleApi(
+      { method: "PUT", path: "/api/settings", body: { models: ["anything"] } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect((await d.storage.getSettings())?.models).toEqual(["anything"]);
+  });
+
+  test("PUT /api/admin/chats/:id rejects an unknown override model", async () => {
+    const d = { ...deps(), modelCatalog: catalogOf("gpt-4o") };
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      { method: "PUT", path: "/api/admin/chats/-100", body: { models: ["nope"] } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+    expect(await d.storage.getChatSettings("-100")).toBeNull();
   });
 });
 
@@ -136,147 +176,6 @@ describe("PUT /api/settings", () => {
       "anthropic/claude-3.5-sonnet",
     ]);
     expect(saved?.rateLimit).toEqual(DEFAULT_SETTINGS.rateLimit);
-  });
-
-  test("accepts a valid providerSort", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { providerSort: "throughput" },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.providerSort).toBe("throughput");
-  });
-
-  test("accepts null providerSort to clear it", async () => {
-    const d = deps();
-    await d.storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      providerSort: "price",
-    });
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { providerSort: null },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.providerSort).toBeNull();
-  });
-
-  test("rejects an invalid providerSort with 400", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { providerSort: "nope" },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(400);
-  });
-
-  test("accepts a valid provider slug", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { provider: "deepinfra/fp4" },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.provider).toBe("deepinfra/fp4");
-  });
-
-  test("accepts null provider to clear it", async () => {
-    const d = deps();
-    await d.storage.saveSettings({ ...DEFAULT_SETTINGS, provider: "novita" });
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { provider: null },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.provider).toBeNull();
-  });
-
-  test("rejects an invalid provider slug with 400", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { provider: "not a slug!" },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(400);
-  });
-
-  test("accepts a valid serviceTier", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { serviceTier: "flex" },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.serviceTier).toBe("flex");
-  });
-
-  test("accepts null serviceTier to clear it", async () => {
-    const d = deps();
-    await d.storage.saveSettings({
-      ...DEFAULT_SETTINGS,
-      serviceTier: "priority",
-    });
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { serviceTier: null },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.serviceTier).toBeNull();
-  });
-
-  test("rejects an invalid serviceTier with 400", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { serviceTier: "turbo" },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(400);
   });
 
   test("rejects an empty models array with 400", async () => {
@@ -915,231 +814,6 @@ describe("/api/me", () => {
   });
 });
 
-describe("/api/me/openrouter-key", () => {
-  test("GET returns hasKey=false when no key is stored", async () => {
-    const r = await handleApi(
-      { method: "GET", path: "/api/me/openrouter-key", body: null },
-      deps(),
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ hasKey: false, last4: null });
-  });
-
-  test("PUT stores the key and exposes only its last 4 chars", async () => {
-    const d = deps();
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-key",
-        body: { key: "sk-or-secret1234" },
-      },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ hasKey: true, last4: "1234" });
-    expect(await d.storage.getUserOpenrouterKey("42")).toBe(
-      "sk-or-secret1234",
-    );
-  });
-
-  test("GET after PUT returns hasKey=true with last 4", async () => {
-    const d = deps();
-    await d.storage.setUserOpenrouterKey("42", "sk-or-abcdef9999");
-    const r = await handleApi(
-      { method: "GET", path: "/api/me/openrouter-key", body: null },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ hasKey: true, last4: "9999" });
-  });
-
-  test("PUT with key=null clears the stored key", async () => {
-    const d = deps();
-    await d.storage.setUserOpenrouterKey("42", "sk-or-stored");
-    const r = await handleApi(
-      { method: "PUT", path: "/api/me/openrouter-key", body: { key: null } },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ hasKey: false, last4: null });
-    expect(await d.storage.getUserOpenrouterKey("42")).toBeNull();
-  });
-
-  test("PUT with empty / whitespace string clears the stored key", async () => {
-    const d = deps();
-    await d.storage.setUserOpenrouterKey("42", "sk-or-stored");
-    const r = await handleApi(
-      { method: "PUT", path: "/api/me/openrouter-key", body: { key: "  " } },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ hasKey: false, last4: null });
-    expect(await d.storage.getUserOpenrouterKey("42")).toBeNull();
-  });
-
-  test("PUT rejects a non-string key with 400", async () => {
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-key",
-        body: { key: 12345 },
-      },
-      deps(),
-      guest("42"),
-    );
-    expect(r.status).toBe(400);
-  });
-
-  test("PUT rejects an excessively long key with 400", async () => {
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-key",
-        body: { key: "x".repeat(1024) },
-      },
-      deps(),
-      guest("42"),
-    );
-    expect(r.status).toBe(400);
-  });
-
-  test("keys are stored per-user (not shared)", async () => {
-    const d = deps();
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-key",
-        body: { key: "key-of-42" },
-      },
-      d,
-      guest("42"),
-    );
-    const otherGet = await handleApi(
-      { method: "GET", path: "/api/me/openrouter-key", body: null },
-      d,
-      guest("99"),
-    );
-    expect(otherGet.body).toEqual({ hasKey: false, last4: null });
-  });
-});
-
-describe("/api/me/openrouter-models", () => {
-  test("GET returns models=null when none stored", async () => {
-    const r = await handleApi(
-      { method: "GET", path: "/api/me/openrouter-models", body: null },
-      deps(),
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ models: null });
-  });
-
-  test("PUT stores a trimmed list and drops empties", async () => {
-    const d = deps();
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-models",
-        body: { models: ["  openai/gpt-4o  ", "", "anthropic/claude-sonnet-4-5"] },
-      },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({
-      models: ["openai/gpt-4o", "anthropic/claude-sonnet-4-5"],
-    });
-    expect(await d.storage.getUserOpenrouterModels("42")).toEqual([
-      "openai/gpt-4o",
-      "anthropic/claude-sonnet-4-5",
-    ]);
-  });
-
-  test("PUT with null clears the stored models", async () => {
-    const d = deps();
-    await d.storage.setUserOpenrouterModels("42", ["openai/gpt-4o"]);
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-models",
-        body: { models: null },
-      },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ models: null });
-    expect(await d.storage.getUserOpenrouterModels("42")).toBeNull();
-  });
-
-  test("PUT with an empty array clears the stored models", async () => {
-    const d = deps();
-    await d.storage.setUserOpenrouterModels("42", ["openai/gpt-4o"]);
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-models",
-        body: { models: [] },
-      },
-      d,
-      guest("42"),
-    );
-    expect(r.status).toBe(200);
-    expect(r.body).toEqual({ models: null });
-    expect(await d.storage.getUserOpenrouterModels("42")).toBeNull();
-  });
-
-  test("PUT rejects a non-array with 400", async () => {
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-models",
-        body: { models: "openai/gpt-4o" },
-      },
-      deps(),
-      guest("42"),
-    );
-    expect(r.status).toBe(400);
-  });
-
-  test("PUT rejects entries that are not strings with 400", async () => {
-    const r = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-models",
-        body: { models: ["openai/gpt-4o", 42] },
-      },
-      deps(),
-      guest("42"),
-    );
-    expect(r.status).toBe(400);
-  });
-
-  test("models are stored per-user (not shared)", async () => {
-    const d = deps();
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/me/openrouter-models",
-        body: { models: ["openai/gpt-4o"] },
-      },
-      d,
-      guest("42"),
-    );
-    const otherGet = await handleApi(
-      { method: "GET", path: "/api/me/openrouter-models", body: null },
-      d,
-      guest("99"),
-    );
-    expect(otherGet.body).toEqual({ models: null });
-  });
-});
-
 describe("/api/admin/users", () => {
   test("GET list returns empty initially", async () => {
     const r = await handleApi(
@@ -1731,213 +1405,6 @@ describe("/api/admin/chats", () => {
     );
     expect(await d.storage.getChatSettings("-100")).toEqual({
       timezone: "Asia/Yekaterinburg",
-    });
-  });
-
-  test("PUT accepts providerSort string override", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { providerSort: "latency" },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      providerSort: "latency",
-    });
-  });
-
-  test("PUT accepts providerSort=null to override-to-none", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { providerSort: null },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      providerSort: null,
-    });
-  });
-
-  test("PUT silently drops invalid providerSort string", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { systemPrompt: "p", providerSort: "fastest" },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      systemPrompt: "p",
-    });
-  });
-
-  test("PUT accepts provider slug override", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { provider: "deepinfra/fp4" },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      provider: "deepinfra/fp4",
-    });
-  });
-
-  test("PUT accepts provider=null to override-to-none", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { provider: null },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      provider: null,
-    });
-  });
-
-  test("PUT silently drops invalid provider slug", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { systemPrompt: "p", provider: "not a slug!" },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      systemPrompt: "p",
-    });
-  });
-
-  test("PUT accepts serviceTier string override", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { serviceTier: "priority" },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      serviceTier: "priority",
-    });
-  });
-
-  test("PUT accepts serviceTier=null to override-to-none", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { serviceTier: null },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      serviceTier: null,
-    });
-  });
-
-  test("PUT silently drops invalid serviceTier string", async () => {
-    const d = deps();
-    await d.storage.upsertChat({
-      id: "-100",
-      type: "group",
-      title: "T",
-      username: null,
-      lastSeenAt: 1,
-    });
-    await handleApi(
-      {
-        method: "PUT",
-        path: "/api/admin/chats/-100",
-        body: { systemPrompt: "p", serviceTier: "turbo" },
-      },
-      d,
-      owner,
-    );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
-      systemPrompt: "p",
     });
   });
 

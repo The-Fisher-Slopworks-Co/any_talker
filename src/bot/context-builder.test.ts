@@ -395,7 +395,7 @@ describe("buildContext", () => {
         role: "user",
         content: [
           { type: "text", text: envelope({ text: "what did they say?" }) },
-          { type: "audio", audio: bytes, mediaType: "audio/ogg" },
+          { type: "audio", audio: bytes, mediaType: "audio/mp3" },
         ],
       },
     ]);
@@ -417,7 +417,7 @@ describe("buildContext", () => {
     expect(msgs).toHaveLength(1);
     expect(msgs[0]!.content).toEqual([
       { type: "text", text: envelope({ text: "" }) },
-      { type: "audio", audio: bytes, mediaType: "audio/ogg" },
+      { type: "audio", audio: bytes, mediaType: "audio/mp3" },
     ]);
   });
 
@@ -443,7 +443,7 @@ describe("buildContext", () => {
       role: "user",
       content: [
         { type: "text", text: "Context (replied message from Alice): <media>" },
-        { type: "audio", audio: replyBytes, mediaType: "audio/ogg" },
+        { type: "audio", audio: replyBytes, mediaType: "audio/mp3" },
       ],
     });
   });

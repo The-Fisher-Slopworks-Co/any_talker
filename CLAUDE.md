@@ -1,6 +1,6 @@
 ## Project
 
-Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
+Telegram bot with AI integration via an OpenAI-compatible API (grammY + Bun + KeyDB).
 See `README.md` for setup, running, deployment, observability, and the
 user-facing feature/metrics catalog. This file covers how to work in the code.
 
@@ -32,7 +32,7 @@ bun test           # tests (co-located *.test.ts)
 
 - `main.ts` — composition root: loads config, wires storage/ai/rateLimiter, registers tools, starts bot + HTTP server + schedulers.
 - `bot/` — grammY bot, handlers (`handlers/ask.ts`, `guest.ts`, …), middleware, Telegram formatting.
-- `ai/` — OpenRouter client, instruction builder, and `tools/` (registry + each tool).
+- `ai/` — OpenAI-compatible client (`compat-client.ts`), model catalogue + pricing (`model-catalog.ts`), instruction builder, and `tools/` (registry + each tool).
 - `storage/` — `Storage` interface (`types.ts`); `KeyDBStorage` (prod) and `MemoryStorage` (`memory.ts`, used by tests).
 - `webapp/` — admin Web App: HTTP API (`api.ts`, `auth.ts`) + React UI (`ui/`).
 - `reminders/`, `checks/`, `ratelimit/`, `spending/`, `metrics/`, `shared/` — supporting subsystems.
