@@ -263,7 +263,10 @@ http/https + ports 80/443. Tools: `random_number`, `random_choice`,
 `calculator` (hand-written parser, no `eval`), `currency_convert`, `fetch_page`
 (Readability → Markdown), `youtube_transcript` + `search_web` (Firecrawl,
 concurrency-bounded by `createSemaphore`), `user_facts`, and the `reminders`
-tools (which **create** reminders; firing lives in `src/reminders/`).
+tools — `schedule_reminder_in`/`schedule_reminder_at` **create** reminders
+(capped per user by `Settings.maxRemindersPerUser`), `list_reminders` returns a
+user's pending reminders (soonest-first, bounded), and `cancel_reminder` deletes
+one by id after an O(1) ownership check; firing lives in `src/reminders/`.
 **Depends on:** `storage` (facts/reminders), `proxy`, `metrics`, Firecrawl/web.
 **Depended on by:** `ai/compat-client` (via `getAllTools()`), `main.ts` (registration).
 
@@ -403,7 +406,7 @@ persisted entities:
 
 | Entity | Key pattern | Redis type | TTL | Shape (abridged) |
 |---|---|---|---|---|
-| Global settings | `at:settings` | string | — | `Settings` (systemPrompt, models[], rateLimit, timezone, …) |
+| Global settings | `at:settings` | string | — | `Settings` (systemPrompt, models[], rateLimit, timezone, maxRemindersPerUser, …) |
 | Chat settings | `at:chat_settings:{chatId}` | string | — | partial `ChatSettings` overrides; key deleted when empty |
 | Whitelist | `at:whitelist:{users\|chats}` | string | — | `WhitelistEntry[]` (`{id, label?}`) |
 | Per-user rate-limit usage | `at:usage:{userId}` | string | ~9 days (week + slack) | `{ fiveHour: {windowStart, used}, weekly: {windowStart, used} }` (per-user, global; window phase derived from the user id) |
@@ -598,6 +601,22 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   message from stored context rather than echoing stored text, trading
   determinism/cost for freshness; non-transactional delete means possible
   duplicates over guaranteed delivery.
+- **Per-user reminder cap + bounded list/cancel tools** — users manage reminders
+  conversationally via `list_reminders`/`cancel_reminder`, but reminders carry no
+  TTL and creation was previously unbounded, so a user could accumulate enough to
+  blow the model context (a list tool result is fed back into the LLM uncapped)
+  and make deletion an O(n²) grind. Three guardrails: (1) a configurable per-user
+  cap (`Settings.maxRemindersPerUser`, default 50) enforced as **rejection, not
+  eviction** in `persistReminder` — a reminder is a user-visible commitment, so
+  silently dropping the oldest (as `user_facts` does) is wrong; enforcement is a
+  check-then-save guardrail, not an atomic invariant, since a rare off-by-one over
+  the cap is harmless. (2) `list_reminders` independently caps its result (soonest
+  N, shortened notes) because nothing downstream bounds a tool result before it
+  re-enters the model. (3) `cancel_reminder` verifies ownership and reads the fire
+  time via an O(1) `getReminder` (a single `GET`) instead of an O(n) list scan, so
+  the per-call cost is constant. No blanket cancel-all verb exists — bounding the
+  blast radius of an accidental "delete everything" — and the AI step loop is
+  **not** the safeguard (parallel tool calls can fan out within a step).
 - **Stateless Mini App auth** — `initData` is re-verified on every request (no
   sessions); simpler and tamper-evident, at the cost of per-request HMAC work.
 - **Managed bots as N independent `Bot` instances** — each character is a real

@@ -34,6 +34,9 @@ export type ReminderTimeParts = {
   offset: string;
 };
 
+// Zero-pad a number to two digits (shared by the reminder time formatters).
+const pad2 = (n: number) => n.toString().padStart(2, "0");
+
 type Strings = {
   bot_photo_cant_fetch: string;
   bot_voice_cant_fetch: string;
@@ -47,6 +50,7 @@ type Strings = {
   bot_contact_added: (label: string) => string;
   bot_check_wrong_user: string;
   bot_reminder_scheduled: (parts: ReminderTimeParts) => string;
+  bot_reminder_cancelled: (parts: ReminderTimeParts) => string;
   bot_managed_bot_created: (username: string) => string;
 
   ui_loading: string;
@@ -348,8 +352,10 @@ const en: Strings = {
   bot_contact_added: (label) => `Added ${label} to the whitelist.`,
   bot_check_wrong_user: "This check isn't addressed to you.",
   bot_reminder_scheduled: (p) => {
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `Reminder set for ${p.year}-${pad(p.month)}-${pad(p.day)} at ${pad(p.hour)}:${pad(p.minute)} (${p.offset})`;
+    return `Reminder set for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+  },
+  bot_reminder_cancelled: (p) => {
+    return `Reminder cancelled for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
   },
   bot_managed_bot_created: (username) =>
     `✅ Managed bot @${username} is now running.`,
@@ -678,8 +684,10 @@ const ru: Strings = {
   bot_contact_added: (label) => `${label} добавлен(а) в белый список.`,
   bot_check_wrong_user: "Этот вопрос адресован не тебе.",
   bot_reminder_scheduled: (p) => {
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `Было создано напоминание на ${pad(p.day)}.${pad(p.month)}.${p.year} в ${pad(p.hour)}:${pad(p.minute)} (${p.offset})`;
+    return `Было создано напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+  },
+  bot_reminder_cancelled: (p) => {
+    return `Напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset}) отменено`;
   },
   bot_managed_bot_created: (username) =>
     `✅ Управляемый бот @${username} запущен.`,

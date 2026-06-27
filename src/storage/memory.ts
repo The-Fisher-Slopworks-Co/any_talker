@@ -441,6 +441,19 @@ export class MemoryStorage implements Storage {
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
+  async getReminder(id: string): Promise<Reminder | null> {
+    const r = this.b.reminders.get(this.sk(id));
+    return r ? structuredClone(r) : null;
+  }
+
+  async countRemindersForUser(userId: string): Promise<number> {
+    let n = 0;
+    for (const [key, r] of this.b.reminders.entries()) {
+      if (this.inScope(key) && r.userId === userId) n++;
+    }
+    return n;
+  }
+
   async deleteReminder(id: string, _userId: string): Promise<void> {
     this.b.reminders.delete(this.sk(id));
   }

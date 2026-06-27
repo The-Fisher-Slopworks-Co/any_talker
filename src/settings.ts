@@ -61,6 +61,14 @@ function normalize(s: Settings): Settings {
     s.expandableBlockquoteThreshold >= 0
       ? Math.floor(s.expandableBlockquoteThreshold)
       : DEFAULT_SETTINGS.expandableBlockquoteThreshold;
+  // A cap below 1 would block all reminder creation; reject any
+  // non-positive/non-finite stored value and fall back to the default (50).
+  const maxRemindersPerUser =
+    typeof s.maxRemindersPerUser === "number" &&
+    Number.isFinite(s.maxRemindersPerUser) &&
+    s.maxRemindersPerUser >= 1
+      ? Math.floor(s.maxRemindersPerUser)
+      : DEFAULT_SETTINGS.maxRemindersPerUser;
   // Field-by-field return (no `...s` spread) so legacy OpenRouter-era fields
   // (providerSort / provider / serviceTier) are dropped on read and never
   // re-persisted — schema-on-read, no migration.
@@ -73,6 +81,7 @@ function normalize(s: Settings): Settings {
     rateLimit,
     timezone,
     expandableBlockquoteThreshold,
+    maxRemindersPerUser,
   };
 }
 
@@ -88,6 +97,8 @@ export function applyChatOverrides(
     rateLimit: global.rateLimit,
     timezone: chat.timezone ?? global.timezone,
     expandableBlockquoteThreshold: global.expandableBlockquoteThreshold,
+    // The reminder cap is a global policy, like the rate limit; no per-chat override.
+    maxRemindersPerUser: global.maxRemindersPerUser,
   };
 }
 
