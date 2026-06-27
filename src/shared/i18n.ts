@@ -50,6 +50,7 @@ type Strings = {
   bot_contact_added: (label: string) => string;
   bot_check_wrong_user: string;
   bot_reminder_scheduled: (parts: ReminderTimeParts) => string;
+  bot_reminder_updated: (parts: ReminderTimeParts) => string;
   bot_reminder_cancelled: (parts: ReminderTimeParts) => string;
   bot_managed_bot_created: (username: string) => string;
 
@@ -353,6 +354,9 @@ const en: Strings = {
   bot_check_wrong_user: "This check isn't addressed to you.",
   bot_reminder_scheduled: (p) => {
     return `Reminder set for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+  },
+  bot_reminder_updated: (p) => {
+    return `Reminder updated for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
   },
   bot_reminder_cancelled: (p) => {
     return `Reminder cancelled for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
@@ -685,6 +689,9 @@ const ru: Strings = {
   bot_check_wrong_user: "Этот вопрос адресован не тебе.",
   bot_reminder_scheduled: (p) => {
     return `Было создано напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+  },
+  bot_reminder_updated: (p) => {
+    return `Напоминание обновлено на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
   },
   bot_reminder_cancelled: (p) => {
     return `Напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset}) отменено`;

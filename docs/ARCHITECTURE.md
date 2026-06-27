@@ -265,8 +265,10 @@ http/https + ports 80/443. Tools: `random_number`, `random_choice`,
 concurrency-bounded by `createSemaphore`), `user_facts`, and the `reminders`
 tools — `schedule_reminder_in`/`schedule_reminder_at` **create** reminders
 (capped per user by `Settings.maxRemindersPerUser`), `list_reminders` returns a
-user's pending reminders (soonest-first, bounded), and `cancel_reminder` deletes
-one by id after an O(1) ownership check; firing lives in `src/reminders/`.
+user's pending reminders (soonest-first, bounded), `edit_reminder` changes a
+reminder's note and/or fire time by id after an O(1) ownership check (no cap
+re-check; the count is unchanged), and `cancel_reminder` deletes one by id after
+the same O(1) check; firing lives in `src/reminders/`.
 **Depends on:** `storage` (facts/reminders), `proxy`, `metrics`, Firecrawl/web.
 **Depended on by:** `ai/compat-client` (via `getAllTools()`), `main.ts` (registration).
 
@@ -601,8 +603,8 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   message from stored context rather than echoing stored text, trading
   determinism/cost for freshness; non-transactional delete means possible
   duplicates over guaranteed delivery.
-- **Per-user reminder cap + bounded list/cancel tools** — users manage reminders
-  conversationally via `list_reminders`/`cancel_reminder`, but reminders carry no
+- **Per-user reminder cap + bounded list/edit/cancel tools** — users manage reminders
+  conversationally via `list_reminders`/`edit_reminder`/`cancel_reminder`, but reminders carry no
   TTL and creation was previously unbounded, so a user could accumulate enough to
   blow the model context (a list tool result is fed back into the LLM uncapped)
   and make deletion an O(n²) grind. Three guardrails: (1) a configurable per-user
@@ -612,9 +614,12 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   check-then-save guardrail, not an atomic invariant, since a rare off-by-one over
   the cap is harmless. (2) `list_reminders` independently caps its result (soonest
   N, shortened notes) because nothing downstream bounds a tool result before it
-  re-enters the model. (3) `cancel_reminder` verifies ownership and reads the fire
+  re-enters the model. (3) `cancel_reminder` and `edit_reminder` verify ownership and read the fire
   time via an O(1) `getReminder` (a single `GET`) instead of an O(n) list scan, so
-  the per-call cost is constant. No blanket cancel-all verb exists — bounding the
+  the per-call cost is constant. `edit_reminder` keeps the same `id` and the
+  original conversation snapshot, overwriting via `saveReminder` (which upserts the
+  due-index score), and re-checks the 1-minute lead only when the time changes.
+  No blanket cancel-all verb exists — bounding the
   blast radius of an accidental "delete everything" — and the AI step loop is
   **not** the safeguard (parallel tool calls can fan out within a step).
 - **Stateless Mini App auth** — `initData` is re-verified on every request (no

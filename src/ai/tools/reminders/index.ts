@@ -7,12 +7,14 @@ import { createScheduleReminderAtTool } from "./scheduleAt";
 import { createScheduleReminderInTool } from "./scheduleIn";
 import { createListRemindersTool } from "./list";
 import { createCancelReminderTool } from "./cancel";
+import { createEditReminderTool } from "./edit";
 
 export function createReminderTools(deps: { storage: Storage }): Tool[] {
   return [
     createScheduleReminderInTool(deps) as Tool,
     createScheduleReminderAtTool(deps) as Tool,
     createListRemindersTool(deps) as Tool,
+    createEditReminderTool(deps) as Tool,
     createCancelReminderTool(deps) as Tool,
   ];
 }

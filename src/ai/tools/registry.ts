@@ -9,6 +9,7 @@ export type ToolCallSource = "ask" | "guest";
 
 export type ToolEffect =
   | { type: "reminder_scheduled"; fireAtMs: number; timezone: string }
+  | { type: "reminder_updated"; fireAtMs: number; timezone: string }
   | { type: "reminder_cancelled"; fireAtMs: number; timezone: string };
 
 export type ToolCallContext = {
