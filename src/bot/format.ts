@@ -75,6 +75,7 @@ export function buildEffectsTopBlock(
   for (const effect of effects) {
     if (
       effect.type === "reminder_scheduled" ||
+      effect.type === "reminder_updated" ||
       effect.type === "reminder_cancelled"
     ) {
       lines.push(renderReminderBlockquote(effect, lang));
@@ -86,7 +87,7 @@ export function buildEffectsTopBlock(
 function renderReminderBlockquote(
   effect: Extract<
     ToolEffect,
-    { type: "reminder_scheduled" | "reminder_cancelled" }
+    { type: "reminder_scheduled" | "reminder_updated" | "reminder_cancelled" }
   >,
   lang: Lang,
 ): string {
@@ -98,7 +99,9 @@ function renderReminderBlockquote(
   const line =
     effect.type === "reminder_scheduled"
       ? t(lang).bot_reminder_scheduled(parts)
-      : t(lang).bot_reminder_cancelled(parts);
+      : effect.type === "reminder_updated"
+        ? t(lang).bot_reminder_updated(parts)
+        : t(lang).bot_reminder_cancelled(parts);
   return `<blockquote>${escapeHtmlText(line)}</blockquote>`;
 }
 
