@@ -130,6 +130,14 @@ export interface Storage {
   fetchDueReminders(nowMs: number): Promise<Reminder[]>;
   listRemindersForUser(userId: string): Promise<Reminder[]>;
   listAllReminders(): Promise<Reminder[]>;
+  // Fetch a single reminder by id (O(1)); null if absent or corrupt. Lets the
+  // cancel tool verify ownership and read fireAtMs without an O(n) list scan.
+  getReminder(id: string): Promise<Reminder | null>;
+  // Count a user's reminders (O(1) via SCARD) for the per-user creation cap.
+  // May over-count slightly if a corrupted reminder left a dangling id in the
+  // index (the quarantine path can't reverse-map it to a user) — that only makes
+  // the cap marginally stricter, never looser, which is fine for a soft cap.
+  countRemindersForUser(userId: string): Promise<number>;
   deleteReminder(id: string, userId: string): Promise<void>;
 
   recordPrivateChat(userId: string): Promise<void>;

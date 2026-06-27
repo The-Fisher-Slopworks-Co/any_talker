@@ -119,6 +119,10 @@ are supported as `host:port`).
 
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
 - Tool calling — built-in `random_number` tool; add new tools via `registerTool()`.
+- Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, or cancel
+  them by description; the AI drives this via the `schedule_reminder_*` / `list_reminders` /
+  `cancel_reminder` tools. Each user is capped at `maxRemindersPerUser` reminders (default 50;
+  configurable via `PUT /api/settings`).
 - Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
   (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.

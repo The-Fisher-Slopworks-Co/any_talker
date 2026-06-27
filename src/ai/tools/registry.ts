@@ -7,11 +7,9 @@ import type { AIMessage } from "../types";
 
 export type ToolCallSource = "ask" | "guest";
 
-export type ToolEffect = {
-  type: "reminder_scheduled";
-  fireAtMs: number;
-  timezone: string;
-};
+export type ToolEffect =
+  | { type: "reminder_scheduled"; fireAtMs: number; timezone: string }
+  | { type: "reminder_cancelled"; fireAtMs: number; timezone: string };
 
 export type ToolCallContext = {
   source: ToolCallSource;

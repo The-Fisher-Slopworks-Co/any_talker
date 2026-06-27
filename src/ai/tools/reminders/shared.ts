@@ -5,6 +5,7 @@ import type { ToolCallContext } from "../registry";
 import type { DeliveryTarget } from "../../../reminders/types";
 import { MIN_LEAD_MS } from "../../../reminders/types";
 import type { Storage } from "../../../storage/types";
+import { getOrInitSettings } from "../../../settings";
 import { serializeMessages } from "../../serialize";
 
 export function buildDeliveryTarget(ctx: ToolCallContext): DeliveryTarget {
@@ -58,6 +59,19 @@ export async function persistReminder(
           "user has not started a private chat with the bot yet; ask them to send any message to the bot in DM first, then retry",
       };
     }
+  }
+
+  // Per-user reminder cap (global policy; settings are not bot-scoped). The cap
+  // is enforced per character via the scoped count. This is a check-then-save
+  // guardrail, not an atomic invariant: concurrent creations within one tool
+  // step could overshoot by a few, which is harmless for a quota bound.
+  const { maxRemindersPerUser } = await getOrInitSettings(storage);
+  const count = await scoped.countRemindersForUser(ctx.userId);
+  if (count >= maxRemindersPerUser) {
+    return {
+      ok: false,
+      reason: `limit_reached: the user already has the maximum of ${maxRemindersPerUser} active reminders; ask them to cancel some before adding more`,
+    };
   }
 
   const reminderId = crypto.randomUUID();

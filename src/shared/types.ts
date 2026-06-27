@@ -31,9 +31,19 @@ export type Settings = {
   rateLimit: RateLimitConfig;
   timezone: string;
   expandableBlockquoteThreshold: number;
+  // Cap on how many reminders one user may hold at once (per character bot).
+  // Creation past this is rejected (not evicted — a reminder is a user-visible
+  // commitment). Bounds list/cancel cost and the KeyDB keyspace, since reminders
+  // carry no TTL. Configurable via PUT /api/settings; defaults to 50.
+  maxRemindersPerUser: number;
 };
 
 export const DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
+
+// Default per-user reminder cap (see `Settings.maxRemindersPerUser`). Mirrors
+// the `USER_FACTS_MAX_PER_USER` precedent, but enforced as rejection rather than
+// oldest-eviction.
+export const DEFAULT_MAX_REMINDERS_PER_USER = 50;
 
 export type WhitelistKind = "users" | "chats";
 
@@ -122,6 +132,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   timezone: "UTC",
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
+  maxRemindersPerUser: DEFAULT_MAX_REMINDERS_PER_USER,
 };
 
 // Cap on how far back the conversation graph is walked when building LLM
