@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import type { WindowKind } from "./types";
+import type { UserSettingChange, UserSettingField, WindowKind } from "./types";
 
 export type Lang = "en" | "ru";
 
@@ -52,6 +52,7 @@ type Strings = {
   bot_reminder_scheduled: (parts: ReminderTimeParts) => string;
   bot_reminder_updated: (parts: ReminderTimeParts) => string;
   bot_reminder_cancelled: (parts: ReminderTimeParts) => string;
+  bot_settings_updated: (changes: UserSettingChange[]) => string;
   bot_managed_bot_created: (username: string) => string;
 
   ui_loading: string;
@@ -333,6 +334,59 @@ function etaRu(ms: number): string {
   return `${Math.ceil(hours / 24)} дн`;
 }
 
+// Render a `settings_updated` confirmation line. Each change shows the field
+// label and the new value; gender/language are de-coded to a readable word, and
+// a cleared field (value === null) reads as "reset to default".
+const SETTING_LABEL_EN: Record<UserSettingField, string> = {
+  name: "name",
+  timezone: "timezone",
+  gender: "gender",
+  language: "language",
+};
+
+function settingValueEn(change: UserSettingChange): string {
+  if (change.value === null) return "reset to default";
+  if (change.field === "gender") {
+    return change.value === "male" ? "male" : "female";
+  }
+  if (change.field === "language") {
+    return change.value === "ru" ? "Russian" : "English";
+  }
+  return change.value;
+}
+
+function settingsUpdatedEn(changes: UserSettingChange[]): string {
+  const parts = changes.map(
+    (c) => `${SETTING_LABEL_EN[c.field]}: ${settingValueEn(c)}`,
+  );
+  return `Settings updated — ${parts.join(", ")}`;
+}
+
+const SETTING_LABEL_RU: Record<UserSettingField, string> = {
+  name: "имя",
+  timezone: "часовой пояс",
+  gender: "пол",
+  language: "язык",
+};
+
+function settingValueRu(change: UserSettingChange): string {
+  if (change.value === null) return "сброшено";
+  if (change.field === "gender") {
+    return change.value === "male" ? "мужской" : "женский";
+  }
+  if (change.field === "language") {
+    return change.value === "ru" ? "русский" : "английский";
+  }
+  return change.value;
+}
+
+function settingsUpdatedRu(changes: UserSettingChange[]): string {
+  const parts = changes.map(
+    (c) => `${SETTING_LABEL_RU[c.field]}: ${settingValueRu(c)}`,
+  );
+  return `Настройки обновлены — ${parts.join(", ")}`;
+}
+
 const en: Strings = {
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
   bot_voice_cant_fetch: "⚠️ Couldn't fetch the voice message.",
@@ -361,6 +415,7 @@ const en: Strings = {
   bot_reminder_cancelled: (p) => {
     return `Reminder cancelled for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
   },
+  bot_settings_updated: settingsUpdatedEn,
   bot_managed_bot_created: (username) =>
     `✅ Managed bot @${username} is now running.`,
 
@@ -696,6 +751,7 @@ const ru: Strings = {
   bot_reminder_cancelled: (p) => {
     return `Напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset}) отменено`;
   },
+  bot_settings_updated: settingsUpdatedRu,
   bot_managed_bot_created: (username) =>
     `✅ Управляемый бот @${username} запущен.`,
 

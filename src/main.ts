@@ -18,6 +18,7 @@ import { createYoutubeTranscriptTool } from "./ai/tools/youtube-transcript";
 import { createSearchWebTool } from "./ai/tools/search-web";
 import { createReminderTools } from "./ai/tools/reminders";
 import { createUserFactsTools } from "./ai/tools/user-facts";
+import { createUserSettingsTools } from "./ai/tools/user-settings";
 import { startScheduler } from "./reminders/scheduler";
 import { reminderApiFromGrammy } from "./reminders/delivery";
 import { startChecksScheduler } from "./checks/runner";
@@ -72,6 +73,7 @@ async function main() {
   }
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
   for (const t of createUserFactsTools({ storage })) registerTool(logged(t));
+  for (const t of createUserSettingsTools({ storage })) registerTool(logged(t));
 
   const mainResolver = createMainPersonaResolver(storage);
   // Forward-declared so the main bot's `siblingBotIds` can read the live set of

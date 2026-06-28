@@ -99,6 +99,31 @@ describe("MESSAGES parity", () => {
       }),
     ).toBe("Reminder set for 2026-05-07 at 10:00 (GMT+5)");
   });
+
+  test("bot_settings_updated decodes values and joins changes", () => {
+    const changes = [
+      { field: "name" as const, value: "Vasya" },
+      { field: "timezone" as const, value: "Europe/Moscow" },
+      { field: "gender" as const, value: "female" },
+      { field: "language" as const, value: "ru" },
+    ];
+    expect(t("en").bot_settings_updated(changes)).toBe(
+      "Settings updated — name: Vasya, timezone: Europe/Moscow, gender: female, language: Russian",
+    );
+    expect(t("ru").bot_settings_updated(changes)).toBe(
+      "Настройки обновлены — имя: Vasya, часовой пояс: Europe/Moscow, пол: женский, язык: русский",
+    );
+  });
+
+  test("bot_settings_updated renders a cleared field", () => {
+    const changes = [{ field: "gender" as const, value: null }];
+    expect(t("en").bot_settings_updated(changes)).toBe(
+      "Settings updated — gender: reset to default",
+    );
+    expect(t("ru").bot_settings_updated(changes)).toBe(
+      "Настройки обновлены — пол: сброшено",
+    );
+  });
 });
 
 describe("languageSection", () => {

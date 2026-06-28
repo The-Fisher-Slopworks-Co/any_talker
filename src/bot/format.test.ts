@@ -215,4 +215,31 @@ describe("buildEffectsTopBlock", () => {
         "<blockquote>Было создано напоминание на 08.05.2026 в 10:00 (GMT+3)</blockquote>\n",
     );
   });
+
+  test("renders a settings_updated effect, decoding gender/language and clears", () => {
+    const effects: ToolEffect[] = [
+      {
+        type: "settings_updated",
+        changes: [
+          { field: "language", value: "ru" },
+          { field: "gender", value: null },
+        ],
+      },
+    ];
+    expect(buildEffectsTopBlock(effects, "en")).toBe(
+      "<blockquote>Settings updated — language: Russian, gender: reset to default</blockquote>\n",
+    );
+    expect(buildEffectsTopBlock(effects, "ru")).toBe(
+      "<blockquote>Настройки обновлены — язык: русский, пол: сброшено</blockquote>\n",
+    );
+  });
+
+  test("HTML-escapes a user-controlled name in a settings_updated effect", () => {
+    const effects: ToolEffect[] = [
+      { type: "settings_updated", changes: [{ field: "name", value: "A&B" }] },
+    ];
+    expect(buildEffectsTopBlock(effects, "en")).toBe(
+      "<blockquote>Settings updated — name: A&amp;B</blockquote>\n",
+    );
+  });
 });

@@ -126,7 +126,7 @@ flowchart TB
 | `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenAI-compatible client, model catalogue + pricing, system-prompt builder, message (de)serialization, AI types. | `compat-client.ts`, `model-catalog.ts`, `instruction.ts`, `serialize.ts`, `types.ts` |
-| `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `reminders/` |
+| `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
 | `src/managed-bots/` | Owner-created character bots (Bot API 9.6): lifecycle manager, persona resolver, native-creation handling, avatar + input validation. | `manager.ts`, `persona.ts`, `avatar.ts`, `validate.ts`, `types.ts` |
 | `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests). | `types.ts`, `keydb.ts`, `memory.ts` |
 | `src/webapp/` | HTTP server, JSON API, Telegram initData auth, model-catalogue route. | `server.ts`, `api.ts`, `auth.ts` |
@@ -262,14 +262,26 @@ IP (defeating DNS rebinding), re-validates redirects, and allow-lists
 http/https + ports 80/443. Tools: `random_number`, `random_choice`,
 `calculator` (hand-written parser, no `eval`), `currency_convert`, `fetch_page`
 (Readability → Markdown), `youtube_transcript` + `search_web` (Firecrawl,
-concurrency-bounded by `createSemaphore`), `user_facts`, and the `reminders`
+concurrency-bounded by `createSemaphore`), `user_facts`, the `user_settings`
+tools, and the `reminders`
 tools — `schedule_reminder_in`/`schedule_reminder_at` **create** reminders
 (capped per user by `Settings.maxRemindersPerUser`), `list_reminders` returns a
 user's pending reminders (soonest-first, bounded), `edit_reminder` changes a
 reminder's note and/or fire time by id after an O(1) ownership check (no cap
 re-check; the count is unchanged), and `cancel_reminder` deletes one by id after
 the same O(1) check; firing lives in `src/reminders/`.
-**Depends on:** `storage` (facts/reminders), `proxy`, `metrics`, Firecrawl/web.
+`user-settings.ts` exposes `get_user_settings` (reads the effective name/timezone/
+gender/language plus an `isDefault` flag per field) and `update_user_settings`
+(partial, all-or-nothing write of any subset, with a `clear` list to reset a field
+to its default). It validates before writing — `validateDisplayName` for the name,
+`canonicalizeTimezone` for the zone (the storage setter does no validation of its
+own) — and pushes a `settings_updated` `ToolEffect` rendered as a confirmation
+blockquote (`bot/format.ts`). These four attributes are **user-global** (not
+`forBot`-scoped). A change is persisted immediately and also written back into
+the turn's shared `ToolCallContext` (`ctx.timezone`/`ctx.lang`), so a later tool
+call in the same reply — e.g. scheduling a reminder for the just-set zone —
+uses the new value rather than the snapshot resolved at the start of the turn.
+**Depends on:** `storage` (facts/reminders/attributes), `proxy`, `metrics`, Firecrawl/web.
 **Depended on by:** `ai/compat-client` (via `getAllTools()`), `main.ts` (registration).
 
 ### Storage — `src/storage/`
