@@ -35,7 +35,7 @@ export function createListRemindersTool(deps: {
   return {
     name: "list_reminders",
     description:
-      "List the current user's pending reminders, soonest first. Takes no parameters. " +
+      "List the current user's pending reminders in THIS chat, soonest first. Takes no parameters. " +
       "Returns { reminders: [{ id, fireAt (ISO 8601 UTC), note }], total, truncated }, where " +
       "'note' is the private reminder note (possibly shortened). " +
       "At most " +
@@ -46,9 +46,16 @@ export function createListRemindersTool(deps: {
       "Call this to show the user their reminders or to find which one to cancel.",
     parameters: Schema,
     execute: async (_input, ctx) => {
-      const all = await deps.storage
+      const stored = await deps.storage
         .forBot(ctx.botId ?? null)
         .listRemindersForUser(ctx.userId);
+      // Scope to the chat this turn runs in: a user's reminders are stored
+      // per-user (one due-index across all their chats), but each reminder
+      // records the chat it was created in. Showing reminders from other chats
+      // here would leak one chat's private notes into another, so filter to the
+      // current chat. listRemindersForUser already returns soonest-first, and
+      // filtering preserves that order.
+      const all = stored.filter((r) => r.chatId === ctx.chatId);
       const shown = all.slice(0, LIST_REMINDERS_LIMIT);
       return {
         reminders: shown.map((r) => ({

@@ -46,6 +46,19 @@ describe("list_reminders", () => {
     expect(out.reminders.map((r) => r.id)).toEqual(["mine"]);
   });
 
+  test("only reminders from the current chat are returned", async () => {
+    const storage = new MemoryStorage();
+    // Same user, two different chats; the tool runs in chat "c1" (baseAskCtx).
+    await storage.saveReminder(reminder({ id: "here", chatId: "c1" }));
+    await storage.saveReminder(reminder({ id: "elsewhere", chatId: "c2" }));
+    const tool = createListRemindersTool({ storage });
+    const out = await tool.execute({}, ctx);
+    expect(out.reminders.map((r) => r.id)).toEqual(["here"]);
+    // total/truncated reflect the chat-scoped set, not the user's whole list.
+    expect(out.total).toBe(1);
+    expect(out.truncated).toBe(false);
+  });
+
   test("truncates a long note to a bounded preview ending with an ellipsis", async () => {
     const storage = new MemoryStorage();
     await storage.saveReminder(reminder({ text: "x".repeat(500) }));
