@@ -339,6 +339,49 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(400);
   });
 
+  test("accepts a valid maxRemindersPerUser", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { maxRemindersPerUser: 120 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.maxRemindersPerUser).toBe(120);
+  });
+
+  test("rejects maxRemindersPerUser below 1", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { maxRemindersPerUser: 0 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a non-integer maxRemindersPerUser", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { maxRemindersPerUser: 12.5 },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("rejects non-positive multipliers", async () => {
     const d = deps();
     const res = await handleApi(

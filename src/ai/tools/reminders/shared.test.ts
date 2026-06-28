@@ -9,6 +9,7 @@ import {
   persistReminder,
 } from "./shared";
 import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
+import { DEFAULT_SETTINGS } from "../../../shared/types";
 import type { ToolCallContext, ToolEffect } from "../registry";
 
 const baseCtx: ToolCallContext = {
@@ -221,5 +222,62 @@ describe("persistReminder effects", () => {
       "ping",
     );
     expect(out.ok).toBe(true);
+  });
+});
+
+describe("persistReminder per-user cap", () => {
+  const future = (n: number) => baseCtx.now + (n + 1) * 60_000;
+
+  async function withCap(storage: MemoryStorage, cap: number): Promise<void> {
+    await storage.saveSettings({ ...DEFAULT_SETTINGS, maxRemindersPerUser: cap });
+  }
+
+  test("allows creation up to the cap, then rejects with limit_reached", async () => {
+    const storage = new MemoryStorage();
+    await withCap(storage, 2);
+    expect((await persistReminder(storage, baseCtx, future(0), "a")).ok).toBe(true);
+    expect((await persistReminder(storage, baseCtx, future(1), "b")).ok).toBe(true);
+    const out = await persistReminder(storage, baseCtx, future(2), "c");
+    expect(out).toEqual({
+      ok: false,
+      reason: expect.stringContaining("limit_reached"),
+    });
+    // The rejected reminder was not saved.
+    expect(await storage.countRemindersForUser("u1")).toBe(2);
+  });
+
+  test("does not record an effect when rejected by the cap", async () => {
+    const storage = new MemoryStorage();
+    await withCap(storage, 1);
+    await persistReminder(storage, baseCtx, future(0), "a");
+    const effects: ToolEffect[] = [];
+    const out = await persistReminder(
+      storage,
+      { ...baseCtx, effects },
+      future(1),
+      "b",
+    );
+    expect(out.ok).toBe(false);
+    expect(effects).toEqual([]);
+  });
+
+  test("the cap is per user", async () => {
+    const storage = new MemoryStorage();
+    await withCap(storage, 1);
+    expect((await persistReminder(storage, baseCtx, future(0), "a")).ok).toBe(true);
+    // A different user has their own allowance.
+    const u2 = { ...baseCtx, userId: "u2" };
+    expect((await persistReminder(storage, u2, future(1), "b")).ok).toBe(true);
+  });
+
+  test("the cap is scoped per character bot", async () => {
+    const storage = new MemoryStorage();
+    await withCap(storage, 1);
+    // Fill the main bot's allowance for u1.
+    expect((await persistReminder(storage, baseCtx, future(0), "a")).ok).toBe(true);
+    expect((await persistReminder(storage, baseCtx, future(1), "b")).ok).toBe(false);
+    // The same user under a managed bot has a separate allowance.
+    const managed = { ...baseCtx, botId: "bot9" };
+    expect((await persistReminder(storage, managed, future(2), "c")).ok).toBe(true);
   });
 });

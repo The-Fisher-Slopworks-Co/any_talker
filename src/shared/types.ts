@@ -22,6 +22,18 @@ export type ReasoningEffort = "low" | "high";
 
 export type Gender = "male" | "female";
 
+// The four self-service user attributes the AI can read/edit via the
+// user-settings tools. Kept here (a low-level shared module) so both the tool
+// layer (`ToolEffect`) and the i18n catalogue can reference them without a
+// layering inversion.
+export type UserSettingField = "name" | "timezone" | "gender" | "language";
+
+// One applied change, surfaced as a `settings_updated` ToolEffect and rendered
+// into the reply's blockquote. `value` is the new canonical value (a display
+// name, an IANA timezone, `"male"`/`"female"`, or `"en"`/`"ru"`), or `null` when
+// the field was cleared back to its default.
+export type UserSettingChange = { field: UserSettingField; value: string | null };
+
 export type Settings = {
   systemPrompt: string;
   // Model ids to try, most-preferred first. A generic OpenAI-compatible endpoint
@@ -31,9 +43,19 @@ export type Settings = {
   rateLimit: RateLimitConfig;
   timezone: string;
   expandableBlockquoteThreshold: number;
+  // Cap on how many reminders one user may hold at once (per character bot).
+  // Creation past this is rejected (not evicted — a reminder is a user-visible
+  // commitment). Bounds list/cancel cost and the KeyDB keyspace, since reminders
+  // carry no TTL. Configurable via PUT /api/settings; defaults to 50.
+  maxRemindersPerUser: number;
 };
 
 export const DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
+
+// Default per-user reminder cap (see `Settings.maxRemindersPerUser`). Mirrors
+// the `USER_FACTS_MAX_PER_USER` precedent, but enforced as rejection rather than
+// oldest-eviction.
+export const DEFAULT_MAX_REMINDERS_PER_USER = 50;
 
 export type WhitelistKind = "users" | "chats";
 
@@ -122,6 +144,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   timezone: "UTC",
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
+  maxRemindersPerUser: DEFAULT_MAX_REMINDERS_PER_USER,
 };
 
 // Cap on how far back the conversation graph is walked when building LLM

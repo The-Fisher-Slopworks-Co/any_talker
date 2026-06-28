@@ -160,6 +160,11 @@ const BAD_EXPANDABLE_THRESHOLD: ApiResponse = {
   },
 };
 
+const BAD_MAX_REMINDERS: ApiResponse = {
+  status: 400,
+  body: { error: "maxRemindersPerUser must be an integer >= 1" },
+};
+
 function isValidModelsList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
@@ -455,6 +460,17 @@ export async function handleApi(
           v < 0
         ) {
           return BAD_EXPANDABLE_THRESHOLD;
+        }
+      }
+      if (patch.maxRemindersPerUser !== undefined) {
+        const v = patch.maxRemindersPerUser;
+        if (
+          typeof v !== "number" ||
+          !Number.isFinite(v) ||
+          !Number.isInteger(v) ||
+          v < 1
+        ) {
+          return BAD_MAX_REMINDERS;
         }
       }
       const next: Settings = {

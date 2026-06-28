@@ -115,6 +115,51 @@ test("reminders created via a managed bot's tool scope only fire on that bot's s
   expect(await storage.forBot("other-bot").fetchDueReminders(afterFire)).toHaveLength(0);
 });
 
+test("list_reminders and cancel_reminder are scoped to the calling bot", async () => {
+  const storage = new MemoryStorage();
+  const tools = createReminderTools({ storage });
+  const scheduleIn = byName(tools, "schedule_reminder_in");
+  const list = byName(tools, "list_reminders");
+  const cancel = byName(tools, "cancel_reminder");
+
+  const now = 1_700_000_000_000;
+  await scheduleIn.execute(
+    { amount: 10, unit: "minutes", text: "feed me" },
+    ctx("cat-bot", { now }),
+  );
+
+  // The cat sees its reminder; the main bot does not.
+  const catList = (await list.execute({}, ctx("cat-bot", { now }))) as {
+    reminders: Array<{ id: string }>;
+  };
+  expect(catList.reminders).toHaveLength(1);
+  const mainList = (await list.execute({}, ctx(null, { now }))) as {
+    reminders: unknown[];
+  };
+  expect(mainList.reminders).toHaveLength(0);
+
+  // The main bot cannot cancel the cat's reminder (wrong scope) ...
+  const id = catList.reminders[0]!.id;
+  const mainCancel = (await cancel.execute(
+    { reminderId: id },
+    ctx(null, { now }),
+  )) as { cancelled: boolean };
+  expect(mainCancel.cancelled).toBe(false);
+  expect(
+    await storage.forBot("cat-bot").fetchDueReminders(now + 11 * 60_000),
+  ).toHaveLength(1);
+
+  // ... but the cat can.
+  const catCancel = (await cancel.execute(
+    { reminderId: id },
+    ctx("cat-bot", { now }),
+  )) as { cancelled: boolean };
+  expect(catCancel.cancelled).toBe(true);
+  expect(
+    await storage.forBot("cat-bot").fetchDueReminders(now + 11 * 60_000),
+  ).toHaveLength(0);
+});
+
 test("forBot(null) is byte-identical scope to the base main storage", async () => {
   const storage = new MemoryStorage();
   await storage.saveConversation("chat-9", 100, {

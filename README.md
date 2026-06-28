@@ -119,6 +119,16 @@ are supported as `host:port`).
 
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
 - Tool calling — built-in `random_number` tool; add new tools via `registerTool()`.
+- Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, edit a
+  reminder's note or time, or cancel them by description; the AI drives this via the
+  `schedule_reminder_*` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
+  is capped at `maxRemindersPerUser` reminders (default 50; configurable via `PUT /api/settings`).
+- Personal settings via chat — ask the bot to read or change your own name, timezone, gender, or
+  language in plain language ("call me Vasya", "I'm in Moscow time", "switch to Russian"); the AI
+  drives this via the `get_user_settings` / `update_user_settings` tools (the same four fields the
+  Web App exposes). Changes are confirmed with a blockquote and applied immediately — including to a
+  reminder set in the same message (e.g. "set it for 15:00, Yekaterinburg time") — and are shared
+  across the main bot and all character bots. The same settings are also editable in the Web App.
 - Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
   (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
