@@ -265,8 +265,9 @@ http/https + ports 80/443. Tools: `random_number`, `random_choice`,
 concurrency-bounded by `createSemaphore`), `user_facts`, the `user_settings`
 tools, and the `reminders`
 tools — `schedule_reminder_in`/`schedule_reminder_at` **create** reminders
-(capped per user by `Settings.maxRemindersPerUser`), `list_reminders` returns a
-user's pending reminders (soonest-first, bounded), `edit_reminder` changes a
+(capped per user by `Settings.maxRemindersPerUser`), `list_reminders` returns the
+user's pending reminders **for the current chat only** (soonest-first, bounded),
+`edit_reminder` changes a
 reminder's note and/or fire time by id after an O(1) ownership check (no cap
 re-check; the count is unchanged), and `cancel_reminder` deletes one by id after
 the same O(1) check; firing lives in `src/reminders/`.
@@ -626,7 +627,11 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   check-then-save guardrail, not an atomic invariant, since a rare off-by-one over
   the cap is harmless. (2) `list_reminders` independently caps its result (soonest
   N, shortened notes) because nothing downstream bounds a tool result before it
-  re-enters the model. (3) `cancel_reminder` and `edit_reminder` verify ownership and read the fire
+  re-enters the model; it also filters the user's reminders to the **current chat**
+  (reminders are stored per-user but each records its origin chat) so one chat's
+  private notes never leak into another — and because `edit_reminder`/`cancel_reminder`
+  act on ids surfaced by `list_reminders`, that scoping carries to them too.
+  (3) `cancel_reminder` and `edit_reminder` verify ownership and read the fire
   time via an O(1) `getReminder` (a single `GET`) instead of an O(n) list scan, so
   the per-call cost is constant. `edit_reminder` keeps the same `id` and the
   original conversation snapshot, overwriting via `saveReminder` (which upserts the
