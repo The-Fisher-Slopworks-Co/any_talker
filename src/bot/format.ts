@@ -79,9 +79,19 @@ export function buildEffectsTopBlock(
       effect.type === "reminder_cancelled"
     ) {
       lines.push(renderReminderBlockquote(effect, lang));
+    } else if (effect.type === "settings_updated") {
+      lines.push(renderSettingsBlockquote(effect, lang));
     }
   }
   return lines.length === 0 ? "" : lines.join("") + "\n";
+}
+
+function renderSettingsBlockquote(
+  effect: Extract<ToolEffect, { type: "settings_updated" }>,
+  lang: Lang,
+): string {
+  const line = t(lang).bot_settings_updated(effect.changes);
+  return `<blockquote>${escapeHtmlText(line)}</blockquote>`;
 }
 
 function renderReminderBlockquote(

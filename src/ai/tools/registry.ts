@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import type { Lang } from "../../shared/i18n";
+import type { UserSettingChange } from "../../shared/types";
 import type { AIMessage } from "../types";
 
 export type ToolCallSource = "ask" | "guest";
@@ -10,7 +11,11 @@ export type ToolCallSource = "ask" | "guest";
 export type ToolEffect =
   | { type: "reminder_scheduled"; fireAtMs: number; timezone: string }
   | { type: "reminder_updated"; fireAtMs: number; timezone: string }
-  | { type: "reminder_cancelled"; fireAtMs: number; timezone: string };
+  | { type: "reminder_cancelled"; fireAtMs: number; timezone: string }
+  // One or more of the user's self-service settings (name/timezone/gender/
+  // language) were changed by `update_user_settings`; rendered as a confirmation
+  // blockquote above the reply, like the reminder effects.
+  | { type: "settings_updated"; changes: UserSettingChange[] };
 
 export type ToolCallContext = {
   source: ToolCallSource;

@@ -22,6 +22,18 @@ export type ReasoningEffort = "low" | "high";
 
 export type Gender = "male" | "female";
 
+// The four self-service user attributes the AI can read/edit via the
+// user-settings tools. Kept here (a low-level shared module) so both the tool
+// layer (`ToolEffect`) and the i18n catalogue can reference them without a
+// layering inversion.
+export type UserSettingField = "name" | "timezone" | "gender" | "language";
+
+// One applied change, surfaced as a `settings_updated` ToolEffect and rendered
+// into the reply's blockquote. `value` is the new canonical value (a display
+// name, an IANA timezone, `"male"`/`"female"`, or `"en"`/`"ru"`), or `null` when
+// the field was cleared back to its default.
+export type UserSettingChange = { field: UserSettingField; value: string | null };
+
 export type Settings = {
   systemPrompt: string;
   // Model ids to try, most-preferred first. A generic OpenAI-compatible endpoint
