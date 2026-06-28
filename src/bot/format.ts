@@ -73,29 +73,45 @@ export function buildEffectsTopBlock(
 ): string {
   const lines: string[] = [];
   for (const effect of effects) {
-    if (effect.type === "reminder_scheduled") {
+    if (
+      effect.type === "reminder_scheduled" ||
+      effect.type === "reminder_updated" ||
+      effect.type === "reminder_cancelled"
+    ) {
       lines.push(renderReminderBlockquote(effect, lang));
+    } else if (effect.type === "settings_updated") {
+      lines.push(renderSettingsBlockquote(effect, lang));
     }
   }
   return lines.length === 0 ? "" : lines.join("") + "\n";
 }
 
+function renderSettingsBlockquote(
+  effect: Extract<ToolEffect, { type: "settings_updated" }>,
+  lang: Lang,
+): string {
+  const line = t(lang).bot_settings_updated(effect.changes);
+  return `<blockquote>${escapeHtmlText(line)}</blockquote>`;
+}
+
 function renderReminderBlockquote(
-  effect: Extract<ToolEffect, { type: "reminder_scheduled" }>,
+  effect: Extract<
+    ToolEffect,
+    { type: "reminder_scheduled" | "reminder_updated" | "reminder_cancelled" }
+  >,
   lang: Lang,
 ): string {
   const local = formatLocalParts(effect.fireAtMs, effect.timezone);
   const offset = formatGmtOffset(
     tzOffsetMinutesAt(effect.fireAtMs, effect.timezone),
   );
-  const line = t(lang).bot_reminder_scheduled({
-    year: local.year,
-    month: local.month,
-    day: local.day,
-    hour: local.hour,
-    minute: local.minute,
-    offset,
-  });
+  const parts = { ...local, offset };
+  const line =
+    effect.type === "reminder_scheduled"
+      ? t(lang).bot_reminder_scheduled(parts)
+      : effect.type === "reminder_updated"
+        ? t(lang).bot_reminder_updated(parts)
+        : t(lang).bot_reminder_cancelled(parts);
   return `<blockquote>${escapeHtmlText(line)}</blockquote>`;
 }
 

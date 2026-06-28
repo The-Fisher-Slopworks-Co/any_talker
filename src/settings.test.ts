@@ -57,6 +57,8 @@ describe("applyChatOverrides", () => {
       timezone: DEFAULT_SETTINGS.timezone,
       expandableBlockquoteThreshold:
         DEFAULT_SETTINGS.expandableBlockquoteThreshold,
+      // Reminder cap is global policy too — never overridden per chat.
+      maxRemindersPerUser: DEFAULT_SETTINGS.maxRemindersPerUser,
     });
   });
 
@@ -92,6 +94,34 @@ describe("applyChatOverrides", () => {
     expect(s.expandableBlockquoteThreshold).toBe(
       DEFAULT_SETTINGS.expandableBlockquoteThreshold,
     );
+  });
+
+  test("normalize fills default maxRemindersPerUser when missing", async () => {
+    const storage = new MemoryStorage();
+    const legacy = {
+      ...DEFAULT_SETTINGS,
+      maxRemindersPerUser: undefined,
+    } as never;
+    await storage.saveSettings(legacy);
+    const s = await getOrInitSettings(storage);
+    expect(s.maxRemindersPerUser).toBe(DEFAULT_SETTINGS.maxRemindersPerUser);
+  });
+
+  test("normalize rejects non-positive stored maxRemindersPerUser", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({ ...DEFAULT_SETTINGS, maxRemindersPerUser: 0 });
+    const s = await getOrInitSettings(storage);
+    expect(s.maxRemindersPerUser).toBe(DEFAULT_SETTINGS.maxRemindersPerUser);
+  });
+
+  test("normalize floors a fractional maxRemindersPerUser", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      maxRemindersPerUser: 7.9,
+    });
+    const s = await getOrInitSettings(storage);
+    expect(s.maxRemindersPerUser).toBe(7);
   });
 
   test("normalize drops legacy OpenRouter-era fields on read", async () => {

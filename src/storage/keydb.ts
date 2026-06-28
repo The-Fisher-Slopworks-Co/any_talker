@@ -610,6 +610,31 @@ export class KeyDBStorage implements Storage {
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
+  async getReminder(id: string): Promise<Reminder | null> {
+    const raw = await this.client.get(this.sk(`reminder:${id}`));
+    if (raw === null || raw === undefined) return null;
+    try {
+      return parseStoredReminder(raw);
+    } catch (err) {
+      if (err instanceof ReminderParseError) {
+        remindersParseFailuresTotal.inc({ reason: err.reason });
+        console.error(
+          `[reminders] skipping corrupted reminder id=${id} reason=${err.reason}:`,
+          err.cause,
+        );
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  async countRemindersForUser(userId: string): Promise<number> {
+    // SCARD is O(1). May slightly over-count if a corrupted reminder left a
+    // dangling id in the set (the quarantine path can't SREM without the
+    // userId); that only makes the cap marginally stricter, never looser.
+    return await this.client.scard(this.sk(`user_reminders:${userId}`));
+  }
+
   async deleteReminder(id: string, userId: string): Promise<void> {
     // Payload first so a crash leaves a ZSET orphan fetchDueReminders can GC;
     // index-first would leak a payload key (no TTL). user_reminders may
