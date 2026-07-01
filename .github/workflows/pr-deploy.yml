@@ -73,7 +73,7 @@ jobs:
           build-args: |
             GIT_COMMIT=${{ steps.pr.outputs.sha }}
           cache-from: type=gha,scope=preview
-          cache-to: type=gha,mode=max,scope=preview
+          cache-to: type=gha,mode=max,scope=preview,ignore-error=true
 
       - name: Trigger Portainer webhook
         env:
