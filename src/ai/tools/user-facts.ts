@@ -3,14 +3,19 @@
 
 import { z } from "zod";
 import type { Tool } from "./registry";
-import type { Storage } from "../../storage/types";
+import { USER_FACTS_MAX_PER_USER, type Storage } from "../../storage/types";
+import {
+  FACT_KEY_MAX_LEN,
+  FACT_KEY_REGEX,
+  FACT_VALUE_MAX_LEN,
+} from "../../shared/user-facts";
 
 const KeySchema = z
   .string()
   .min(1)
-  .max(64)
-  .regex(/^[a-z0-9_]+$/i);
-const ValueSchema = z.string().min(1).max(500);
+  .max(FACT_KEY_MAX_LEN)
+  .regex(FACT_KEY_REGEX);
+const ValueSchema = z.string().min(1).max(FACT_VALUE_MAX_LEN);
 
 const RememberSchema = z.object({
   key: KeySchema,
@@ -35,8 +40,8 @@ const FACTS_PURPOSE_DOC =
   "Short, persistent, per-user notes that YOU (the assistant) maintain across conversations to " +
   "personalise future replies — favourite topics, preferences, ongoing situations, hobbies, recurring " +
   "context the user keeps mentioning. Lowercase snake_case keys (e.g. 'favourite_team', 'pets', " +
-  "'job_role'). Do NOT store secrets, passwords, contact details, or anything sensitive. Limit: 50 " +
-  "facts per user; once full, remembering a new fact evicts the oldest one.";
+  "'job_role'). Do NOT store secrets, passwords, contact details, or anything sensitive. Limit: " +
+  `${USER_FACTS_MAX_PER_USER} facts per user; once full, remembering a new fact evicts the oldest one.`;
 
 function createRememberFactTool(deps: {
   storage: Storage;
@@ -46,9 +51,9 @@ function createRememberFactTool(deps: {
     description:
       `Upsert one short fact about the current user. ${FACTS_PURPOSE_DOC} ` +
       "Use this whenever the user shares a stable preference or detail worth remembering for next time. " +
-      "Keys are case-insensitive (stored lowercased) and must match /^[a-z0-9_]+$/i (1–64 chars). " +
-      "Values are 1–500 chars. Always returns {ok:true}: updating an existing key overwrites its " +
-      "value, and adding a new key past the 50-fact cap evicts the oldest fact to make room.",
+      `Keys are case-insensitive (stored lowercased) and must match ${FACT_KEY_REGEX} (1–${FACT_KEY_MAX_LEN} chars). ` +
+      `Values are 1–${FACT_VALUE_MAX_LEN} chars. Always returns {ok:true}: updating an existing key overwrites its ` +
+      `value, and adding a new key past the ${USER_FACTS_MAX_PER_USER}-fact cap evicts the oldest fact to make room.`,
     parameters: RememberSchema,
     execute: async ({ key, value }, ctx) => {
       return deps.storage.forBot(ctx.botId ?? null).rememberUserFact(ctx.userId, key, value);

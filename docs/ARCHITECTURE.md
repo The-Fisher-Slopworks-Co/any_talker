@@ -137,7 +137,7 @@ flowchart TB
 | `src/spending/` | UTC-day-bucketed per-user spend windows (day/week/month). | `window.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
-| `src/shared/` | i18n catalog, timezone math, display-name validation, interval scheduler, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `interval-scheduler.ts`, `types.ts` |
+| `src/shared/` | i18n catalog, timezone math, display-name validation, user-fact key/value constraints, interval scheduler, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `types.ts` |
 | `src/log.ts` · `src/proxy.ts` · `src/build-info.ts` | Structured logging, HTTP-proxy resolution, version/git metadata. | — |
 | `src/types/` | Ambient declarations (Bot API 10.0 guest mode + 10.1 rich messages; HTML/CSS module imports). | `telegram-guest.d.ts`, `telegram-rich.d.ts`, `html-modules.d.ts` |
 
@@ -305,6 +305,20 @@ App `initData` (HMAC-SHA256, constant-time compare, 24h freshness) — auth is
 **stateless** (re-verified every request, no sessions). `api.ts` is a pure
 `handleApi(req, deps, actor)` with a two-tier authorization model: user-scoped
 routes, then `if (!actor.isOwner) return FORBIDDEN` gating all admin routes.
+The user-scoped tier includes a per-character **memory vault**: `GET
+/api/me/bots` lists the bot family as a narrow DTO (never the raw `ManagedBot`,
+which carries `systemPrompt`/`ownerUserId`), and `GET|POST
+/api/me/facts/:scope` + `PUT|DELETE /api/me/facts/:scope/:key` (scope =
+`"main"` or a managed bot id, validated against the registry) let a user view,
+add, edit, rename and delete the facts that character remembers about them,
+through `storage.forBot(...)` — the same records the AI's
+`remember_fact`/`forget_fact` tools maintain. Policy deliberately differs by
+caller: the AI tool FIFO-evicts at the 50-fact cap, while the vault **rejects**
+a new key at the cap (`limit reached`) and rejects a rename onto an existing
+key (409) — an explicit user action must never silently destroy a memory (the
+reminders-cap rationale). Key/value constraints live in
+`shared/user-facts.ts`, the single source of truth shared by the tool's Zod
+schemas and the API's hand-rolled validators.
 The admin-only `GET /api/models` route serves the `ModelCatalog` to the
 admin model picker (the browser can't hit a keyed/non-CORS endpoint
 directly), which uses it for `<datalist>` autocomplete and to flag unknown ids;
