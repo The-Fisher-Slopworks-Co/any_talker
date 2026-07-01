@@ -1983,3 +1983,322 @@ describe("unknown route", () => {
     expect(r.status).toBe(404);
   });
 });
+
+describe("memory vault (/api/me/bots, /api/me/facts)", () => {
+  const charBot = {
+    botId: "777",
+    ownerUserId: ownerId,
+    username: "char_bot",
+    displayName: "Кошечка",
+    systemPrompt: "secret persona prompt",
+    createdAtMs: 1,
+  };
+
+  test("GET /api/me/bots returns only the main bot when no characters exist", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/bots", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      bots: [{ botId: null, displayName: null, username: null }],
+    });
+  });
+
+  test("GET /api/me/bots lists characters via a narrow DTO (no systemPrompt leak)", async () => {
+    const d = deps();
+    await d.storage.saveManagedBot(charBot);
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/bots", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      bots: [
+        { botId: null, displayName: null, username: null },
+        { botId: "777", displayName: "Кошечка", username: "char_bot" },
+      ],
+    });
+  });
+
+  test("GET /api/me/facts/main returns the actor's facts and the cap", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/facts/main", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      facts: [{ key: "pets", value: "two cats" }],
+      cap: 50,
+    });
+  });
+
+  test("facts are scoped to the actor, never another user", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const r = await handleApi(
+      { method: "GET", path: "/api/me/facts/main", body: null },
+      d,
+      guest("99"),
+    );
+    expect((r.body as { facts: unknown[] }).facts).toEqual([]);
+  });
+
+  test("an unknown bot scope is 404 on every route", async () => {
+    const d = deps();
+    for (const req of [
+      { method: "GET" as const, path: "/api/me/facts/12345", body: null },
+      { method: "POST" as const, path: "/api/me/facts/12345", body: { key: "a", value: "b" } },
+      { method: "PUT" as const, path: "/api/me/facts/12345/a", body: { value: "b" } },
+      { method: "DELETE" as const, path: "/api/me/facts/12345/a", body: null },
+    ]) {
+      const r = await handleApi(req, d, guest("42"));
+      expect(r.status).toBe(404);
+      expect(r.body).toEqual({ error: "bot not found" });
+    }
+  });
+
+  test("POST creates a fact (key lowercased) and returns the fresh list", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/main",
+        body: { key: "Pets", value: "two cats" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { facts: unknown[] }).facts).toEqual([
+      { key: "pets", value: "two cats" },
+    ]);
+  });
+
+  test("POST rejects a malformed key and an oversized value", async () => {
+    const d = deps();
+    const badKey = await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/main",
+        body: { key: "no spaces!", value: "v" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(badKey.status).toBe(400);
+    expect(badKey.body).toEqual({ error: "invalid fact key" });
+
+    const badValue = await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/main",
+        body: { key: "ok", value: "x".repeat(501) },
+      },
+      d,
+      guest("42"),
+    );
+    expect(badValue.status).toBe(400);
+    expect(badValue.body).toEqual({ error: "invalid fact value" });
+  });
+
+  test("POST with a new key at the cap is rejected and never evicts", async () => {
+    const d = deps();
+    for (let i = 0; i < 50; i++) {
+      await d.storage.rememberUserFact("42", `fact_${i}`, `v${i}`);
+    }
+    const r = await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/main",
+        body: { key: "one_too_many", value: "v" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+    expect(r.body).toEqual({ error: "limit reached" });
+    const facts = await d.storage.listUserFacts("42");
+    expect(facts.length).toBe(50);
+    expect(facts.some((f) => f.key === "fact_0")).toBe(true);
+    expect(facts.some((f) => f.key === "one_too_many")).toBe(false);
+  });
+
+  test("POST with an existing key at the cap is an update and allowed", async () => {
+    const d = deps();
+    for (let i = 0; i < 50; i++) {
+      await d.storage.rememberUserFact("42", `fact_${i}`, `v${i}`);
+    }
+    const r = await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/main",
+        body: { key: "fact_7", value: "updated" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    const facts = (r.body as { facts: Array<{ key: string; value: string }> }).facts;
+    expect(facts.length).toBe(50);
+    expect(facts.find((f) => f.key === "fact_7")?.value).toBe("updated");
+  });
+
+  test("PUT updates the value in place", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/facts/main/pets",
+        body: { value: "three cats" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { facts: unknown[] }).facts).toEqual([
+      { key: "pets", value: "three cats" },
+    ]);
+  });
+
+  test("PUT renames via newKey", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/facts/main/pets",
+        body: { value: "two cats", newKey: "animals" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { facts: unknown[] }).facts).toEqual([
+      { key: "animals", value: "two cats" },
+    ]);
+  });
+
+  test("PUT rename succeeds at exactly the cap (old slot freed first)", async () => {
+    const d = deps();
+    for (let i = 0; i < 50; i++) {
+      await d.storage.rememberUserFact("42", `fact_${i}`, `v${i}`);
+    }
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/facts/main/fact_0",
+        body: { value: "v0", newKey: "renamed" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    const facts = (r.body as { facts: Array<{ key: string }> }).facts;
+    expect(facts.length).toBe(50);
+    expect(facts.some((f) => f.key === "renamed")).toBe(true);
+    expect(facts.some((f) => f.key === "fact_0")).toBe(false);
+  });
+
+  test("PUT rename onto another existing key is a 409, both facts intact", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.rememberUserFact("42", "job", "welder");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/facts/main/pets",
+        body: { value: "two cats", newKey: "job" },
+      },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(409);
+    expect(r.body).toEqual({ error: "fact key exists" });
+    const facts = await d.storage.listUserFacts("42");
+    expect(facts).toEqual([
+      { key: "job", value: "welder" },
+      { key: "pets", value: "two cats" },
+    ]);
+  });
+
+  test("PUT on a missing fact is 404", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/me/facts/main/nope",
+        body: { value: "v" },
+      },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(404);
+    expect(r.body).toEqual({ error: "fact not found" });
+  });
+
+  test("DELETE removes a fact and is idempotent", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const first = await handleApi(
+      { method: "DELETE", path: "/api/me/facts/main/pets", body: null },
+      d,
+      guest("42"),
+    );
+    expect(first.status).toBe(200);
+    expect((first.body as { facts: unknown[] }).facts).toEqual([]);
+
+    const second = await handleApi(
+      { method: "DELETE", path: "/api/me/facts/main/pets", body: null },
+      d,
+      guest("42"),
+    );
+    expect(second.status).toBe(200);
+  });
+
+  test("facts are isolated per character scope", async () => {
+    const d = deps();
+    await d.storage.saveManagedBot(charBot);
+    await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/main",
+        body: { key: "main_fact", value: "for the main bot" },
+      },
+      d,
+      guest("42"),
+    );
+    await handleApi(
+      {
+        method: "POST",
+        path: "/api/me/facts/777",
+        body: { key: "char_fact", value: "for the character" },
+      },
+      d,
+      guest("42"),
+    );
+
+    const mainList = await handleApi(
+      { method: "GET", path: "/api/me/facts/main", body: null },
+      d,
+      guest("42"),
+    );
+    expect((mainList.body as { facts: unknown[] }).facts).toEqual([
+      { key: "main_fact", value: "for the main bot" },
+    ]);
+
+    const charList = await handleApi(
+      { method: "GET", path: "/api/me/facts/777", body: null },
+      d,
+      guest("42"),
+    );
+    expect((charList.body as { facts: unknown[] }).facts).toEqual([
+      { key: "char_fact", value: "for the character" },
+    ]);
+  });
+});

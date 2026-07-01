@@ -13,6 +13,7 @@ import { BuildInfoFooter } from "./components/build-info-footer";
 import { adminSection, type Route } from "./lib/routes";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
+import { FactsView } from "./views/facts-view";
 import { AdminView } from "./views/admin/admin-view";
 import { AdminSectionView } from "./views/admin/admin-section-view";
 import { UserEditView } from "./views/admin/user-edit-view";
@@ -51,6 +52,7 @@ function AppShell({
             return { kind: "admin" };
           case "admin":
           case "my-reminders":
+          case "my-facts":
           case "main":
             return { kind: "main" };
         }
@@ -86,6 +88,8 @@ function AppShell({
           : s.ui_route_bot_edit;
       case "my-reminders":
         return s.ui_route_my_reminders;
+      case "my-facts":
+        return s.ui_route_my_facts;
     }
   })();
 
@@ -99,6 +103,7 @@ function AppShell({
             onMe={onMe}
             onOpenAdmin={() => setRoute({ kind: "admin" })}
             onOpenMyReminders={() => setRoute({ kind: "my-reminders" })}
+            onOpenMyFacts={() => setRoute({ kind: "my-facts" })}
           />
         );
       case "admin":
@@ -157,6 +162,8 @@ function AppShell({
             showUserId={false}
           />
         );
+      case "my-facts":
+        return <FactsView />;
     }
   };
 

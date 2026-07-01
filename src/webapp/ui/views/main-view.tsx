@@ -21,11 +21,13 @@ export function MainView({
   onMe,
   onOpenAdmin,
   onOpenMyReminders,
+  onOpenMyFacts,
 }: {
   me: MeResponse;
   onMe: (m: MeResponse) => void;
   onOpenAdmin: () => void;
   onOpenMyReminders: () => void;
+  onOpenMyFacts: () => void;
 }) {
   const { t: s, lang: resolvedLang } = useI18n();
   const [name, setName] = useState(me.displayName ?? "");
@@ -166,6 +168,11 @@ export function MainView({
         <RowButton onClick={onOpenMyReminders}>
           {s.ui_main_my_reminders}
         </RowButton>
+      </Card>
+
+      <SectionHeader>{s.ui_main_memory}</SectionHeader>
+      <Card>
+        <RowButton onClick={onOpenMyFacts}>{s.ui_main_my_facts}</RowButton>
       </Card>
 
       {me.isOwner && (
