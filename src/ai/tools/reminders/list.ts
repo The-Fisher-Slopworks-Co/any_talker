@@ -35,7 +35,8 @@ export function createListRemindersTool(deps: {
   return {
     name: "list_reminders",
     description:
-      "List the current user's pending reminders in THIS chat, soonest first. Takes no parameters. " +
+      "List the current user's pending reminders, soonest first. Takes no parameters. " +
+      "In a group chat this returns only reminders created in THIS chat; in a private chat with the bot it returns all of the user's reminders. " +
       "Returns { reminders: [{ id, fireAt (ISO 8601 UTC), note }], total, truncated }, where " +
       "'note' is the private reminder note (possibly shortened). " +
       "At most " +
@@ -49,13 +50,21 @@ export function createListRemindersTool(deps: {
       const stored = await deps.storage
         .forBot(ctx.botId ?? null)
         .listRemindersForUser(ctx.userId);
-      // Scope to the chat this turn runs in: a user's reminders are stored
-      // per-user (one due-index across all their chats), but each reminder
-      // records the chat it was created in. Showing reminders from other chats
-      // here would leak one chat's private notes into another, so filter to the
-      // current chat. listRemindersForUser already returns soonest-first, and
+      // Reminders are stored per-user (one due-index across all of a user's
+      // chats), but each records the chat it was created in. In a group (or
+      // business) chat, listing reminders created elsewhere would leak one
+      // chat's private notes into another, so scope to the current chat. In the
+      // user's private DM (chatId === the userId) there is no other audience,
+      // and the DM is the natural place to manage the whole list — including
+      // guest-DM reminders, which are delivered there but recorded against the
+      // business chat they were created in, and reminders whose chat id changed
+      // under them (e.g. a group upgraded to a supergroup). So in the DM return
+      // everything. Either way listRemindersForUser returns soonest-first, and
       // filtering preserves that order.
-      const all = stored.filter((r) => r.chatId === ctx.chatId);
+      const inPrivateDm = ctx.chatId === ctx.userId;
+      const all = inPrivateDm
+        ? stored
+        : stored.filter((r) => r.chatId === ctx.chatId);
       const shown = all.slice(0, LIST_REMINDERS_LIMIT);
       return {
         reminders: shown.map((r) => ({

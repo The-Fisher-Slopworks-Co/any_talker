@@ -266,7 +266,8 @@ concurrency-bounded by `createSemaphore`), `user_facts`, the `user_settings`
 tools, and the `reminders`
 tools — `schedule_reminder_in`/`schedule_reminder_at` **create** reminders
 (capped per user by `Settings.maxRemindersPerUser`), `list_reminders` returns the
-user's pending reminders **for the current chat only** (soonest-first, bounded),
+user's pending reminders (soonest-first, bounded) — **scoped to the current chat**
+in a group, but the user's **whole list** in a private DM (the management hub),
 `edit_reminder` changes a
 reminder's note and/or fire time by id after an O(1) ownership check (no cap
 re-check; the count is unchanged), and `cancel_reminder` deletes one by id after
@@ -627,10 +628,19 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   check-then-save guardrail, not an atomic invariant, since a rare off-by-one over
   the cap is harmless. (2) `list_reminders` independently caps its result (soonest
   N, shortened notes) because nothing downstream bounds a tool result before it
-  re-enters the model; it also filters the user's reminders to the **current chat**
-  (reminders are stored per-user but each records its origin chat) so one chat's
-  private notes never leak into another — and because `edit_reminder`/`cancel_reminder`
-  act on ids surfaced by `list_reminders`, that scoping carries to them too.
+  re-enters the model. In a group chat it also scopes the list to the **current
+  chat** (reminders are stored per-user but each records its origin chat) so one
+  chat's private notes never leak into another; in the user's **private DM**
+  (`chatId == userId`) it returns the whole list, since there is no other audience
+  and the DM is where the user manages everything — including guest-DM reminders
+  (delivered there but recorded against the business chat they were created in)
+  and reminders whose chat id changed under them (group→supergroup). This is a
+  **display filter only**: `edit_reminder`/`cancel_reminder` gate solely on
+  `userId` ownership, so a user can edit/cancel any reminder they own by id
+  regardless of which chat surfaced it — the scoping does **not** carry to them.
+  Note the per-user cap is counted across *all* chats while a group-chat list is
+  scoped to one, so a user at the cap may see fewer here than the count implies;
+  the DM shows the full list to reconcile them.
   (3) `cancel_reminder` and `edit_reminder` verify ownership and read the fire
   time via an O(1) `getReminder` (a single `GET`) instead of an O(n) list scan, so
   the per-call cost is constant. `edit_reminder` keeps the same `id` and the

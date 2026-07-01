@@ -59,6 +59,27 @@ describe("list_reminders", () => {
     expect(out.truncated).toBe(false);
   });
 
+  test("in the user's private DM, all of their reminders are returned", async () => {
+    const storage = new MemoryStorage();
+    // A private DM is the one chat whose id equals the user's id. There the
+    // user manages their whole list, including reminders created elsewhere
+    // (e.g. a guest-DM reminder delivered here but recorded against another
+    // chat, or one whose chat id changed under it). Distinct fire times keep
+    // the soonest-first assertion deterministic.
+    await storage.saveReminder(
+      reminder({ id: "here", chatId: "u1", fireAtMs: 2_000_000 }),
+    );
+    await storage.saveReminder(
+      reminder({ id: "elsewhere", chatId: "c2", fireAtMs: 3_000_000 }),
+    );
+    const tool = createListRemindersTool({ storage });
+    // Run in the DM: chatId === userId ("u1").
+    const out = await tool.execute({}, { ...ctx, chatId: "u1" });
+    expect(out.reminders.map((r) => r.id)).toEqual(["here", "elsewhere"]);
+    expect(out.total).toBe(2);
+    expect(out.truncated).toBe(false);
+  });
+
   test("truncates a long note to a bounded preview ending with an ellipsis", async () => {
     const storage = new MemoryStorage();
     await storage.saveReminder(reminder({ text: "x".repeat(500) }));
