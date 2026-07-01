@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import type { Storage } from "../storage/types";
+import { USER_FACTS_MAX_PER_USER, type Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
+import { normalizeFactKey, normalizeFactValue } from "../shared/user-facts";
 import type {
   Chat,
   Settings,
@@ -116,6 +117,58 @@ const BAD_TIMEZONE: ApiResponse = {
   status: 400,
   body: { error: "invalid timezone" },
 };
+
+// --- Memory vault (user facts) responses & helpers ---
+
+const BAD_FACT_KEY: ApiResponse = {
+  status: 400,
+  body: { error: "invalid fact key" },
+};
+const BAD_FACT_VALUE: ApiResponse = {
+  status: 400,
+  body: { error: "invalid fact value" },
+};
+const FACTS_LIMIT_REACHED: ApiResponse = {
+  status: 400,
+  body: { error: "limit reached" },
+};
+const FACT_NOT_FOUND: ApiResponse = {
+  status: 404,
+  body: { error: "fact not found" },
+};
+const FACT_KEY_EXISTS: ApiResponse = {
+  status: 409,
+  body: { error: "fact key exists" },
+};
+const FACTS_BOT_NOT_FOUND: ApiResponse = {
+  status: 404,
+  body: { error: "bot not found" },
+};
+
+// The vault addresses a character by URL scope: the literal "main" is the main
+// bot (forBot(null)); anything else must be a registered managed bot's id.
+// Telegram bot ids are numeric, so "main" can never collide with a real id.
+const MAIN_BOT_SCOPE = "main";
+
+async function resolveFactsStorage(
+  storage: Storage,
+  scope: string,
+): Promise<Storage | null> {
+  if (scope === MAIN_BOT_SCOPE) return storage.forBot(null);
+  const bot = await storage.getManagedBot(scope);
+  return bot ? storage.forBot(scope) : null;
+}
+
+// Every vault mutation returns the fresh list (like the whitelist routes), so
+// the client can replace its state without a second round trip. The cap rides
+// along so the UI never hardcodes it.
+async function respondFacts(
+  scoped: Storage,
+  userId: string,
+): Promise<ApiResponse> {
+  const facts = await scoped.listUserFacts(userId);
+  return { status: 200, body: { facts, cap: USER_FACTS_MAX_PER_USER } };
+}
 
 const BAD_GENDER: ApiResponse = {
   status: 400,
@@ -397,6 +450,96 @@ export async function handleApi(
   if (req.path === "/api/me/spending" && req.method === "GET") {
     const spending = await deps.storage.getUserSpend(actor.userId, Date.now());
     return { status: 200, body: { spending } };
+  }
+
+  // Memory vault: the family roster for the character switcher. A narrow DTO
+  // on purpose — never the raw ManagedBot, which carries systemPrompt and
+  // ownerUserId that a non-owner must not see. Bot names/usernames are already
+  // public via Telegram, so exposing the roster to any authenticated user is fine.
+  if (req.path === "/api/me/bots" && req.method === "GET") {
+    const managed = await deps.storage.listManagedBots();
+    const bots: Array<{
+      botId: string | null;
+      displayName: string | null;
+      username: string | null;
+    }> = [
+      { botId: null, displayName: null, username: null },
+      ...managed.map((b) => ({
+        botId: b.botId,
+        displayName: b.displayName,
+        username: b.username,
+      })),
+    ];
+    return { status: 200, body: { bots } };
+  }
+
+  // Memory vault: a user reads/edits the facts a character remembers about
+  // them. Scoped strictly to actor.userId — the id never comes from the request.
+  const factsCollection = req.path.match(/^\/api\/me\/facts\/([^/]+)$/);
+  if (factsCollection) {
+    const scoped = await resolveFactsStorage(deps.storage, factsCollection[1]!);
+    if (!scoped) return FACTS_BOT_NOT_FOUND;
+
+    if (req.method === "GET") return respondFacts(scoped, actor.userId);
+
+    if (req.method === "POST") {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const key = normalizeFactKey(body.key);
+      if (key === null) return BAD_FACT_KEY;
+      const value = normalizeFactValue(body.value);
+      if (value === null) return BAD_FACT_VALUE;
+      // Check-then-save soft cap, mirroring the reminders cap rationale: an
+      // explicit UI add must be rejected at the limit, never silently evict a
+      // memory the way the AI's remember_fact does. Upserting an existing key
+      // doesn't grow the count, so it is always allowed.
+      const existing = await scoped.listUserFacts(actor.userId);
+      const isUpdate = existing.some((f) => f.key === key);
+      if (!isUpdate && existing.length >= USER_FACTS_MAX_PER_USER) {
+        return FACTS_LIMIT_REACHED;
+      }
+      await scoped.rememberUserFact(actor.userId, key, value);
+      return respondFacts(scoped, actor.userId);
+    }
+  }
+
+  const factsItem = req.path.match(/^\/api\/me\/facts\/([^/]+)\/([^/]+)$/);
+  if (factsItem) {
+    const scoped = await resolveFactsStorage(deps.storage, factsItem[1]!);
+    if (!scoped) return FACTS_BOT_NOT_FOUND;
+    // The key charset ([a-z0-9_]) is URL-safe, so the path segment is the key
+    // verbatim; anything else fails normalization here.
+    const key = normalizeFactKey(factsItem[2]!);
+    if (key === null) return BAD_FACT_KEY;
+
+    if (req.method === "PUT") {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const value = normalizeFactValue(body.value);
+      if (value === null) return BAD_FACT_VALUE;
+      const facts = await scoped.listUserFacts(actor.userId);
+      if (!facts.some((f) => f.key === key)) return FACT_NOT_FOUND;
+      let nextKey = key;
+      if (body.newKey !== undefined) {
+        const renamed = normalizeFactKey(body.newKey);
+        if (renamed === null) return BAD_FACT_KEY;
+        nextKey = renamed;
+      }
+      if (nextKey !== key) {
+        // Renaming onto another fact's key would silently destroy it — reject.
+        if (facts.some((f) => f.key === nextKey)) return FACT_KEY_EXISTS;
+        // Delete-then-create: freeing the old slot first means a rename can
+        // never trip the cap, even at exactly 50/50.
+        await scoped.forgetUserFact(actor.userId, key);
+      }
+      await scoped.rememberUserFact(actor.userId, nextKey, value);
+      return respondFacts(scoped, actor.userId);
+    }
+
+    if (req.method === "DELETE") {
+      // Idempotent: deleting an already-gone fact succeeds, mirroring
+      // forget_fact's {existed:false}-is-not-an-error semantics.
+      await scoped.forgetUserFact(actor.userId, key);
+      return respondFacts(scoped, actor.userId);
+    }
   }
 
   // Everything below this line is admin-only.

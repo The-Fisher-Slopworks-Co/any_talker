@@ -6,6 +6,7 @@ import { composeFullName, type Chat, type User } from "../../../shared/types";
 import type { Reminder } from "../../../reminders/types";
 import type { Lang } from "../../../shared/i18n";
 import type { DisplayNameError } from "../../../shared/display-name";
+import type { FactBot } from "../api-client";
 
 // USD spend can range from fractions of a cent per request to dollars over a
 // month, so allow up to 4 decimals while always showing at least 2.
@@ -62,6 +63,21 @@ export const LANG_LABEL_KEY = {
   en: "ui_main_lang_english",
   ru: "ui_main_lang_russian",
 } as const satisfies Record<Lang, keyof Strings>;
+
+export function botLabel(s: Strings, b: FactBot): string {
+  if (b.botId === null) return s.ui_facts_main_bot;
+  return b.displayName || (b.username ? `@${b.username}` : `id:${b.botId}`);
+}
+
+// Maps the machine error codes of the /api/me/facts routes to i18n strings;
+// unknown codes fall through to the generic ui_facts_save_error formatter.
+export const FACT_ERR_KEY = {
+  "invalid fact key": "ui_facts_error_invalid_key",
+  "invalid fact value": "ui_facts_error_invalid_value",
+  "limit reached": "ui_facts_error_limit_reached",
+  "fact not found": "ui_facts_error_not_found",
+  "fact key exists": "ui_facts_error_key_exists",
+} as const satisfies Record<string, keyof Strings>;
 
 export const DISPLAY_NAME_ERR_KEY = {
   too_long: "ui_main_name_err_too_long",

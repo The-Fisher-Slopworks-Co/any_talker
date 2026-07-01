@@ -77,6 +77,13 @@ export type ChatSettingsResponse = {
 export type SpendingResponse = {
   spending: SpendSummary;
 };
+export type UserFact = { key: string; value: string };
+export type FactBot = {
+  botId: string | null;
+  displayName: string | null;
+  username: string | null;
+};
+export type FactsResponse = { facts: UserFact[]; cap: number };
 export type ManagedBotRow = ManagedBot & { running: boolean };
 export type ManagedBotDetail = { bot: ManagedBot; running: boolean };
 export type ManagedBotNewInfo = {
@@ -178,6 +185,15 @@ export const api = {
     ),
   listMyReminders: () =>
     req<RemindersResponse>("GET", "/api/me/reminders"),
+  listMyBots: () => req<{ bots: FactBot[] }>("GET", "/api/me/bots"),
+  listMyFacts: (scope: string) =>
+    req<FactsResponse>("GET", `/api/me/facts/${scope}`),
+  addMyFact: (scope: string, fact: UserFact) =>
+    req<FactsResponse>("POST", `/api/me/facts/${scope}`, fact),
+  updateMyFact: (scope: string, key: string, patch: { value: string; newKey?: string }) =>
+    req<FactsResponse>("PUT", `/api/me/facts/${scope}/${key}`, patch),
+  deleteMyFact: (scope: string, key: string) =>
+    req<FactsResponse>("DELETE", `/api/me/facts/${scope}/${key}`),
   listAdminReminders: () =>
     req<RemindersResponse>("GET", "/api/admin/reminders"),
   listChecks: () =>

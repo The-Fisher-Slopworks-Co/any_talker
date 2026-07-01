@@ -218,6 +218,28 @@ type Strings = {
   ui_reminders_dm: string;
   ui_reminders_chat_fallback: (id: string) => string;
 
+  ui_route_my_facts: string;
+  ui_main_memory: string;
+  ui_main_my_facts: string;
+  ui_facts_character: string;
+  ui_facts_main_bot: string;
+  ui_facts_header: string;
+  ui_facts_empty: string;
+  ui_facts_add: string;
+  ui_facts_key_label: string;
+  ui_facts_key_placeholder: string;
+  ui_facts_value_placeholder: string;
+  ui_facts_cancel: string;
+  ui_facts_delete_confirm: string;
+  ui_facts_footer: string;
+  ui_facts_count: (count: number, cap: number) => string;
+  ui_facts_error_invalid_key: string;
+  ui_facts_error_invalid_value: string;
+  ui_facts_error_limit_reached: string;
+  ui_facts_error_not_found: string;
+  ui_facts_error_key_exists: string;
+  ui_facts_save_error: (code: string) => string;
+
   ui_route_checks: string;
   ui_route_check_edit: string;
   ui_route_check_create: string;
@@ -602,6 +624,31 @@ const en: Strings = {
   ui_reminders_dm: "DM",
   ui_reminders_chat_fallback: (id) => `chat ${id}`,
 
+  ui_route_my_facts: "Memory",
+  ui_main_memory: "Memory",
+  ui_main_my_facts: "What the bot remembers about me",
+  ui_facts_character: "Character",
+  ui_facts_main_bot: "Main bot",
+  ui_facts_header: "Saved facts",
+  ui_facts_empty: "Nothing saved yet.",
+  ui_facts_add: "Add fact",
+  ui_facts_key_label: "Key",
+  ui_facts_key_placeholder: "favourite_team",
+  ui_facts_value_placeholder: "What should the bot remember?",
+  ui_facts_cancel: "Cancel",
+  ui_facts_delete_confirm: "Delete this fact?",
+  ui_facts_footer:
+    "Notes the bot keeps about you and uses in its replies. Edit or delete them, or add your own.",
+  ui_facts_count: (count, cap) => `${count} of ${cap} facts used`,
+  ui_facts_error_invalid_key:
+    "The key must be 1–64 Latin letters, digits, or underscores.",
+  ui_facts_error_invalid_value: "The text must be 1–500 characters.",
+  ui_facts_error_limit_reached:
+    "Fact limit reached — delete one before adding another.",
+  ui_facts_error_not_found: "This fact no longer exists.",
+  ui_facts_error_key_exists: "A fact with this key already exists.",
+  ui_facts_save_error: (code) => `Could not save: ${code}`,
+
   ui_route_checks: "Checks",
   ui_route_check_edit: "Edit Check",
   ui_route_check_create: "New Check",
@@ -940,6 +987,31 @@ const ru: Strings = {
     "Ожидающие напоминания всех пользователей. Доставки с временными ошибками остаются до успешной или окончательной ошибки.",
   ui_reminders_dm: "ЛС",
   ui_reminders_chat_fallback: (id) => `чат ${id}`,
+
+  ui_route_my_facts: "Память",
+  ui_main_memory: "Память",
+  ui_main_my_facts: "Что бот помнит обо мне",
+  ui_facts_character: "Персонаж",
+  ui_facts_main_bot: "Основной бот",
+  ui_facts_header: "Сохранённые факты",
+  ui_facts_empty: "Пока ничего не сохранено.",
+  ui_facts_add: "Добавить факт",
+  ui_facts_key_label: "Ключ",
+  ui_facts_key_placeholder: "favourite_team",
+  ui_facts_value_placeholder: "Что бот должен запомнить?",
+  ui_facts_cancel: "Отмена",
+  ui_facts_delete_confirm: "Удалить этот факт?",
+  ui_facts_footer:
+    "Заметки, которые бот хранит о тебе и использует в ответах. Их можно редактировать, удалять и добавлять свои.",
+  ui_facts_count: (count, cap) => `Занято фактов: ${count} из ${cap}`,
+  ui_facts_error_invalid_key:
+    "Ключ — от 1 до 64 латинских букв, цифр или подчёркиваний.",
+  ui_facts_error_invalid_value: "Текст — от 1 до 500 символов.",
+  ui_facts_error_limit_reached:
+    "Достигнут лимит фактов — удали один, чтобы добавить новый.",
+  ui_facts_error_not_found: "Этот факт уже не существует.",
+  ui_facts_error_key_exists: "Факт с таким ключом уже есть.",
+  ui_facts_save_error: (code) => `Не удалось сохранить: ${code}`,
 
   ui_route_checks: "Чеки",
   ui_route_check_edit: "Редактирование чека",

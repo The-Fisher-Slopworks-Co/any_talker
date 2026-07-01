@@ -23,7 +23,8 @@ export type Route =
   | { kind: "chat-edit"; chatId: string; from: AdminSection }
   | { kind: "check-edit"; checkId: string | null }
   | { kind: "managed-bot-edit"; botId: string | null }
-  | { kind: "my-reminders" };
+  | { kind: "my-reminders" }
+  | { kind: "my-facts" };
 
 export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "prompt",
