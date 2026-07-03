@@ -125,6 +125,9 @@ export type ConversationNode = {
 export type GuestThreadTurn = {
   userQuestion: string;
   botAnswer: string;
+  // Telegram file_ids of the images that accompanied the question (own photo +
+  // replied-to photos), re-fetched on follow-up turns — as in ConversationNode.
+  userImageFileIds?: string[];
 };
 
 export type GuestThreadNode = {

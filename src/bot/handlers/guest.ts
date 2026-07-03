@@ -4,7 +4,14 @@
 import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { AIClient } from "../../ai/types";
-import { buildUserEnvelope, type Sender } from "../context-builder";
+import {
+  buildReplyFallbackMessage,
+  buildUserEnvelope,
+  loadChainImages,
+  withMedia,
+  type ReplyTarget,
+  type Sender,
+} from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
 import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
 import { buildInstruction } from "../../ai/instruction";
@@ -29,9 +36,20 @@ export type GuestAskInput = {
   userId: string;
   sender: Sender;
   userText: string;
+  quote: string | null;
+  images: Uint8Array[];
+  audios?: Uint8Array[];
+  imageFileIds: string[];
+  replyImageFileIds: string[];
+  // The message the guest query replied to. Guest threads only capture this
+  // bot's own answers, so a reply to anything else (another user's message, or
+  // a bot answer whose stored thread has expired) reaches the model through
+  // /ask's unknown-reply fallback (`buildReplyFallbackMessage`).
+  replyTarget: ReplyTarget | null;
   priorThread: GuestThreadNode | null;
   lang: Lang;
   onAIStart?: () => void;
+  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
 
 export type GuestAskOutcome =
@@ -61,7 +79,18 @@ export async function guestAskHandler(
     : await storage.isWhitelisted("users", input.userId);
   if (!isWhitelisted) return { kind: "denied" };
 
-  if (input.userText.trim() === "") return { kind: "denied" };
+  // Nothing to answer about — no text, no replied-to message, no media. The
+  // same emptiness check as /ask's "usage" outcome; guest queries have no
+  // usage hint to send, so it stays a silent deny.
+  const audios = input.audios ?? [];
+  if (
+    input.userText.trim() === "" &&
+    input.replyTarget === null &&
+    input.images.length === 0 &&
+    audios.length === 0
+  ) {
+    return { kind: "denied" };
+  }
 
   const [{ settings, botName }, userTimezone] = await Promise.all([
     input.resolver(input.chatId),
@@ -87,16 +116,36 @@ export async function guestAskHandler(
 
   const envelope = buildUserEnvelope({
     sender: input.sender,
-    quote: null,
+    quote: input.quote,
     text: input.userText,
   });
   const priorTurns = input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
   const messages: AIMessage[] = [];
   for (const turn of priorTurns) {
-    messages.push({ role: "user", content: turn.userQuestion });
+    const chainImages = await loadChainImages(turn.userImageFileIds, input.fetchPhoto);
+    if (chainImages.length > 0) {
+      messages.push({
+        role: "user",
+        content: withMedia(turn.userQuestion, chainImages, []),
+      });
+    } else {
+      messages.push({ role: "user", content: turn.userQuestion });
+    }
     messages.push({ role: "assistant", content: turn.botAnswer });
   }
-  messages.push({ role: "user", content: envelope });
+  // A stored thread already contains the replied-to bot answer; the raw
+  // replied-to message only fills in when there is no thread to speak for it.
+  if (priorTurns.length === 0 && input.replyTarget) {
+    messages.push(buildReplyFallbackMessage(input.replyTarget));
+  }
+  if (input.images.length > 0 || audios.length > 0) {
+    messages.push({
+      role: "user",
+      content: withMedia(envelope, input.images, audios),
+    });
+  } else {
+    messages.push({ role: "user", content: envelope });
+  }
 
   input.onAIStart?.();
 
@@ -159,9 +208,18 @@ export async function guestAskHandler(
     effects,
     expandableThreshold: settings.expandableBlockquoteThreshold,
     persistThread: async () => {
+      const allImageFileIds = [
+        ...input.imageFileIds,
+        ...input.replyImageFileIds,
+      ];
       const turns = [
         ...priorTurns,
-        { userQuestion: envelope, botAnswer: body },
+        {
+          userQuestion: envelope,
+          botAnswer: body,
+          userImageFileIds:
+            allImageFileIds.length > 0 ? allImageFileIds : undefined,
+        },
       ].slice(-MAX_REPLY_CHAIN_DEPTH);
       await storage.saveGuestThread(input.chatId, {
         chatId: input.chatId,
