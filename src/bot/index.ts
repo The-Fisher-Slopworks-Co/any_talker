@@ -401,6 +401,75 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
     const userText = (msg.text ?? msg.caption ?? "").trim();
 
+    const answerGuestQuery = (
+      ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
+    ).answerGuestQuery;
+    const answer = (
+      text: string,
+      botName: string | null,
+      topBlock?: string,
+      expandableThreshold?: number,
+    ) => {
+      const content = buildRichMarkdown(text, botName, {
+        topBlock,
+        collapseThreshold:
+          expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
+        detailsSummary: ctx.t.bot_details_summary,
+      });
+      const richContent: InputRichMessageContent = {
+        rich_message: { markdown: content.markdown },
+      };
+      return answerGuestQuery({
+        guest_query_id: guestQueryId,
+        result: {
+          type: "article",
+          id: "1",
+          title: "Reply",
+          input_message_content:
+            richContent as unknown as InputMessageContent,
+        },
+      });
+    };
+
+    // Own media, mirroring the `message:photo` / `message:voice` ask flows.
+    // A guest update delivers only the query message itself, so an album has
+    // no sibling messages to buffer — the photo embedded here is the ceiling.
+    let images: Uint8Array[] = [];
+    let imageFileIds: string[] = [];
+    if (msg.photo) {
+      const picked = pickPhotoSize(msg.photo);
+      if (picked) {
+        try {
+          images = [await fetchPhoto(picked.file_id)];
+          imageFileIds = [picked.file_id];
+        } catch (err) {
+          console.error("guest photo download failed:", err);
+          await answer(ctx.t.bot_photo_cant_fetch, null).catch((e) =>
+            console.error("answerGuestQuery failed:", e),
+          );
+          return;
+        }
+      }
+    }
+
+    let audios: Uint8Array[] = [];
+    if (msg.voice) {
+      try {
+        const raw = await downloadTelegramFile(deps.botToken, msg.voice.file_id);
+        // ogg → mp3, as in the voice ask flow; unusable audio is surfaced
+        // like a fetch failure rather than sending raw ogg.
+        const mp3 = await transcodeOggToMp3(raw);
+        if (!mp3) throw new Error("voice transcode failed");
+        audios = [mp3];
+      } catch (err) {
+        console.error("guest voice download failed:", err);
+        await answer(ctx.t.bot_voice_cant_fetch, null).catch((e) =>
+          console.error("answerGuestQuery failed:", e),
+        );
+        return;
+      }
+    }
+
     const [nameOverride, gender] = await Promise.all([
       readValidDisplayName(deps.storage, userId),
       deps.storage.getUserGender(userId),
@@ -412,11 +481,51 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       gender,
     };
 
-    const replyToOurBot =
-      msg.reply_to_message?.from?.id === ctx.me.id;
+    const replyMsg = msg.reply_to_message;
+    const replyToOurBot = replyMsg?.from?.id === ctx.me.id;
     const priorThread = replyToOurBot
       ? await scopedStorage.getGuestThread(chatId)
       : null;
+    // Always extracted when the query is a reply; the handler prefers the
+    // stored thread and falls back to the raw replied-to message (mirrors
+    // /ask, where a reply outside the conversation graph is surfaced verbatim).
+    const replyTarget = replyMsg ? extractReplyTarget(replyMsg) : null;
+    let replyImageFileIds: string[] = [];
+    if (replyTarget && replyMsg) {
+      const reply = await resolveReplyImages({
+        chatId,
+        replyToMessage: replyMsg,
+        storage: scopedStorage,
+        fetchPhoto,
+      });
+      replyTarget.images = reply.images;
+      replyImageFileIds = reply.fileIds;
+    }
+    const replyVoice = replyMsg?.voice;
+    if (replyTarget && replyVoice) {
+      try {
+        const raw = await downloadTelegramFile(deps.botToken, replyVoice.file_id);
+        // Transcode ogg → mp3; on failure drop the reply audio (it's only
+        // supplementary context, and raw ogg would crash the request).
+        const mp3 = await transcodeOggToMp3(raw);
+        if (mp3) replyTarget.audios = [mp3];
+        else console.error("reply voice transcode failed, dropping audio");
+      } catch (err) {
+        console.error("reply voice download failed:", err);
+      }
+    }
+
+    debugLog("guest_dispatch", {
+      chat_id: msg.chat.id,
+      message_id: msg.message_id,
+      user_text_len: userText.length,
+      images: images.length,
+      audios: audios.length,
+      has_quote: msg.quote !== undefined,
+      has_reply_target: replyTarget !== null,
+      reply_images: replyTarget?.images.length ?? 0,
+      prior_thread_turns: priorThread?.turns.length ?? 0,
+    });
 
     const startedAt = performance.now();
     let outcomeLabel: AskOutcomeLabel = "error";
@@ -433,40 +542,17 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         userId,
         sender,
         userText,
+        quote: msg.quote?.text ?? null,
+        images,
+        audios,
+        imageFileIds,
+        replyImageFileIds,
+        replyTarget,
         priorThread,
         lang: ctx.lang,
+        fetchPhoto,
       });
       outcomeLabel = askOutcomeLabel(outcome.kind);
-
-      const answerGuestQuery = (
-        ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
-      ).answerGuestQuery;
-      const answer = (
-        text: string,
-        botName: string | null,
-        topBlock?: string,
-        expandableThreshold?: number,
-      ) => {
-        const content = buildRichMarkdown(text, botName, {
-          topBlock,
-          collapseThreshold:
-            expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
-          detailsSummary: ctx.t.bot_details_summary,
-        });
-        const richContent: InputRichMessageContent = {
-          rich_message: { markdown: content.markdown },
-        };
-        return answerGuestQuery({
-          guest_query_id: guestQueryId,
-          result: {
-            type: "article",
-            id: "1",
-            title: "Reply",
-            input_message_content:
-              richContent as unknown as InputMessageContent,
-          },
-        });
-      };
 
       switch (outcome.kind) {
         case "denied":

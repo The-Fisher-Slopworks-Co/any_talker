@@ -85,7 +85,7 @@ export function buildUserEnvelope(args: {
   return JSON.stringify(obj);
 }
 
-function withMedia(
+export function withMedia(
   text: string,
   images: Uint8Array[],
   audios: Uint8Array[],
@@ -98,6 +98,24 @@ function withMedia(
     parts.push({ type: "audio", audio, mediaType: VOICE_MEDIA_TYPE });
   }
   return parts;
+}
+
+// The unknown-reply fallback: a replied-to message that no stored context
+// (conversation node / guest thread) can speak for is surfaced verbatim,
+// media included. Shared by /ask's `buildContext` and the guest flow so both
+// present replies to the model identically.
+export function buildReplyFallbackMessage(replyTarget: ReplyTarget): AIMessage {
+  const author = replyTarget.authorFirstName ?? "unknown";
+  const text = replyTarget.text ?? "<media>";
+  const header = `Context (replied message from ${author}): ${text}`;
+  const replyAudios = replyTarget.audios ?? [];
+  if (replyTarget.images.length > 0 || replyAudios.length > 0) {
+    return {
+      role: "user",
+      content: withMedia(header, replyTarget.images, replyAudios),
+    };
+  }
+  return { role: "user", content: header };
 }
 
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
@@ -123,18 +141,7 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
         messages.push({ role: "assistant", content: c.botAnswer });
       }
     } else {
-      const author = replyTarget.authorFirstName ?? "unknown";
-      const text = replyTarget.text ?? "<media>";
-      const header = `Context (replied message from ${author}): ${text}`;
-      const replyAudios = replyTarget.audios ?? [];
-      if (replyTarget.images.length > 0 || replyAudios.length > 0) {
-        messages.push({
-          role: "user",
-          content: withMedia(header, replyTarget.images, replyAudios),
-        });
-      } else {
-        messages.push({ role: "user", content: header });
-      }
+      messages.push(buildReplyFallbackMessage(replyTarget));
     }
   }
 
@@ -177,7 +184,7 @@ async function collectChain(
   return chain;
 }
 
-async function loadChainImages(
+export async function loadChainImages(
   fileIds: string[] | undefined,
   fetchPhoto: ((fileId: string) => Promise<Uint8Array | null>) | undefined,
 ): Promise<Uint8Array[]> {

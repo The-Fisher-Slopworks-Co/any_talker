@@ -163,9 +163,16 @@ into Telegram sends:
   `askHandler`, and on `"answered"` sends the Rich Markdown reply via Bot API
   10.1 `sendRichMessage` (plain `sendMessage` fallback) and persists the
   conversation node.
-- `dispatchGuest` — Bot API 10.0 guest queries; replies once via the raw
+- `dispatchGuest` — Bot API 10.0 guest queries; mirrors the ask flows:
+  downloads the query's own photo/voice (voice transcoded ogg→mp3), resolves
+  reply context (the stored guest thread for a reply to this bot's own answer,
+  otherwise the replied-to message — text and media — via the same
+  unknown-reply fallback `/ask` uses), and replies once via the raw
   `answerGuestQuery` API call, carrying the answer as a Bot API 10.1
-  `InputRichMessageContent` (Rich Markdown).
+  `InputRichMessageContent` (Rich Markdown). Telegram delivers only the album
+  message that carries the mention caption — sibling album messages produce no
+  guest update at all (verified live) — so an album resolves to at most its
+  single embedded photo and the album index is never populated for guest chats.
 
 Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
 bot-side authorization gate (owner / user-whitelist / chat-whitelist). AI replies
@@ -446,7 +453,7 @@ persisted entities:
 | Conversation node | `at:msg:{chatId}:{msgId}` — one node per turn, written under both the bot-reply id and the user's ask message id (DMs add the `mbot:{botId}:` scope; groups stay shared) | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }`; failed turns store the rate-limit/error notice as `botAnswer` |
 | Photo cache | `at:photo_cache:{fileId}` | base64 string | 7 days | raw bytes (TTL renewed on read) |
 | Album photos | `at:album:{chatId}:{mediaGroupId}` | hash | 30 days | `messageId → fileId` |
-| Guest thread | `at:guest_thread:{chatId}` | string | 30 days | `{ turns: [{userQuestion, botAnswer}], ts }` |
+| Guest thread | `at:guest_thread:{chatId}` | string | 30 days | `{ turns: [{userQuestion, botAnswer, userImageFileIds?}], ts }` |
 | Reminder payload | `at:reminder:{id}` | string | — | `Reminder` (incl. serialized `contextMessages`) |
 | Reminder indexes | `at:reminders:due` · `at:user_reminders:{userId}` | ZSET · SET | — | due-by-`fireAtMs` index · per-user id set |
 | Recurring checks | `at:checks` | hash | — | `RecurringCheck` per field |

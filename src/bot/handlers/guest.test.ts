@@ -47,6 +47,11 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
     userId: "42",
     sender: { firstName: "Jane", lastName: null, nameOverride: null, gender: null },
     userText: "hello",
+    quote: null,
+    images: [],
+    imageFileIds: [],
+    replyImageFileIds: [],
+    replyTarget: null,
     priorThread: null,
     lang: "en",
     ...overrides,
@@ -171,6 +176,230 @@ describe("guestAskHandler", () => {
       ],
       ts: 1000,
     });
+  });
+
+  test("reply to a non-bot message is surfaced as context before the question", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        replyTarget: {
+          messageId: 7,
+          text: "how are you?",
+          authorFirstName: "Bob",
+          images: [],
+        },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      { role: "user", content: "Context (replied message from Bob): how are you?" },
+      {
+        role: "user",
+        content: JSON.stringify({ author: "Jane", text: "hello" }),
+      },
+    ]);
+  });
+
+  test("replyTarget falls back to placeholders for missing author/text", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        replyTarget: { messageId: 7, text: null, authorFirstName: null, images: [] },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages[0]).toEqual({
+      role: "user",
+      content: "Context (replied message from unknown): <media>",
+    });
+  });
+
+  test("stored thread wins over replyTarget (no duplicate context header)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "A1" }],
+      ts: 500,
+    };
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        replyTarget: { messageId: 7, text: "A1", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+      {
+        role: "user",
+        content: JSON.stringify({ author: "Jane", text: "hello" }),
+      },
+    ]);
+  });
+
+  test("empty text with a replyTarget is answered, not denied (bare-mention reply)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const out = await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        userText: "",
+        replyTarget: { messageId: 7, text: "hi", authorFirstName: "Bob", images: [] },
+      }),
+    );
+    expect(out.kind).toBe("answered");
+  });
+
+  test("empty text with an image attached is answered, not denied", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const out = await guestAskHandler(
+      baseInput({
+        storage,
+        userText: "",
+        images: [new Uint8Array([1])],
+        imageFileIds: ["f1"],
+      }),
+    );
+    expect(out.kind).toBe("answered");
+  });
+
+  test("own images and audio are attached to the envelope as media parts", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const img = new Uint8Array([1, 2]);
+    const voice = new Uint8Array([3, 4]);
+    await guestAskHandler(
+      baseInput({ storage, ai, images: [img], audios: [voice], imageFileIds: ["f1"] }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: JSON.stringify({ author: "Jane", text: "hello" }) },
+          { type: "image", image: img, mediaType: "image/jpeg" },
+          { type: "audio", audio: voice, mediaType: "audio/mp3" },
+        ],
+      },
+    ]);
+  });
+
+  test("replied-to images and audio ride along with the context header", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const img = new Uint8Array([9]);
+    const voice = new Uint8Array([8]);
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        replyTarget: {
+          messageId: 7,
+          text: null,
+          authorFirstName: "Bob",
+          images: [img],
+          audios: [voice],
+        },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Context (replied message from Bob): <media>" },
+        { type: "image", image: img, mediaType: "image/jpeg" },
+        { type: "audio", audio: voice, mediaType: "audio/mp3" },
+      ],
+    });
+  });
+
+  test("persistThread stores own + reply image file ids on the turn", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "seen", totalTokens: 1 });
+    const out = await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        images: [new Uint8Array([1])],
+        imageFileIds: ["own1"],
+        replyImageFileIds: ["reply1", "reply2"],
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistThread();
+    const stored = await storage.getGuestThread("c1");
+    expect(stored?.turns[0]?.userImageFileIds).toEqual(["own1", "reply1", "reply2"]);
+  });
+
+  test("prior-turn image file ids are re-fetched and attached to the chain", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const img = new Uint8Array([7, 7]);
+    const fetched: string[] = [];
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "A1", userImageFileIds: ["old1"] }],
+      ts: 500,
+    };
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        fetchPhoto: async (fileId) => {
+          fetched.push(fileId);
+          return img;
+        },
+      }),
+    );
+    expect(fetched).toEqual(["old1"]);
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Q1" },
+        { type: "image", image: img, mediaType: "image/jpeg" },
+      ],
+    });
+    expect(call.messages[1]).toEqual({ role: "assistant", content: "A1" });
+  });
+
+  test("quote is embedded in the user envelope", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await guestAskHandler(baseInput({ storage, ai, quote: "как дела" }));
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      {
+        role: "user",
+        content: JSON.stringify({
+          author: "Jane",
+          quote: "как дела",
+          text: "hello",
+        }),
+      },
+    ]);
   });
 
   test("answered with priorThread: prepends prior turns to AI messages", async () => {
