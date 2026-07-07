@@ -146,7 +146,18 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   }
 
   const hasQuote = quote !== null && quote.trim() !== "";
-  if (userText.trim() !== "" || hasQuote || images.length > 0 || audios.length > 0) {
+  // A bare /ask replying into a stored chain adds no content of its own, but
+  // the prompt must still end with a user turn: a chat-completions prompt
+  // ending on an assistant message reads as a prefill of an already-complete
+  // answer, and models reliably "continue" it with an empty completion.
+  const endsWithAssistant = messages.at(-1)?.role === "assistant";
+  if (
+    userText.trim() !== "" ||
+    hasQuote ||
+    images.length > 0 ||
+    audios.length > 0 ||
+    endsWithAssistant
+  ) {
     const envelope = buildUserEnvelope({ sender, quote, text: userText });
     if (images.length > 0 || audios.length > 0) {
       messages.push({ role: "user", content: withMedia(envelope, images, audios) });

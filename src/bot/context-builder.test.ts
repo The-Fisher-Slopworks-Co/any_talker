@@ -302,7 +302,7 @@ describe("buildContext", () => {
     ]);
   });
 
-  test("empty userText with bot-msg reply: chain becomes the prompt (no trailing empty user)", async () => {
+  test("empty userText with bot-msg reply: chain plus an empty envelope so the prompt still ends with a user turn", async () => {
     const storage = new MemoryStorage();
     await storage.saveConversation("c1", 100, {
       userQuestion: "Q1",
@@ -319,9 +319,13 @@ describe("buildContext", () => {
       replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
       images: [],
     });
+    // Without the trailing envelope the prompt would end on an assistant
+    // message — a chat-completions prefill — and the model would return an
+    // empty completion.
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
+      { role: "user", content: envelope() },
     ]);
   });
 

@@ -234,6 +234,17 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));
 
+  // A model can legitimately finish with no text (e.g. an output-token cap hit
+  // mid-reasoning). Surface it as an error turn — Telegram rejects empty
+  // messages, so trying to send it would only crash the dispatcher.
+  if (result.text.trim() === "") {
+    return {
+      kind: "error",
+      message: "AI returned an empty answer",
+      persistConversation: persistTurn,
+    };
+  }
+
   // The AI now emits Rich Markdown sent verbatim via sendRichMessage; Telegram
   // parses it server-side (only supported tags/schemes are honored), so there
   // is no HTML sanitization step. The same text is persisted as conversation
