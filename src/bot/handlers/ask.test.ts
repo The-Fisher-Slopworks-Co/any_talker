@@ -250,6 +250,15 @@ describe("askHandler", () => {
     expect(await storage.getConversation("c1", 3)).toEqual(expected);
   });
 
+  test("an empty AI answer is an error turn, not an answered one (Telegram rejects empty messages)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const out = await askHandler(
+      baseInput({ storage, ai: new FakeAI({ text: "  \n", totalTokens: 50 }) }),
+    );
+    expect(out.kind).toBe("error");
+  });
+
   test("a rate-limited turn does not sever the chain: reply to own ask message carries full history", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

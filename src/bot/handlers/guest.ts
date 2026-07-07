@@ -196,6 +196,13 @@ export async function guestAskHandler(
     .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
     .catch((err) => console.error("recording user spend failed:", err));
 
+  // A model can legitimately finish with no text (e.g. an output-token cap hit
+  // mid-reasoning). Surface it as an error turn — Telegram rejects empty
+  // messages, so trying to send it would only crash the dispatcher.
+  if (result.text.trim() === "") {
+    return { kind: "error", message: "AI returned an empty answer" };
+  }
+
   // Sent verbatim as Rich Markdown (parsed server-side by Telegram) — no HTML
   // sanitization. The same text is persisted as the guest-thread context.
   const body = result.text;

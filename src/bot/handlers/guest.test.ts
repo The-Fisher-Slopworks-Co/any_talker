@@ -87,6 +87,14 @@ describe("guestAskHandler", () => {
     if (out.kind === "answered") expect(out.text).toBe("hi");
   });
 
+  test("an empty AI answer is an error turn, not an answered one (Telegram rejects empty messages)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "  \n", totalTokens: 50 });
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("error");
+  });
+
   test("owner with ownerExempt skips rate limit", async () => {
     const storage = new MemoryStorage();
     await storage.saveSettings({
