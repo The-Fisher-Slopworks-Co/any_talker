@@ -52,6 +52,8 @@ describe("applyChatOverrides", () => {
     expect(r).toEqual({
       systemPrompt: "p",
       models: ["x"],
+      // Access-gate policy is global — chat settings never override it.
+      whitelistEnabled: DEFAULT_SETTINGS.whitelistEnabled,
       // Rate limit is per-user and global — chat settings never override it.
       rateLimit: DEFAULT_SETTINGS.rateLimit,
       // Budget/anomaly are global policy too — never overridden per chat.
@@ -125,6 +127,24 @@ describe("applyChatOverrides", () => {
     });
     const s = await getOrInitSettings(storage);
     expect(s.maxRemindersPerUser).toBe(7);
+  });
+
+  test("normalize defaults whitelistEnabled to true on legacy rows", async () => {
+    const storage = new MemoryStorage();
+    const legacy = {
+      ...DEFAULT_SETTINGS,
+      whitelistEnabled: undefined,
+    } as never;
+    await storage.saveSettings(legacy);
+    const s = await getOrInitSettings(storage);
+    expect(s.whitelistEnabled).toBe(true);
+  });
+
+  test("normalize preserves a stored whitelistEnabled=false", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({ ...DEFAULT_SETTINGS, whitelistEnabled: false });
+    const s = await getOrInitSettings(storage);
+    expect(s.whitelistEnabled).toBe(false);
   });
 
   test("normalize drops legacy OpenRouter-era fields on read", async () => {

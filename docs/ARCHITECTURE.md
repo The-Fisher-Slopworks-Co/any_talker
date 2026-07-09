@@ -179,7 +179,10 @@ into Telegram sends:
   single embedded photo and the album index is never populated for guest chats.
 
 Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
-bot-side authorization gate (owner / user-whitelist / chat-whitelist). AI replies
+bot-side authorization gate (owner / user-whitelist / chat-whitelist), consulted
+after settings resolve and only while `settings.whitelistEnabled` — a single
+admin toggle that opens the bot to everyone (leaving the budget guard + rate
+limit as the protection) without discarding the whitelist entries. AI replies
 are **Rich Markdown** (Bot API 10.1): the model emits Markdown (see
 `ai/instruction.ts`), `format.ts:buildRichMarkdown` assembles the payload
 (bot-name prefix + effects block as escaped Rich HTML, long answers collapsed
@@ -388,8 +391,8 @@ sequenceDiagram
     MW->>D: command/message handler
     D->>D: resolve reply chain, download images/voice, start typing
     D->>H: askHandler(dispatch, deps)
-    H->>ACC: isAllowed(owner/whitelist)?
     H->>S: load effective settings + timezone
+    H->>ACC: isAllowed(owner/whitelist, if whitelistEnabled)?
     H->>RL: check() (skipped if owner-exempt)
     H->>S: buildContext (walk conversation graph, attach media)
     H->>AI: ai.ask({models, system, messages, tools, ...})
@@ -650,8 +653,9 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   money and fairness are different currencies and scopes, so the `BudgetGuard`
   (USD caps: global monthly/daily, per-chat daily, new-user soft-start) is a
   second, independent gate checked *before* the per-user token limiter, not
-  folded into it. It exists so the whitelist can be removed safely: the token
-  limiter bounds one user's *volume*, the budget guard bounds total *dollars*
+  folded into it. It exists so the whitelist can be turned off safely (the
+  `whitelistEnabled` toggle): the token limiter bounds one user's *volume*, the
+  budget guard bounds total *dollars*
   (an expensive model with few tokens still costs money). The **global monthly
   cap is the real kill-switch** (sized to the operator's actual budget); the
   daily/chat/new-user caps bound how fast it can drain. The owner is never denied

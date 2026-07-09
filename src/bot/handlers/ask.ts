@@ -102,11 +102,20 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     input.chatId,
   );
 
+  const [{ settings, botName }, userTimezone] = await Promise.all([
+    input.resolver(input.chatId),
+    storage.getUserTimezone(input.userId),
+  ]);
+  const timezone = userTimezone ?? settings.timezone;
+
+  // Access gate: owner always passes; otherwise the whitelist is consulted only
+  // while `whitelistEnabled` (the budget guard is the safety net when it's off).
   const allowed = await isAllowed({
     storage,
     ownerId: input.ownerId,
     userId: input.userId,
     chatId: input.chatId,
+    whitelistEnabled: settings.whitelistEnabled,
   });
   if (!allowed) return { kind: "denied" };
 
@@ -119,12 +128,6 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   ) {
     return { kind: "usage" };
   }
-
-  const [{ settings, botName }, userTimezone] = await Promise.all([
-    input.resolver(input.chatId),
-    storage.getUserTimezone(input.userId),
-  ]);
-  const timezone = userTimezone ?? settings.timezone;
 
   // Persist this turn into the conversation graph under BOTH the bot's reply
   // message id and the user's ask message id (unique within a chat, so no

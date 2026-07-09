@@ -34,7 +34,10 @@ export function AdminSectionView({
   const { t: s } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
   const needsSettings =
-    section === "prompt" || section === "ratelimit" || section === "budget";
+    section === "prompt" ||
+    section === "ratelimit" ||
+    section === "budget" ||
+    section === "whitelist";
   const goUser = (id: string) => onEditUser(id, section);
   const goChat = (id: string) => onEditChat(id, section);
 
@@ -43,8 +46,6 @@ export function AdminSectionView({
   }, [needsSettings]);
 
   if (section === "spend") return <SpendTab />;
-  if (section === "whitelist")
-    return <WhitelistTab onOpenUser={goUser} onOpenChat={goChat} />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
   if (section === "chats") return <ChatsTab onEdit={goChat} />;
   if (section === "checks")
@@ -73,6 +74,15 @@ export function AdminSectionView({
       />
     );
   if (!settings) return <LoadingState />;
+  if (section === "whitelist")
+    return (
+      <WhitelistTab
+        settings={settings}
+        onSaved={setSettings}
+        onOpenUser={goUser}
+        onOpenChat={goChat}
+      />
+    );
   if (section === "prompt")
     return <PromptTab settings={settings} onSaved={setSettings} />;
   if (section === "budget")

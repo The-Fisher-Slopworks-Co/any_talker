@@ -81,6 +81,11 @@ export type Settings = {
   // has no server-side fallback chain, so only `models[0]` is sent per request;
   // the rest are retained for the admin UI / future client-side fallback.
   models: string[];
+  // Whether the user/chat whitelist is enforced as an access gate. When false,
+  // anyone may invoke the bot and the USD budget guard + rate limit are the only
+  // protection (the whitelist entries are preserved, just not consulted). The
+  // owner is always allowed either way. Defaults to true (whitelist enforced).
+  whitelistEnabled: boolean;
   rateLimit: RateLimitConfig;
   // Hard USD spend caps (the budget-protection safety net) and the alert-only
   // anomaly thresholds. Global policy like `rateLimit` — no per-chat override.
@@ -193,6 +198,7 @@ export type GuestThreadNode = {
 export const DEFAULT_SETTINGS: Settings = {
   systemPrompt: "You are a helpful assistant in a Telegram chat. Be concise.",
   models: ["anthropic/claude-sonnet-4-5"],
+  whitelistEnabled: true,
   rateLimit: {
     fiveHourTokens: 30000,
     weeklyTokens: 300000,
