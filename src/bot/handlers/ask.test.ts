@@ -4,6 +4,7 @@
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../../storage/memory";
 import { DualWindowLimiter } from "../../ratelimit/dual-window";
+import { SpendBudgetGuard } from "../../budget/guard";
 import { currentWindowStarts } from "../../ratelimit/window";
 import type { AIClient, AskResult } from "../../ai/types";
 import { askHandler, type AskInput, type AskOutcome } from "./ask";
@@ -41,6 +42,7 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
   return {
     storage,
     rateLimiter: new DualWindowLimiter(new MemoryStorage()),
+    budgetGuard: new SpendBudgetGuard(storage),
     ai: new FakeAI(),
     resolver: createMainPersonaResolver(storage),
     ownerId: "1",
@@ -846,5 +848,55 @@ describe("askHandler", () => {
       { type: "text", text: "Q-with-photo" },
       { type: "image", image: replayBytes, mediaType: "image/jpeg" },
     ]);
+  });
+
+  test("budget cap hit returns budgetLimited (after passing the whitelist)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    // Push global monthly spend over the default $18 cap.
+    await storage.addGlobalSpend(20, 1_000);
+    const out = await askHandler(baseInput({ storage }));
+    expect(out.kind).toBe("budgetLimited");
+    if (out.kind === "budgetLimited") expect(out.reason).toBe("globalMonthly");
+    // A denial counts toward the "who hits limits most" ranking.
+    expect(await storage.topDenied(1_000, 10)).toEqual([
+      { userId: "42", count: 1 },
+    ]);
+  });
+
+  test("answered: records spend across user/chat/global/model ledgers", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({
+      text: "ok",
+      totalTokens: 100,
+      modelId: "m1",
+      costUsd: 0.5,
+      priced: true,
+    });
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    expect((await storage.getUserSpend("42", 1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.getChatSpend("c1", 1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.getGlobalSpend(1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.getModelSpend("m1", 1_000)).day).toBeCloseTo(0.5);
+    expect(await storage.listSpendModels()).toEqual(["m1"]);
+    expect(await storage.listUnpricedModels()).toEqual([]);
+  });
+
+  test("answered with an unpriced model flags it and records $0", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({
+      text: "ok",
+      totalTokens: 100,
+      modelId: "m-free",
+      costUsd: 0,
+      priced: false,
+    });
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    expect(await storage.listUnpricedModels()).toEqual(["m-free"]);
+    expect((await storage.getGlobalSpend(1_000)).day).toBe(0);
   });
 });

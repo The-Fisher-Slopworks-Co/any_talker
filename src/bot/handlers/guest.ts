@@ -3,7 +3,9 @@
 
 import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
+import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
+import { recordSpend, recordDenial } from "../../spending/record";
 import {
   buildReplyFallbackMessage,
   buildUserEnvelope,
@@ -20,12 +22,14 @@ import {
   MAX_REPLY_CHAIN_DEPTH,
   type GuestThreadNode,
   type WindowKind,
+  type BudgetDenyReason,
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
 
 export type GuestAskInput = {
   storage: Storage;
   rateLimiter: RateLimiter;
+  budgetGuard: BudgetGuard;
   ai: AIClient;
   resolver: PersonaResolver;
   // null/undefined = main bot, a managed bot's id otherwise.
@@ -54,6 +58,7 @@ export type GuestAskInput = {
 
 export type GuestAskOutcome =
   | { kind: "denied" }
+  | { kind: "budgetLimited"; reason: BudgetDenyReason }
   | { kind: "rateLimited"; limitedBy: WindowKind; msUntilReset: number }
   | {
       kind: "answered";
@@ -98,6 +103,21 @@ export async function guestAskHandler(
   ]);
   const timezone = userTimezone ?? settings.timezone;
 
+  // Hard USD budget gate (money), before the token rate limit (fairness).
+  const budgetVerdict = await input.budgetGuard.check(
+    {
+      userId: input.userId,
+      chatId: input.chatId,
+      isOwner,
+      now: input.now,
+    },
+    settings.budget,
+  );
+  if (!budgetVerdict.allowed) {
+    recordDenial(storage, input.userId, input.now);
+    return { kind: "budgetLimited", reason: budgetVerdict.reason };
+  }
+
   const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
@@ -106,6 +126,7 @@ export async function guestAskHandler(
       input.now,
     );
     if (!r.allowed) {
+      recordDenial(storage, input.userId, input.now);
       return {
         kind: "rateLimited",
         limitedBy: r.limitedBy,
@@ -189,12 +210,20 @@ export async function guestAskHandler(
     await input.rateLimiter.deduct(input.userId, result.totalTokens, input.now);
   }
 
-  // Record spend regardless of rate-limit exemption — an exempt owner's usage is
-  // still money spent through the bot. Best-effort: a storage hiccup on this
-  // display-only accounting must not fail an answer already produced.
-  await storage
-    .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
-    .catch((err) => console.error("recording user spend failed:", err));
+  // Record spend across every ledger (user/chat/global/model) regardless of
+  // rate-limit exemption — the global total is the kill-switch's source of
+  // truth. Best-effort: a storage hiccup must not fail an answer already made.
+  await recordSpend(
+    storage,
+    {
+      userId: input.userId,
+      chatId: input.chatId,
+      modelId: result.modelId ?? null,
+      costUsd: result.costUsd ?? 0,
+      priced: result.priced ?? true,
+    },
+    input.now,
+  ).catch((err) => console.error("recording spend failed:", err));
 
   // A model can legitimately finish with no text (e.g. an output-token cap hit
   // mid-reasoning). Surface it as an error turn — Telegram rejects empty

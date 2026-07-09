@@ -3,7 +3,9 @@
 
 import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
+import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
+import { recordSpend, recordDenial } from "../../spending/record";
 import { isAllowed } from "../access";
 import {
   buildContext,
@@ -21,11 +23,12 @@ import {
   type DetailLevel,
 } from "../../ai/instruction";
 import type { Lang } from "../../shared/i18n";
-import type { WindowKind } from "../../shared/types";
+import type { WindowKind, BudgetDenyReason } from "../../shared/types";
 
 export type AskInput = {
   storage: Storage;
   rateLimiter: RateLimiter;
+  budgetGuard: BudgetGuard;
   ai: AIClient;
   // Resolves the character to answer as (settings + display name) for this chat.
   resolver: PersonaResolver;
@@ -54,6 +57,13 @@ export type AskInput = {
 export type AskOutcome =
   | { kind: "denied" }
   | { kind: "usage" }
+  | {
+      // Denied by a hard USD budget cap. `reason` is for metrics/alerting only;
+      // the user sees a generic "try later" (never the financial detail).
+      kind: "budgetLimited";
+      reason: BudgetDenyReason;
+      persistConversation: PersistFailedTurn;
+    }
   | {
       kind: "rateLimited";
       limitedBy: WindowKind;
@@ -151,6 +161,28 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   };
 
   const isOwner = input.userId === input.ownerId;
+
+  // Hard USD budget gate (money), checked before the token rate limit
+  // (fairness) — the coarser, cheaper "is the bot even allowed to spend more"
+  // question. Disabled/owner-exempt short-circuit inside the guard.
+  const budgetVerdict = await input.budgetGuard.check(
+    {
+      userId: input.userId,
+      chatId: input.chatId,
+      isOwner,
+      now: input.now,
+    },
+    settings.budget,
+  );
+  if (!budgetVerdict.allowed) {
+    recordDenial(storage, input.userId, input.now);
+    return {
+      kind: "budgetLimited",
+      reason: budgetVerdict.reason,
+      persistConversation: persistTurn,
+    };
+  }
+
   const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
@@ -159,6 +191,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       input.now,
     );
     if (!r.allowed) {
+      recordDenial(storage, input.userId, input.now);
       return {
         kind: "rateLimited",
         limitedBy: r.limitedBy,
@@ -227,12 +260,22 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     await input.rateLimiter.deduct(input.userId, deduction, input.now);
   }
 
-  // Record spend regardless of rate-limit exemption — an exempt owner's usage is
-  // still money spent through the bot. Best-effort: a storage hiccup on this
-  // display-only accounting must not fail an answer already produced.
-  await storage
-    .addUserSpend(input.userId, result.costUsd ?? 0, input.now)
-    .catch((err) => console.error("recording user spend failed:", err));
+  // Record spend across every ledger (user/chat/global/model) regardless of
+  // rate-limit exemption — an exempt owner's usage is still money spent through
+  // the bot, and the global total is the kill-switch's source of truth.
+  // Best-effort: a storage hiccup on this accounting must not fail an answer
+  // already produced.
+  await recordSpend(
+    storage,
+    {
+      userId: input.userId,
+      chatId: input.chatId,
+      modelId: result.modelId ?? null,
+      costUsd: result.costUsd ?? 0,
+      priced: result.priced ?? true,
+    },
+    input.now,
+  ).catch((err) => console.error("recording spend failed:", err));
 
   // A model can legitimately finish with no text (e.g. an output-token cap hit
   // mid-reasoning). Surface it as an error turn — Telegram rejects empty

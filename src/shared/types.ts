@@ -15,6 +15,47 @@ export type RateLimitConfig = {
 // Which of the two windows is being referred to (denial reason, UI labels).
 export type WindowKind = "fiveHour" | "weekly";
 
+// Hard USD budget caps, enforced by the budget guard alongside (and independent
+// of) the token rate limit — money vs. fairness. Checked most-severe-first, so
+// when several caps are breached at once the guard reports the top one.
+export type BudgetDenyReason =
+  | "globalMonthly"
+  | "globalDaily"
+  | "chatDaily"
+  | "newUser";
+
+// USD spend caps. The primary protector of a fixed monthly budget is
+// `globalMonthlyCapUsd`; the daily/chat/new-user caps bound how fast that budget
+// can be drained by any single day, chat, or freshly-seen (untrusted) user. All
+// are admin-editable at runtime; window *lengths* (day/month) are fixed in the
+// spend-bucket math. The owner is never denied when `ownerExempt` (default true),
+// but owner spend still counts toward the global totals — the money is real.
+export type BudgetConfig = {
+  enabled: boolean;
+  ownerExempt: boolean;
+  globalMonthlyCapUsd: number;
+  globalDailyCapUsd: number;
+  perChatDailyCapUsd: number;
+  newUserDailyCapUsd: number;
+  // How long (days from first-seen) a user is treated as "new" and held to the
+  // tighter `newUserDailyCapUsd`.
+  newUserWindowDays: number;
+};
+
+// Anomaly-detection thresholds for the observability layer (alert-only — these
+// never deny a request, unlike `BudgetConfig`). A spend "spike" fires when a
+// user's/chat's spend today crosses EITHER the absolute floor OR a multiple of
+// its own trailing baseline (velocity), so a sudden jump is caught even below
+// the absolute bar. The velocity signal is floored by `spikeMinBaselineUsd` so
+// trivial amounts (a few cents) can't trip it.
+export type AnomalyConfig = {
+  digestIntervalHours: number;
+  spikeUserAbsoluteUsd: number;
+  spikeChatAbsoluteUsd: number;
+  spikeVelocityMultiplier: number;
+  spikeMinBaselineUsd: number;
+};
+
 // Reasoning effort passed through to the model per request, mapped to the
 // standard `reasoning_effort` chat-completions field (honored by reasoning
 // models, ignored by others).
@@ -41,6 +82,10 @@ export type Settings = {
   // the rest are retained for the admin UI / future client-side fallback.
   models: string[];
   rateLimit: RateLimitConfig;
+  // Hard USD spend caps (the budget-protection safety net) and the alert-only
+  // anomaly thresholds. Global policy like `rateLimit` — no per-chat override.
+  budget: BudgetConfig;
+  anomaly: AnomalyConfig;
   timezone: string;
   expandableBlockquoteThreshold: number;
   // Cap on how many reminders one user may hold at once (per character bot).
@@ -88,6 +133,12 @@ export type User = {
   firstName: string | null;
   lastName: string | null;
   username: string | null;
+  // Epoch ms the user was first seen. Set once on the first-ever upsert and
+  // preserved thereafter; legacy rows written before this field existed are
+  // backfilled to 0 on read, so an existing user never looks "brand new" (which
+  // would wrongly subject them to the new-user soft-start budget). Drives both
+  // the new-user cap and the "new users" digest.
+  firstSeenAt: number;
   lastSeenAt: number;
 };
 
@@ -98,6 +149,9 @@ export type Chat = {
   type: ChatType;
   title: string | null;
   username: string | null;
+  // Epoch ms the chat was first seen (see `User.firstSeenAt`). A genuinely new
+  // non-private chat is, by construction, a group the bot was just added to.
+  firstSeenAt: number;
   lastSeenAt: number;
 };
 
@@ -144,6 +198,26 @@ export const DEFAULT_SETTINGS: Settings = {
     weeklyTokens: 300000,
     ownerExempt: true,
     wiseMultiplier: 1.8,
+  },
+  // Defaults sized for a small (~$20/month) budget: the monthly cap is the real
+  // ceiling (with a little headroom), the daily cap stops one day from eating
+  // the month, and per-chat/new-user caps keep any single chat or unknown
+  // newcomer to a small slice. All tunable at runtime from the admin Mini App.
+  budget: {
+    enabled: true,
+    ownerExempt: true,
+    globalMonthlyCapUsd: 18,
+    globalDailyCapUsd: 2,
+    perChatDailyCapUsd: 1,
+    newUserDailyCapUsd: 0.1,
+    newUserWindowDays: 3,
+  },
+  anomaly: {
+    digestIntervalHours: 24,
+    spikeUserAbsoluteUsd: 0.5,
+    spikeChatAbsoluteUsd: 1,
+    spikeVelocityMultiplier: 5,
+    spikeMinBaselineUsd: 0.02,
   },
   timezone: "UTC",
   expandableBlockquoteThreshold: DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,

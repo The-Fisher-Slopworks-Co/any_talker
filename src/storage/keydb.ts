@@ -140,6 +140,16 @@ export function parseRememberFactReply(
   );
 }
 
+// User/chat rows written before `firstSeenAt` existed have no such field; treat
+// a missing value as epoch 0 so an existing entity is never mistaken for "new"
+// (which would wrongly apply the new-user budget or surface it in the digest).
+function withFirstSeen<T extends { firstSeenAt: number }>(rec: T): T {
+  if (typeof rec.firstSeenAt !== "number") {
+    (rec as { firstSeenAt: number }).firstSeenAt = 0;
+  }
+  return rec;
+}
+
 export class KeyDBStorage implements Storage {
   // `botPrefix` is "" for the main bot (legacy unprefixed keys) or
   // `mbot:{botId}:` for a managed bot. It is interposed between the global
@@ -333,22 +343,25 @@ export class KeyDBStorage implements Storage {
     else await this.client.set(key, lang);
   }
 
-  async addUserSpend(
-    userId: string,
+  // Accrue a positive cost into `{keyPrefix}:{date}` (a float counter) and renew
+  // its retention TTL. Shared by the user/chat/global/model spend ledgers.
+  private async accrueSpend(
+    keyPrefix: string,
     costUsd: number,
     nowMs: number,
   ): Promise<void> {
-    if (!(costUsd > 0)) return;
-    const key = `${PREFIX}spend:${userId}:${utcDateKey(nowMs)}`;
+    const key = `${keyPrefix}:${utcDateKey(nowMs)}`;
     await this.client.send("INCRBYFLOAT", [key, String(costUsd)]);
     await this.client.expire(key, SPEND_RETENTION_DAYS * 24 * 60 * 60);
   }
 
-  async getUserSpend(userId: string, nowMs: number): Promise<SpendSummary> {
+  // Read the trailing day/week/month windows for a `{keyPrefix}:{date}` ledger.
+  private async readSpend(
+    keyPrefix: string,
+    nowMs: number,
+  ): Promise<SpendSummary> {
     const dates = recentUtcDateKeys(nowMs, SPEND_WINDOW_DAYS.month);
-    const raws = await this.client.mget(
-      ...dates.map((d) => `${PREFIX}spend:${userId}:${d}`),
-    );
+    const raws = await this.client.mget(...dates.map((d) => `${keyPrefix}:${d}`));
     const byDate: Record<string, number> = {};
     for (let i = 0; i < dates.length; i++) {
       const raw = raws[i];
@@ -358,36 +371,202 @@ export class KeyDBStorage implements Storage {
     return summarizeSpend(byDate, nowMs);
   }
 
+  // Record an id in the day's active-spender set (TTL 2 days — only the spike
+  // scan reads it, and only for today).
+  private async markActive(
+    kind: "user" | "chat",
+    id: string,
+    nowMs: number,
+  ): Promise<void> {
+    const key = `${PREFIX}spend_active:${kind}:${utcDateKey(nowMs)}`;
+    await this.client.send("SADD", [key, id]);
+    await this.client.expire(key, 2 * 24 * 60 * 60);
+  }
+
+  async addUserSpend(
+    userId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    await this.accrueSpend(`${PREFIX}spend:${userId}`, costUsd, nowMs);
+    await this.markActive("user", userId, nowMs);
+  }
+
+  async getUserSpend(userId: string, nowMs: number): Promise<SpendSummary> {
+    return this.readSpend(`${PREFIX}spend:${userId}`, nowMs);
+  }
+
+  async addChatSpend(
+    chatId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    await this.accrueSpend(`${PREFIX}spend_chat:${chatId}`, costUsd, nowMs);
+    await this.markActive("chat", chatId, nowMs);
+  }
+
+  async getChatSpend(chatId: string, nowMs: number): Promise<SpendSummary> {
+    return this.readSpend(`${PREFIX}spend_chat:${chatId}`, nowMs);
+  }
+
+  async addGlobalSpend(costUsd: number, nowMs: number): Promise<void> {
+    if (!(costUsd > 0)) return;
+    await this.accrueSpend(`${PREFIX}spend_global`, costUsd, nowMs);
+  }
+
+  async getGlobalSpend(nowMs: number): Promise<SpendSummary> {
+    return this.readSpend(`${PREFIX}spend_global`, nowMs);
+  }
+
+  async addModelSpend(
+    modelId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    await this.accrueSpend(`${PREFIX}spend_model:${modelId}`, costUsd, nowMs);
+    await this.client.send("SADD", [`${PREFIX}spend_models`, modelId]);
+  }
+
+  async getModelSpend(modelId: string, nowMs: number): Promise<SpendSummary> {
+    return this.readSpend(`${PREFIX}spend_model:${modelId}`, nowMs);
+  }
+
+  async listSpendModels(): Promise<string[]> {
+    const reply = await this.client.send("SMEMBERS", [`${PREFIX}spend_models`]);
+    return Array.isArray(reply) ? reply.map(String) : [];
+  }
+
+  async flagUnpricedModel(modelId: string): Promise<void> {
+    await this.client.send("SADD", [`${PREFIX}unpriced_models`, modelId]);
+  }
+
+  async listUnpricedModels(): Promise<string[]> {
+    const reply = await this.client.send("SMEMBERS", [
+      `${PREFIX}unpriced_models`,
+    ]);
+    return Array.isArray(reply) ? reply.map(String) : [];
+  }
+
+  async listSpendActiveEntities(
+    kind: "user" | "chat",
+    nowMs: number,
+  ): Promise<string[]> {
+    const key = `${PREFIX}spend_active:${kind}:${utcDateKey(nowMs)}`;
+    const reply = await this.client.send("SMEMBERS", [key]);
+    return Array.isArray(reply) ? reply.map(String) : [];
+  }
+
+  async incrementDenialCount(userId: string, nowMs: number): Promise<void> {
+    const key = `${PREFIX}denial_rank:${utcDateKey(nowMs)}`;
+    await this.client.send("ZINCRBY", [key, "1", userId]);
+    await this.client.expire(key, 9 * 24 * 60 * 60);
+  }
+
+  async topDenied(
+    nowMs: number,
+    limit: number,
+  ): Promise<Array<{ userId: string; count: number }>> {
+    const n = Math.max(0, Math.floor(limit));
+    if (n === 0) return [];
+    const key = `${PREFIX}denial_rank:${utcDateKey(nowMs)}`;
+    const reply = await this.client.send("ZREVRANGE", [
+      key,
+      "0",
+      String(n - 1),
+      "WITHSCORES",
+    ]);
+    const flat = Array.isArray(reply) ? reply : [];
+    const out: Array<{ userId: string; count: number }> = [];
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+      const count = Number(flat[i + 1]);
+      if (Number.isFinite(count)) out.push({ userId: String(flat[i]), count });
+    }
+    return out;
+  }
+
+  async getDigestState(): Promise<{ lastSentAtMs: number } | null> {
+    const raw = await this.client.get(`${PREFIX}digest_state`);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as { lastSentAtMs?: unknown };
+      return typeof parsed.lastSentAtMs === "number"
+        ? { lastSentAtMs: parsed.lastSentAtMs }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async setDigestState(state: { lastSentAtMs: number }): Promise<void> {
+    await this.client.set(`${PREFIX}digest_state`, JSON.stringify(state));
+  }
+
+  async claimAlert(key: string, ttlSeconds: number): Promise<boolean> {
+    const reply = await this.client.send("SET", [
+      `${PREFIX}alert_claim:${key}`,
+      "1",
+      "NX",
+      "EX",
+      String(Math.max(1, Math.floor(ttlSeconds))),
+    ]);
+    return reply === "OK";
+  }
+
   async listUsers(): Promise<User[]> {
     const values = await this.client.hvals(`${PREFIX}users`);
     return values
-      .map((raw) => JSON.parse(raw) as User)
+      .map((raw) => withFirstSeen(JSON.parse(raw) as User))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
-  async upsertUser(user: User): Promise<void> {
-    await this.client.hset(`${PREFIX}users`, user.id, JSON.stringify(user));
+  // Non-atomic read-merge (like the fire-and-forget upserts that call it): keep
+  // the stored `firstSeenAt` if the row exists, else stamp the caller's. A rare
+  // concurrent double-insert may report `isNew` twice, which downstream tolerates
+  // (the new-group alert is `claimAlert`-deduped; the digest is firstSeenAt-derived).
+  async upsertUser(user: User): Promise<{ isNew: boolean }> {
+    const existingRaw = await this.client.hget(`${PREFIX}users`, user.id);
+    const prev = existingRaw
+      ? withFirstSeen(JSON.parse(existingRaw) as User)
+      : null;
+    const record: User = {
+      ...user,
+      firstSeenAt: prev ? prev.firstSeenAt : user.firstSeenAt,
+    };
+    await this.client.hset(`${PREFIX}users`, user.id, JSON.stringify(record));
+    return { isNew: prev === null };
   }
 
   async getUser(id: string): Promise<User | null> {
     const raw = await this.client.hget(`${PREFIX}users`, id);
-    return raw ? (JSON.parse(raw) as User) : null;
+    return raw ? withFirstSeen(JSON.parse(raw) as User) : null;
   }
 
   async listChats(): Promise<Chat[]> {
     const values = await this.client.hvals(`${PREFIX}chats`);
     return values
-      .map((raw) => JSON.parse(raw) as Chat)
+      .map((raw) => withFirstSeen(JSON.parse(raw) as Chat))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
-  async upsertChat(chat: Chat): Promise<void> {
-    await this.client.hset(`${PREFIX}chats`, chat.id, JSON.stringify(chat));
+  async upsertChat(chat: Chat): Promise<{ isNew: boolean }> {
+    const existingRaw = await this.client.hget(`${PREFIX}chats`, chat.id);
+    const prev = existingRaw
+      ? withFirstSeen(JSON.parse(existingRaw) as Chat)
+      : null;
+    const record: Chat = {
+      ...chat,
+      firstSeenAt: prev ? prev.firstSeenAt : chat.firstSeenAt,
+    };
+    await this.client.hset(`${PREFIX}chats`, chat.id, JSON.stringify(record));
+    return { isNew: prev === null };
   }
 
   async getChat(id: string): Promise<Chat | null> {
     const raw = await this.client.hget(`${PREFIX}chats`, id);
-    return raw ? (JSON.parse(raw) as Chat) : null;
+    return raw ? withFirstSeen(JSON.parse(raw) as Chat) : null;
   }
 
   async getChatSettings(chatId: string): Promise<ChatSettings | null> {

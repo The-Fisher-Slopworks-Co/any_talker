@@ -4,7 +4,9 @@
 import { GrammyError, type Api } from "grammy";
 import type { Reminder } from "./types";
 import type { Storage } from "../storage/types";
+import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient, AIMessage } from "../ai/types";
+import { recordSpend } from "../spending/record";
 import { deserializeMessages } from "../ai/serialize";
 import { getAllTools, type ToolEffect } from "../ai/tools/registry";
 import { buildInstruction } from "../ai/instruction";
@@ -54,6 +56,12 @@ export type DeliveryDeps = {
   storage: Storage;
   api: ReminderApi;
   ai: AIClient;
+  // Reminder delivery re-runs the LLM, so it must charge the tokens to the
+  // user's rate-limit budget and record the USD spend — otherwise reminders are
+  // an invisible cost sink that bypasses both ledgers. `ownerId` gates the
+  // token deduction by owner-exemption, mirroring the /ask path.
+  rateLimiter: RateLimiter;
+  ownerId: string;
   // Resolves the character this reminder is delivered as. For a managed bot it
   // yields that bot's persona over the global settings; for the main bot, the
   // chat-derived persona (today's behavior).
@@ -185,6 +193,29 @@ async function composeReminderMessage(
       effects,
     },
   });
+
+  // Account for the LLM re-run: charge the tokens to the user's budget and
+  // record spend across the ledgers, exactly as an /ask would. Best-effort — an
+  // accounting hiccup must NOT throw, or delivery would retry and re-run the
+  // model, double-spending. The owner-exempt user skips the token deduction
+  // (their spend is still recorded — the money is real), mirroring /ask.
+  const isOwner = reminder.userId === deps.ownerId;
+  if (!(isOwner && settings.rateLimit.ownerExempt)) {
+    await deps.rateLimiter
+      .deduct(reminder.userId, result.totalTokens, nowMs)
+      .catch((err) => console.error("reminder deduct failed:", err));
+  }
+  await recordSpend(
+    deps.storage,
+    {
+      userId: reminder.userId,
+      chatId: reminder.chatId,
+      modelId: result.modelId ?? null,
+      costUsd: result.costUsd ?? 0,
+      priced: result.priced ?? true,
+    },
+    nowMs,
+  ).catch((err) => console.error("reminder spend record failed:", err));
 
   const trimmed = result.text.trim();
   // If the model produced nothing usable, fall back to the original note so

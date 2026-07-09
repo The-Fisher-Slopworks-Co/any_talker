@@ -99,8 +99,22 @@ const grammyErr = (code: number) =>
     {},
   );
 
+const testRateLimiter = {
+  check: async () => ({ allowed: true as const }),
+  deduct: async () => {},
+  reset: async () => {},
+};
+
 const deps = (ai: AIClient, api: ReminderApi, storage = new MemoryStorage()) =>
-  ({ storage, api, ai, resolver: createMainPersonaResolver(storage), botId: null });
+  ({
+    storage,
+    api,
+    ai,
+    rateLimiter: testRateLimiter,
+    ownerId: "owner",
+    resolver: createMainPersonaResolver(storage),
+    botId: null,
+  });
 
 describe("deliverReminder (AI-driven)", () => {
   test("ask_reply: builds reminder_fired envelope and sends AI output with reply_parameters", async () => {
@@ -199,6 +213,7 @@ describe("deliverReminder (AI-driven)", () => {
       firstName: "Bob",
       lastName: "Smith",
       username: null,
+      firstSeenAt: 0,
       lastSeenAt: 0,
     });
     const r = reminderAsk();
@@ -378,5 +393,79 @@ describe("deliverReminder (AI-driven)", () => {
     await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
     expect(ai.calls[0]!.models).toEqual(["custom/model"]);
     expect(ai.calls[0]!.system).toContain("Be a pirate.");
+  });
+});
+
+describe("deliverReminder accounting (the untracked-cost fix)", () => {
+  test("charges tokens to the user and records spend across ledgers", async () => {
+    const storage = new MemoryStorage();
+    const deducts: Array<{ userId: string; tokens: number }> = [];
+    const spyLimiter = {
+      check: async () => ({ allowed: true as const }),
+      deduct: async (userId: string, tokens: number) => {
+        deducts.push({ userId, tokens });
+      },
+      reset: async () => {},
+    };
+    const ai = new FakeAI(async () => ({
+      text: "hi",
+      totalTokens: 42,
+      modelId: "m1",
+      costUsd: 0.3,
+      priced: true,
+    }));
+    const r = reminderAsk({ userId: "u1", chatId: "c1" });
+    await deliverReminder(
+      {
+        storage,
+        api: new FakeTgApi(),
+        ai,
+        rateLimiter: spyLimiter,
+        ownerId: "owner",
+        resolver: createMainPersonaResolver(storage),
+        botId: null,
+      },
+      r,
+      r.fireAtMs,
+    );
+    expect(deducts).toEqual([{ userId: "u1", tokens: 42 }]);
+    expect((await storage.getUserSpend("u1", r.fireAtMs)).day).toBeCloseTo(0.3);
+    expect((await storage.getChatSpend("c1", r.fireAtMs)).day).toBeCloseTo(0.3);
+    expect((await storage.getGlobalSpend(r.fireAtMs)).day).toBeCloseTo(0.3);
+    expect((await storage.getModelSpend("m1", r.fireAtMs)).day).toBeCloseTo(0.3);
+  });
+
+  test("owner-exempt reminder records spend but skips the deduction", async () => {
+    const storage = new MemoryStorage();
+    const deducts: number[] = [];
+    const spyLimiter = {
+      check: async () => ({ allowed: true as const }),
+      deduct: async (_u: string, tokens: number) => {
+        deducts.push(tokens);
+      },
+      reset: async () => {},
+    };
+    const ai = new FakeAI(async () => ({
+      text: "hi",
+      totalTokens: 42,
+      costUsd: 0.3,
+      priced: true,
+    }));
+    const r = reminderAsk({ userId: "owner", chatId: "c9" });
+    await deliverReminder(
+      {
+        storage,
+        api: new FakeTgApi(),
+        ai,
+        rateLimiter: spyLimiter,
+        ownerId: "owner",
+        resolver: createMainPersonaResolver(storage),
+        botId: null,
+      },
+      r,
+      r.fireAtMs,
+    );
+    expect(deducts).toEqual([]); // owner is rate-limit-exempt by default
+    expect((await storage.getGlobalSpend(r.fireAtMs)).day).toBeCloseTo(0.3);
   });
 });

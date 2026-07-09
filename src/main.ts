@@ -5,6 +5,7 @@ import { loadConfig } from "./config";
 import { getEffectiveProxyForUrl, proxiedFetch } from "./proxy";
 import { KeyDBStorage } from "./storage/keydb";
 import { DualWindowLimiter } from "./ratelimit/dual-window";
+import { SpendBudgetGuard } from "./budget/guard";
 import { OpenAICompatClient } from "./ai/compat-client";
 import { createModelCatalog } from "./ai/model-catalog";
 import { registerTool, type Tool } from "./ai/tools/registry";
@@ -22,6 +23,8 @@ import { createUserSettingsTools } from "./ai/tools/user-settings";
 import { startScheduler } from "./reminders/scheduler";
 import { reminderApiFromGrammy } from "./reminders/delivery";
 import { startChecksScheduler } from "./checks/runner";
+import { startObservabilityScheduler } from "./observability/scheduler";
+import { notifyApiFromGrammy } from "./observability/types";
 import { createBot } from "./bot";
 import { syncBotCommands } from "./bot/commands";
 import { ALLOWED_UPDATES } from "./bot/allowed-updates";
@@ -40,6 +43,10 @@ async function main() {
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
   const rateLimiter = new DualWindowLimiter(storage);
+  // The hard USD budget safety net, shared across the whole bot family (its
+  // ledgers are global, like the rate limiter's). Enforced alongside the token
+  // limiter on every /ask and guest query.
+  const budgetGuard = new SpendBudgetGuard(storage);
   // One catalogue object serves two roles: pricing source for cost computation
   // in the AI client, and the model list behind the Mini App's `/api/models`.
   const modelCatalog = createModelCatalog({
@@ -85,6 +92,7 @@ async function main() {
     ownerId: config.botOwnerId,
     storage,
     rateLimiter,
+    budgetGuard,
     ai,
     resolver: mainResolver,
     // The main bot's family siblings are exactly the managed (character) bots. It
@@ -103,6 +111,7 @@ async function main() {
   botManager = new BotManager({
     storage,
     rateLimiter,
+    budgetGuard,
     ai,
     ownerId: config.botOwnerId,
     mainApi: bot.api,
@@ -168,13 +177,31 @@ async function main() {
   const scheduler = startScheduler({
     runtimes: () => [mainReminderRuntime, ...botManager.reminderRuntimes()],
     ai,
+    rateLimiter,
+    ownerId: config.botOwnerId,
   });
   console.log("Reminder scheduler started");
 
   const checksScheduler = startChecksScheduler({ storage, api: bot.api });
   console.log("Checks scheduler started");
 
-  return { bot, server, scheduler, checksScheduler, botManager };
+  // Observability: scans for spend spikes and sends the periodic owner digest.
+  // Uses the main bot's api to DM the owner (a family-global concern).
+  const observabilityScheduler = startObservabilityScheduler({
+    storage,
+    api: notifyApiFromGrammy(bot.api),
+    ownerId: config.botOwnerId,
+  });
+  console.log("Observability scheduler started");
+
+  return {
+    bot,
+    server,
+    scheduler,
+    checksScheduler,
+    observabilityScheduler,
+    botManager,
+  };
 }
 
 const handles = await main().catch((err) => {
@@ -186,6 +213,7 @@ if (import.meta.hot) {
   import.meta.hot.dispose(async () => {
     handles.scheduler.stop();
     handles.checksScheduler.stop();
+    handles.observabilityScheduler.stop();
     handles.server.stop();
     await handles.botManager.stopAll();
     await handles.bot.stop().catch((err) => {

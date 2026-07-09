@@ -11,6 +11,14 @@ import type { Reminder } from "./types";
 import type { AIClient, AIMessage, AskResult } from "../ai/types";
 import type { Tool, ToolCallContext } from "../ai/tools/registry";
 
+// Delivery now charges tokens to the limiter; these tests don't assert on that,
+// so a no-op limiter satisfies the dep.
+const testRateLimiter = {
+  check: async () => ({ allowed: true as const }),
+  deduct: async () => {},
+  reset: async () => {},
+};
+
 type AskArgs = {
   models: string[];
   system: string;
@@ -83,7 +91,7 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, nowMs: 1_000 });
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
 
     expect(api.calls).toHaveLength(1);
     expect(ai.calls).toBe(1);
@@ -99,7 +107,7 @@ describe("runReminderTick", () => {
     });
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, nowMs: 1_000 });
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
     expect((await storage.fetchDueReminders(1_000)).map((r) => r.id)).toEqual([
       "due",
     ]);
@@ -113,7 +121,7 @@ describe("runReminderTick", () => {
       throw new Error("ai down");
     });
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, nowMs: 1_000 });
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
     expect(api.calls).toEqual([]);
     expect((await storage.fetchDueReminders(1_000)).map((r) => r.id)).toEqual([
       "due",
@@ -128,7 +136,7 @@ describe("runReminderTick", () => {
     });
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, nowMs: 1_000 });
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
     expect(await storage.fetchDueReminders(1_000)).toEqual([]);
   });
 
@@ -138,7 +146,7 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, nowMs: 1_000 });
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
     expect(api.calls).toEqual([]);
     expect(ai.calls).toBe(0);
   });
@@ -151,7 +159,7 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, nowMs: 1_000 });
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
 
     expect(api.calls).toHaveLength(3);
     expect(ai.calls).toBe(3);

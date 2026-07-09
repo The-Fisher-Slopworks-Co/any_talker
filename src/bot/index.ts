@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { Bot, type Context } from "grammy";
+import { Bot, type Context, type Api } from "grammy";
 import type {
   InlineQueryResult,
   InputMessageContent,
@@ -10,6 +10,8 @@ import type {
 } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
+import type { BudgetGuard } from "../budget/types";
+import type { BudgetDenyReason, ChatType } from "../shared/types";
 import type { AIClient } from "../ai/types";
 import { formatLog, type LogFields, type LogFormat } from "../log";
 import { proxiedFetch } from "../proxy";
@@ -30,6 +32,9 @@ import { richApi } from "./rich";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { readValidDisplayName } from "../shared/display-name";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
+import { t } from "../shared/i18n";
+import { utcDateKey } from "../spending/window";
+import { ALERT_TTL_SECONDS } from "../observability/scheduler";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import type { InputRichMessageContent } from "../types/telegram-rich";
 import { makeIncomingUpdateLogger } from "./log-update";
@@ -60,6 +65,7 @@ export type BotDeps = {
   ownerId: string;
   storage: Storage;
   rateLimiter: RateLimiter;
+  budgetGuard: BudgetGuard;
   ai: AIClient;
   // Resolves the character to answer as for a given chat (settings + name).
   resolver: PersonaResolver;
@@ -349,19 +355,28 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           firstName: from.first_name ?? null,
           lastName: from.last_name ?? null,
           username: from.username ?? null,
+          // Tentative first-seen; storage keeps the stored value when the row
+          // already exists, so this only sticks for a genuinely new user.
+          firstSeenAt: now,
           lastSeenAt: now,
         })
         .catch((err) => console.error("upsertUser failed:", err));
     }
     const chat = ctx.chat ?? guestMsg?.chat;
     if (chat) {
+      const chatRecord = {
+        id: String(chat.id),
+        type: chat.type,
+        title: "title" in chat ? chat.title ?? null : null,
+        username: "username" in chat ? chat.username ?? null : null,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      };
       void deps.storage
-        .upsertChat({
-          id: String(chat.id),
-          type: chat.type,
-          title: "title" in chat ? chat.title ?? null : null,
-          username: "username" in chat ? chat.username ?? null : null,
-          lastSeenAt: now,
+        .upsertChat(chatRecord)
+        .then((res) => {
+          // First-ever sighting of a non-private chat = a fresh group join.
+          if (res.isNew) void alertNewGroup(ctx.api, chatRecord);
         })
         .catch((err) => console.error("upsertChat failed:", err));
     }
@@ -388,6 +403,62 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
     await next();
   });
+
+  // Fire-and-forget owner DM when a GLOBAL budget cap first trips today. Deduped
+  // via `claimAlert` so the owner gets one DM per period per UTC day, not one per
+  // denied request. Only the global caps are alarms — the per-chat and new-user
+  // caps are routine guardrails and stay silent (they still show on the
+  // dashboard/metrics). Fires identically for the main bot and every managed bot.
+  const alertGlobalCapBreach = async (
+    api: Api,
+    reason: BudgetDenyReason,
+  ): Promise<void> => {
+    if (reason !== "globalMonthly" && reason !== "globalDaily") return;
+    const period: "day" | "month" = reason === "globalMonthly" ? "month" : "day";
+    try {
+      const now = Date.now();
+      const claimed = await deps.storage.claimAlert(
+        `global_cap:${period}:${utcDateKey(now)}`,
+        ALERT_TTL_SECONDS,
+      );
+      if (!claimed) return;
+      const [global, ownerLang] = await Promise.all([
+        deps.storage.getGlobalSpend(now),
+        deps.storage.getUserLang(deps.ownerId),
+      ]);
+      const spent = period === "month" ? global.month : global.day;
+      await api.sendMessage(
+        deps.ownerId,
+        t(ownerLang ?? "en").bot_owner_budget_cap(period, spent.toFixed(2)),
+      );
+    } catch (err) {
+      console.error("global cap breach alert failed:", err);
+    }
+  };
+
+  // Fire-and-forget owner DM the first time the bot is seen in a new non-private
+  // chat — i.e. it was just added to a group. Deduped via `claimAlert` so a rare
+  // concurrent double-`isNew` (the read-merge upsert isn't atomic) sends once.
+  const alertNewGroup = async (
+    api: Api,
+    chat: { id: string; type: ChatType; title: string | null },
+  ): Promise<void> => {
+    if (chat.type === "private") return;
+    try {
+      const claimed = await deps.storage.claimAlert(
+        `new_chat:${chat.id}`,
+        7 * 24 * 60 * 60,
+      );
+      if (!claimed) return;
+      const ownerLang = await deps.storage.getUserLang(deps.ownerId);
+      await api.sendMessage(
+        deps.ownerId,
+        t(ownerLang ?? "en").bot_owner_new_group(chat.title ?? chat.id, chat.id),
+      );
+    } catch (err) {
+      console.error("new group alert failed:", err);
+    }
+  };
 
   const dispatchGuest = async (
     ctx: BotContext,
@@ -533,6 +604,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const outcome = await guestAskHandler({
         storage: deps.storage,
         rateLimiter: deps.rateLimiter,
+        budgetGuard: deps.budgetGuard,
         ai: deps.ai,
         resolver: deps.resolver,
         botId,
@@ -556,6 +628,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
       switch (outcome.kind) {
         case "denied":
+          return;
+        case "budgetLimited":
+          void alertGlobalCapBreach(ctx.api, outcome.reason);
+          await answer(ctx.t.bot_budget_limited, null).catch((err) =>
+            console.error("answerGuestQuery failed:", err),
+          );
           return;
         case "rateLimited":
           await answer(
@@ -731,6 +809,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         outcome = await askHandler({
           storage: deps.storage,
           rateLimiter: deps.rateLimiter,
+          budgetGuard: deps.budgetGuard,
           ai: deps.ai,
           resolver: deps.resolver,
           botId,
@@ -766,6 +845,13 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         // Failure notices are still part of the conversation: persist the turn
         // (question + the notice actually sent) so a later reply to either the
         // notice or the user's own ask message carries the full chain.
+        case "budgetLimited": {
+          void alertGlobalCapBreach(ctx.api, outcome.reason);
+          const text = ctx.t.bot_budget_limited;
+          const sent = await ctx.reply(text);
+          await outcome.persistConversation(sent.message_id, text);
+          return;
+        }
         case "rateLimited": {
           const text = ctx.t.bot_rate_limited(
             outcome.limitedBy,
@@ -1162,6 +1248,7 @@ type AskOutcomeKind =
   | "answered"
   | "denied"
   | "usage"
+  | "budgetLimited"
   | "rateLimited"
   | "error";
 
@@ -1169,6 +1256,7 @@ const ASK_OUTCOME_LABEL: Record<AskOutcomeKind, AskOutcomeLabel> = {
   answered: "answered",
   denied: "denied",
   usage: "usage",
+  budgetLimited: "budget_limited",
   rateLimited: "rate_limited",
   error: "error",
 };

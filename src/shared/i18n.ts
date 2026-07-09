@@ -42,6 +42,33 @@ type Strings = {
   bot_voice_cant_fetch: string;
   bot_ask_usage: string;
   bot_rate_limited: (limitedBy: WindowKind, msUntilReset: number) => string;
+  // Shown to a user denied by a hard USD budget cap. Deliberately generic — it
+  // never leaks the financial/operational detail (which cap, how much) to a
+  // stranger now that the whitelist is gone.
+  bot_budget_limited: string;
+  // Owner DM when a GLOBAL budget cap trips (the kill-switch). `period` is the
+  // window that filled; `spentUsd` is the pre-formatted amount.
+  bot_owner_budget_cap: (period: "day" | "month", spentUsd: string) => string;
+  // Owner DM when the bot is added to a new group chat.
+  bot_owner_new_group: (title: string, chatId: string) => string;
+  // Owner DM when a user's/chat's spend today spikes (absolute or velocity).
+  bot_owner_spike: (
+    scope: "user" | "chat",
+    label: string,
+    todayUsd: string,
+    baselineUsd: string,
+  ) => string;
+  // Periodic owner digest (plain text). Section headers are keys; the rows
+  // (labels + amounts) are data composed in `observability/digest.ts`.
+  bot_digest_header: string;
+  bot_digest_spend: (day: string, week: string, month: string) => string;
+  bot_digest_new_users: (n: number) => string;
+  bot_digest_new_chats: (n: number) => string;
+  bot_digest_top_users: string;
+  bot_digest_top_chats: string;
+  bot_digest_top_models: string;
+  bot_digest_denials: string;
+  bot_digest_unpriced: (models: string) => string;
   bot_ai_error: string;
   bot_details_summary: string;
   bot_contact_no_user_id: string;
@@ -75,6 +102,37 @@ type Strings = {
   ui_admin_prompt_desc: string;
   ui_admin_limits: string;
   ui_admin_limits_desc: string;
+  ui_admin_budget: string;
+  ui_admin_budget_desc: string;
+  ui_admin_spend: string;
+  ui_admin_spend_desc: string;
+  // Budget settings tab (caps + anomaly thresholds)
+  ui_budget_caps_header: string;
+  ui_budget_caps_footer: string;
+  ui_budget_enabled: string;
+  ui_budget_owner_exempt: string;
+  ui_budget_global_monthly: string;
+  ui_budget_global_daily: string;
+  ui_budget_per_chat_daily: string;
+  ui_budget_new_user_daily: string;
+  ui_budget_new_user_window: string;
+  ui_budget_anomaly_header: string;
+  ui_budget_anomaly_footer: string;
+  ui_budget_digest_interval: string;
+  ui_budget_spike_user_abs: string;
+  ui_budget_spike_chat_abs: string;
+  ui_budget_spike_velocity: string;
+  ui_budget_spike_min_baseline: string;
+  // Spend dashboard tab
+  ui_spend_global_header: string;
+  ui_spend_top_users: string;
+  ui_spend_top_chats: string;
+  ui_spend_models: string;
+  ui_spend_denials: string;
+  ui_spend_new_users: string;
+  ui_spend_new_chats: string;
+  ui_spend_unpriced: string;
+  ui_spend_empty: string;
   ui_admin_whitelist: string;
   ui_admin_whitelist_desc: string;
   ui_admin_users: string;
@@ -418,6 +476,24 @@ const en: Strings = {
     limitedBy === "weekly"
       ? `Weekly token limit reached. Resets in ~${etaEn(ms)}.`
       : `5-hour token limit reached. Resets in ~${etaEn(ms)}.`,
+  bot_budget_limited: "⚠️ The bot is at capacity right now. Please try again later.",
+  bot_owner_budget_cap: (period, spent) =>
+    `🛑 Global ${period === "month" ? "monthly" : "daily"} budget cap reached ($${spent} spent). Non-owner requests are blocked until it resets.`,
+  bot_owner_new_group: (title, chatId) =>
+    `👥 Added to a new group: ${title} (${chatId}).`,
+  bot_owner_spike: (scope, label, today, baseline) =>
+    `📈 Spend spike (${scope}): ${label} spent ${today} today (baseline ~${baseline}/day).`,
+  bot_digest_header: "📊 Budget digest",
+  bot_digest_spend: (day, week, month) =>
+    `Spend — today ${day} · 7d ${week} · 30d ${month}`,
+  bot_digest_new_users: (n) => `🆕 New users: ${n}`,
+  bot_digest_new_chats: (n) => `🆕 New chats: ${n}`,
+  bot_digest_top_users: "Top spenders (users):",
+  bot_digest_top_chats: "Top spenders (chats):",
+  bot_digest_top_models: "By model:",
+  bot_digest_denials: "Most-denied users:",
+  bot_digest_unpriced: (models) =>
+    `⚠️ Unpriced models (spend under-counted): ${models}`,
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -461,6 +537,37 @@ const en: Strings = {
   ui_admin_prompt_desc: "Models, character, timezone, collapse threshold",
   ui_admin_limits: "Limits",
   ui_admin_limits_desc: "5-hour and weekly token budgets",
+  ui_admin_budget: "Budget caps",
+  ui_admin_budget_desc: "USD spend caps and anomaly thresholds",
+  ui_admin_spend: "Spend dashboard",
+  ui_admin_spend_desc: "Totals, top spenders, models, denials",
+  ui_budget_caps_header: "Hard USD caps",
+  ui_budget_caps_footer:
+    "The monthly cap is your real budget ceiling; the others bound how fast it can drain. The owner is never blocked.",
+  ui_budget_enabled: "Enforce budget caps",
+  ui_budget_owner_exempt: "Exempt owner",
+  ui_budget_global_monthly: "Global / month ($)",
+  ui_budget_global_daily: "Global / day ($)",
+  ui_budget_per_chat_daily: "Per chat / day ($)",
+  ui_budget_new_user_daily: "New user / day ($)",
+  ui_budget_new_user_window: "New-user window (days)",
+  ui_budget_anomaly_header: "Spike alerts & digest",
+  ui_budget_anomaly_footer:
+    "Alert-only — these never block a request. A spike fires on the absolute amount or a jump over the recent baseline.",
+  ui_budget_digest_interval: "Digest every (hours)",
+  ui_budget_spike_user_abs: "User spike ($/day)",
+  ui_budget_spike_chat_abs: "Chat spike ($/day)",
+  ui_budget_spike_velocity: "Velocity (× baseline)",
+  ui_budget_spike_min_baseline: "Min baseline ($)",
+  ui_spend_global_header: "Total spend (everyone)",
+  ui_spend_top_users: "Top spenders — users",
+  ui_spend_top_chats: "Top spenders — chats",
+  ui_spend_models: "By model",
+  ui_spend_denials: "Most-denied users (today)",
+  ui_spend_new_users: "New users (7 days)",
+  ui_spend_new_chats: "New chats (7 days)",
+  ui_spend_unpriced: "unpriced",
+  ui_spend_empty: "Nothing yet.",
   ui_admin_whitelist: "Whitelist",
   ui_admin_whitelist_desc: "Allowed users and chats",
   ui_admin_users: "Users",
@@ -779,6 +886,24 @@ const ru: Strings = {
     limitedBy === "weekly"
       ? `Недельный лимит токенов исчерпан. Восстановится примерно через ${etaRu(ms)}.`
       : `Лимит токенов за 5 часов исчерпан. Восстановится примерно через ${etaRu(ms)}.`,
+  bot_budget_limited: "⚠️ Бот сейчас перегружен. Попробуй позже.",
+  bot_owner_budget_cap: (period, spent) =>
+    `🛑 Достигнут глобальный лимит бюджета (за ${period === "month" ? "месяц" : "день"}): потрачено $${spent}. Запросы не-владельцев заблокированы до сброса.`,
+  bot_owner_new_group: (title, chatId) =>
+    `👥 Бота добавили в новый чат: ${title} (${chatId}).`,
+  bot_owner_spike: (scope, label, today, baseline) =>
+    `📈 Скачок трат (${scope === "user" ? "юзер" : "чат"}): ${label} потратил ${today} за сегодня (базовый уровень ~${baseline}/день).`,
+  bot_digest_header: "📊 Сводка по бюджету",
+  bot_digest_spend: (day, week, month) =>
+    `Траты — сегодня ${day} · 7д ${week} · 30д ${month}`,
+  bot_digest_new_users: (n) => `🆕 Новых юзеров: ${n}`,
+  bot_digest_new_chats: (n) => `🆕 Новых чатов: ${n}`,
+  bot_digest_top_users: "Топ по тратам (юзеры):",
+  bot_digest_top_chats: "Топ по тратам (чаты):",
+  bot_digest_top_models: "По моделям:",
+  bot_digest_denials: "Чаще всего отклонялись:",
+  bot_digest_unpriced: (models) =>
+    `⚠️ Модели без прайса (траты занижены): ${models}`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:
@@ -822,6 +947,37 @@ const ru: Strings = {
   ui_admin_prompt_desc: "Модели, персонаж, часовой пояс, порог сворачивания",
   ui_admin_limits: "Лимиты",
   ui_admin_limits_desc: "Бюджеты токенов за 5 часов и за неделю",
+  ui_admin_budget: "Лимиты бюджета",
+  ui_admin_budget_desc: "Потолки трат в USD и пороги аномалий",
+  ui_admin_spend: "Дашборд трат",
+  ui_admin_spend_desc: "Итоги, топ-спендеры, модели, отказы",
+  ui_budget_caps_header: "Жёсткие потолки в USD",
+  ui_budget_caps_footer:
+    "Месячный потолок — твой реальный лимит бюджета; остальные ограничивают скорость его расхода. Владельца никогда не блокирует.",
+  ui_budget_enabled: "Применять лимиты бюджета",
+  ui_budget_owner_exempt: "Исключить владельца",
+  ui_budget_global_monthly: "Глобально / месяц ($)",
+  ui_budget_global_daily: "Глобально / день ($)",
+  ui_budget_per_chat_daily: "На чат / день ($)",
+  ui_budget_new_user_daily: "Новый юзер / день ($)",
+  ui_budget_new_user_window: "Окно новизны (дни)",
+  ui_budget_anomaly_header: "Алерты скачков и дайджест",
+  ui_budget_anomaly_footer:
+    "Только уведомления — не блокируют запрос. Скачок срабатывает по абсолютной сумме или прыжку выше недавнего базового уровня.",
+  ui_budget_digest_interval: "Дайджест каждые (часов)",
+  ui_budget_spike_user_abs: "Скачок юзера ($/день)",
+  ui_budget_spike_chat_abs: "Скачок чата ($/день)",
+  ui_budget_spike_velocity: "Скорость (× базы)",
+  ui_budget_spike_min_baseline: "Мин. база ($)",
+  ui_spend_global_header: "Всего трат (все)",
+  ui_spend_top_users: "Топ по тратам — юзеры",
+  ui_spend_top_chats: "Топ по тратам — чаты",
+  ui_spend_models: "По моделям",
+  ui_spend_denials: "Чаще всего отклонялись (сегодня)",
+  ui_spend_new_users: "Новые юзеры (7 дней)",
+  ui_spend_new_chats: "Новые чаты (7 дней)",
+  ui_spend_unpriced: "без прайса",
+  ui_spend_empty: "Пока пусто.",
   ui_admin_whitelist: "Белый список",
   ui_admin_whitelist_desc: "Разрешённые пользователи и чаты",
   ui_admin_users: "Пользователи",

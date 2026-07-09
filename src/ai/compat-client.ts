@@ -89,12 +89,16 @@ export class OpenAICompatClient implements AIClient {
       return {
         text: result.text,
         totalTokens: result.totalUsage.totalTokens ?? 0,
+        modelId: primary,
         costUsd: computeCostUsd(
           this.pricing,
           primary,
           result.totalUsage.inputTokens ?? 0,
           result.totalUsage.outputTokens ?? 0,
         ),
+        // Null pricing ⇒ cost floored at $0; flag it so the owner knows the
+        // ledger under-counts for this model.
+        priced: this.pricing.getPricing(primary) !== null,
       };
     } catch (err) {
       outcome = "error";

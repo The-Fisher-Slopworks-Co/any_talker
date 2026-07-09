@@ -18,9 +18,10 @@ import type { CheckInputFields } from "../../checks/validate";
 import type { ManagedBot } from "../../managed-bots/types";
 import type { ManagedBotInput } from "../../managed-bots/validate";
 import type { SpendSummary } from "../../spending/window";
+import type { SpendOverview } from "../../spending/overview";
 import type { UsageStatus } from "../../ratelimit/window";
 
-export type { SpendSummary, UsageStatus };
+export type { SpendSummary, UsageStatus, SpendOverview };
 
 declare global {
   interface Window {
@@ -175,6 +176,8 @@ export const api = {
       language: Lang | null;
     }>("PUT", `/api/admin/users/${id}`, patch),
   listAdminChats: () => req<{ chats: Chat[] }>("GET", "/api/admin/chats"),
+  getSpendOverview: () =>
+    req<SpendOverview>("GET", "/api/admin/spend/overview"),
   getAdminChat: (id: string) =>
     req<ChatSettingsResponse>("GET", `/api/admin/chats/${id}`),
   putAdminChat: (id: string, settings: ChatSettings) =>

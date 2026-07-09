@@ -43,6 +43,20 @@ type Backing = {
   userGenders: Map<string, Gender>;
   userLangs: Map<string, Lang>;
   userSpend: Map<string, Map<string, number>>;
+  chatSpend: Map<string, Map<string, number>>;
+  globalSpend: Map<string, number>;
+  modelSpend: Map<string, Map<string, number>>;
+  spendModels: Set<string>;
+  unpricedModels: Set<string>;
+  // kind -> (UTC date -> set of entity ids that spent that day). Bounds the
+  // spike scan to today's real spenders.
+  spendActive: { user: Map<string, Set<string>>; chat: Map<string, Set<string>> };
+  // UTC date -> (userId -> denial count) for the "who hits limits most" ranking.
+  denialRank: Map<string, Map<string, number>>;
+  // Wrapped so the scalar is shared by reference across `forBot` views.
+  digestState: { value: { lastSentAtMs: number } | null };
+  // Alert dedupe key -> expiry epoch ms (mirrors KeyDB `SET NX EX`).
+  alertClaims: Map<string, number>;
   users: Map<string, User>;
   chats: Map<string, Chat>;
   chatSettings: Map<string, ChatSettings>;
@@ -70,6 +84,15 @@ function createBacking(): Backing {
     userGenders: new Map(),
     userLangs: new Map(),
     userSpend: new Map(),
+    chatSpend: new Map(),
+    globalSpend: new Map(),
+    modelSpend: new Map(),
+    spendModels: new Set(),
+    unpricedModels: new Set(),
+    spendActive: { user: new Map(), chat: new Map() },
+    denialRank: new Map(),
+    digestState: { value: null },
+    alertClaims: new Map(),
     users: new Map(),
     chats: new Map(),
     chatSettings: new Map(),
@@ -89,6 +112,31 @@ function createBacking(): Backing {
 // and the entity key can never be confused. The main bot's empty scope yields
 // keys starting with the delimiter; a managed bot's keys start with its id.
 const SCOPE_SEP = "\x00";
+
+// Accrue a positive cost into a per-UTC-date bucket map and prune buckets older
+// than the retention window. Date keys are fixed-width, so a lexical `<` is a
+// date comparison — shared by the user/chat/global/model spend ledgers.
+function accrueDailyBucket(
+  byDate: Map<string, number>,
+  costUsd: number,
+  nowMs: number,
+): void {
+  const key = utcDateKey(nowMs);
+  byDate.set(key, (byDate.get(key) ?? 0) + costUsd);
+  pruneDateKeyed(byDate, nowMs, SPEND_RETENTION_DAYS);
+}
+
+// Drop entries whose fixed-width `YYYY-MM-DD` key is older than `retentionDays`.
+function pruneDateKeyed(
+  m: Map<string, unknown>,
+  nowMs: number,
+  retentionDays: number,
+): void {
+  const cutoff = utcDateKey(nowMs - retentionDays * 86_400_000);
+  for (const k of m.keys()) {
+    if (k < cutoff) m.delete(k);
+  }
+}
 
 export class MemoryStorage implements Storage {
   private readonly b: Backing;
@@ -275,29 +323,139 @@ export class MemoryStorage implements Storage {
     else this.b.userLangs.set(userId, lang);
   }
 
+  private nestedBucket(
+    outer: Map<string, Map<string, number>>,
+    id: string,
+  ): Map<string, number> {
+    let byDate = outer.get(id);
+    if (!byDate) {
+      byDate = new Map();
+      outer.set(id, byDate);
+    }
+    return byDate;
+  }
+
+  private markActive(kind: "user" | "chat", id: string, nowMs: number): void {
+    const byDate = this.b.spendActive[kind];
+    const key = utcDateKey(nowMs);
+    let set = byDate.get(key);
+    if (!set) {
+      set = new Set();
+      byDate.set(key, set);
+    }
+    set.add(id);
+    // Active-spender sets are only needed for the near-real-time spike scan.
+    pruneDateKeyed(byDate, nowMs, 2);
+  }
+
   async addUserSpend(
     userId: string,
     costUsd: number,
     nowMs: number,
   ): Promise<void> {
     if (!(costUsd > 0)) return;
-    let byDate = this.b.userSpend.get(userId);
-    if (!byDate) {
-      byDate = new Map();
-      this.b.userSpend.set(userId, byDate);
-    }
-    const key = utcDateKey(nowMs);
-    byDate.set(key, (byDate.get(key) ?? 0) + costUsd);
-    // Prune buckets older than the retention window. Date keys are fixed-width
-    // so a lexical comparison is a date comparison.
-    const cutoff = utcDateKey(nowMs - SPEND_RETENTION_DAYS * 86_400_000);
-    for (const k of byDate.keys()) {
-      if (k < cutoff) byDate.delete(k);
-    }
+    accrueDailyBucket(this.nestedBucket(this.b.userSpend, userId), costUsd, nowMs);
+    this.markActive("user", userId, nowMs);
   }
 
   async getUserSpend(userId: string, nowMs: number): Promise<SpendSummary> {
     return summarizeSpend(this.b.userSpend.get(userId) ?? new Map(), nowMs);
+  }
+
+  async addChatSpend(
+    chatId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    accrueDailyBucket(this.nestedBucket(this.b.chatSpend, chatId), costUsd, nowMs);
+    this.markActive("chat", chatId, nowMs);
+  }
+
+  async getChatSpend(chatId: string, nowMs: number): Promise<SpendSummary> {
+    return summarizeSpend(this.b.chatSpend.get(chatId) ?? new Map(), nowMs);
+  }
+
+  async addGlobalSpend(costUsd: number, nowMs: number): Promise<void> {
+    if (!(costUsd > 0)) return;
+    accrueDailyBucket(this.b.globalSpend, costUsd, nowMs);
+  }
+
+  async getGlobalSpend(nowMs: number): Promise<SpendSummary> {
+    return summarizeSpend(this.b.globalSpend, nowMs);
+  }
+
+  async addModelSpend(
+    modelId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    accrueDailyBucket(this.nestedBucket(this.b.modelSpend, modelId), costUsd, nowMs);
+    this.b.spendModels.add(modelId);
+  }
+
+  async getModelSpend(modelId: string, nowMs: number): Promise<SpendSummary> {
+    return summarizeSpend(this.b.modelSpend.get(modelId) ?? new Map(), nowMs);
+  }
+
+  async listSpendModels(): Promise<string[]> {
+    return [...this.b.spendModels];
+  }
+
+  async flagUnpricedModel(modelId: string): Promise<void> {
+    this.b.unpricedModels.add(modelId);
+  }
+
+  async listUnpricedModels(): Promise<string[]> {
+    return [...this.b.unpricedModels];
+  }
+
+  async listSpendActiveEntities(
+    kind: "user" | "chat",
+    nowMs: number,
+  ): Promise<string[]> {
+    const set = this.b.spendActive[kind].get(utcDateKey(nowMs));
+    return set ? [...set] : [];
+  }
+
+  async incrementDenialCount(userId: string, nowMs: number): Promise<void> {
+    const key = utcDateKey(nowMs);
+    let byUser = this.b.denialRank.get(key);
+    if (!byUser) {
+      byUser = new Map();
+      this.b.denialRank.set(key, byUser);
+    }
+    byUser.set(userId, (byUser.get(userId) ?? 0) + 1);
+    pruneDateKeyed(this.b.denialRank, nowMs, 9);
+  }
+
+  async topDenied(
+    nowMs: number,
+    limit: number,
+  ): Promise<Array<{ userId: string; count: number }>> {
+    const byUser = this.b.denialRank.get(utcDateKey(nowMs));
+    if (!byUser) return [];
+    return [...byUser.entries()]
+      .map(([userId, count]) => ({ userId, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, Math.max(0, limit));
+  }
+
+  async getDigestState(): Promise<{ lastSentAtMs: number } | null> {
+    return this.b.digestState.value ? { ...this.b.digestState.value } : null;
+  }
+
+  async setDigestState(state: { lastSentAtMs: number }): Promise<void> {
+    this.b.digestState.value = { ...state };
+  }
+
+  async claimAlert(key: string, ttlSeconds: number): Promise<boolean> {
+    const now = Date.now();
+    const existing = this.b.alertClaims.get(key);
+    if (existing !== undefined && existing > now) return false;
+    this.b.alertClaims.set(key, now + ttlSeconds * 1000);
+    return true;
   }
 
   async listUsers(): Promise<User[]> {
@@ -306,8 +464,14 @@ export class MemoryStorage implements Storage {
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
-  async upsertUser(user: User): Promise<void> {
-    this.b.users.set(user.id, { ...user });
+  async upsertUser(user: User): Promise<{ isNew: boolean }> {
+    const existing = this.b.users.get(user.id);
+    const isNew = existing === undefined;
+    // Preserve the original first-seen instant; a legacy record without one is
+    // treated as long-known (epoch 0), never "new".
+    const firstSeenAt = existing ? existing.firstSeenAt ?? 0 : user.firstSeenAt;
+    this.b.users.set(user.id, { ...user, firstSeenAt });
+    return { isNew };
   }
 
   async getUser(id: string): Promise<User | null> {
@@ -321,8 +485,12 @@ export class MemoryStorage implements Storage {
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt);
   }
 
-  async upsertChat(chat: Chat): Promise<void> {
-    this.b.chats.set(chat.id, { ...chat });
+  async upsertChat(chat: Chat): Promise<{ isNew: boolean }> {
+    const existing = this.b.chats.get(chat.id);
+    const isNew = existing === undefined;
+    const firstSeenAt = existing ? existing.firstSeenAt ?? 0 : chat.firstSeenAt;
+    this.b.chats.set(chat.id, { ...chat, firstSeenAt });
+    return { isNew };
   }
 
   async getChat(id: string): Promise<Chat | null> {

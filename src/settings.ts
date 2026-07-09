@@ -2,8 +2,31 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Storage } from "./storage/types";
-import type { Settings, ChatSettings, RateLimitConfig } from "./shared/types";
+import type {
+  Settings,
+  ChatSettings,
+  RateLimitConfig,
+  BudgetConfig,
+  AnomalyConfig,
+} from "./shared/types";
 import { DEFAULT_SETTINGS } from "./shared/types";
+
+// Reads a non-negative finite number, falling back to `def`.
+function num(v: unknown, def: number): number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : def;
+}
+
+// Reads a boolean, falling back to `def`.
+function bool(v: unknown, def: boolean): boolean {
+  return typeof v === "boolean" ? v : def;
+}
+
+// Reads a positive integer (>= 1), falling back to `def`.
+function posInt(v: unknown, def: number): number {
+  return typeof v === "number" && Number.isFinite(v) && v >= 1
+    ? Math.floor(v)
+    : def;
+}
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   const existing = await storage.getSettings();
@@ -41,6 +64,41 @@ function normalizeRateLimit(
   return { fiveHourTokens, weeklyTokens, ownerExempt, wiseMultiplier };
 }
 
+// Backfills the USD budget caps from a possibly-legacy/absent stored shape.
+// Tolerant of missing/invalid fields so old `at:settings` rows load without a
+// migration (schema-on-read), same as `normalizeRateLimit`.
+function normalizeBudget(b: BudgetConfig | undefined): BudgetConfig {
+  const def = DEFAULT_SETTINGS.budget;
+  const legacy = (b ?? {}) as Partial<BudgetConfig>;
+  return {
+    enabled: bool(legacy.enabled, def.enabled),
+    ownerExempt: bool(legacy.ownerExempt, def.ownerExempt),
+    globalMonthlyCapUsd: num(legacy.globalMonthlyCapUsd, def.globalMonthlyCapUsd),
+    globalDailyCapUsd: num(legacy.globalDailyCapUsd, def.globalDailyCapUsd),
+    perChatDailyCapUsd: num(legacy.perChatDailyCapUsd, def.perChatDailyCapUsd),
+    newUserDailyCapUsd: num(legacy.newUserDailyCapUsd, def.newUserDailyCapUsd),
+    newUserWindowDays: posInt(legacy.newUserWindowDays, def.newUserWindowDays),
+  };
+}
+
+// Backfills the anomaly-detection thresholds (alert-only), same approach.
+function normalizeAnomaly(a: AnomalyConfig | undefined): AnomalyConfig {
+  const def = DEFAULT_SETTINGS.anomaly;
+  const legacy = (a ?? {}) as Partial<AnomalyConfig>;
+  return {
+    digestIntervalHours: posInt(legacy.digestIntervalHours, def.digestIntervalHours),
+    spikeUserAbsoluteUsd: num(legacy.spikeUserAbsoluteUsd, def.spikeUserAbsoluteUsd),
+    spikeChatAbsoluteUsd: num(legacy.spikeChatAbsoluteUsd, def.spikeChatAbsoluteUsd),
+    // A multiplier below 1 would flag every spender; floor it at 1.
+    spikeVelocityMultiplier:
+      typeof legacy.spikeVelocityMultiplier === "number" &&
+      legacy.spikeVelocityMultiplier >= 1
+        ? legacy.spikeVelocityMultiplier
+        : def.spikeVelocityMultiplier,
+    spikeMinBaselineUsd: num(legacy.spikeMinBaselineUsd, def.spikeMinBaselineUsd),
+  };
+}
+
 function normalize(s: Settings): Settings {
   let models = s.models;
   if (!Array.isArray(models) || models.length === 0) {
@@ -55,6 +113,8 @@ function normalize(s: Settings): Settings {
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
   const rateLimit = normalizeRateLimit(s.rateLimit);
+  const budget = normalizeBudget(s.budget);
+  const anomaly = normalizeAnomaly(s.anomaly);
   const expandableBlockquoteThreshold =
     typeof s.expandableBlockquoteThreshold === "number" &&
     Number.isFinite(s.expandableBlockquoteThreshold) &&
@@ -79,6 +139,8 @@ function normalize(s: Settings): Settings {
         : DEFAULT_SETTINGS.systemPrompt,
     models,
     rateLimit,
+    budget,
+    anomaly,
     timezone,
     expandableBlockquoteThreshold,
     maxRemindersPerUser,
@@ -95,6 +157,10 @@ export function applyChatOverrides(
     models: chat.models ?? global.models,
     // Rate limit is per-user and global; there is no per-chat override.
     rateLimit: global.rateLimit,
+    // Budget caps and anomaly thresholds are global policy, like the rate
+    // limit; a per-chat override would let the per-chat cap be sidestepped.
+    budget: global.budget,
+    anomaly: global.anomaly,
     timezone: chat.timezone ?? global.timezone,
     expandableBlockquoteThreshold: global.expandableBlockquoteThreshold,
     // The reminder cap is a global policy, like the rate limit; no per-chat override.

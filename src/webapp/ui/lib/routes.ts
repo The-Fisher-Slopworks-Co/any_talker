@@ -8,6 +8,8 @@ export type Strings = ReturnType<typeof t>;
 export type AdminSection =
   | "prompt"
   | "ratelimit"
+  | "budget"
+  | "spend"
   | "whitelist"
   | "users"
   | "chats"
@@ -29,6 +31,8 @@ export type Route =
 export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "prompt",
   "ratelimit",
+  "budget",
+  "spend",
   "whitelist",
   "users",
   "chats",
@@ -46,6 +50,10 @@ export function adminSection(
       return { label: s.ui_admin_prompt, description: s.ui_admin_prompt_desc };
     case "ratelimit":
       return { label: s.ui_admin_limits, description: s.ui_admin_limits_desc };
+    case "budget":
+      return { label: s.ui_admin_budget, description: s.ui_admin_budget_desc };
+    case "spend":
+      return { label: s.ui_admin_spend, description: s.ui_admin_spend_desc };
     case "whitelist":
       return {
         label: s.ui_admin_whitelist,

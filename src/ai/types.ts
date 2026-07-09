@@ -25,11 +25,18 @@ export type SerializedAIMessage =
 export type AskResult = {
   text: string;
   totalTokens: number;
+  // The model id that actually answered (`models[0]`). Lets spend be attributed
+  // per model. Optional so fixtures that don't care still type.
+  modelId?: string;
   // USD cost computed locally from the catalogue's per-token pricing
   // (inputTokens × promptPrice + outputTokens × completionPrice). Zero when the
   // model has no pricing data. Optional so fixtures/callers that don't care
   // still type.
   costUsd?: number;
+  // False when the model had no pricing entry, so `costUsd` is a floor of $0 and
+  // real spend is under-counted. Surfaced to the owner so the blind spot is
+  // visible. Optional (absent ⇒ treat as priced) for fixtures.
+  priced?: boolean;
 };
 
 export interface AIClient {

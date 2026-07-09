@@ -89,15 +89,68 @@ export interface Storage {
 
   // Accrues `costUsd` to the user's spend for the UTC date of `nowMs`. A
   // non-positive cost is a no-op so free/uncosted replies don't create buckets.
+  // Also records the user in the day's "active spenders" set (see
+  // `listSpendActiveEntities`).
   addUserSpend(userId: string, costUsd: number, nowMs: number): Promise<void>;
   getUserSpend(userId: string, nowMs: number): Promise<SpendSummary>;
 
+  // Parallel per-chat / global / per-model spend accounting, same UTC-day
+  // bucketing and retention as `addUserSpend`. Written alongside it by
+  // `spending/record.ts` so the budget guard and dashboard can see spend from
+  // every angle (who / where / which model). All non-positive costs are no-ops.
+  addChatSpend(chatId: string, costUsd: number, nowMs: number): Promise<void>;
+  getChatSpend(chatId: string, nowMs: number): Promise<SpendSummary>;
+  addGlobalSpend(costUsd: number, nowMs: number): Promise<void>;
+  getGlobalSpend(nowMs: number): Promise<SpendSummary>;
+  addModelSpend(modelId: string, costUsd: number, nowMs: number): Promise<void>;
+  getModelSpend(modelId: string, nowMs: number): Promise<SpendSummary>;
+  // Directory of every model id that has ever recorded spend (for the per-model
+  // dashboard breakdown — model metadata itself lives in the ModelCatalog).
+  listSpendModels(): Promise<string[]>;
+
+  // Records that a model answered without pricing data (cost computed as $0), so
+  // the owner can be told their spend numbers are under-counting. Idempotent.
+  flagUnpricedModel(modelId: string): Promise<void>;
+  listUnpricedModels(): Promise<string[]>;
+
+  // The user/chat ids that actually spent on the UTC date of `nowMs`. Bounds the
+  // periodic spike scan to today's real spenders instead of every entity ever.
+  listSpendActiveEntities(
+    kind: "user" | "chat",
+    nowMs: number,
+  ): Promise<string[]>;
+
+  // Per-user denial ranking for "who hits limits most" — incremented on every
+  // budget/rate-limit denial. Prometheus deliberately carries no per-user label
+  // (cardinality), so this is the only per-user denial signal. `topDenied`
+  // returns the highest-denied users for the UTC date of `nowMs`.
+  incrementDenialCount(userId: string, nowMs: number): Promise<void>;
+  topDenied(
+    nowMs: number,
+    limit: number,
+  ): Promise<Array<{ userId: string; count: number }>>;
+
+  // Cadence bookkeeping for the periodic owner digest (last-sent timestamp).
+  getDigestState(): Promise<{ lastSentAtMs: number } | null>;
+  setDigestState(state: { lastSentAtMs: number }): Promise<void>;
+
+  // One-shot idempotent alert claim: returns true only for the FIRST caller
+  // within `ttlSeconds` for a given `key`, so an alert (global-cap breach, a
+  // per-entity spike) is DM'd to the owner once per period rather than on every
+  // request/scan that observes the same condition.
+  claimAlert(key: string, ttlSeconds: number): Promise<boolean>;
+
   listUsers(): Promise<User[]>;
-  upsertUser(user: User): Promise<void>;
+  // Upserts the user directory row, preserving `firstSeenAt` across updates.
+  // Returns `{ isNew: true }` only when no row existed before — the signal that
+  // drives new-user detection and the new-user soft-start budget.
+  upsertUser(user: User): Promise<{ isNew: boolean }>;
   getUser(id: string): Promise<User | null>;
 
   listChats(): Promise<Chat[]>;
-  upsertChat(chat: Chat): Promise<void>;
+  // Upserts the chat directory row, preserving `firstSeenAt`. `{ isNew: true }`
+  // for a never-before-seen chat (a new non-private chat is a fresh group join).
+  upsertChat(chat: Chat): Promise<{ isNew: boolean }>;
   getChat(id: string): Promise<Chat | null>;
 
   getChatSettings(chatId: string): Promise<ChatSettings | null>;
