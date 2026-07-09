@@ -72,6 +72,7 @@ describe("contactHandler", () => {
       firstName: "Alice",
       lastName: "Smith",
       username: null,
+      firstSeenAt: 1_000,
       lastSeenAt: 1_000,
     });
   });
@@ -91,6 +92,7 @@ describe("contactHandler", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1_000,
       lastSeenAt: 1_000,
     });
   });
@@ -102,6 +104,7 @@ describe("contactHandler", () => {
       firstName: "Alice",
       lastName: "Smith",
       username: "alice_real",
+      firstSeenAt: 5_000,
       lastSeenAt: 5_000,
     });
     const out = await contactHandler(baseInput({ storage }));
@@ -111,6 +114,7 @@ describe("contactHandler", () => {
       firstName: "Alice",
       lastName: "Smith",
       username: "alice_real",
+      firstSeenAt: 5_000,
       lastSeenAt: 5_000,
     });
   });
@@ -123,6 +127,7 @@ describe("contactHandler", () => {
       firstName: "Alice",
       lastName: "Smith",
       username: "alice_real",
+      firstSeenAt: 5_000,
       lastSeenAt: 5_000,
     });
     const out = await contactHandler(baseInput({ storage }));
@@ -137,6 +142,7 @@ describe("contactHandler", () => {
       firstName: "Alice",
       lastName: "Smith",
       username: "alice_real",
+      firstSeenAt: 5_000,
       lastSeenAt: 5_000,
     });
   });

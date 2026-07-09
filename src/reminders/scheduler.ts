@@ -3,6 +3,7 @@
 
 import type { Storage } from "../storage/types";
 import type { AIClient } from "../ai/types";
+import type { RateLimiter } from "../ratelimit/types";
 import {
   startIntervalScheduler,
   type IntervalScheduler,
@@ -29,6 +30,11 @@ export type SchedulerDeps = {
   // loop and deleted ones drop out without restarting the scheduler.
   runtimes: () => ReminderRuntime[];
   ai: AIClient;
+  // The per-user token limiter and owner id — reminder delivery re-runs the LLM,
+  // so it charges tokens/records spend the same as an /ask (family-global, like
+  // `ai`, so they live here rather than per-runtime).
+  rateLimiter: RateLimiter;
+  ownerId: string;
   intervalMs?: number;
 };
 
@@ -37,16 +43,22 @@ const DEFAULT_INTERVAL_MS = 30_000;
 export async function runReminderTick(deps: {
   runtimes: ReminderRuntime[];
   ai: AIClient;
+  rateLimiter: RateLimiter;
+  ownerId: string;
   nowMs: number;
 }): Promise<void> {
   await Promise.allSettled(
-    deps.runtimes.map((runtime) => runRuntimeTick(runtime, deps.ai, deps.nowMs)),
+    deps.runtimes.map((runtime) =>
+      runRuntimeTick(runtime, deps.ai, deps.rateLimiter, deps.ownerId, deps.nowMs),
+    ),
   );
 }
 
 async function runRuntimeTick(
   runtime: ReminderRuntime,
   ai: AIClient,
+  rateLimiter: RateLimiter,
+  ownerId: string,
   nowMs: number,
 ): Promise<void> {
   const due = await runtime.storage.fetchDueReminders(nowMs);
@@ -58,6 +70,8 @@ async function runRuntimeTick(
           storage: runtime.storage,
           api: runtime.api,
           ai,
+          rateLimiter,
+          ownerId,
           resolver: runtime.resolver,
           botId: runtime.botId,
         },
@@ -102,6 +116,8 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
       runReminderTick({
         runtimes: deps.runtimes(),
         ai: deps.ai,
+        rateLimiter: deps.rateLimiter,
+        ownerId: deps.ownerId,
         nowMs: Date.now(),
       }),
   });

@@ -6,6 +6,7 @@ import type { Api } from "grammy";
 import { MemoryStorage } from "../storage/memory";
 import { BotManager, type BotManagerDeps } from "./manager";
 import type { RateLimiter } from "../ratelimit/types";
+import type { BudgetGuard } from "../budget/types";
 import type { AIClient } from "../ai/types";
 import type { ManagedBot } from "./types";
 
@@ -25,6 +26,7 @@ function makeManager(storage: MemoryStorage) {
   const deps: BotManagerDeps = {
     storage,
     rateLimiter: {} as unknown as RateLimiter,
+    budgetGuard: {} as unknown as BudgetGuard,
     ai: {} as unknown as AIClient,
     ownerId: "1",
     mainApi,

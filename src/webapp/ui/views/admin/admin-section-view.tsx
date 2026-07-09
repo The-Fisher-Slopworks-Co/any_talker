@@ -12,6 +12,8 @@ import { ChecksTab } from "./checks-tab";
 import { ManagedBotsTab } from "./managed-bots-tab";
 import { PromptTab } from "./prompt-tab";
 import { RateLimitTab } from "./rate-limit-tab";
+import { BudgetTab } from "./budget-tab";
+import { SpendTab } from "./spend-tab";
 import { UsersTab } from "./users-tab";
 import { WhitelistTab } from "./whitelist-tab";
 import type { AdminSection } from "../../lib/routes";
@@ -31,7 +33,8 @@ export function AdminSectionView({
 }) {
   const { t: s } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
-  const needsSettings = section === "prompt" || section === "ratelimit";
+  const needsSettings =
+    section === "prompt" || section === "ratelimit" || section === "budget";
   const goUser = (id: string) => onEditUser(id, section);
   const goChat = (id: string) => onEditChat(id, section);
 
@@ -39,6 +42,7 @@ export function AdminSectionView({
     if (needsSettings) api.getSettings().then(setSettings);
   }, [needsSettings]);
 
+  if (section === "spend") return <SpendTab />;
   if (section === "whitelist")
     return <WhitelistTab onOpenUser={goUser} onOpenChat={goChat} />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
@@ -71,5 +75,7 @@ export function AdminSectionView({
   if (!settings) return <LoadingState />;
   if (section === "prompt")
     return <PromptTab settings={settings} onSaved={setSettings} />;
+  if (section === "budget")
+    return <BudgetTab settings={settings} onSaved={setSettings} />;
   return <RateLimitTab settings={settings} onSaved={setSettings} />;
 }

@@ -5,6 +5,7 @@ import { Bot, type Api } from "grammy";
 import { proxiedFetch } from "../proxy";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
+import type { BudgetGuard } from "../budget/types";
 import type { AIClient } from "../ai/types";
 import type { LogFormat } from "../log";
 import { createBot, type BotDeps } from "../bot";
@@ -33,6 +34,7 @@ type RunningBot = {
 export type BotManagerDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
+  budgetGuard: BudgetGuard;
   ai: AIClient;
   ownerId: string;
   // The main bot's api — used to broker managed bot tokens (getManagedBotToken).
@@ -138,6 +140,7 @@ export class BotManager {
       ownerId: this.deps.ownerId,
       storage: this.deps.storage,
       rateLimiter: this.deps.rateLimiter,
+      budgetGuard: this.deps.budgetGuard,
       ai: this.deps.ai,
       resolver: createManagedPersonaResolver(this.deps.storage, record.botId),
       persona: { botId: record.botId },

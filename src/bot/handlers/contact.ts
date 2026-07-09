@@ -54,6 +54,7 @@ export async function contactHandler(input: ContactInput): Promise<ContactOutcom
       firstName: input.contact.first_name,
       lastName: input.contact.last_name ?? null,
       username: null,
+      firstSeenAt: input.now,
       lastSeenAt: input.now,
     });
   }

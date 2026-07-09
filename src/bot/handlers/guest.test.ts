@@ -4,6 +4,7 @@
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../../storage/memory";
 import { DualWindowLimiter } from "../../ratelimit/dual-window";
+import { SpendBudgetGuard } from "../../budget/guard";
 import { currentWindowStarts } from "../../ratelimit/window";
 import type { AIClient, AskResult } from "../../ai/types";
 import { guestAskHandler, type GuestAskInput } from "./guest";
@@ -39,6 +40,7 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
   return {
     storage,
     rateLimiter: new DualWindowLimiter(new MemoryStorage()),
+    budgetGuard: new SpendBudgetGuard(storage),
     ai: new FakeAI(),
     resolver: createMainPersonaResolver(storage),
     ownerId: "1",

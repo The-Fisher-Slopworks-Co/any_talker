@@ -54,6 +54,9 @@ describe("applyChatOverrides", () => {
       models: ["x"],
       // Rate limit is per-user and global — chat settings never override it.
       rateLimit: DEFAULT_SETTINGS.rateLimit,
+      // Budget/anomaly are global policy too — never overridden per chat.
+      budget: DEFAULT_SETTINGS.budget,
+      anomaly: DEFAULT_SETTINGS.anomaly,
       timezone: DEFAULT_SETTINGS.timezone,
       expandableBlockquoteThreshold:
         DEFAULT_SETTINGS.expandableBlockquoteThreshold,

@@ -133,6 +133,7 @@ describe("model validation against the catalogue", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -875,6 +876,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 100,
       lastSeenAt: 100,
     });
     await d.storage.upsertUser({
@@ -882,6 +884,7 @@ describe("/api/admin/users", () => {
       firstName: "Bob",
       lastName: null,
       username: "bob",
+      firstSeenAt: 200,
       lastSeenAt: 200,
     });
     const r = await handleApi(
@@ -909,6 +912,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -931,6 +935,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserName("42", "Override");
@@ -954,6 +959,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserTimezone("42", "Europe/Moscow");
@@ -979,6 +985,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1002,6 +1009,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserTimezone("42", "Europe/Moscow");
@@ -1027,6 +1035,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserTimezone("42", "Europe/Moscow");
@@ -1053,6 +1062,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1074,6 +1084,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1095,6 +1106,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserLang("42", "ru");
@@ -1114,6 +1126,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1137,6 +1150,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserLang("42", "ru");
@@ -1160,6 +1174,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1181,6 +1196,7 @@ describe("/api/admin/users", () => {
       firstName: "Alice",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.setUserName("42", "Override");
@@ -1218,6 +1234,7 @@ describe("/api/admin/users", () => {
       firstName: "Spender",
       lastName: null,
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.addUserSpend("42", 0.75, Date.now());
@@ -1297,6 +1314,7 @@ describe("/api/admin/chats", () => {
       type: "supergroup",
       title: "Old",
       username: null,
+      firstSeenAt: 100,
       lastSeenAt: 100,
     });
     await d.storage.upsertChat({
@@ -1304,6 +1322,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "New",
       username: null,
+      firstSeenAt: 200,
       lastSeenAt: 200,
     });
     const r = await handleApi(
@@ -1331,6 +1350,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1349,6 +1369,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     const r = await handleApi(
@@ -1376,6 +1397,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await handleApi(
@@ -1412,6 +1434,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await handleApi(
@@ -1435,6 +1458,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await handleApi(
@@ -1458,6 +1482,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await handleApi(
@@ -1481,6 +1506,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.saveChatSettings("-100", { botName: "Old" });
@@ -1503,6 +1529,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await handleApi(
@@ -1528,6 +1555,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await handleApi(
@@ -1551,6 +1579,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.saveChatSettings("-100", {
@@ -1575,6 +1604,7 @@ describe("/api/admin/chats", () => {
       type: "group",
       title: "T",
       username: null,
+      firstSeenAt: 1,
       lastSeenAt: 1,
     });
     await d.storage.saveChatSettings("-100", { systemPrompt: "x" });
@@ -1692,6 +1722,7 @@ describe("/api/me/reminders", () => {
       type: "supergroup",
       title: "Team Chat",
       username: null,
+      firstSeenAt: 1000,
       lastSeenAt: 1000,
     });
     await d.storage.saveReminder({
@@ -1764,6 +1795,7 @@ describe("/api/admin/reminders", () => {
       firstName: "Jane",
       lastName: "Doe",
       username: "jane",
+      firstSeenAt: 100,
       lastSeenAt: 100,
     });
     await d.storage.saveReminder({
@@ -2300,5 +2332,88 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
     expect((charList.body as { facts: unknown[] }).facts).toEqual([
       { key: "char_fact", value: "for the character" },
     ]);
+  });
+});
+
+describe("GET /api/admin/spend/overview", () => {
+  test("returns the aggregated overview for the owner", async () => {
+    const d = deps();
+    const now = Date.now();
+    await d.storage.addGlobalSpend(2, now);
+    await d.storage.addUserSpend("42", 2, now);
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "A",
+      lastName: null,
+      username: "aa",
+      firstSeenAt: now,
+      lastSeenAt: now,
+    });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/spend/overview", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const body = r.body as {
+      global: { day: number };
+      topUsers: Array<{ id: string }>;
+    };
+    expect(body.global.day).toBeCloseTo(2);
+    expect(body.topUsers.map((u) => u.id)).toContain("42");
+  });
+
+  test("is admin-only: a non-owner gets 403", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/spend/overview", body: null },
+      deps(),
+      guest("99"),
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
+describe("PUT /api/settings — budget & anomaly", () => {
+  test("persists a valid budget patch and preserves the rest", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { budget: { globalMonthlyCapUsd: 10 } },
+      },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const budget = (r.body as { budget: { globalMonthlyCapUsd: number; enabled: boolean } })
+      .budget;
+    expect(budget.globalMonthlyCapUsd).toBe(10);
+    expect(budget.enabled).toBe(true);
+  });
+
+  test("rejects a negative cap", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { budget: { globalDailyCapUsd: -1 } },
+      },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("rejects a velocity multiplier below 1", async () => {
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { anomaly: { spikeVelocityMultiplier: 0.5 } },
+      },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(400);
   });
 });

@@ -44,6 +44,7 @@ export type AskOutcomeLabel =
   | "answered"
   | "denied"
   | "usage"
+  | "budget_limited"
   | "rate_limited"
   | "error";
 
@@ -124,6 +125,17 @@ export const rateLimitTokensDeductedTotal = registry.register(
   new Counter(
     "bot_rate_limit_tokens_deducted_total",
     "Sum of tokens charged to per-user rate-limit windows after AI replies.",
+  ),
+);
+
+// --- Budget metrics --------------------------------------------------------
+
+// The four hard USD caps, bounded cardinality (a fixed enum of reasons).
+export const budgetDeniedTotal = registry.register(
+  new Counter(
+    "bot_budget_denied_total",
+    "Requests denied by the USD budget guard, by cap reason.",
+    ["reason"],
   ),
 );
 

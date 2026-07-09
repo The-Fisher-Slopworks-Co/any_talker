@@ -11,6 +11,8 @@ import type {
   WhitelistEntry,
   ChatSettings,
   RateLimitConfig,
+  BudgetConfig,
+  AnomalyConfig,
   Gender,
 } from "../shared/types";
 import { isValidTimezone, isValidGender } from "../shared/types";
@@ -27,6 +29,7 @@ import type { SpendSummary } from "../spending/window";
 import { normalizeCheckInput } from "../checks/validate";
 import { normalizeManagedBotInput } from "../managed-bots/validate";
 import { getOrInitSettings } from "../settings";
+import { gatherSpendOverview } from "../spending/overview";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
 import type { ModelCatalog } from "../ai/model-catalog";
 
@@ -217,6 +220,53 @@ const BAD_MAX_REMINDERS: ApiResponse = {
   status: 400,
   body: { error: "maxRemindersPerUser must be an integer >= 1" },
 };
+
+const BAD_BUDGET: ApiResponse = {
+  status: 400,
+  body: {
+    error:
+      "budget caps must be non-negative numbers; newUserWindowDays an integer >= 1",
+  },
+};
+
+const BAD_ANOMALY: ApiResponse = {
+  status: 400,
+  body: {
+    error:
+      "anomaly thresholds must be non-negative numbers; velocity multiplier >= 1; digestIntervalHours an integer >= 1",
+  },
+};
+
+const nonNegNum = (v: unknown): boolean =>
+  v === undefined || (typeof v === "number" && Number.isFinite(v) && v >= 0);
+const posIntOrUndef = (v: unknown): boolean =>
+  v === undefined ||
+  (typeof v === "number" && Number.isInteger(v) && v >= 1);
+const boolOrUndef = (v: unknown): boolean =>
+  v === undefined || typeof v === "boolean";
+
+function validateBudgetPatch(b: Partial<BudgetConfig>): boolean {
+  return (
+    nonNegNum(b.globalMonthlyCapUsd) &&
+    nonNegNum(b.globalDailyCapUsd) &&
+    nonNegNum(b.perChatDailyCapUsd) &&
+    nonNegNum(b.newUserDailyCapUsd) &&
+    posIntOrUndef(b.newUserWindowDays) &&
+    boolOrUndef(b.enabled) &&
+    boolOrUndef(b.ownerExempt)
+  );
+}
+
+function validateAnomalyPatch(a: Partial<AnomalyConfig>): boolean {
+  const mult = a.spikeVelocityMultiplier;
+  return (
+    nonNegNum(a.spikeUserAbsoluteUsd) &&
+    nonNegNum(a.spikeChatAbsoluteUsd) &&
+    nonNegNum(a.spikeMinBaselineUsd) &&
+    posIntOrUndef(a.digestIntervalHours) &&
+    (mult === undefined || (typeof mult === "number" && mult >= 1))
+  );
+}
 
 function isValidModelsList(value: unknown): value is string[] {
   return (
@@ -616,10 +666,24 @@ export async function handleApi(
           return BAD_MAX_REMINDERS;
         }
       }
+      if (
+        patch.budget !== undefined &&
+        !validateBudgetPatch(patch.budget as Partial<BudgetConfig>)
+      ) {
+        return BAD_BUDGET;
+      }
+      if (
+        patch.anomaly !== undefined &&
+        !validateAnomalyPatch(patch.anomaly as Partial<AnomalyConfig>)
+      ) {
+        return BAD_ANOMALY;
+      }
       const next: Settings = {
         ...current,
         ...patch,
         rateLimit: { ...current.rateLimit, ...(patch.rateLimit ?? {}) },
+        budget: { ...current.budget, ...(patch.budget ?? {}) },
+        anomaly: { ...current.anomaly, ...(patch.anomaly ?? {}) },
       };
       await deps.storage.saveSettings(next);
       return { status: 200, body: next };
@@ -679,6 +743,18 @@ export async function handleApi(
       deps.storage,
       await deps.storage.listAllReminders(),
     );
+  }
+
+  // Consolidated spend dashboard: global aggregate, top spenders (users +
+  // chats), per-model breakdown, denial leaderboard, and entities first seen in
+  // the last 7 days.
+  if (req.path === "/api/admin/spend/overview" && req.method === "GET") {
+    const now = Date.now();
+    const overview = await gatherSpendOverview(deps.storage, now, {
+      limit: 10,
+      newSinceMs: now - 7 * 24 * 60 * 60 * 1000,
+    });
+    return { status: 200, body: overview };
   }
 
   const userSpendMatch = req.path.match(

@@ -39,6 +39,7 @@ async function seedUser(storage: MemoryStorage): Promise<void> {
     firstName: "Tucker",
     lastName: "Carlson",
     username: "tc",
+    firstSeenAt: 0,
     lastSeenAt: 0,
   });
 }

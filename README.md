@@ -96,6 +96,7 @@ following metric families:
 | `bot_tool_call_duration_seconds` | histogram | `tool` | Tool execution latency |
 | `bot_rate_limit_checks_total` | counter | `result` | Rate-limit allow/deny |
 | `bot_rate_limit_tokens_deducted_total` | counter | — | Total tokens charged to usage windows |
+| `bot_budget_denied_total` | counter | `reason` | Requests denied by a USD budget cap (global/chat/new-user) |
 | `bot_reminders_delivered_total` | counter | `outcome` | Reminder scheduler results |
 | `bot_checks_processed_total` | counter | `outcome` | Recurring-check fires/timeouts/answers |
 | `http_requests_total` | counter | `method`, `route`, `status` | Web App / API traffic |
@@ -132,7 +133,19 @@ are supported as `host:port`).
 - Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
   (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
-- Whitelist (chats and users). Owner bypasses whitelist.
+- **USD budget guard** — hard spend caps enforced independently of the token limit (money vs.
+  volume): a global **monthly** cap (the kill-switch — sized to your real budget), a global **daily**
+  cap, a **per-chat** daily cap, and a tighter **new-user** daily cap during a soft-start window. The
+  owner is never blocked, but owner spend still counts. All caps are runtime-editable in the admin UI
+  (**Budget caps** tab); disable enforcement with one toggle. Spend is tracked per user/chat/global/
+  model — including reminder-delivery LLM re-runs, which now book cost too.
+- **Budget observability** — a **Spend dashboard** (admin UI) with the global total, top spenders
+  (users + chats), per-model breakdown (unpriced models flagged), most-denied users, and new
+  users/chats. Plus proactive owner DMs: instant alarms (global cap breached, bot added to a new
+  group, a user/chat spend spike) and a periodic **budget digest** (interval + spike thresholds
+  configurable). Alarms are deduped to once per period.
+- Whitelist (chats and users). Owner bypasses whitelist. (The budget guard runs alongside it, so the
+  whitelist can be removed without leaving the budget unprotected.)
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's

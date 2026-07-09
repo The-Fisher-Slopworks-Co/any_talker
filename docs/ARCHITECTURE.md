@@ -22,8 +22,8 @@ is done from a Telegram Mini App served by the bot itself.
 
 A single Bun process (`src/main.ts`) is the composition root. It loads config,
 constructs the shared services — `KeyDBStorage`, `DualWindowLimiter`,
-`ModelCatalog`, `OpenAICompatClient` — registers the AI tools, then starts four
-long-lived things:
+`SpendBudgetGuard`, `ModelCatalog`, `OpenAICompatClient` — registers the AI
+tools, then starts five long-lived things:
 
 1. **The grammY bot(s)** in long-polling mode — receives Telegram updates, runs
    the `/ask` and guest-mode flows, photo/voice/contact handlers, and the
@@ -35,6 +35,8 @@ long-lived things:
    `/api/*` surface, `GET /metrics` (Prometheus), and `GET /health`.
 3. **The reminder scheduler** — polls KeyDB for due reminders and delivers them.
 4. **The checks scheduler** — fires recurring daily check-ins and times them out.
+5. **The observability scheduler** — scans for spend spikes and sends the
+   periodic budget digest to the owner (`observability/`).
 
 Everything persists through one `Storage` interface backed by **KeyDB** (a
 Redis-compatible store) in production and an in-memory double in tests. The AI
@@ -134,7 +136,9 @@ flowchart TB
 | `src/reminders/` | One-shot reminder scheduling, delivery (re-runs the LLM), stored-record validation. | `scheduler.ts`, `delivery.ts`, `parse.ts`, `types.ts` |
 | `src/checks/` | Recurring daily check-ins: schedule math, firing, resolution, counters. | `runner.ts`, `schedule.ts`, `resolve.ts`, `counter.ts`, `validate.ts`, `format.ts`, `callback-data.ts` |
 | `src/ratelimit/` | Per-user dual fixed-window rate limiter (5-hour + weekly token budgets, per-user phase-shifted). | `dual-window.ts`, `window.ts`, `types.ts` |
-| `src/spending/` | UTC-day-bucketed per-user spend windows (day/week/month). | `window.ts` |
+| `src/budget/` | Hard USD budget guard — the enforcement safety net that denies non-owner requests when a global/chat/new-user spend cap is breached. Port + impl, mirroring `ratelimit/`. | `guard.ts`, `types.ts` |
+| `src/spending/` | UTC-day-bucketed spend windows (per-user/chat/global/model), the multi-ledger spend recorder, and the shared spend-overview aggregator (powers the digest + dashboard). | `window.ts`, `record.ts`, `overview.ts` |
+| `src/observability/` | Budget observability: pure spike detection, the owner digest formatter, the narrow owner-DM `NotifyApi`, and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
 | `src/shared/` | i18n catalog, timezone math, display-name validation, user-fact key/value constraints, interval scheduler, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `types.ts` |
@@ -412,6 +416,13 @@ Notes that matter:
   after** the AI responds and is not floored, so one request can overshoot a
   window's budget (at-least-one-more-request semantics). Owner-exempt
   requests skip the limiter entirely.
+- The **budget guard** runs as a second, independent gate right before the token
+  limiter (after settings resolve, since it needs `settings.budget`): it denies
+  (`kind: "budgetLimited"`) when a global/chat/new-user USD cap is breached. Both
+  the budget and rate-limit denial paths bump the per-user denial counter, and a
+  global-cap breach fires a deduped owner DM from the dispatcher. On a successful
+  answer, `spending/record.ts` books the cost to the user/chat/global/model
+  ledgers (the global total drives the kill-switch).
 - **Conversation context** is a reply-chain graph: each turn is stored as a
   `ConversationNode` with a `parentBotMsgId` pointer, written under **both** the
   bot's reply message id and the user's ask message id (unique within a chat),
@@ -443,13 +454,19 @@ persisted entities:
 
 | Entity | Key pattern | Redis type | TTL | Shape (abridged) |
 |---|---|---|---|---|
-| Global settings | `at:settings` | string | — | `Settings` (systemPrompt, models[], rateLimit, timezone, maxRemindersPerUser, …) |
+| Global settings | `at:settings` | string | — | `Settings` (systemPrompt, models[], rateLimit, budget, anomaly, timezone, maxRemindersPerUser, …) |
 | Chat settings | `at:chat_settings:{chatId}` | string | — | partial `ChatSettings` overrides; key deleted when empty |
 | Whitelist | `at:whitelist:{users\|chats}` | string | — | `WhitelistEntry[]` (`{id, label?}`) |
 | Per-user rate-limit usage | `at:usage:{userId}` | string | ~9 days (week + slack) | `{ fiveHour: {windowStart, used}, weekly: {windowStart, used} }` (per-user, global; window phase derived from the user id) |
 | User attributes | `at:user_{name,tz,gender,lang}:{userId}` | string (raw) | — | scalar strings, validated on read |
 | Per-user spend | `at:spend:{userId}:{YYYY-MM-DD}` | float counter | 35 days | USD per UTC day (`INCRBYFLOAT`); summarized to day/week/month |
-| Users / chats directory | `at:users` · `at:chats` | hash | — | `User` / `Chat` per field |
+| Per-chat / global / per-model spend | `at:spend_chat:{chatId}:{date}` · `at:spend_global:{date}` · `at:spend_model:{modelId}:{date}` | float counter | 35 days | Same day-bucket shape as per-user spend, written alongside it by `spending/record.ts`. Global is the kill-switch's source of truth. |
+| Spend model directory · unpriced models | `at:spend_models` · `at:unpriced_models` | SET | — | Every model id that recorded spend · models that answered without pricing (spend under-counted) |
+| Active spenders (per day) | `at:spend_active:{user\|chat}:{date}` | SET | 2 days | Ids that actually spent that day; bounds the spike scan to real spenders |
+| Denial ranking (per day) | `at:denial_rank:{date}` | ZSET | ~9 days | `userId → denial count` (`ZINCRBY`) — "who hits limits most"; Prometheus has no per-user label by design |
+| Digest cadence | `at:digest_state` | string | — | `{ lastSentAtMs }` — gates the periodic digest and bounds "new since last digest" |
+| Alert dedupe | `at:alert_claim:{key}` | string | caller TTL | `SET NX EX` one-shot claim: an alert (cap breach, spike, new group) is DM'd once per period, not per event |
+| Users / chats directory | `at:users` · `at:chats` | hash | — | `User` / `Chat` per field, incl. `firstSeenAt` (legacy rows backfilled to epoch 0 on read ⇒ never "new") |
 | Conversation node | `at:msg:{chatId}:{msgId}` — one node per turn, written under both the bot-reply id and the user's ask message id (DMs add the `mbot:{botId}:` scope; groups stay shared) | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }`; failed turns store the rate-limit/error notice as `botAnswer` |
 | Photo cache | `at:photo_cache:{fileId}` | base64 string | 7 days | raw bytes (TTL renewed on read) |
 | Album photos | `at:album:{chatId}:{mediaGroupId}` | hash | 30 days | `messageId → fileId` |
@@ -629,6 +646,42 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   migration; `check` is a pure read and `deduct` is the only writer. Trade-off:
   there is no longer a per-chat rate-limit override (it can't compose with a
   global per-user budget).
+- **Hard USD budget guard, separate from the token rate limit** (`budget/`) —
+  money and fairness are different currencies and scopes, so the `BudgetGuard`
+  (USD caps: global monthly/daily, per-chat daily, new-user soft-start) is a
+  second, independent gate checked *before* the per-user token limiter, not
+  folded into it. It exists so the whitelist can be removed safely: the token
+  limiter bounds one user's *volume*, the budget guard bounds total *dollars*
+  (an expensive model with few tokens still costs money). The **global monthly
+  cap is the real kill-switch** (sized to the operator's actual budget); the
+  daily/chat/new-user caps bound how fast it can drain. The owner is never denied
+  (`ownerExempt`) but owner spend still counts toward the global totals. Caps are
+  checked most-severe-first and are global policy (no per-chat override, same
+  rationale as the rate limit). Spend is recorded across four ledgers
+  (user/chat/global/model) by one `spending/record.ts` fan-out, so every LLM call
+  site — `/ask`, guest mode, **and reminder delivery** (previously an untracked
+  cost sink that re-ran the model with no accounting) — books cost the same way.
+- **`firstSeenAt` backfilled to epoch 0, not "now"** — new-user detection needs a
+  first-seen instant, added to `User`/`Chat`. Rows written before the field
+  existed are treated as epoch 0 on read (and on their next upsert), so an
+  existing user is never mistaken for "new" on deploy day — which would wrongly
+  subject long-time users to the new-user soft-start cap or flood the digest.
+  Schema-on-read, no migration. The upsert is a non-atomic read-merge (like the
+  fire-and-forget upserts calling it); a rare concurrent double-`isNew` is
+  tolerated because the new-group alert is `claimAlert`-deduped and the digest is
+  `firstSeenAt`-derived.
+- **Observability is derived, not queued** (`observability/`) — the periodic
+  owner digest (new users/chats since last digest, top spenders, per-model spend,
+  denial leaders, unpriced models) is re-projected from the persisted day-bucket
+  counters + `firstSeenAt` at digest time, so there is no event log to maintain.
+  Spend spikes (absolute OR velocity-vs-own-baseline) are found by a periodic
+  scan bounded to today's active spenders, not computed on the hot path — the
+  *enforcement* caps stay real-time (the guard re-reads storage per request), but
+  the owner's *notification* of a spike lags by at most the scan interval.
+  Delivery is hybrid: instant owner DMs for alarms (global cap breach, new group,
+  spend spike, each `claimAlert`-deduped to once/period), a batched digest for
+  routine reporting. All owner-facing surfaces (digest, dashboard) reuse one
+  `spending/overview.ts` aggregator.
 - **Custom Prometheus implementation** — `metrics/registry.ts` explicitly avoids
   `prom-client` (hand-rolled exposition + cardinality guards); fewer deps, more
   in-house code to maintain.
