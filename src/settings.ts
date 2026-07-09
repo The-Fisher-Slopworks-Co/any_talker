@@ -108,6 +108,10 @@ function normalize(s: Settings): Settings {
         ? [legacy]
         : DEFAULT_SETTINGS.models;
   }
+  const whitelistEnabled = bool(
+    s.whitelistEnabled,
+    DEFAULT_SETTINGS.whitelistEnabled,
+  );
   const timezone =
     typeof s.timezone === "string" && s.timezone.length > 0
       ? s.timezone
@@ -138,6 +142,7 @@ function normalize(s: Settings): Settings {
         ? s.systemPrompt
         : DEFAULT_SETTINGS.systemPrompt,
     models,
+    whitelistEnabled,
     rateLimit,
     budget,
     anomaly,
@@ -155,6 +160,8 @@ export function applyChatOverrides(
   return {
     systemPrompt: chat.systemPrompt ?? global.systemPrompt,
     models: chat.models ?? global.models,
+    // Access-gate policy is global, like the rate limit; no per-chat override.
+    whitelistEnabled: global.whitelistEnabled,
     // Rate limit is per-user and global; there is no per-chat override.
     rateLimit: global.rateLimit,
     // Budget caps and anomaly thresholds are global policy, like the rate

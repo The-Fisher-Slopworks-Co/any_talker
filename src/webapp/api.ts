@@ -221,6 +221,11 @@ const BAD_MAX_REMINDERS: ApiResponse = {
   body: { error: "maxRemindersPerUser must be an integer >= 1" },
 };
 
+const BAD_WHITELIST_ENABLED: ApiResponse = {
+  status: 400,
+  body: { error: "whitelistEnabled must be a boolean" },
+};
+
 const BAD_BUDGET: ApiResponse = {
   status: 400,
   body: {
@@ -665,6 +670,12 @@ export async function handleApi(
         ) {
           return BAD_MAX_REMINDERS;
         }
+      }
+      if (
+        patch.whitelistEnabled !== undefined &&
+        typeof patch.whitelistEnabled !== "boolean"
+      ) {
+        return BAD_WHITELIST_ENABLED;
       }
       if (
         patch.budget !== undefined &&

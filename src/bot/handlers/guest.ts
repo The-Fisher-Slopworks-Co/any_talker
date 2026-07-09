@@ -79,10 +79,6 @@ export async function guestAskHandler(
   const storage = input.storage.forBot(input.botId ?? null);
 
   const isOwner = input.userId === input.ownerId;
-  const isWhitelisted = isOwner
-    ? true
-    : await storage.isWhitelisted("users", input.userId);
-  if (!isWhitelisted) return { kind: "denied" };
 
   // Nothing to answer about — no text, no replied-to message, no media. The
   // same emptiness check as /ask's "usage" outcome; guest queries have no
@@ -102,6 +98,14 @@ export async function guestAskHandler(
     storage.getUserTimezone(input.userId),
   ]);
   const timezone = userTimezone ?? settings.timezone;
+
+  // Access gate: owner always passes; otherwise the user whitelist is consulted
+  // only while `whitelistEnabled` (guest queries have no chat membership, so
+  // only the user list applies). The budget guard is the safety net when off.
+  if (settings.whitelistEnabled && !isOwner) {
+    const isWhitelisted = await storage.isWhitelisted("users", input.userId);
+    if (!isWhitelisted) return { kind: "denied" };
+  }
 
   // Hard USD budget gate (money), before the token rate limit (fairness).
   const budgetVerdict = await input.budgetGuard.check(

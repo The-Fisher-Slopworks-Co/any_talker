@@ -144,8 +144,10 @@ are supported as `host:port`).
   users/chats. Plus proactive owner DMs: instant alarms (global cap breached, bot added to a new
   group, a user/chat spend spike) and a periodic **budget digest** (interval + spike thresholds
   configurable). Alarms are deduped to once per period.
-- Whitelist (chats and users). Owner bypasses whitelist. (The budget guard runs alongside it, so the
-  whitelist can be removed without leaving the budget unprotected.)
+- Whitelist (chats and users). Owner always bypasses it. Enforcement is a single toggle in the admin
+  UI (**Whitelist** tab): turn it off to open the bot to everyone — the USD budget guard and rate
+  limit stay in force as the safety net, and the whitelist entries are preserved (not consulted) so
+  it can be turned back on unchanged.
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's

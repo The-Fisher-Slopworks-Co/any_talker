@@ -383,6 +383,35 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(400);
   });
 
+  test("persists whitelistEnabled=false", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { whitelistEnabled: false },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.getSettings())?.whitelistEnabled).toBe(false);
+  });
+
+  test("rejects a non-boolean whitelistEnabled", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { whitelistEnabled: "yes" },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
   test("rejects non-positive multipliers", async () => {
     const d = deps();
     const res = await handleApi(

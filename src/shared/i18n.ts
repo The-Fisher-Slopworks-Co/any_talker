@@ -173,6 +173,8 @@ type Strings = {
 
   ui_whitelist_remove: string;
   ui_whitelist_add: string;
+  ui_whitelist_enforce: string;
+  ui_whitelist_enforce_footer: string;
   ui_whitelist_allowed_users: string;
   ui_whitelist_allowed_chats: string;
   ui_whitelist_no_entries: string;
@@ -612,6 +614,9 @@ const en: Strings = {
 
   ui_whitelist_remove: "Remove from whitelist",
   ui_whitelist_add: "Add to whitelist",
+  ui_whitelist_enforce: "Enforce whitelist",
+  ui_whitelist_enforce_footer:
+    "When on, only whitelisted users/chats (and you) may use the bot. When off, anyone may — the USD budget caps and rate limit are the only protection. Entries below are kept either way.",
   ui_whitelist_allowed_users: "Allowed Users",
   ui_whitelist_allowed_chats: "Allowed Chats",
   ui_whitelist_no_entries: "No entries",
@@ -1022,6 +1027,9 @@ const ru: Strings = {
 
   ui_whitelist_remove: "Убрать из белого списка",
   ui_whitelist_add: "Добавить в белый список",
+  ui_whitelist_enforce: "Требовать белый список",
+  ui_whitelist_enforce_footer:
+    "Когда включено, ботом могут пользоваться только пользователи/чаты из белого списка (и вы). Когда выключено — кто угодно, и защищают только лимиты трат в долларах и рейт-лимит. Записи ниже сохраняются в любом случае.",
   ui_whitelist_allowed_users: "Разрешённые пользователи",
   ui_whitelist_allowed_chats: "Разрешённые чаты",
   ui_whitelist_no_entries: "Записей нет",
