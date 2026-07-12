@@ -117,7 +117,9 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:8428/health"]
+      # 127.0.0.1, not localhost: busybox wget resolves localhost to ::1 and
+      # VictoriaMetrics binds IPv4-only, so the check would always fail.
+      test: ["CMD", "wget", "-qO-", "--spider", "http://127.0.0.1:8428/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -137,7 +139,8 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "--spider", "http://localhost:9428/health"]
+      # Same IPv4-only bind as VictoriaMetrics above.
+      test: ["CMD", "wget", "-qO-", "--spider", "http://127.0.0.1:9428/health"]
       interval: 30s
       timeout: 5s
       retries: 3
