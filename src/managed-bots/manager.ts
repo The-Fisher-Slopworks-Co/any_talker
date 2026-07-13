@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { Bot, type Api } from "grammy";
+import { Bot, GrammyError, type Api } from "grammy";
 import { proxiedFetch } from "../proxy";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
@@ -162,12 +162,80 @@ export class BotManager {
     await syncBotCommands(bot.api).catch((err) =>
       console.error(`[managed-bots] syncBotCommands failed:`, err),
     );
+    // grammY rethrows a fatal getUpdates error (401 unauthorized / 409
+    // conflict) out of the polling loop. Left uncaught it would be an unhandled
+    // rejection and take down the whole process — main bot included — so a dead
+    // character bot is unregistered here and recovery is attempted instead.
     bot.start({
       drop_pending_updates: true,
       allowed_updates: [...ALLOWED_UPDATES],
+    }).catch((err) => {
+      const entry = this.running.get(record.botId);
+      // Already stopped via stopBot/deleteBot, or replaced by a newer
+      // instance — this death is stale and not ours to handle.
+      if (!entry || entry.bot !== bot) return;
+      this.running.delete(record.botId);
+      this.handlePollingCrash(record, token, err).catch((recoverErr) =>
+        console.error(
+          `[managed-bots] crash recovery failed for ${record.botId}:`,
+          recoverErr,
+        ),
+      );
     });
     this.running.set(record.botId, { record, bot });
     console.log(`[managed-bots] started ${record.botId} (@${username})`);
+  }
+
+  // React to a managed bot's polling loop dying (the bot has already been
+  // removed from `running`). A 401 means the token was revoked — the bot was
+  // deleted in @BotFather or its token was rotated — so re-broker it via the
+  // main bot: rotation yields a fresh token to restart with; deletion makes the
+  // re-broker fail and the bot stays stopped, its registry record kept so the
+  // owner can clean it up from the admin UI. Any other death (e.g. a 409
+  // getUpdates conflict) just leaves the bot stopped. Public so tests can drive
+  // the recovery matrix without a live polling loop.
+  async handlePollingCrash(
+    record: ManagedBot,
+    deadToken: string,
+    err: unknown,
+  ): Promise<void> {
+    const botId = record.botId;
+    if (!(err instanceof GrammyError) || err.error_code !== 401) {
+      console.error(
+        `[managed-bots] polling crashed for ${botId}, bot stopped:`,
+        err,
+      );
+      return;
+    }
+    // The stored token just got a 401 and is dead either way — drop it so the
+    // next boot re-brokers a token instead of starting with this one.
+    await this.deps.storage.setManagedBotToken(botId, null);
+    let fresh: string;
+    try {
+      fresh = await this.deps.mainApi.getManagedBotToken(Number(botId));
+    } catch (refetchErr) {
+      console.error(
+        `[managed-bots] token revoked for ${botId} and re-broker failed (bot deleted in @BotFather?), bot stopped:`,
+        refetchErr,
+      );
+      return;
+    }
+    if (fresh === deadToken) {
+      // Telegram handed back the very token that just got a 401 — restarting
+      // with it would only crash this bot's polling again.
+      console.error(
+        `[managed-bots] re-brokered token for ${botId} is unchanged, bot stopped`,
+      );
+      return;
+    }
+    const current = await this.deps.storage.getManagedBot(botId);
+    // Deleted via the admin UI while recovering — don't resurrect it.
+    if (!current) return;
+    await this.deps.storage.setManagedBotToken(botId, fresh);
+    console.log(
+      `[managed-bots] token for ${botId} was rotated, restarting with the new one`,
+    );
+    await this.startBot(current, fresh);
   }
 
   async stopBot(botId: string): Promise<void> {
