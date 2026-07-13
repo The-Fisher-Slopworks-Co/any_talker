@@ -291,6 +291,42 @@ describe("deliverReminder (AI-driven)", () => {
     );
   });
 
+  test("group upgraded to supergroup -> retries at the new chat id, delivered", async () => {
+    _resetRegistryForTest();
+    const ai = okAI("still here");
+    const migrated = new GrammyError(
+      "Call to 'sendMessage' failed!",
+      {
+        ok: false,
+        error_code: 400,
+        description:
+          "Bad Request: group chat was upgraded to a supergroup chat",
+        parameters: { migrate_to_chat_id: -1003965869359 },
+      },
+      "sendMessage",
+      {},
+    );
+    // Both the rich send and the plain fallback fail at the old id; the
+    // retry at the migrated id succeeds.
+    const api = new FakeTgApi(async (...args) => {
+      const first = args[0];
+      const chat =
+        typeof first === "object" && first !== null
+          ? (first as { chat_id: unknown }).chat_id
+          : first;
+      if (chat === "c1") throw migrated;
+      return {};
+    });
+    const r = reminderAsk();
+    const out = await deliverReminder(deps(ai, api), r, r.fireAtMs);
+    expect(out).toBe("delivered");
+    expect(api.richCalls.map((c) => c.chat_id)).toEqual([
+      "c1",
+      "-1003965869359",
+    ]);
+    expect(api.calls.map((c) => c.chat_id)).toEqual(["c1"]);
+  });
+
   test("Telegram 429 -> transient", async () => {
     _resetRegistryForTest();
     const ai = okAI();

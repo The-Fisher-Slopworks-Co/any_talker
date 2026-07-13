@@ -148,10 +148,25 @@ export interface Storage {
   getUser(id: string): Promise<User | null>;
 
   listChats(): Promise<Chat[]>;
-  // Upserts the chat directory row, preserving `firstSeenAt`. `{ isNew: true }`
-  // for a never-before-seen chat (a new non-private chat is a fresh group join).
+  // Upserts the chat directory row, keeping the EARLIEST `firstSeenAt` of the
+  // stored row and the argument (normal upserts pass "now", so the stored value
+  // wins; chat migration passes the old group's instant to carry it over).
+  // `{ isNew: true }` for a never-before-seen chat (a new non-private chat is a
+  // fresh group join).
   upsertChat(chat: Chat): Promise<{ isNew: boolean }>;
   getChat(id: string): Promise<Chat | null>;
+  // Removes a chat's directory row. Only chat migration (group→supergroup)
+  // retires an id; nothing else ever deletes from the directory.
+  deleteChat(id: string): Promise<void>;
+  // Moves every retained per-day spend bucket from one chat ledger to another
+  // (group→supergroup migration). Each day's move is atomic — concurrent
+  // migrations (several family bots reacting to the same upgrade) must not
+  // double the totals.
+  moveChatSpend(
+    oldChatId: string,
+    newChatId: string,
+    nowMs: number,
+  ): Promise<void>;
 
   getChatSettings(chatId: string): Promise<ChatSettings | null>;
   saveChatSettings(chatId: string, settings: ChatSettings): Promise<void>;

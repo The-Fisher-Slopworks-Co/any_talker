@@ -6,6 +6,7 @@ import type { RecurringCheck, CheckAnswer } from "./types";
 import { formatQuestion, formatReply } from "./format";
 import { applyAnswer, currentCount } from "./counter";
 import { escapeHtmlText } from "../bot/html";
+import { migratedChatId } from "../shared/chat-migration";
 
 export type CheckInlineKeyboardButton = {
   text: string;
@@ -59,6 +60,7 @@ export async function resolveCheck(args: {
   const nowMs = args.nowMs ?? Date.now();
 
   if (check.pendingMessageId === null) return { kind: "not_pending" };
+  const pendingMessageId = check.pendingMessageId;
   if (fromUserId !== null && fromUserId !== check.targetUserId) {
     return { kind: "wrong_user" };
   }
@@ -71,15 +73,34 @@ export async function resolveCheck(args: {
     count: replyCount,
   });
 
-  try {
-    await api.sendMessage(check.chatId, reply, {
+  // The group may have been upgraded to a supergroup since the question was
+  // sent; on the migration error switch to the new chat id, retry the reply
+  // once, and persist the new id in the final saveCheck below.
+  let chatId = check.chatId;
+  const sendReply = (chat: string) =>
+    api.sendMessage(chat, reply, {
       reply_parameters: {
-        message_id: check.pendingMessageId,
+        message_id: pendingMessageId,
         allow_sending_without_reply: true,
       },
     });
+  try {
+    await sendReply(chatId);
   } catch (err) {
-    console.error(`[checks] reply send failed id=${check.id}:`, err);
+    const newChatId = migratedChatId(err);
+    if (newChatId === null) {
+      console.error(`[checks] reply send failed id=${check.id}:`, err);
+    } else {
+      chatId = newChatId;
+      console.warn(
+        `[checks] chat migrated to supergroup id=${check.id}, now targeting ${newChatId}`,
+      );
+      try {
+        await sendReply(chatId);
+      } catch (retryErr) {
+        console.error(`[checks] reply send failed id=${check.id}:`, retryErr);
+      }
+    }
   }
 
   const fireMs = check.pendingFiredAtMs ?? nowMs;
@@ -93,12 +114,9 @@ export async function resolveCheck(args: {
   const editedText = `${originalQuestion}\n${escapeHtmlText(statusLine)}`;
 
   try {
-    await api.editMessageText(
-      check.chatId,
-      check.pendingMessageId,
-      editedText,
-      { parse_mode: "HTML" },
-    );
+    await api.editMessageText(chatId, pendingMessageId, editedText, {
+      parse_mode: "HTML",
+    });
   } catch (err) {
     if (!isHarmlessEditError(err)) {
       console.error(`[checks] edit message text failed id=${check.id}:`, err);
@@ -106,7 +124,7 @@ export async function resolveCheck(args: {
   }
 
   try {
-    await api.editMessageReplyMarkup(check.chatId, check.pendingMessageId);
+    await api.editMessageReplyMarkup(chatId, pendingMessageId);
   } catch (err) {
     if (!isHarmlessEditError(err)) {
       console.error(`[checks] edit reply markup failed id=${check.id}:`, err);
@@ -116,6 +134,7 @@ export async function resolveCheck(args: {
   await storage.saveCheck({
     ...check,
     ...patch,
+    chatId,
     pendingMessageId: null,
     pendingFiredAtMs: null,
   });

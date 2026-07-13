@@ -97,6 +97,28 @@ redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 return '1'
 `;
 
+// Atomic per-day spend move for chat migration. KEYS is a flat list of
+// [old, new] pairs (one per retained UTC date). Each pair is moved as one
+// server-side step — GET + INCRBYFLOAT + DEL can't interleave — so when several
+// family bots migrate the same chat concurrently, the second caller finds the
+// old key already deleted and no total is ever doubled. The destination
+// inherits the source's remaining TTL (unless it already has a fresher one) so
+// migrated buckets still expire when they originally would have.
+const MOVE_CHAT_SPEND_LUA = `
+for i = 1, #KEYS, 2 do
+  local v = redis.call('GET', KEYS[i])
+  if v then
+    local ttl = redis.call('TTL', KEYS[i])
+    redis.call('INCRBYFLOAT', KEYS[i+1], v)
+    if ttl > 0 and ttl > redis.call('TTL', KEYS[i+1]) then
+      redis.call('EXPIRE', KEYS[i+1], ttl)
+    end
+    redis.call('DEL', KEYS[i])
+  end
+end
+return '1'
+`;
+
 function parseUsageEvalReply(reply: unknown): UserUsage {
   if (!Array.isArray(reply) || reply.length !== 4) {
     throw new Error(
@@ -556,9 +578,14 @@ export class KeyDBStorage implements Storage {
     const prev = existingRaw
       ? withFirstSeen(JSON.parse(existingRaw) as Chat)
       : null;
+    // Earliest first-seen wins: ordinary upserts pass "now" (≥ stored, so the
+    // stored value survives, as before), while chat migration passes the old
+    // group's instant to carry it onto the supergroup row.
     const record: Chat = {
       ...chat,
-      firstSeenAt: prev ? prev.firstSeenAt : chat.firstSeenAt,
+      firstSeenAt: prev
+        ? Math.min(prev.firstSeenAt, chat.firstSeenAt)
+        : chat.firstSeenAt,
     };
     await this.client.hset(`${PREFIX}chats`, chat.id, JSON.stringify(record));
     return { isNew: prev === null };
@@ -567,6 +594,31 @@ export class KeyDBStorage implements Storage {
   async getChat(id: string): Promise<Chat | null> {
     const raw = await this.client.hget(`${PREFIX}chats`, id);
     return raw ? withFirstSeen(JSON.parse(raw) as Chat) : null;
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    await this.client.hdel(`${PREFIX}chats`, id);
+  }
+
+  async moveChatSpend(
+    oldChatId: string,
+    newChatId: string,
+    nowMs: number,
+  ): Promise<void> {
+    if (oldChatId === newChatId) return;
+    const dates = recentUtcDateKeys(nowMs, SPEND_RETENTION_DAYS);
+    const keys: string[] = [];
+    for (const d of dates) {
+      keys.push(
+        `${PREFIX}spend_chat:${oldChatId}:${d}`,
+        `${PREFIX}spend_chat:${newChatId}:${d}`,
+      );
+    }
+    await this.client.send("EVAL", [
+      MOVE_CHAT_SPEND_LUA,
+      String(keys.length),
+      ...keys,
+    ]);
   }
 
   async getChatSettings(chatId: string): Promise<ChatSettings | null> {
