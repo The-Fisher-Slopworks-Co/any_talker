@@ -38,6 +38,7 @@ import { ALERT_TTL_SECONDS } from "../observability/scheduler";
 import type { SentGuestMessage } from "../types/telegram-guest";
 import type { InputRichMessageContent } from "../types/telegram-rich";
 import { makeIncomingUpdateLogger } from "./log-update";
+import { migrateChatData } from "../storage/migrate-chat";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
 import { makeKeywordFilterMiddleware } from "./middleware/keyword-filter";
 import {
@@ -1157,6 +1158,42 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     } catch (err) {
       console.error("my_chat_member presence update failed:", err);
     }
+  });
+
+  // A basic group upgraded to a supergroup gets a brand-new chat id; Telegram
+  // announces it with service messages in both chats (`migrate_to_chat_id` in
+  // the old group, `migrate_from_chat_id` in the new supergroup — delivery of
+  // either alone is possible, so both trigger). Move every chat-scoped record
+  // to the new id so the chat keeps its settings, whitelist access, checks,
+  // reminders and spend history. The migration is idempotent: the duplicate
+  // trigger — and every family bot in the chat receiving its own copy of the
+  // service message — all converge on the same end state. The send-time
+  // migrate-and-retry in checks/reminders remains the backstop for a missed
+  // service message (e.g. the bot was down during the upgrade).
+  const runChatMigration = async (oldChatId: string, newChatId: string) => {
+    // The supergroup is the same chat under a new id, not a fresh join — claim
+    // the new-group alert key so the owner isn't DM'd about a "new" group.
+    void deps.storage
+      .claimAlert(`new_chat:${newChatId}`, 7 * 24 * 60 * 60)
+      .catch(() => {});
+    console.warn(
+      `[migrate-chat] group upgraded to supergroup: ${oldChatId} -> ${newChatId}`,
+    );
+    await migrateChatData(deps.storage, oldChatId, newChatId, Date.now());
+  };
+
+  bot.on("message:migrate_to_chat_id", async (ctx) => {
+    await runChatMigration(
+      String(ctx.chat.id),
+      String(ctx.message.migrate_to_chat_id),
+    );
+  });
+
+  bot.on("message:migrate_from_chat_id", async (ctx) => {
+    await runChatMigration(
+      String(ctx.message.migrate_from_chat_id),
+      String(ctx.chat.id),
+    );
   });
 
   bot.on("message:contact", async (ctx) => {

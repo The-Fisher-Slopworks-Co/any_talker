@@ -12,6 +12,7 @@ import type { PersonaResolver } from "../managed-bots/persona";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
 import { richApi } from "../bot/rich";
 import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
+import { migratedChatId } from "../shared/chat-migration";
 import { composeFullName } from "../shared/types";
 import { readValidDisplayName } from "../shared/display-name";
 import { t } from "../shared/i18n";
@@ -102,35 +103,57 @@ export async function deliverReminder(
         }
       : undefined;
 
-  try {
-    await deps.api.sendRichMessage({
-      chat_id: chatId,
-      rich_message: { markdown: body },
-      ...(replyParameters ? { reply_parameters: replyParameters } : {}),
-    });
-    return "delivered";
-  } catch (errRich) {
-    // Rich send failed (markdown Telegram rejected, or the method is
-    // unavailable on this server) — fall back to a plain message so the
-    // reminder still lands.
-    console.error(
-      `[reminders] sendRichMessage failed id=${reminder.id}, sending plain:`,
-      errRich,
-    );
+  // Rich send with a plain-message fallback (markdown Telegram rejected, or
+  // the method is unavailable on this server); the fallback's failure
+  // propagates to the caller.
+  const sendOnce = async (chat: string): Promise<void> => {
     try {
+      await deps.api.sendRichMessage({
+        chat_id: chat,
+        rich_message: { markdown: body },
+        ...(replyParameters ? { reply_parameters: replyParameters } : {}),
+      });
+    } catch (errRich) {
+      console.error(
+        `[reminders] sendRichMessage failed id=${reminder.id}, sending plain:`,
+        errRich,
+      );
       await deps.api.sendMessage(
-        chatId,
+        chat,
         body,
         replyParameters ? { reply_parameters: replyParameters } : undefined,
       );
-      return "delivered";
-    } catch (err) {
-      if (err instanceof GrammyError && PERMANENT_CODES.has(err.error_code)) {
-        return "permanent";
-      }
-      return "transient";
     }
+  };
+
+  try {
+    await sendOnce(chatId);
+    return "delivered";
+  } catch (err) {
+    // The group was upgraded to a supergroup and its chat id retired — without
+    // this retry the migration 400 would classify as "permanent" and silently
+    // drop the reminder.
+    const newChatId = migratedChatId(err);
+    if (newChatId !== null) {
+      console.warn(
+        `[reminders] chat migrated to supergroup id=${reminder.id}, now targeting ${newChatId}`,
+      );
+      try {
+        await sendOnce(newChatId);
+        return "delivered";
+      } catch (retryErr) {
+        return classifySendError(retryErr);
+      }
+    }
+    return classifySendError(err);
   }
+}
+
+function classifySendError(err: unknown): DeliveryOutcome {
+  if (err instanceof GrammyError && PERMANENT_CODES.has(err.error_code)) {
+    return "permanent";
+  }
+  return "transient";
 }
 
 async function composeReminderMessage(

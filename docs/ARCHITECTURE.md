@@ -130,7 +130,7 @@ flowchart TB
 | `src/ai/` | OpenAI-compatible client, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, message (de)serialization, AI types. | `compat-client.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
 | `src/managed-bots/` | Owner-created character bots (Bot API 9.6): lifecycle manager, persona resolver, native-creation handling, avatar + input validation. | `manager.ts`, `persona.ts`, `avatar.ts`, `validate.ts`, `types.ts` |
-| `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests). | `types.ts`, `keydb.ts`, `memory.ts` |
+| `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests) + the group→supergroup chat-data migration. | `types.ts`, `keydb.ts`, `memory.ts`, `migrate-chat.ts` |
 | `src/webapp/` | HTTP server, JSON API, Telegram initData auth, model-catalogue route. | `server.ts`, `api.ts`, `auth.ts` |
 | `src/webapp/ui/` | React + Tailwind admin Mini App (views, components, api client, i18n). | `app.tsx`, `api-client.ts`, `views/`, `components/`, `lib/` |
 | `src/reminders/` | One-shot reminder scheduling, delivery (re-runs the LLM), stored-record validation. | `scheduler.ts`, `delivery.ts`, `parse.ts`, `types.ts` |
@@ -141,7 +141,7 @@ flowchart TB
 | `src/observability/` | Budget observability: pure spike detection, the owner digest formatter, the narrow owner-DM `NotifyApi`, and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
-| `src/shared/` | i18n catalog, timezone math, display-name validation, user-fact key/value constraints, interval scheduler, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `types.ts` |
+| `src/shared/` | i18n catalog, timezone math, display-name validation, user-fact key/value constraints, interval scheduler, group→supergroup chat-id migration detection, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `chat-migration.ts`, `types.ts` |
 | `src/log.ts` · `src/proxy.ts` · `src/build-info.ts` | Structured logging, HTTP-proxy resolution, version/git metadata. | — |
 | `src/types/` | Ambient declarations (Bot API 10.0 guest mode + 10.1 rich messages; HTML/CSS module imports). | `telegram-guest.d.ts`, `telegram-rich.d.ts`, `html-modules.d.ts` |
 
@@ -328,8 +328,12 @@ chat settings, conversation graph, photo cache, albums, guest threads, reminders
 checks, user facts). `keydb.ts` implements it over Bun's `RedisClient`, with all
 keys under the `at:` prefix and **server-side Lua (`EVAL`)** for the two
 race-prone operations (usage accrual, fact upsert+evict).
-`memory.ts` (`MemoryStorage`) mirrors the interface for tests. **Depended on by:**
-essentially everything.
+`memory.ts` (`MemoryStorage`) mirrors the interface for tests.
+`migrate-chat.ts` (`migrateChatData`) moves every chat-scoped record — chat
+settings, the whitelist entry, the directory row, checks, reminders (across all
+`forBot` namespaces), bot presence and the per-day spend buckets — from a
+retired group id to its supergroup successor (see §7, "Group→supergroup
+migration"). **Depended on by:** essentially everything.
 
 ### Web App — `src/webapp/`
 `server.ts` runs `Bun.serve`: static routes serve the React bundle (`import
@@ -378,6 +382,14 @@ double-spend); delivery keeps only the reminder-specific envelope build and the
 `bot/format`/`bot/rich` rendering around it. The **checks** scheduler fires recurring daily questions with yes/no
 inline buttons, times them out, and resolves them (also reachable via the
 button-press callback through `bot/handlers/check-callback.ts`).
+Both schedulers send to a **persisted** chat id, which Telegram retires when a
+group is upgraded to a supergroup (400 + `parameters.migrate_to_chat_id`); both
+handle it via `shared/chat-migration.ts` — a check repoints its stored `chatId`
+(persisted even if the retry fails) and resends once, and reminder delivery
+retries at the new id instead of classifying the 400 as a permanent failure
+(which used to silently drop the reminder). This send-time retry is the
+*backstop*: the primary path is the proactive `migrateChatData` run when the
+bot sees the migration service message (§7, "Group→supergroup migration").
 **Depends on:** `storage`, `bot.api`, `ai` (reminders only), `shared/tz`,
 `shared/i18n`, `metrics`. **Depended on by:** `main.ts` (started at boot);
 `checks/resolve` is also called from the bot's check-callback handler.
@@ -540,6 +552,32 @@ collide). The bot layer picks the right view via
 group chats (negative `chatId`) to `forBot(null)` and private chats to
 `forBot(botId)`; `askHandler` uses it for every conversation read/write while
 keeping facts/reminders on the per-character view.
+
+**Group→supergroup migration.** When Telegram upgrades a basic group to a
+supergroup it retires the chat id, which would orphan every chat-keyed row
+above. The bot listens for the `migrate_to_chat_id` / `migrate_from_chat_id`
+service messages (both trigger — either alone may arrive) and runs
+`storage/migrate-chat.ts:migrateChatData`, which moves chat settings, the chat
+whitelist entry, the directory row (keeping the supergroup's identity fields
+but the **earliest** `firstSeenAt`, so the chat is never mistaken for a new
+group — `upsertChat` keeps the earliest first-seen for the same reason), checks,
+reminders in **every** `forBot` namespace (both `chatId` and an `ask_reply`
+target), bot presence, and the per-day chat-spend buckets. Every family bot in
+the chat receives its own copy of the service message, so the migration is
+idempotent step-by-step and the one non-idempotent piece — summing spend
+buckets — is a dedicated atomic `Storage.moveChatSpend` (Lua in KeyDB), so
+concurrent runs can never double a total; a failing step is logged and skipped
+rather than aborting the rest. The handler also pre-claims the `new_chat:{id}`
+alert so the owner isn't DM'd about a "new" group. Deliberately **not**
+migrated: conversation nodes and album buffers (keyed by message id, and the
+old group and new supergroup have unrelated message-id sequences — a verbatim
+move could attach a stale reply chain to an unrelated new message; replies to
+pre-migration messages fall back to the unknown-reply quoting path, and the
+rows expire with their 30-day TTL), guest threads (business-DM ids never
+migrate), and all user-keyed data. If the service messages are missed entirely
+(bot down during the upgrade), the send-time migrate-and-retry in
+checks/reminders (`shared/chat-migration.ts`) still self-heals the ids that
+matter for delivery.
 
 Migration approach (schema-on-read): `settings.ts:normalize()` backfills/repairs
 settings (e.g. legacy scalar `model` → `models[]`); `reminders/parse.ts`

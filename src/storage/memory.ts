@@ -488,7 +488,12 @@ export class MemoryStorage implements Storage {
   async upsertChat(chat: Chat): Promise<{ isNew: boolean }> {
     const existing = this.b.chats.get(chat.id);
     const isNew = existing === undefined;
-    const firstSeenAt = existing ? existing.firstSeenAt ?? 0 : chat.firstSeenAt;
+    // Earliest first-seen wins (see the interface doc): ordinary upserts pass
+    // "now" so the stored value survives; chat migration passes the old
+    // group's instant to carry it onto the supergroup row.
+    const firstSeenAt = existing
+      ? Math.min(existing.firstSeenAt ?? 0, chat.firstSeenAt)
+      : chat.firstSeenAt;
     this.b.chats.set(chat.id, { ...chat, firstSeenAt });
     return { isNew };
   }
@@ -496,6 +501,28 @@ export class MemoryStorage implements Storage {
   async getChat(id: string): Promise<Chat | null> {
     const c = this.b.chats.get(id);
     return c ? { ...c } : null;
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    this.b.chats.delete(id);
+  }
+
+  // Atomic by JS event-loop construction (no `await` between read and write),
+  // mirroring the KeyDB Lua script: a concurrent second migration finds the
+  // old buckets already deleted and never doubles a total.
+  async moveChatSpend(
+    oldChatId: string,
+    newChatId: string,
+    _nowMs: number,
+  ): Promise<void> {
+    if (oldChatId === newChatId) return;
+    const old = this.b.chatSpend.get(oldChatId);
+    if (!old) return;
+    const dest = this.nestedBucket(this.b.chatSpend, newChatId);
+    for (const [date, usd] of old) {
+      dest.set(date, (dest.get(date) ?? 0) + usd);
+    }
+    this.b.chatSpend.delete(oldChatId);
   }
 
   async getChatSettings(chatId: string): Promise<ChatSettings | null> {

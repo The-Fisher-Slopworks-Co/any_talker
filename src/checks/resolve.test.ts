@@ -294,6 +294,49 @@ describe("resolveCheck", () => {
     expect(saved?.counterAnchorDate).toBe("2026-05-11");
   });
 
+  test("chat migration: retries reply at the supergroup id and persists it", async () => {
+    const storage = new MemoryStorage();
+    const check = makeCheck();
+    await storage.saveCheck(check);
+    const api = new FakeApi();
+    const originalSend = api.sendMessage.bind(api);
+    api.sendMessage = async (chat_id, text, other) => {
+      if (chat_id === "chat-1") {
+        throw Object.assign(
+          new Error(
+            "Call to 'sendMessage' failed! (400: Bad Request: group chat was upgraded to a supergroup chat)",
+          ),
+          { parameters: { migrate_to_chat_id: -1003965869359 } },
+        );
+      }
+      return originalSend(chat_id, text, other);
+    };
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      const out = await resolveCheck({
+        storage,
+        api,
+        check,
+        answer: "no",
+        fromUserId: "user-1",
+      });
+
+      expect(out.kind).toBe("resolved");
+      // Reply landed on the retry, and the edits target the migrated chat.
+      expect(api.sent).toHaveLength(1);
+      expect(api.sent[0]?.chat_id).toBe("-1003965869359");
+      expect(api.editedText[0]?.chat_id).toBe("-1003965869359");
+      expect(api.editedMarkup[0]?.chat_id).toBe("-1003965869359");
+      const saved = await storage.getCheck("c1");
+      expect(saved?.chatId).toBe("-1003965869359");
+      expect(saved?.counter).toBe(723);
+      expect(saved?.pendingMessageId).toBeNull();
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
   test("not_pending: returns not_pending if pendingMessageId is null", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck({ pendingMessageId: null });

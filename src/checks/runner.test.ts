@@ -245,6 +245,68 @@ describe("runChecksTick date mode", () => {
   });
 });
 
+describe("runChecksTick chat migration", () => {
+  const migrationError = () =>
+    Object.assign(
+      new Error(
+        "Call to 'sendMessage' failed! (400: Bad Request: group chat was upgraded to a supergroup chat)",
+      ),
+      { parameters: { migrate_to_chat_id: -1003965869359 } },
+    );
+
+  test("repoints the check to the supergroup id and retries the send", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveCheck(makeCheck());
+    const api = new FakeApi();
+    const originalSend = api.sendMessage.bind(api);
+    api.sendMessage = async (chat_id, text, other) => {
+      if (chat_id === "chat-1") throw migrationError();
+      return originalSend(chat_id, text, other);
+    };
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      const now = utcMs(2026, 5, 11, 23, 35);
+      await runChecksTick({ storage, api, nowMs: now });
+
+      expect(api.sent).toHaveLength(1);
+      expect(api.sent[0]?.chat_id).toBe("-1003965869359");
+      const saved = await storage.getCheck("c1");
+      expect(saved?.chatId).toBe("-1003965869359");
+      expect(saved?.pendingMessageId).toBe(100);
+      expect(saved?.lastFiredAtMs).toBe(now);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  test("keeps the new chat id even when the retry fails", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveCheck(makeCheck());
+    const api = new FakeApi();
+    api.sendMessage = async (chat_id) => {
+      if (chat_id === "chat-1") throw migrationError();
+      throw new Error("boom");
+    };
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    console.error = () => {};
+    console.warn = () => {};
+    try {
+      await runChecksTick({ storage, api, nowMs: utcMs(2026, 5, 11, 23, 35) });
+
+      const saved = await storage.getCheck("c1");
+      expect(saved?.chatId).toBe("-1003965869359");
+      // Not marked fired — the next tick retries against the migrated id.
+      expect(saved?.pendingMessageId).toBeNull();
+      expect(saved?.lastFiredAtMs).toBe(0);
+    } finally {
+      console.error = originalError;
+      console.warn = originalWarn;
+    }
+  });
+});
+
 describe("runChecksTick fire failure", () => {
   test("does not mark fired if send fails (retries next tick)", async () => {
     const storage = new MemoryStorage();

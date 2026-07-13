@@ -12,6 +12,7 @@ import { formatQuestion } from "./format";
 import { buildCheckCallback } from "./callback-data";
 import { resolveCheck, type CheckApi } from "./resolve";
 import { currentCount } from "./counter";
+import { migratedChatId } from "../shared/chat-migration";
 import { checksProcessedTotal } from "../metrics";
 
 export async function runChecksTick(deps: {
@@ -79,9 +80,8 @@ async function fireCheck(
     count: currentCount(check, nowMs),
   });
 
-  let messageId: number;
-  try {
-    const sent = await api.sendMessage(check.chatId, text, {
+  const send = (chatId: string) =>
+    api.sendMessage(chatId, text, {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
@@ -98,11 +98,34 @@ async function fireCheck(
         ],
       },
     });
+
+  let messageId: number;
+  try {
+    const sent = await send(check.chatId);
     messageId = sent.message_id;
   } catch (err) {
-    checksProcessedTotal.inc({ outcome: "fire_failed" });
-    console.error(`[checks] fire failed id=${check.id}:`, err);
-    return;
+    // Group upgraded to a supergroup: persist the new chat id first (so even a
+    // failed retry leaves the check pointed right for the next tick), then
+    // retry once.
+    const newChatId = migratedChatId(err);
+    if (newChatId === null) {
+      checksProcessedTotal.inc({ outcome: "fire_failed" });
+      console.error(`[checks] fire failed id=${check.id}:`, err);
+      return;
+    }
+    check = { ...check, chatId: newChatId };
+    await storage.saveCheck(check);
+    console.warn(
+      `[checks] chat migrated to supergroup id=${check.id}, now targeting ${newChatId}`,
+    );
+    try {
+      const sent = await send(newChatId);
+      messageId = sent.message_id;
+    } catch (retryErr) {
+      checksProcessedTotal.inc({ outcome: "fire_failed" });
+      console.error(`[checks] fire failed id=${check.id}:`, retryErr);
+      return;
+    }
   }
 
   await storage.saveCheck({
