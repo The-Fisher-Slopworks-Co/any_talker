@@ -127,7 +127,7 @@ flowchart TB
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
 | `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
-| `src/ai/` | OpenAI-compatible client, model catalogue + pricing, system-prompt builder, message (de)serialization, AI types. | `compat-client.ts`, `model-catalog.ts`, `instruction.ts`, `serialize.ts`, `types.ts` |
+| `src/ai/` | OpenAI-compatible client, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, message (de)serialization, AI types. | `compat-client.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
 | `src/managed-bots/` | Owner-created character bots (Bot API 9.6): lifecycle manager, persona resolver, native-creation handling, avatar + input validation. | `manager.ts`, `persona.ts`, `avatar.ts`, `validate.ts`, `types.ts` |
 | `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests). | `types.ts`, `keydb.ts`, `memory.ts` |
@@ -262,9 +262,21 @@ exposes a `PriceLookup` port to the client, `list()` to the `/api/models` route,
 and `unknownModels()` so write routes can reject model ids absent from the
 catalogue (both degrade to "allowed" when the catalogue is empty/unavailable). `instruction.ts` builds the (Russian) system prompt and defines the
 `DetailLevel` multipliers; `serialize.ts` converts messages to/from a base64-safe
-form for storage inside reminders. **Depends on:** `proxy`, `metrics`, `shared`,
-`storage` (via tools). **Depended on by:** `bot`, `reminders/delivery`, `webapp`
-(catalogue route).
+form for storage inside reminders. `turn.ts` (`runAiTurn`) is the **one deep
+interface the three LLM call sites share** — `/ask`, guest mode, and reminder
+delivery: given domain inputs (persona, messages, source, detail level, facts,
+identity/locale) it assembles the request (`buildInstruction` + `getAllTools()` +
+the `ToolCallContext` literal, including the mutable `effects` array), calls
+`ai.ask`, then does the post-call accounting — owner-exempt token deduction with
+the detail-level multiplier, and the four-ledger `recordSpend` fan-out (with the
+`?? null`/`?? 0`/`?? true` defaults, best-effort by `.catch`). It returns
+`{ text, totalTokens, modelId, costUsd, priced, effects }`; it does **not** own
+the access/budget/rate-limit gates, message assembly, the try/catch that maps an
+`ai.ask` throw onto a caller-specific outcome, or any rendering. A thrown
+`ai.ask` propagates before any accounting runs, so a failed call is never
+charged. **Depends on:** `proxy`, `metrics`, `shared`, `storage` (via tools),
+`ratelimit`, `spending` (turn runner). **Depended on by:** `bot`,
+`reminders/delivery`, `webapp` (catalogue route).
 
 ### Tools — `src/ai/tools/`
 `registry.ts` defines the `Tool` contract (`name`, `description`, Zod
@@ -350,7 +362,11 @@ then on an interval; skip — never queue — a tick if the previous is still
 in-flight; default 30 s). The **reminder** scheduler fetches due reminders and
 delivers each; `deliverReminder` **re-runs the LLM** with the stored context plus
 a `reminder_fired` envelope (it is not a stored-text echo), giving at-least-once
-delivery. The **checks** scheduler fires recurring daily questions with yes/no
+delivery. That re-run goes through the same `ai/turn.ts:runAiTurn` the bot uses,
+so the tokens and USD spend are charged exactly as an `/ask` would (with
+`bestEffortDeduct` so a deduction failure can't retry the tick into a
+double-spend); delivery keeps only the reminder-specific envelope build and the
+`bot/format`/`bot/rich` rendering around it. The **checks** scheduler fires recurring daily questions with yes/no
 inline buttons, times them out, and resolves them (also reachable via the
 button-press callback through `bot/handlers/check-callback.ts`).
 **Depends on:** `storage`, `bot.api`, `ai` (reminders only), `shared/tz`,
@@ -423,9 +439,12 @@ Notes that matter:
   limiter (after settings resolve, since it needs `settings.budget`): it denies
   (`kind: "budgetLimited"`) when a global/chat/new-user USD cap is breached. Both
   the budget and rate-limit denial paths bump the per-user denial counter, and a
-  global-cap breach fires a deduped owner DM from the dispatcher. On a successful
-  answer, `spending/record.ts` books the cost to the user/chat/global/model
-  ledgers (the global total drives the kill-switch).
+  global-cap breach fires a deduped owner DM from the dispatcher. Once the gates
+  pass, the request assembly and the whole post-call accounting — the after-the-
+  response token `deduct` and the `spending/record.ts` fan-out that books the cost
+  to the user/chat/global/model ledgers (the global total drives the kill-switch)
+  — live in one place, `ai/turn.ts:runAiTurn`, shared by `/ask`, guest mode, and
+  reminder delivery, rather than being hand-written at each call site.
 - **Conversation context** is a reply-chain graph: each turn is stored as a
   `ConversationNode` with a `parentBotMsgId` pointer, written under **both** the
   bot's reply message id and the user's ask message id (unique within a chat),
