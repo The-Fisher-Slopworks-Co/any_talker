@@ -236,7 +236,16 @@ bold name prefix** (a managed bot *is* the character — `resolver` returns a nu
 them at boot, starts/stops individual long-polling loops as the owner creates
 (via the native `managed_bot` update → `getManagedBotToken`) or deletes them, and
 stops all on hot-reload. Each managed bot is a full `createBot` instance with its
-own token and update stream. `persona.ts` resolves the character per turn — for a
+own token and update stream. A polling loop that dies is **contained**: grammY
+rethrows a fatal `getUpdates` error (401/409) out of the loop, the manager
+catches it (it must never surface as an unhandled rejection — that would kill
+the whole process) and unregisters the bot; on a 401 — the token was revoked,
+i.e. the bot was deleted in @BotFather or its token rotated — it re-brokers the
+token once via the main bot, restarting the bot when rotation yields a fresh
+token, and otherwise dropping the revoked token and leaving the bot stopped
+(registry record kept for admin-UI cleanup). One dead character bot can never
+take down the main bot or its siblings; the main bot's own polling death remains
+fatal, but exits explicitly rather than via an unhandled rejection. `persona.ts` resolves the character per turn — for a
 managed bot the main bot's **global** settings with the character's own
 `systemPrompt`/name substituted in (per-chat overrides deliberately ignored);
 `avatar.ts` wraps `setMyProfilePhoto`; `validate.ts` mirrors the Checks input
@@ -751,7 +760,10 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
 - **Managed bots as N independent `Bot` instances** — each character is a real
   Telegram bot with its own token and update stream, driven by a shared
   `createBot` parameterized by persona; the alternative (one token impersonating
-  many) is not possible in the Bot API. A `BotManager` owns their lifecycles.
+  many) is not possible in the Bot API. A `BotManager` owns their lifecycles and
+  isolates their failures: a character bot whose polling dies (e.g. its token
+  revoked by a @BotFather deletion) is unregistered — with a one-shot token
+  re-broker to self-heal rotations — never crashing the process.
 - **Per-character storage via a `forBot(botId)` facade, not migrations** — chosen
   over threading a `botId` parameter through every storage method because the
   facade leaves all existing call sites and tests byte-identical (`forBot(null)`

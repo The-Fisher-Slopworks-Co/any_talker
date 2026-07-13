@@ -148,10 +148,18 @@ async function main() {
   await syncBotCommands(bot.api).catch((err) => {
     console.error("syncBotCommands failed:", err);
   });
-  bot.start({
-    drop_pending_updates: true,
-    allowed_updates: [...ALLOWED_UPDATES],
-  });
+  // The main bot is the family hub (token brokering, owner notifications), so
+  // its polling loop dying (revoked token / getUpdates conflict) is fatal — but
+  // exit explicitly and loudly rather than via an unhandled rejection.
+  bot
+    .start({
+      drop_pending_updates: true,
+      allowed_updates: [...ALLOWED_UPDATES],
+    })
+    .catch((err) => {
+      console.error("Fatal: main bot polling crashed:", err);
+      process.exit(1);
+    });
   console.log("Bot started in long-polling mode");
 
   await botManager.loadAndStartAll();
