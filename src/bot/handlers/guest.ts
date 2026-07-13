@@ -5,7 +5,8 @@ import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
-import { recordSpend, recordDenial } from "../../spending/record";
+import { recordDenial } from "../../spending/record";
+import { runAiTurn } from "../../ai/turn";
 import {
   buildReplyFallbackMessage,
   buildUserEnvelope,
@@ -15,8 +16,7 @@ import {
   type Sender,
 } from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
-import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
-import { buildInstruction } from "../../ai/instruction";
+import type { ToolEffect } from "../../ai/tools/registry";
 import type { AIMessage } from "../../ai/types";
 import {
   MAX_REPLY_CHAIN_DEPTH,
@@ -176,30 +176,31 @@ export async function guestAskHandler(
 
   const facts = await storage.listUserFacts(input.userId);
 
-  const effects: ToolEffect[] = [];
+  // Assemble the request, run the model, and do the post-call accounting in the
+  // shared turn runner. Guest queries are always single-turn "short" asks (no
+  // /askwise), so no detail level is passed — the deduction is the raw token
+  // total (multiplier 1) and the system prompt carries no detail-level section.
   let result;
   try {
-    result = await input.ai.ask({
+    result = await runAiTurn({
+      ai: input.ai,
+      rateLimiter: input.rateLimiter,
+      storage,
       models: settings.models,
-      system: buildInstruction(settings.systemPrompt, {
-        timezone,
-        lang: input.lang,
-        facts,
-      }),
+      systemPrompt: settings.systemPrompt,
+      rateLimit: settings.rateLimit,
+      userId: input.userId,
+      ownerId: input.ownerId,
+      chatId: input.chatId,
+      botId: input.botId ?? null,
+      source: "guest",
+      replyToMessageId: null,
+      timezone,
+      lang: input.lang,
+      now: input.now,
       messages,
-      tools: getAllTools(),
-      toolCallContext: {
-        source: "guest",
-        chatId: input.chatId,
-        userId: input.userId,
-        botId: input.botId ?? null,
-        replyToMessageId: null,
-        timezone,
-        lang: input.lang,
-        now: input.now,
-        effects,
-        contextMessages: messages,
-      },
+      facts,
+      contextMessages: messages,
     });
   } catch (err) {
     return {
@@ -207,27 +208,6 @@ export async function guestAskHandler(
       message: err instanceof Error ? err.message : String(err),
     };
   }
-
-  if (!skipRateLimit) {
-    // Guest queries are always single-turn "short" asks (no /askwise), so the
-    // raw token total is the deduction — same as the main path with multiplier 1.
-    await input.rateLimiter.deduct(input.userId, result.totalTokens, input.now);
-  }
-
-  // Record spend across every ledger (user/chat/global/model) regardless of
-  // rate-limit exemption — the global total is the kill-switch's source of
-  // truth. Best-effort: a storage hiccup must not fail an answer already made.
-  await recordSpend(
-    storage,
-    {
-      userId: input.userId,
-      chatId: input.chatId,
-      modelId: result.modelId ?? null,
-      costUsd: result.costUsd ?? 0,
-      priced: result.priced ?? true,
-    },
-    input.now,
-  ).catch((err) => console.error("recording spend failed:", err));
 
   // A model can legitimately finish with no text (e.g. an output-token cap hit
   // mid-reasoning). Surface it as an error turn — Telegram rejects empty
@@ -245,7 +225,7 @@ export async function guestAskHandler(
     text: body,
     botName,
     totalTokens: result.totalTokens,
-    effects,
+    effects: result.effects,
     expandableThreshold: settings.expandableBlockquoteThreshold,
     persistThread: async () => {
       const allImageFileIds = [

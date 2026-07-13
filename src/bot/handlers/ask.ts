@@ -5,7 +5,8 @@ import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
-import { recordSpend, recordDenial } from "../../spending/record";
+import { recordDenial } from "../../spending/record";
+import { runAiTurn } from "../../ai/turn";
 import { isAllowed } from "../access";
 import {
   buildContext,
@@ -15,13 +16,8 @@ import {
   type Sender,
 } from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
-import { getAllTools, type ToolEffect } from "../../ai/tools/registry";
-import {
-  buildInstruction,
-  detailLevelMultiplier,
-  detailLevelReasoningEffort,
-  type DetailLevel,
-} from "../../ai/instruction";
+import type { ToolEffect } from "../../ai/tools/registry";
+import type { DetailLevel } from "../../ai/instruction";
 import type { Lang } from "../../shared/i18n";
 import type { WindowKind, BudgetDenyReason } from "../../shared/types";
 
@@ -222,32 +218,32 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // use them without having to call list_facts on every turn.
   const facts = await storage.listUserFacts(input.userId);
 
-  const effects: ToolEffect[] = [];
+  // Assemble the request, run the model, and do the post-call accounting
+  // (owner-exempt token deduction with the detail-level multiplier + the
+  // four-ledger spend booking) in one place shared with guest mode and reminder
+  // delivery. A thrown `ai.ask` propagates before any accounting runs.
   let result;
   try {
-    result = await input.ai.ask({
+    result = await runAiTurn({
+      ai: input.ai,
+      rateLimiter: input.rateLimiter,
+      storage,
       models: settings.models,
-      system: buildInstruction(settings.systemPrompt, {
-        timezone,
-        lang: input.lang,
-        detailLevel: input.detailLevel,
-        facts,
-      }),
+      systemPrompt: settings.systemPrompt,
+      rateLimit: settings.rateLimit,
+      userId: input.userId,
+      ownerId: input.ownerId,
+      chatId: input.chatId,
+      botId: input.botId ?? null,
+      source: "ask",
+      replyToMessageId: input.askMessageId,
+      timezone,
+      lang: input.lang,
+      now: input.now,
       messages,
-      tools: getAllTools(),
-      reasoningEffort: detailLevelReasoningEffort(input.detailLevel),
-      toolCallContext: {
-        source: "ask",
-        chatId: input.chatId,
-        userId: input.userId,
-        botId: input.botId ?? null,
-        replyToMessageId: input.askMessageId,
-        timezone,
-        lang: input.lang,
-        now: input.now,
-        effects,
-        contextMessages: messages,
-      },
+      detailLevel: input.detailLevel,
+      facts,
+      contextMessages: messages,
     });
   } catch (err) {
     return {
@@ -256,29 +252,6 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       persistConversation: persistTurn,
     };
   }
-
-  if (!skipRateLimit) {
-    const multiplier = detailLevelMultiplier(input.detailLevel, settings.rateLimit);
-    const deduction = Math.round(result.totalTokens * multiplier);
-    await input.rateLimiter.deduct(input.userId, deduction, input.now);
-  }
-
-  // Record spend across every ledger (user/chat/global/model) regardless of
-  // rate-limit exemption — an exempt owner's usage is still money spent through
-  // the bot, and the global total is the kill-switch's source of truth.
-  // Best-effort: a storage hiccup on this accounting must not fail an answer
-  // already produced.
-  await recordSpend(
-    storage,
-    {
-      userId: input.userId,
-      chatId: input.chatId,
-      modelId: result.modelId ?? null,
-      costUsd: result.costUsd ?? 0,
-      priced: result.priced ?? true,
-    },
-    input.now,
-  ).catch((err) => console.error("recording spend failed:", err));
 
   // A model can legitimately finish with no text (e.g. an output-token cap hit
   // mid-reasoning). Surface it as an error turn — Telegram rejects empty
@@ -302,7 +275,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     text: body,
     botName,
     totalTokens: result.totalTokens,
-    effects,
+    effects: result.effects,
     expandableThreshold: settings.expandableBlockquoteThreshold,
     persistConversation: (botMsgId) => persistTurn(botMsgId, body),
   };

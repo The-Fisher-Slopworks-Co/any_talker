@@ -6,10 +6,8 @@ import type { Reminder } from "./types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient, AIMessage } from "../ai/types";
-import { recordSpend } from "../spending/record";
+import { runAiTurn } from "../ai/turn";
 import { deserializeMessages } from "../ai/serialize";
-import { getAllTools, type ToolEffect } from "../ai/tools/registry";
-import { buildInstruction } from "../ai/instruction";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
 import { richApi } from "../bot/rich";
@@ -170,58 +168,42 @@ async function composeReminderMessage(
     { role: "user", content: envelope },
   ];
 
-  const effects: ToolEffect[] = [];
   const toolSource: "ask" | "guest" =
     reminder.target.kind === "ask_reply" ? "ask" : "guest";
-  const result = await deps.ai.ask({
+  // Re-run the LLM and account for it (charge tokens to the user's budget +
+  // record spend across the ledgers, exactly as an /ask would) in the shared
+  // turn runner. `bestEffortDeduct` swallows a deduction failure: a throw would
+  // surface as a transient delivery failure, retrying and re-running the model —
+  // a double-spend. The owner-exempt user still skips the deduction (their spend
+  // is recorded — the money is real), mirroring /ask.
+  const result = await runAiTurn({
+    ai: deps.ai,
+    rateLimiter: deps.rateLimiter,
+    storage: deps.storage,
     models: settings.models,
-    system: buildInstruction(settings.systemPrompt, { timezone, lang }),
+    systemPrompt: settings.systemPrompt,
+    rateLimit: settings.rateLimit,
+    userId: reminder.userId,
+    ownerId: deps.ownerId,
+    chatId: reminder.chatId,
+    botId: deps.botId,
+    source: toolSource,
+    replyToMessageId:
+      reminder.target.kind === "ask_reply"
+        ? reminder.target.replyToMessageId
+        : null,
+    timezone,
+    lang,
+    now: nowMs,
     messages,
-    tools: getAllTools(),
-    toolCallContext: {
-      source: toolSource,
-      chatId: reminder.chatId,
-      userId: reminder.userId,
-      botId: deps.botId,
-      replyToMessageId:
-        reminder.target.kind === "ask_reply"
-          ? reminder.target.replyToMessageId
-          : null,
-      timezone,
-      lang,
-      now: nowMs,
-      effects,
-    },
+    bestEffortDeduct: true,
   });
-
-  // Account for the LLM re-run: charge the tokens to the user's budget and
-  // record spend across the ledgers, exactly as an /ask would. Best-effort — an
-  // accounting hiccup must NOT throw, or delivery would retry and re-run the
-  // model, double-spending. The owner-exempt user skips the token deduction
-  // (their spend is still recorded — the money is real), mirroring /ask.
-  const isOwner = reminder.userId === deps.ownerId;
-  if (!(isOwner && settings.rateLimit.ownerExempt)) {
-    await deps.rateLimiter
-      .deduct(reminder.userId, result.totalTokens, nowMs)
-      .catch((err) => console.error("reminder deduct failed:", err));
-  }
-  await recordSpend(
-    deps.storage,
-    {
-      userId: reminder.userId,
-      chatId: reminder.chatId,
-      modelId: result.modelId ?? null,
-      costUsd: result.costUsd ?? 0,
-      priced: result.priced ?? true,
-    },
-    nowMs,
-  ).catch((err) => console.error("reminder spend record failed:", err));
 
   const trimmed = result.text.trim();
   // If the model produced nothing usable, fall back to the original note so
   // the reminder still surfaces something rather than a silent no-op delivery.
   const body = trimmed.length === 0 ? reminder.text : result.text;
-  const topBlock = buildEffectsTopBlock(effects, lang);
+  const topBlock = buildEffectsTopBlock(result.effects, lang);
   return buildRichMarkdown(body, botName, {
     topBlock,
     collapseThreshold: settings.expandableBlockquoteThreshold,
