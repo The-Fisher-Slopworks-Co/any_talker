@@ -11,7 +11,7 @@ import { deserializeMessages } from "../ai/serialize";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
 import { richApi } from "../bot/rich";
-import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
+import { formatLocalParts } from "../shared/tz";
 import { migratedChatId } from "../shared/chat-migration";
 import { composeFullName } from "../shared/types";
 import { readValidDisplayName } from "../shared/display-name";
@@ -257,7 +257,6 @@ function buildReminderEnvelope(args: EnvelopeArgs): string {
 
 function formatLocalDateTime(ms: number, timezone: string): string {
   const p = formatLocalParts(ms, timezone);
-  const offset = formatGmtOffset(tzOffsetMinutesAt(ms, timezone));
   const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)} ${offset}`;
+  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)} ${timezone}`;
 }
