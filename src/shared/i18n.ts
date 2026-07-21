@@ -31,7 +31,7 @@ export type ReminderTimeParts = {
   day: number;
   hour: number;
   minute: number;
-  offset: string;
+  timezone: string;
 };
 
 // Zero-pad a number to two digits (shared by the reminder time formatters).
@@ -507,13 +507,13 @@ const en: Strings = {
   bot_contact_added: (label) => `Added ${label} to the whitelist.`,
   bot_check_wrong_user: "This check isn't addressed to you.",
   bot_reminder_scheduled: (p) => {
-    return `Reminder set for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+    return `Reminder set for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;
   },
   bot_reminder_updated: (p) => {
-    return `Reminder updated for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+    return `Reminder updated for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;
   },
   bot_reminder_cancelled: (p) => {
-    return `Reminder cancelled for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+    return `Reminder cancelled for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;
   },
   bot_settings_updated: settingsUpdatedEn,
   bot_managed_bot_created: (username) =>
@@ -920,13 +920,13 @@ const ru: Strings = {
   bot_contact_added: (label) => `${label} добавлен(а) в белый список.`,
   bot_check_wrong_user: "Этот вопрос адресован не тебе.",
   bot_reminder_scheduled: (p) => {
-    return `Было создано напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+    return `Было создано напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;
   },
   bot_reminder_updated: (p) => {
-    return `Напоминание обновлено на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset})`;
+    return `Напоминание обновлено на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;
   },
   bot_reminder_cancelled: (p) => {
-    return `Напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.offset}) отменено`;
+    return `Напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone}) отменено`;
   },
   bot_settings_updated: settingsUpdatedRu,
   bot_managed_bot_created: (username) =>

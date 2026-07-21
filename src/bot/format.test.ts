@@ -134,7 +134,7 @@ describe("buildEffectsTopBlock", () => {
       },
     ];
     expect(buildEffectsTopBlock(effects, "ru")).toBe(
-      "<blockquote>Было создано напоминание на 07.05.2026 в 10:00 (GMT+3)</blockquote>\n",
+      "<blockquote>Было создано напоминание на 07.05.2026 в 10:00 (Europe/Moscow)</blockquote>\n",
     );
   });
 
@@ -147,7 +147,7 @@ describe("buildEffectsTopBlock", () => {
       },
     ];
     expect(buildEffectsTopBlock(effects, "en")).toBe(
-      "<blockquote>Reminder set for 2026-05-07 at 10:00 (GMT+3)</blockquote>\n",
+      "<blockquote>Reminder set for 2026-05-07 at 10:00 (Europe/Moscow)</blockquote>\n",
     );
   });
 
@@ -160,14 +160,14 @@ describe("buildEffectsTopBlock", () => {
       },
     ];
     expect(buildEffectsTopBlock(effects, "en")).toBe(
-      "<blockquote>Reminder updated for 2026-05-07 at 10:00 (GMT+3)</blockquote>\n",
+      "<blockquote>Reminder updated for 2026-05-07 at 10:00 (Europe/Moscow)</blockquote>\n",
     );
     expect(buildEffectsTopBlock(effects, "ru")).toBe(
-      "<blockquote>Напоминание обновлено на 07.05.2026 в 10:00 (GMT+3)</blockquote>\n",
+      "<blockquote>Напоминание обновлено на 07.05.2026 в 10:00 (Europe/Moscow)</blockquote>\n",
     );
   });
 
-  test("formats fractional-offset timezones (e.g. Asia/Kolkata = GMT+5:30)", () => {
+  test("converts local time in fractional-offset timezones (e.g. Asia/Kolkata)", () => {
     const fireAtMs = Date.UTC(2026, 4, 7, 4, 30); // 04:30 UTC = 10:00 GMT+5:30
     const effects: ToolEffect[] = [
       {
@@ -177,12 +177,12 @@ describe("buildEffectsTopBlock", () => {
       },
     ];
     expect(buildEffectsTopBlock(effects, "en")).toBe(
-      "<blockquote>Reminder set for 2026-05-07 at 10:00 (GMT+5:30)</blockquote>\n",
+      "<blockquote>Reminder set for 2026-05-07 at 10:00 (Asia/Kolkata)</blockquote>\n",
     );
   });
 
-  test("formats negative offsets", () => {
-    const fireAtMs = Date.UTC(2026, 4, 7, 15, 0); // 15:00 UTC = 10:00 GMT-5 (NYC EST winter)
+  test("converts local time in negative-offset timezones respecting DST", () => {
+    const fireAtMs = Date.UTC(2026, 4, 7, 15, 0);
     const effects: ToolEffect[] = [
       {
         type: "reminder_scheduled",
@@ -192,7 +192,7 @@ describe("buildEffectsTopBlock", () => {
     ];
     // May is EDT (-4), so 15:00 UTC = 11:00 EDT
     expect(buildEffectsTopBlock(effects, "en")).toBe(
-      "<blockquote>Reminder set for 2026-05-07 at 11:00 (GMT-4)</blockquote>\n",
+      "<blockquote>Reminder set for 2026-05-07 at 11:00 (America/New_York)</blockquote>\n",
     );
   });
 
@@ -211,8 +211,8 @@ describe("buildEffectsTopBlock", () => {
     ];
     const result = buildEffectsTopBlock(effects, "ru");
     expect(result).toBe(
-      "<blockquote>Было создано напоминание на 07.05.2026 в 10:00 (GMT+3)</blockquote>" +
-        "<blockquote>Было создано напоминание на 08.05.2026 в 10:00 (GMT+3)</blockquote>\n",
+      "<blockquote>Было создано напоминание на 07.05.2026 в 10:00 (Europe/Moscow)</blockquote>" +
+        "<blockquote>Было создано напоминание на 08.05.2026 в 10:00 (Europe/Moscow)</blockquote>\n",
     );
   });
 

@@ -82,9 +82,9 @@ describe("MESSAGES parity", () => {
         day: 7,
         hour: 10,
         minute: 0,
-        offset: "GMT+5",
+        timezone: "Asia/Yekaterinburg",
       }),
-    ).toBe("Было создано напоминание на 07.05.2026 в 10:00 (GMT+5)");
+    ).toBe("Было создано напоминание на 07.05.2026 в 10:00 (Asia/Yekaterinburg)");
   });
 
   test("bot_reminder_scheduled renders EN with YYYY-MM-DD", () => {
@@ -95,9 +95,9 @@ describe("MESSAGES parity", () => {
         day: 7,
         hour: 10,
         minute: 0,
-        offset: "GMT+5",
+        timezone: "Asia/Yekaterinburg",
       }),
-    ).toBe("Reminder set for 2026-05-07 at 10:00 (GMT+5)");
+    ).toBe("Reminder set for 2026-05-07 at 10:00 (Asia/Yekaterinburg)");
   });
 
   test("bot_settings_updated decodes values and joins changes", () => {
