@@ -3,7 +3,7 @@
 
 import { escapeHtmlText } from "./html";
 import type { ToolEffect } from "../ai/tools/registry";
-import { formatGmtOffset, formatLocalParts, tzOffsetMinutesAt } from "../shared/tz";
+import { formatLocalParts } from "../shared/tz";
 import { t, type Lang } from "../shared/i18n";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
 
@@ -102,10 +102,7 @@ function renderReminderBlockquote(
   lang: Lang,
 ): string {
   const local = formatLocalParts(effect.fireAtMs, effect.timezone);
-  const offset = formatGmtOffset(
-    tzOffsetMinutesAt(effect.fireAtMs, effect.timezone),
-  );
-  const parts = { ...local, offset };
+  const parts = { ...local, timezone: effect.timezone };
   const line =
     effect.type === "reminder_scheduled"
       ? t(lang).bot_reminder_scheduled(parts)
