@@ -197,6 +197,8 @@ export const api = {
     req<FactsResponse>("PUT", `/api/me/facts/${scope}/${key}`, patch),
   deleteMyFact: (scope: string, key: string) =>
     req<FactsResponse>("DELETE", `/api/me/facts/${scope}/${key}`),
+  listUserFacts: (id: string, scope: string) =>
+    req<FactsResponse>("GET", `/api/admin/users/${id}/facts/${scope}`),
   listAdminReminders: () =>
     req<RemindersResponse>("GET", "/api/admin/reminders"),
   listChecks: () =>

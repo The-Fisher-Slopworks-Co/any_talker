@@ -2364,6 +2364,93 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
   });
 });
 
+describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
+  const charBot = {
+    botId: "777",
+    ownerUserId: ownerId,
+    username: "char_bot",
+    displayName: "Кошечка",
+    systemPrompt: "secret persona prompt",
+    createdAtMs: 1,
+  };
+
+  test("the owner reads another user's facts", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/facts/main", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      facts: [{ key: "pets", value: "two cats" }],
+      cap: 50,
+    });
+  });
+
+  test("respects character scoping via forBot", async () => {
+    const d = deps();
+    await d.storage.saveManagedBot(charBot);
+    await d.storage.rememberUserFact("42", "main_fact", "main");
+    await d.storage.forBot("777").rememberUserFact("42", "char_fact", "char");
+
+    const mainList = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/facts/main", body: null },
+      d,
+      owner,
+    );
+    expect((mainList.body as { facts: unknown[] }).facts).toEqual([
+      { key: "main_fact", value: "main" },
+    ]);
+
+    const charList = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/facts/777", body: null },
+      d,
+      owner,
+    );
+    expect((charList.body as { facts: unknown[] }).facts).toEqual([
+      { key: "char_fact", value: "char" },
+    ]);
+  });
+
+  test("an unknown bot scope is 404", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/facts/12345", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+    expect(r.body).toEqual({ error: "bot not found" });
+  });
+
+  test("is admin-only: a non-owner gets 403, even for their own id", async () => {
+    const d = deps();
+    await d.storage.rememberUserFact("42", "pets", "two cats");
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42/facts/main", body: null },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+
+  test("is read-only: writes are not routed", async () => {
+    const d = deps();
+    const r = await handleApi(
+      {
+        method: "POST",
+        path: "/api/admin/users/42/facts/main",
+        body: { key: "a", value: "b" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(404);
+    expect(await d.storage.listUserFacts("42")).toEqual([]);
+  });
+});
+
 describe("GET /api/admin/spend/overview", () => {
   test("returns the aggregated overview for the owner", async () => {
     const d = deps();

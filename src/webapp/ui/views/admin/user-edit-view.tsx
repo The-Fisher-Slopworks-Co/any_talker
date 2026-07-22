@@ -23,7 +23,7 @@ import {
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { LoadingState } from "../../components/states";
+import { EmptyState, LoadingState } from "../../components/states";
 import { RowButton, SaveButton, Toggle } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { TimezoneSelect } from "../../components/timezone-select";
@@ -35,10 +35,12 @@ import {
   ROW_VALUE_CLS,
 } from "../../components/row";
 import {
+  botLabel,
   DISPLAY_NAME_ERR_KEY,
   LANG_LABEL_KEY,
   userDisplayName,
 } from "../../lib/labels";
+import { useLoadable } from "../../lib/use-loadable";
 import { openTelegramProfile } from "../../lib/telegram";
 import { validateDisplayName } from "../../../../shared/display-name";
 
@@ -56,6 +58,12 @@ export function UserEditView({ userId }: { userId: string }) {
   const [notFound, setNotFound] = useState(false);
   const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
+  const { data: botsData } = useLoadable(api.listMyBots, []);
+  const [factScope, setFactScope] = useState<string>("main");
+  const { data: factsData } = useLoadable(
+    () => api.listUserFacts(userId, factScope),
+    [userId, factScope],
+  );
 
   useEffect(() => {
     api
@@ -84,6 +92,7 @@ export function UserEditView({ userId }: { userId: string }) {
   if (!data) return <LoadingState />;
 
   const { user } = data;
+  const factBots = botsData?.bots ?? null;
   const fallbackName = userDisplayName(user);
   const effectiveName = userDisplayName(user, data.displayName);
   const desiredTz = tzOverride ? tzValue : null;
@@ -253,6 +262,43 @@ export function UserEditView({ userId }: { userId: string }) {
           </Card>
         </>
       ) : null}
+
+      <SectionHeader>{s.ui_user_facts_header}</SectionHeader>
+      {factBots && factBots.length > 1 ? (
+        <Card>
+          {factBots.map((b) => (
+            <SelectRow
+              key={b.botId ?? "main"}
+              label={botLabel(s, b)}
+              selected={factScope === (b.botId ?? "main")}
+              onSelect={() => setFactScope(b.botId ?? "main")}
+            />
+          ))}
+        </Card>
+      ) : null}
+      {factsData === null ? (
+        <LoadingState />
+      ) : (
+        <>
+          <Card>
+            {factsData.facts.map((f) => (
+              <div key={f.key} className="row relative px-4 py-[11px]">
+                <div className="text-base">{f.key}</div>
+                <div className="text-[13px] text-tg-hint whitespace-pre-wrap break-words">
+                  {f.value}
+                </div>
+              </div>
+            ))}
+            {factsData.facts.length === 0 ? (
+              <EmptyState>{s.ui_facts_empty}</EmptyState>
+            ) : null}
+          </Card>
+          <SectionFooter>
+            {s.ui_user_facts_footer}{" "}
+            {s.ui_facts_count(factsData.facts.length, factsData.cap)}
+          </SectionFooter>
+        </>
+      )}
     </Stack>
   );
 }

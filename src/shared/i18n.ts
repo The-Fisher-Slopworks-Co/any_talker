@@ -299,6 +299,8 @@ type Strings = {
   ui_facts_error_not_found: string;
   ui_facts_error_key_exists: string;
   ui_facts_save_error: (code: string) => string;
+  ui_user_facts_header: string;
+  ui_user_facts_footer: string;
 
   ui_route_checks: string;
   ui_route_check_edit: string;
@@ -760,6 +762,9 @@ const en: Strings = {
   ui_facts_error_not_found: "This fact no longer exists.",
   ui_facts_error_key_exists: "A fact with this key already exists.",
   ui_facts_save_error: (code) => `Could not save: ${code}`,
+  ui_user_facts_header: "Memory",
+  ui_user_facts_footer:
+    "Facts this character has saved about the user. View-only — the user manages them in their own vault.",
 
   ui_route_checks: "Checks",
   ui_route_check_edit: "Edit Check",
@@ -1176,6 +1181,9 @@ const ru: Strings = {
   ui_facts_error_not_found: "Этот факт уже не существует.",
   ui_facts_error_key_exists: "Факт с таким ключом уже есть.",
   ui_facts_save_error: (code) => `Не удалось сохранить: ${code}`,
+  ui_user_facts_header: "Память",
+  ui_user_facts_footer:
+    "Факты, которые персонаж сохранил об этом пользователе. Только просмотр — пользователь управляет ими сам.",
 
   ui_route_checks: "Чеки",
   ui_route_check_edit: "Редактирование чека",
