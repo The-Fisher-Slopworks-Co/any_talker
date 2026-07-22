@@ -779,6 +779,19 @@ export async function handleApi(
     return { status: 200, body: { spending } };
   }
 
+  // Read-only admin view into a user's memory vault, per character scope —
+  // the same records the /api/me/facts routes serve, addressed by an explicit
+  // user id. Deliberately GET-only: edits stay with the user (and the AI tools),
+  // the admin only inspects.
+  const userFactsMatch = req.path.match(
+    /^\/api\/admin\/users\/([^/]+)\/facts\/([^/]+)$/,
+  );
+  if (userFactsMatch && req.method === "GET") {
+    const scoped = await resolveFactsStorage(deps.storage, userFactsMatch[2]!);
+    if (!scoped) return FACTS_BOT_NOT_FOUND;
+    return respondFacts(scoped, userFactsMatch[1]!);
+  }
+
   const userMatch = req.path.match(/^\/api\/admin\/users\/(.+)$/);
   if (userMatch) {
     const id = userMatch[1]!;

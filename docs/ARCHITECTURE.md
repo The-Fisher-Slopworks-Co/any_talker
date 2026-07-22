@@ -358,6 +358,11 @@ key (409) — an explicit user action must never silently destroy a memory (the
 reminders-cap rationale). Key/value constraints live in
 `shared/user-facts.ts`, the single source of truth shared by the tool's Zod
 schemas and the API's hand-rolled validators.
+The owner additionally gets a **read-only** window into any user's vault —
+`GET /api/admin/users/:id/facts/:scope` (same scope resolution and response
+shape as the `/api/me/facts` routes), surfaced as a per-character "Memory"
+section in the admin user card; writes deliberately stay user-only (and
+AI-tool-only), so the admin inspects but never edits another user's memory.
 The admin-only `GET /api/models` route serves the `ModelCatalog` to the
 admin model picker (the browser can't hit a keyed/non-CORS endpoint
 directly), which uses it for `<datalist>` autocomplete and to flag unknown ids;
