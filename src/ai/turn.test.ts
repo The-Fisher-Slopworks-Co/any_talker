@@ -134,7 +134,7 @@ describe("runAiTurn — request assembly", () => {
     );
     const sys = ai.calls[0]!.system;
     expect(sys).toContain("# Что я знаю о пользователе");
-    expect(sys).toContain("city: Kazan");
+    expect(sys).toContain("city: «Kazan»");
   });
 
   test("contextMessages is omitted from the tool context when not passed", async () => {
