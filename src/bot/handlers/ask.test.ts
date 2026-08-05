@@ -37,6 +37,11 @@ class FakeAI implements AIClient {
   }
 }
 
+// Every envelope carries the moment its turn was sent (that stamp lives in the
+// message, not in the system prompt, so the prompt stays cacheable). The
+// fixtures sit a few ms past the epoch in the default UTC timezone.
+const SENT_AT = "1970-01-01 00:00";
+
 const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
   const storage = overrides.storage ?? new MemoryStorage();
   return {
@@ -91,7 +96,7 @@ describe("askHandler", () => {
     expect(out.kind).toBe("answered");
     const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
     expect(sent[0]!.content).toEqual([
-      { type: "text", text: JSON.stringify({ author: "John Doe", text: "" }) },
+      { type: "text", text: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "" }) },
       {
         type: "audio",
         audio: new Uint8Array([0x4f, 0x67, 0x67, 0x53]),
@@ -274,7 +279,7 @@ describe("askHandler", () => {
       await out.persistConversation(999);
       const node = await storage.getConversation("c1", 999);
       expect(node).toEqual({
-        userQuestion: JSON.stringify({ author: "John Doe", text: "hello" }),
+        userQuestion: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
         botAnswer: "hi back",
         parentBotMsgId: null,
         ts: 1000,
@@ -283,6 +288,27 @@ describe("askHandler", () => {
       // one's own question resolves the chain too.
       expect(await storage.getConversation("c1", 1)).toEqual(node!);
     }
+  });
+
+  // The stored envelope is replayed verbatim as the prefix of every later turn
+  // in the chain, so it must be byte-identical to what the model already saw —
+  // one differing character (a clock that ticked between the two builds) and
+  // the whole history falls out of the provider's prompt cache.
+  test("the persisted envelope is byte-identical to the one sent to the model", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({ ...DEFAULT_SETTINGS, timezone: "Europe/Moscow" });
+    const ai = new FakeAI();
+    const out = await askHandler(
+      baseInput({ storage, ai, now: Date.UTC(2026, 4, 8, 15, 42, 31) }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistConversation(999);
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    const stored = await storage.getConversation("c1", 999);
+    expect(stored!.userQuestion).toBe(sent.at(-1)!.content as string);
+    // Stamped in the chat's timezone, not UTC.
+    expect(JSON.parse(stored!.userQuestion).time).toBe("2026-05-08 18:42");
   });
 
   test("answered: persistConversation links parent when reply was to existing bot msg", async () => {
@@ -333,7 +359,7 @@ describe("askHandler", () => {
     if (out.kind !== "rateLimited") throw new Error("expected rateLimited");
     await out.persistConversation(4, "You are rate-limited");
     const expected = {
-      userQuestion: JSON.stringify({ author: "John Doe", text: "How was your day?" }),
+      userQuestion: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "How was your day?" }),
       botAnswer: "You are rate-limited",
       parentBotMsgId: 2,
       ts: 1000,
@@ -356,7 +382,7 @@ describe("askHandler", () => {
     if (out.kind !== "error") throw new Error("expected error");
     await out.persistConversation(4, "AI error");
     const expected = {
-      userQuestion: JSON.stringify({ author: "John Doe", text: "hello" }),
+      userQuestion: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
       botAnswer: "AI error",
       parentBotMsgId: null,
       ts: 1000,
@@ -425,11 +451,11 @@ describe("askHandler", () => {
     expect(third.kind).toBe("answered");
     const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
     expect(sent.map((m) => m.content)).toEqual([
-      JSON.stringify({ author: "John Doe", text: "hello" }),
+      JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
       "Hi!",
-      JSON.stringify({ author: "John Doe", text: "How was your day?" }),
+      JSON.stringify({ author: "John Doe", time: SENT_AT, text: "How was your day?" }),
       "You are rate-limited",
-      JSON.stringify({ author: "John Doe", text: "What is my first ever message?" }),
+      JSON.stringify({ author: "John Doe", time: SENT_AT, text: "What is my first ever message?" }),
     ]);
   });
 
@@ -796,6 +822,7 @@ describe("askHandler", () => {
     const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
     const firstTurnEnvelope = JSON.stringify({
       author: "John Doe",
+      time: SENT_AT,
       text: "what's on these",
     });
     expect(sent[0]!.content).toEqual([
@@ -858,12 +885,12 @@ describe("askHandler", () => {
     const sent = (managedAi.calls[0] as { messages: unknown[] }).messages;
     expect(sent[0]).toEqual({
       role: "user",
-      content: JSON.stringify({ author: "John Doe", text: "Q to main" }),
+      content: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "Q to main" }),
     });
     expect(sent[1]).toEqual({ role: "assistant", content: "Main answer" });
     expect(sent[2]).toEqual({
       role: "user",
-      content: JSON.stringify({ author: "John Doe", text: "follow-up" }),
+      content: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "follow-up" }),
     });
 
     // The managed answer is stored in the shared (group) namespace and links its

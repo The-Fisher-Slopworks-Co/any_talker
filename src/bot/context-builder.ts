@@ -5,6 +5,7 @@ import type { Storage } from "../storage/types";
 import type { AIMessage, AIUserContentPart } from "../ai/types";
 import type { Gender } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
+import { localDateTimeString } from "../shared/tz";
 import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
 import type { VideoClip } from "./video";
 
@@ -60,6 +61,13 @@ export type Sender = {
   gender: Gender | null;
 };
 
+// When a turn was sent, as the model sees it: the instant plus the timezone to
+// read it in. Carried per message rather than in the system prompt so the
+// prompt's cacheable prefix survives — see the comment on `timeSection`
+// (`ai/instruction.ts`). `null` omits the stamp (older stored turns predate it,
+// and tests that don't care about the clock pass null).
+export type SentAt = { ms: number; timezone: string };
+
 export type BuildContextArgs = {
   storage: Storage;
   chatId: string;
@@ -71,6 +79,10 @@ export type BuildContextArgs = {
   videos?: VideoClip[];
   attachments?: string;
   replyTarget: ReplyTarget | null;
+  // Stamped onto the new user turn. Callers that persist the same turn must
+  // reuse the very same value (see `ask.ts`), or the stored envelope would
+  // differ from the one the model saw and break the cache on the next turn.
+  sentAt: SentAt | null;
   maxDepth?: number;
   fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
 };
@@ -79,6 +91,7 @@ export function buildUserEnvelope(args: {
   sender: Sender;
   quote: string | null;
   text: string;
+  sentAt: SentAt | null;
   // Describes media that isn't self-evident from the parts themselves (video
   // frames). Persisted with the turn, so a follow-up reads the same envelope.
   attachments?: string;
@@ -91,6 +104,9 @@ export function buildUserEnvelope(args: {
 
   const obj: Record<string, string> = { author };
   if (args.sender.gender !== null) obj.gender = args.sender.gender;
+  if (args.sentAt) {
+    obj.time = localDateTimeString(args.sentAt.ms, args.sentAt.timezone);
+  }
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
   if (args.attachments) obj.attachments = args.attachments;
   obj.text = args.text;
@@ -189,6 +205,7 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
       quote,
       text: userText,
       attachments: args.attachments,
+      sentAt: args.sentAt,
     });
     if (images.length > 0 || audios.length > 0 || videos.length > 0) {
       messages.push({

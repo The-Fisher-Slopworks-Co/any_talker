@@ -182,11 +182,15 @@ export async function guestAskHandler(
     }
   }
 
+  // One envelope, used both for the request and for the persisted thread turn,
+  // so the stored text is byte-identical to what the model saw — a prefix that
+  // still matches on the next turn is what keeps the prompt cache warm.
   const envelope = buildUserEnvelope({
     sender: input.sender,
     quote: input.quote,
     text: input.userText,
     attachments: input.attachments,
+    sentAt: { ms: input.now, timezone },
   });
   // Continue the stored thread only when the reply verifiably targets its
   // last answer; a mismatched thread (reply to a bot answer from someone

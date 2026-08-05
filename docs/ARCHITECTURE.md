@@ -335,7 +335,20 @@ exposes a `PriceLookup` port to the client, `list()` to the `/api/models` route,
 and `unknownModels()` so write routes can reject model ids absent from the
 catalogue (both degrade to "allowed" when the catalogue is empty/unavailable). `instruction.ts` builds the (Russian) system prompt and defines the
 `DetailLevel` multipliers; `serialize.ts` converts messages to/from a base64-safe
-form for storage inside reminders. `turn.ts` (`runAiTurn`) is the **one deep
+form for storage inside reminders.
+
+**The system prompt is written to be a stable prompt-cache prefix.** A provider's
+cache only covers a prefix, so the first byte that differs between two requests
+ends the cacheable region — and everything behind it, *including the whole
+conversation history*, is re-charged at full price. So the instruction carries no
+clock: the current moment travels per message, in the envelope's `time` field
+(`bot/context-builder.ts`), where it is immutable once the turn is stored. The
+prompt names only the timezone to read those stamps in, and sections are ordered
+stable-first, with the user's facts (which `remember_fact` can change
+mid-conversation) last. Two consequences worth keeping: whatever is added to
+`buildInstruction` must be constant for the life of a conversation, and a turn's
+persisted envelope must be byte-identical to the one that was sent to the model
+(`ask.ts` derives both from one `sentAt`, and a test pins it). `turn.ts` (`runAiTurn`) is the **one deep
 interface the three LLM call sites share** — `/ask`, guest mode, and reminder
 delivery: given domain inputs (persona, messages, source, detail level, facts,
 identity/locale) it assembles the request (`buildInstruction` + `getAllTools()` +
@@ -451,7 +464,9 @@ then on an interval; skip — never queue — a tick if the previous is still
 in-flight; default 30 s). The **reminder** scheduler fetches due reminders and
 delivers each; `deliverReminder` **re-runs the LLM** with the stored context plus
 a `reminder_fired` envelope (it is not a stored-text echo), giving at-least-once
-delivery. That re-run goes through the same `ai/turn.ts:runAiTurn` the bot uses,
+delivery. That envelope carries a `time` of its own — the system prompt states no
+current moment (see the AI layer), and a retried delivery fires later than the
+`scheduled_for` it was due at. That re-run goes through the same `ai/turn.ts:runAiTurn` the bot uses,
 so the tokens and USD spend are charged exactly as an `/ask` would (with
 `bestEffortDeduct` so a deduction failure can't retry the tick into a
 double-spend); delivery keeps only the reminder-specific envelope build and the

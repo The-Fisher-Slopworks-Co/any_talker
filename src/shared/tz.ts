@@ -64,6 +64,15 @@ export function localDateString(utcMs: number, tz: string): string {
   return `${year.toString().padStart(4, "0")}-${pad(month)}-${pad(day)}`;
 }
 
+// Wall-clock stamp for the prompt: `YYYY-MM-DD HH:MM` in the user's timezone.
+// The timezone itself is not repeated here — the system prompt names it once,
+// and every stamp in a conversation is read against that one name.
+export function localDateTimeString(utcMs: number, tz: string): string {
+  const { hour, minute } = formatLocalParts(utcMs, tz);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${localDateString(utcMs, tz)} ${pad(hour)}:${pad(minute)}`;
+}
+
 export function tzOffsetMinutesAt(utcMs: number, tz: string): number {
   const parts = offsetFormatter(tz).formatToParts(new Date(utcMs));
   const off =
