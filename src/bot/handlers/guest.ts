@@ -46,9 +46,11 @@ export type GuestAskInput = {
   imageFileIds: string[];
   replyImageFileIds: string[];
   // The message the guest query replied to. Guest threads only capture this
-  // bot's own answers, so a reply to anything else (another user's message, or
-  // a bot answer whose stored thread has expired) reaches the model through
-  // /ask's unknown-reply fallback (`buildReplyFallbackMessage`).
+  // bot's own answers, so a reply to anything else (another user's message, a
+  // bot answer whose stored thread has expired, or a bot answer that belongs
+  // to a different thread than the replier's own — see `threadMatchesReply`)
+  // reaches the model through /ask's unknown-reply fallback
+  // (`buildReplyFallbackMessage`).
   replyTarget: ReplyTarget | null;
   priorThread: GuestThreadNode | null;
   lang: Lang;
@@ -70,6 +72,38 @@ export type GuestAskOutcome =
       persistThread: () => Promise<void>;
     }
   | { kind: "error"; message: string };
+
+// Rendering strips markdown syntax and adds chrome (bot-name prefix, effects
+// block, details summary), so the comparison keeps only letters and digits and
+// looks for the stored answer's prefix inside the rendered reply text.
+const THREAD_MATCH_PREFIX_CHARS = 64;
+
+const normalizeForMatch = (s: string): string =>
+  s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+// Whether the replied-to message is recognizably the thread's own last answer.
+//
+// A guest thread is keyed by the guest DM — one thread per user, not per
+// message — while a reply can target ANY of this bot's messages in the group,
+// including an answer given to someone else. Telegram gives no id to join on
+// (`answerGuestQuery` never returns the posted message's id), so the replied-to
+// text is the only link: continue the thread only when it matches, otherwise
+// the caller falls back to quoting the replied-to message verbatim.
+export function threadMatchesReply(
+  thread: GuestThreadNode,
+  replyText: string | null,
+): boolean {
+  const lastAnswer = thread.turns[thread.turns.length - 1]?.botAnswer;
+  if (lastAnswer === undefined || replyText === null) return false;
+  const answer = normalizeForMatch(lastAnswer).slice(
+    0,
+    THREAD_MATCH_PREFIX_CHARS,
+  );
+  // Nothing verifiable survives normalization (emoji-only answer, …): keep the
+  // thread rather than silently dropping the user's own context.
+  if (answer === "") return true;
+  return normalizeForMatch(replyText).includes(answer);
+}
 
 export async function guestAskHandler(
   input: GuestAskInput,
@@ -144,7 +178,18 @@ export async function guestAskHandler(
     quote: input.quote,
     text: input.userText,
   });
-  const priorTurns = input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
+  // Continue the stored thread only when the reply verifiably targets its
+  // last answer; a mismatched thread (reply to a bot answer from someone
+  // else's conversation) is dropped so the replied-to message itself becomes
+  // the context via the fallback below. Without a replyTarget there is
+  // nothing to check against, so the thread is trusted as-is.
+  const priorThread =
+    input.priorThread !== null &&
+    input.replyTarget !== null &&
+    !threadMatchesReply(input.priorThread, input.replyTarget.text)
+      ? null
+      : input.priorThread;
+  const priorTurns = priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
   const messages: AIMessage[] = [];
   for (const turn of priorTurns) {
     const chainImages = await loadChainImages(turn.userImageFileIds, input.fetchPhoto);
