@@ -17,6 +17,7 @@ import type {
 } from "../shared/types";
 import { isEmptyChatSettings } from "../shared/types";
 import type { Lang } from "../shared/i18n";
+import type { DateFormat } from "../shared/date-format";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 import type { ManagedBot } from "../managed-bots/types";
@@ -42,6 +43,7 @@ type Backing = {
   userTimezones: Map<string, string>;
   userGenders: Map<string, Gender>;
   userLangs: Map<string, Lang>;
+  userDateFormats: Map<string, DateFormat>;
   userSpend: Map<string, Map<string, number>>;
   chatSpend: Map<string, Map<string, number>>;
   globalSpend: Map<string, number>;
@@ -83,6 +85,7 @@ function createBacking(): Backing {
     userTimezones: new Map(),
     userGenders: new Map(),
     userLangs: new Map(),
+    userDateFormats: new Map(),
     userSpend: new Map(),
     chatSpend: new Map(),
     globalSpend: new Map(),
@@ -303,6 +306,18 @@ export class MemoryStorage implements Storage {
   async setUserTimezone(userId: string, timezone: string | null): Promise<void> {
     if (timezone === null) this.b.userTimezones.delete(userId);
     else this.b.userTimezones.set(userId, timezone);
+  }
+
+  async getUserDateFormat(userId: string): Promise<DateFormat | null> {
+    return this.b.userDateFormats.get(userId) ?? null;
+  }
+
+  async setUserDateFormat(
+    userId: string,
+    format: DateFormat | null,
+  ): Promise<void> {
+    if (format === null) this.b.userDateFormats.delete(userId);
+    else this.b.userDateFormats.set(userId, format);
   }
 
   async getUserGender(userId: string): Promise<Gender | null> {

@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
+import { useDateFmt } from "../../datetime-context";
+import { TimeNote } from "../../components/time-note";
 import {
   api,
   type SpendSummary,
@@ -46,6 +48,7 @@ import { validateDisplayName } from "../../../../shared/display-name";
 
 export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
+  const { format } = useDateFmt();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [name, setName] = useState("");
   const [tzOverride, setTzOverride] = useState(false);
@@ -148,9 +151,7 @@ export function UserEditView({ userId }: { userId: string }) {
         </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_last_seen}</span>
-          <span className={ROW_VALUE_CLS}>
-            {new Date(user.lastSeenAt).toLocaleString()}
-          </span>
+          <span className={ROW_VALUE_CLS}>{format(user.lastSeenAt)}</span>
         </div>
         <RowButton onClick={() => openTelegramProfile(user)}>
           {s.ui_user_open_in_tg}
@@ -162,6 +163,9 @@ export function UserEditView({ userId }: { userId: string }) {
           initial={data.whitelisted}
         />
       </Card>
+      <SectionFooter>
+        <TimeNote />
+      </SectionFooter>
 
       <SectionHeader>{s.ui_main_display_name}</SectionHeader>
       <Card>

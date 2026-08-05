@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { useI18n } from "../i18n-context";
+import { useDateFmt } from "../datetime-context";
 import type { Reminder } from "../../../reminders/types";
 import type { Chat, User } from "../../../shared/types";
 import { Card } from "./layout";
@@ -26,6 +27,7 @@ export function ReminderCard({
   emptyText: string;
 }) {
   const { t: s } = useI18n();
+  const { format } = useDateFmt();
   return (
     <Card>
       {reminders.length === 0 ? (
@@ -45,7 +47,7 @@ export function ReminderCard({
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="shrink-0 text-base font-medium">
-                  {new Date(r.fireAtMs).toLocaleString()}
+                  {format(r.fireAtMs)}
                 </span>
                 <span className="text-[13px] text-tg-hint truncate">
                   {reminderTargetLabel(s, r, chats)}

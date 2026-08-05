@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
+import { useDateFmt } from "../../datetime-context";
+import { TimeNote } from "../../components/time-note";
 import { api } from "../../api-client";
 import type { Chat, ChatSettings, Settings } from "../../../../shared/types";
 import {
@@ -27,6 +29,7 @@ import { chatTitle } from "../../lib/labels";
 
 export function ChatEditView({ chatId }: { chatId: string }) {
   const { t: s } = useI18n();
+  const { format } = useDateFmt();
   const [chat, setChat] = useState<Chat | null>(null);
   const [global, setGlobal] = useState<Settings | null>(null);
   const [original, setOriginal] = useState<ChatSettings | null>(null);
@@ -154,9 +157,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_chat_last_seen}</span>
-          <span className={ROW_VALUE_CLS}>
-            {new Date(chat.lastSeenAt).toLocaleString()}
-          </span>
+          <span className={ROW_VALUE_CLS}>{format(chat.lastSeenAt)}</span>
         </div>
         <WhitelistToggleButton
           kind="chats"
@@ -165,6 +166,9 @@ export function ChatEditView({ chatId }: { chatId: string }) {
           initial={whitelisted}
         />
       </Card>
+      <SectionFooter>
+        <TimeNote />
+      </SectionFooter>
 
       <SectionHeader>{s.ui_chat_bot_name}</SectionHeader>
       <Card>

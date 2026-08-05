@@ -7,6 +7,12 @@ import { api, type MeResponse, type SpendSummary } from "../api-client";
 import { SpendingCard } from "../components/spending-card";
 import { composeFullName, type Gender } from "../../../shared/types";
 import { SUPPORTED_LANGS, type Lang } from "../../../shared/i18n";
+import {
+  DATE_FORMATS,
+  DATE_FORMAT_SAMPLE_MS,
+  formatDateTime,
+  type DateFormat,
+} from "../../../shared/date-format";
 import { validateDisplayName } from "../../../shared/display-name";
 import { DISPLAY_NAME_ERR_KEY } from "../lib/labels";
 import { Card, SectionFooter, SectionHeader, Stack } from "../components/layout";
@@ -36,6 +42,9 @@ export function MainView({
   const [genderOn, setGenderOn] = useState(me.gender !== null);
   const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
   const [langValue, setLangValue] = useState<Lang>(resolvedLang);
+  const [dateFormatValue, setDateFormatValue] = useState<DateFormat | null>(
+    me.dateFormat,
+  );
   const [saving, setSaving] = useState(false);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
 
@@ -57,7 +66,8 @@ export function MainView({
     name.trim() !== (me.displayName ?? "") ||
     desiredTz !== me.timezone ||
     desiredGender !== me.gender ||
-    langValue !== resolvedLang;
+    langValue !== resolvedLang ||
+    dateFormatValue !== me.dateFormat;
 
   const save = async () => {
     setSaving(true);
@@ -67,6 +77,7 @@ export function MainView({
         timezone: desiredTz,
         gender: desiredGender,
         language: langValue,
+        dateFormat: dateFormatValue,
       });
       onMe(next);
       setName(next.displayName ?? "");
@@ -75,6 +86,7 @@ export function MainView({
       setGenderOn(next.gender !== null);
       setGenderValue(next.gender ?? "male");
       setLangValue(next.language ?? resolvedLang);
+      setDateFormatValue(next.dateFormat);
     } finally {
       setSaving(false);
     }
@@ -140,6 +152,24 @@ export function MainView({
         <TimezoneSelect value={tzValue} onChange={setTzValue} />
       ) : null}
       <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_main_time_format}</SectionHeader>
+      <Card>
+        <SelectRow
+          label={s.ui_main_time_format_auto}
+          selected={dateFormatValue === null}
+          onSelect={() => setDateFormatValue(null)}
+        />
+        {DATE_FORMATS.map((fmt) => (
+          <SelectRow
+            key={fmt}
+            label={formatDateTime(DATE_FORMAT_SAMPLE_MS, fmt, desiredTz)}
+            selected={dateFormatValue === fmt}
+            onSelect={() => setDateFormatValue(fmt)}
+          />
+        ))}
+      </Card>
+      <SectionFooter>{s.ui_main_time_format_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_main_language}</SectionHeader>
       <Card>

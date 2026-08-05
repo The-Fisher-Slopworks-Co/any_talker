@@ -12,6 +12,7 @@ import type {
   Gender,
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
+import type { DateFormat } from "../../shared/date-format";
 import type { Reminder } from "../../reminders/types";
 import type { RecurringCheck } from "../../checks/types";
 import type { CheckInputFields } from "../../checks/validate";
@@ -57,6 +58,7 @@ export type MeResponse = {
   timezone: string | null;
   gender: Gender | null;
   language: Lang | null;
+  dateFormat: DateFormat | null;
 };
 export type BuildInfoResponse = {
   commit: string | null;
@@ -150,6 +152,7 @@ export const api = {
     timezone?: string | null;
     gender?: Gender | null;
     language?: Lang | null;
+    dateFormat?: DateFormat | null;
   }) => req<MeResponse>("PUT", "/api/me", patch),
   listAdminUsers: () =>
     req<{
