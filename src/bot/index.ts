@@ -24,6 +24,20 @@ import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
 import { pickPhotoSize, fetchTelegramPhoto, downloadTelegramFile } from "./photo";
 import { transcodeOggToMp3 } from "./transcode";
+import {
+  pickVideo,
+  fetchVideoParts,
+  describeAlbumVideoFrames,
+  describeVideoParts,
+  ALBUM_VIDEO_FRAMES,
+  MAX_VIDEO_BYTES,
+  MAX_VIDEO_FRAMES,
+  MAX_VIDEO_SECONDS,
+  REPLY_VIDEO_FRAMES,
+  type VideoAttachment,
+  type VideoClip,
+  type VideoParts,
+} from "./video";
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
@@ -70,6 +84,10 @@ export type BotDeps = {
   ai: AIClient;
   // Resolves the character to answer as for a given chat (settings + name).
   resolver: PersonaResolver;
+  // Whether a model takes video input (`ModelCatalog.supportsVideoInput`).
+  // Decides whether a clip is sent whole or as sampled frames — see
+  // `resolveVideoMode`. Optional so a test bot can omit it (⇒ always frames).
+  supportsVideoInput?: (modelId: string) => Promise<boolean>;
   // Present for managed bots only; absent ⇒ the main bot.
   persona?: BotPersona;
   // The user ids of the OTHER family bots this bot should consider for routing.
@@ -542,6 +560,25 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
     }
 
+    let videos: VideoClip[] = [];
+    let attachments: string | undefined;
+    const ownVideo = pickVideo(msg);
+    if (ownVideo) {
+      const parts = await loadVideoParts(chatId, ownVideo, MAX_VIDEO_FRAMES);
+      if (!parts.ok) {
+        await answer(videoErrorText(ctx, parts.reason), null).catch((e) =>
+          console.error("answerGuestQuery failed:", e),
+        );
+        return;
+      }
+      const media = videoMedia(ownVideo, parts);
+      images = media.images;
+      audios = media.audios;
+      videos = media.videos;
+      attachments = media.attachments;
+      imageFileIds = ownVideo.thumbnailFileId ? [ownVideo.thumbnailFileId] : [];
+    }
+
     const [nameOverride, gender] = await Promise.all([
       readValidDisplayName(deps.storage, userId),
       deps.storage.getUserGender(userId),
@@ -587,6 +624,30 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
     }
 
+    // Same supplementary-context sample as /ask's reply video (see there).
+    const replyVideo = replyMsg ? pickVideo(replyMsg) : null;
+    if (replyTarget && replyVideo) {
+      const parts = await loadVideoParts(
+        chatId,
+        replyVideo,
+        REPLY_VIDEO_FRAMES,
+      );
+      if (parts.ok) {
+        const media = videoMedia(replyVideo, parts);
+        replyTarget.images = [...replyTarget.images, ...media.images];
+        if (media.audios.length > 0) {
+          replyTarget.audios = [...(replyTarget.audios ?? []), ...media.audios];
+        }
+        if (media.videos.length > 0) {
+          replyTarget.videos = [...(replyTarget.videos ?? []), ...media.videos];
+        }
+        replyTarget.mediaNote = media.attachments;
+        if (replyVideo.thumbnailFileId) {
+          replyImageFileIds = [...replyImageFileIds, replyVideo.thumbnailFileId];
+        }
+      }
+    }
+
     debugLog("guest_dispatch", {
       chat_id: msg.chat.id,
       message_id: msg.message_id,
@@ -618,6 +679,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         quote: msg.quote?.text ?? null,
         images,
         audios,
+        videos,
+        attachments,
         imageFileIds,
         replyImageFileIds,
         replyTarget,
@@ -699,6 +762,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     images: Uint8Array[];
     imageFileIds: string[];
     audios: Uint8Array[];
+    // Whole clips, when the answering model takes video natively.
+    videos?: VideoClip[];
+    // Set when the media needs explaining — video frames aren't loose photos.
+    attachments?: string;
     replyToMessage: Message | undefined;
     quote: string | null;
     forwardOrigin: boolean;
@@ -711,6 +778,66 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       botToken: deps.botToken,
       fileId,
     });
+
+  // Which route a clip takes, decided by the model that will actually answer:
+  // one advertising `video` input (Gemini & co on OpenRouter) gets the clip
+  // whole, anything else gets sampled frames. Costs one settings read, and only
+  // on a message that carries a clip. Any failure degrades to frames, which
+  // every vision model understands.
+  const resolveVideoMode = async (
+    chatId: string,
+  ): Promise<"native" | "frames"> => {
+    if (!deps.supportsVideoInput) return "frames";
+    try {
+      const { settings } = await deps.resolver(chatId);
+      const model = settings.models[0];
+      if (!model) return "frames";
+      return (await deps.supportsVideoInput(model)) ? "native" : "frames";
+    } catch (err) {
+      console.error("video mode resolution failed:", err);
+      return "frames";
+    }
+  };
+
+  // Every flow that meets a clip goes through here, so they all decide, sample
+  // and fail alike.
+  const loadVideoParts = async (
+    chatId: string,
+    video: VideoAttachment,
+    maxFrames: number,
+    // Forces the route. Used by the album path, which must not send several
+    // whole clips in one request.
+    forcedMode?: "native" | "frames",
+  ) =>
+    fetchVideoParts({
+      botToken: deps.botToken,
+      video,
+      mode: forcedMode ?? (await resolveVideoMode(chatId)),
+      maxFrames,
+    });
+
+  // Fold a resolved clip into the media buckets the ask flow carries. A native
+  // clip is one video part; a sampled one is stills + soundtrack, plus the note
+  // that keeps the model from reading those stills as loose photos.
+  const videoMedia = (video: VideoAttachment, parts: VideoParts) =>
+    parts.mode === "native"
+      ? {
+          images: [] as Uint8Array[],
+          audios: [] as Uint8Array[],
+          videos: [parts.clip],
+          attachments: undefined as string | undefined,
+        }
+      : {
+          images: parts.frames,
+          audios: parts.audio ? [parts.audio] : [],
+          videos: [] as VideoClip[],
+          attachments: describeVideoParts({
+            kind: video.kind,
+            durationSec: video.durationSec,
+            frames: parts.frames.length,
+            hasAudio: parts.audio !== null,
+          }),
+        };
 
   const dispatchAsk = async (ctx: BotContext, args: AskDispatch) => {
     debugLog("ask_dispatch", {
@@ -777,6 +904,42 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
     }
 
+    // A replied-to clip is supplementary context, so it contributes a smaller
+    // frame sample than a clip the ask is *about*, and a failure just drops it
+    // (the user asked about their own message, not this one).
+    const replyVideo = args.replyToMessage
+      ? pickVideo(args.replyToMessage)
+      : null;
+    if (replyTarget && replyVideo) {
+      const parts = await loadVideoParts(
+        String(chatId),
+        replyVideo,
+        REPLY_VIDEO_FRAMES,
+      );
+      if (parts.ok) {
+        const media = videoMedia(replyVideo, parts);
+        replyTarget.images = [...replyTarget.images, ...media.images];
+        if (media.audios.length > 0) {
+          replyTarget.audios = [...(replyTarget.audios ?? []), ...media.audios];
+        }
+        if (media.videos.length > 0) {
+          replyTarget.videos = [...(replyTarget.videos ?? []), ...media.videos];
+        }
+        replyTarget.mediaNote = media.attachments;
+        // Neither a clip nor a frame carries a Telegram file id; the clip's
+        // thumbnail is a real one, so a follow-up turn keeps a still of it.
+        if (replyVideo.thumbnailFileId) {
+          replyImageFileIds = [...replyImageFileIds, replyVideo.thumbnailFileId];
+        }
+        debugLog("reply_video_resolved", {
+          chat_id: chatId,
+          reply_message_id: args.replyToMessage?.message_id,
+          kind: replyVideo.kind,
+          mode: parts.mode,
+        });
+      }
+    }
+
     const [nameOverride, gender] = await Promise.all([
       readValidDisplayName(deps.storage, userId),
       deps.storage.getUserGender(userId),
@@ -824,6 +987,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           quote: args.quote,
           images: args.images,
           audios: args.audios,
+          videos: args.videos,
+          attachments: args.attachments,
           imageFileIds: args.imageFileIds,
           replyImageFileIds,
           replyTarget,
@@ -939,21 +1104,56 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const userText = captionMatch.userText;
       const askMessageId = items[0]!.message_id;
 
+      // Album items are resolved in arrival (message) order and one at a time:
+      // a group holds up to ten items and a video costs a download plus two
+      // ffmpeg passes, so running ten of those at once would spike the host.
+      // Video items contribute frames only — an album's worth of soundtracks
+      // would dwarf everything else in the request.
+      // One clip in the album can go to the model whole; several cannot — ten
+      // 20 MB clips base64'd into one request is not a request anyone wants to
+      // send, so a multi-clip album falls back to frames for all of them.
+      const albumChatId = String(ctx.chat?.id ?? "");
+      const clipCount = items.filter((it) => pickVideo(it) !== null).length;
+      const albumMode = clipCount > 1 ? "frames" : undefined;
+
       const fileIds: string[] = [];
-      let images: Uint8Array[];
-      try {
-        images = await Promise.all(
-          items.map((it) => {
-            const picked = it.photo ? pickPhotoSize(it.photo) : null;
-            if (!picked) throw new Error("no usable photo size in media group");
+      const images: Uint8Array[] = [];
+      const videos: VideoClip[] = [];
+      let albumVideos = 0;
+      let albumVideoFrames = 0;
+      for (const it of items) {
+        const picked = it.photo ? pickPhotoSize(it.photo) : null;
+        if (picked) {
+          try {
+            images.push(await fetchPhoto(picked.file_id));
             fileIds.push(picked.file_id);
-            return fetchPhoto(picked.file_id);
-          }),
+          } catch (err) {
+            console.error("media group photo download failed:", err);
+            await ctx.reply(ctx.t.bot_photo_cant_fetch).catch(() => {});
+            return;
+          }
+          continue;
+        }
+        const video = pickVideo(it);
+        if (!video) continue;
+        const parts = await loadVideoParts(
+          albumChatId,
+          video,
+          ALBUM_VIDEO_FRAMES,
+          albumMode,
         );
-      } catch (err) {
-        console.error("media group photo download failed:", err);
-        await ctx.reply(ctx.t.bot_photo_cant_fetch).catch(() => {});
-        return;
+        if (!parts.ok) {
+          await ctx.reply(videoErrorText(ctx, parts.reason)).catch(() => {});
+          return;
+        }
+        if (parts.mode === "native") {
+          videos.push(parts.clip);
+        } else {
+          images.push(...parts.frames);
+          albumVideos += 1;
+          albumVideoFrames += parts.frames.length;
+        }
+        if (video.thumbnailFileId) fileIds.push(video.thumbnailFileId);
       }
 
       await dispatchAsk(ctx, {
@@ -962,6 +1162,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         images,
         imageFileIds: fileIds,
         audios: [],
+        videos,
+        attachments:
+          albumVideos > 0
+            ? describeAlbumVideoFrames(albumVideos, albumVideoFrames)
+            : undefined,
         replyToMessage: askItem.reply_to_message,
         quote: askItem.quote?.text ?? null,
         forwardOrigin: false,
@@ -1135,6 +1340,89 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     });
   });
 
+  // `/ask` on a clip. Videos and animations are the two clip attachments that
+  // can carry a caption — a video note never has one, so it reaches the model
+  // only as a reply target. The provider rejects `video/*` parts outright, so
+  // every clip is decomposed into frames + soundtrack first (see `video.ts`).
+  const handleVideoAsk = async (ctx: BotContext) => {
+    const msg = ctx.message;
+    const chatId = ctx.chat?.id;
+    if (!msg || chatId === undefined) return;
+    const video = pickVideo(msg);
+    if (!video) return;
+
+    const captionRaw = msg.caption ?? "";
+    const match = matchAsk(captionRaw, ctx.me.username);
+    debugLog("video_received", {
+      chat_id: chatId,
+      message_id: msg.message_id,
+      kind: video.kind,
+      media_group_id: msg.media_group_id ?? null,
+      caption_len: captionRaw.length,
+      ask_caption: match !== null,
+      duration: video.durationSec,
+      file_size: video.fileSize,
+    });
+
+    if (msg.media_group_id !== undefined) {
+      // Index the clip's thumbnail alongside the album's photos so a later
+      // reply to the album still surfaces something for this item.
+      if (video.thumbnailFileId) {
+        void scopedStorage
+          .appendAlbumPhoto(String(chatId), msg.media_group_id, {
+            messageId: msg.message_id,
+            fileId: video.thumbnailFileId,
+          })
+          .catch((err) => console.error("appendAlbumPhoto failed:", err));
+      }
+      const key = `${chatId}:${msg.media_group_id}`;
+      mediaGroupBuffer.push({ key, context: ctx, item: msg });
+      debugLog("media_group_push", {
+        key,
+        message_id: msg.message_id,
+        pending_groups: mediaGroupBuffer.pendingCount(),
+      });
+      return;
+    }
+
+    if (!match) return;
+    if (!(await shouldAnswer(ctx, match, msg.reply_to_message))) return;
+
+    const parts = await loadVideoParts(String(chatId), video, MAX_VIDEO_FRAMES);
+    if (!parts.ok) {
+      await ctx.reply(videoErrorText(ctx, parts.reason));
+      return;
+    }
+    const media = videoMedia(video, parts);
+    debugLog("video_resolved", {
+      chat_id: chatId,
+      message_id: msg.message_id,
+      mode: parts.mode,
+    });
+
+    await dispatchAsk(ctx, {
+      userText: match.userText,
+      askMessageId: msg.message_id,
+      images: media.images,
+      // Neither a whole clip nor a sampled frame has a Telegram file id of its
+      // own; the clip's thumbnail does, so a follow-up turn in the chain keeps
+      // a still of the video rather than losing the visual entirely.
+      imageFileIds: video.thumbnailFileId ? [video.thumbnailFileId] : [],
+      audios: media.audios,
+      videos: media.videos,
+      attachments: media.attachments,
+      replyToMessage: msg.reply_to_message,
+      quote: msg.quote?.text ?? null,
+      forwardOrigin: Boolean(msg.forward_origin),
+      detailLevel: match.detailLevel,
+    });
+  };
+
+  // Registered before any `message:document` filter would be: an animation
+  // message also carries a `document` for backward compatibility.
+  bot.on("message:video", handleVideoAsk);
+  bot.on("message:animation", handleVideoAsk);
+
   // Authoritative presence tracking: when THIS bot is added to / removed from a
   // group, record or clear its presence so managed siblings can resolve the
   // bare-`/ask` alone-check. Private chats are never tracked.
@@ -1268,6 +1556,25 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   });
 
   return bot;
+}
+
+// Every video failure the user is actually told about, in one place: a clip
+// past a limit names that limit (the user can trim and resend), anything else
+// is a generic notice.
+function videoErrorText(
+  ctx: BotContext,
+  reason: "too_large" | "too_long" | "unavailable",
+): string {
+  switch (reason) {
+    case "too_large":
+      return ctx.t.bot_video_too_large(
+        Math.round(MAX_VIDEO_BYTES / (1024 * 1024)),
+      );
+    case "too_long":
+      return ctx.t.bot_video_too_long(MAX_VIDEO_SECONDS);
+    case "unavailable":
+      return ctx.t.bot_video_cant_fetch;
+  }
 }
 
 function extractReplyTarget(reply: Message): ReplyTarget {

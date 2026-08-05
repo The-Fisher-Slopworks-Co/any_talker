@@ -16,7 +16,9 @@ ARG GIT_COMMIT=""
 ENV NODE_ENV=production
 ENV GIT_COMMIT=${GIT_COMMIT}
 # ffmpeg transcodes Telegram ogg/opus voice notes to mp3 before they're sent to
-# the AI endpoint (the OpenAI-compatible input_audio field accepts only wav/mp3).
+# the AI endpoint (the OpenAI-compatible input_audio field accepts only wav/mp3)
+# and samples frames + the soundtrack out of a video when the configured model
+# has no video input (a model that does gets the clip whole, no ffmpeg needed).
 RUN apk add --no-cache ffmpeg
 COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY . .

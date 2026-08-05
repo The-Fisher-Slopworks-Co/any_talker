@@ -25,6 +25,7 @@ import {
   type BudgetDenyReason,
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
+import type { VideoClip } from "../video";
 
 export type GuestAskInput = {
   storage: Storage;
@@ -43,6 +44,12 @@ export type GuestAskInput = {
   quote: string | null;
   images: Uint8Array[];
   audios?: Uint8Array[];
+  // Whole clips, sent when the answering model advertises video input. Empty in
+  // frames mode, where the clip already arrived as `images` + `audios`.
+  videos?: VideoClip[];
+  // Describes media the parts alone don't explain — video frames (see
+  // `bot/video.ts`). Goes into the user envelope, so it is persisted too.
+  attachments?: string;
   imageFileIds: string[];
   replyImageFileIds: string[];
   // The message the guest query replied to. Guest threads only capture this
@@ -118,11 +125,13 @@ export async function guestAskHandler(
   // same emptiness check as /ask's "usage" outcome; guest queries have no
   // usage hint to send, so it stays a silent deny.
   const audios = input.audios ?? [];
+  const videos = input.videos ?? [];
   if (
     input.userText.trim() === "" &&
     input.replyTarget === null &&
     input.images.length === 0 &&
-    audios.length === 0
+    audios.length === 0 &&
+    videos.length === 0
   ) {
     return { kind: "denied" };
   }
@@ -177,6 +186,7 @@ export async function guestAskHandler(
     sender: input.sender,
     quote: input.quote,
     text: input.userText,
+    attachments: input.attachments,
   });
   // Continue the stored thread only when the reply verifiably targets its
   // last answer; a mismatched thread (reply to a bot answer from someone
@@ -208,10 +218,10 @@ export async function guestAskHandler(
   if (priorTurns.length === 0 && input.replyTarget) {
     messages.push(buildReplyFallbackMessage(input.replyTarget));
   }
-  if (input.images.length > 0 || audios.length > 0) {
+  if (input.images.length > 0 || audios.length > 0 || videos.length > 0) {
     messages.push({
       role: "user",
-      content: withMedia(envelope, input.images, audios),
+      content: withMedia(envelope, input.images, audios, videos),
     });
   } else {
     messages.push({ role: "user", content: envelope });

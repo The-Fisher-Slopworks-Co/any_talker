@@ -68,6 +68,11 @@ export interface ModelCatalog extends PriceLookup {
   // allowed" — when the catalogue is empty or unavailable, so callers degrade
   // gracefully and never block a save just because no list could be fetched.
   unknownModels(modelIds: string[]): Promise<string[]>;
+  // Whether the model advertises `video` among its input modalities — the bot
+  // sends a clip as a `video_url` part when it does, and falls back to sampled
+  // frames when it doesn't. Unknown model or no capability metadata ⇒ false, so
+  // an endpoint that publishes no modalities gets the portable path.
+  supportsVideoInput(modelId: string): Promise<boolean>;
 }
 
 export function createModelCatalog(opts: {
@@ -160,6 +165,14 @@ export function createModelCatalog(opts: {
       return modelIds.filter(
         (id) => resolveModelId(entryMap, id.trim()) === null,
       );
+    },
+    async supportsVideoInput(modelId: string): Promise<boolean> {
+      // Refreshes if stale (unlike `getPricing`, which stays sync on the hot
+      // path): this is consulted once per video ask, next to a multi-megabyte
+      // download, and a cold catalogue would silently downgrade every clip.
+      await ensureFresh();
+      const entry = resolveModelId(entryMap, modelId.trim());
+      return entry?.capabilities?.modalities?.includes("video") ?? false;
     },
     getPricing(modelId: string): ModelPricing | null {
       return resolveModelId(priceMap, modelId);
