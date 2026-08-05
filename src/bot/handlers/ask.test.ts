@@ -205,6 +205,51 @@ describe("askHandler", () => {
     expect(out.kind).toBe("rateLimited");
   });
 
+  // The handler is the only thing that turns stored settings into the client's
+  // routing argument. Nothing downstream would fail if it stopped: the request
+  // just quietly goes wherever the gateway feels like, at whatever tier.
+  test("passes the effective provider routing to the AI", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "throughput",
+      provider: "deepinfra",
+      serviceTier: "flex",
+    });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect(
+      (ai.calls[0] as Parameters<AIClient["ask"]>[0]).routing,
+    ).toEqual({
+      providerSort: "throughput",
+      provider: "deepinfra",
+      serviceTier: "flex",
+    });
+  });
+
+  test("a chat's routing override reaches the AI over the global one", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "price",
+      provider: "together",
+      serviceTier: "priority",
+    });
+    // An explicit null is an override too — "ignore the global pin in this chat".
+    await storage.saveChatSettings("c1", { providerSort: "latency", provider: null });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai }));
+    expect(
+      (ai.calls[0] as Parameters<AIClient["ask"]>[0]).routing,
+    ).toEqual({
+      providerSort: "latency",
+      provider: null,
+      serviceTier: "priority",
+    });
+  });
+
   test("passes the configured models to the AI", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

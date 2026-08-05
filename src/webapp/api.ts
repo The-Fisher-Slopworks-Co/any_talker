@@ -15,7 +15,13 @@ import type {
   AnomalyConfig,
   Gender,
 } from "../shared/types";
-import { isValidTimezone, isValidGender } from "../shared/types";
+import {
+  isValidTimezone,
+  isValidGender,
+  isValidProviderSlug,
+  isValidProviderSort,
+  isValidServiceTier,
+} from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
 import { isValidDateFormat, type DateFormat } from "../shared/date-format";
 import {
@@ -33,6 +39,12 @@ import { getOrInitSettings } from "../settings";
 import { gatherSpendOverview } from "../spending/overview";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
 import type { ModelCatalog } from "../ai/model-catalog";
+import {
+  capabilitiesFor,
+  type ProviderCapabilities,
+  type ProviderFlavor,
+} from "../ai/provider-profile";
+import { isValidPermaslug, type FetchProviderEndpoints } from "./openrouter-proxy";
 
 export type ApiRequest = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -64,6 +76,18 @@ export type ApiDeps = {
   ownerId: string;
   modelCatalog?: ModelCatalog;
   managedBots?: ManagedBotController;
+  // What the configured AI endpoint supports beyond the standard OpenAI surface.
+  // Served to the Mini App so it only offers controls this deployment can
+  // honour. Absent ⇒ the generic profile, the one that is always safe to send.
+  provider?: { flavor: ProviderFlavor; capabilities: ProviderCapabilities };
+  // Wired only when that profile advertises `endpointStats`, so an absent
+  // fetcher is itself the answer "this endpoint has no per-provider stats".
+  fetchProviderEndpoints?: FetchProviderEndpoints;
+};
+
+const GENERIC_PROVIDER = {
+  flavor: "generic" as const,
+  capabilities: capabilitiesFor("generic"),
 };
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
@@ -204,6 +228,27 @@ const BAD_MODELS: ApiResponse = {
   status: 400,
   body: { error: "models must be a non-empty array of non-empty strings" },
 };
+
+const BAD_PROVIDER_SORT: ApiResponse = {
+  status: 400,
+  body: { error: "invalid providerSort" },
+};
+
+const BAD_PROVIDER: ApiResponse = {
+  status: 400,
+  body: { error: "invalid provider" },
+};
+
+const BAD_SERVICE_TIER: ApiResponse = {
+  status: 400,
+  body: { error: "invalid serviceTier" },
+};
+
+// True when a nullable settings field is absent (not being patched), explicitly
+// cleared, or a well-formed value.
+function nullOrValid<T>(v: unknown, isValid: (x: unknown) => x is T): boolean {
+  return v === undefined || v === null || isValid(v);
+}
 
 const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
   status: 400,
@@ -373,6 +418,9 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     models?: unknown;
     botName?: unknown;
     timezone?: unknown;
+    providerSort?: unknown;
+    provider?: unknown;
+    serviceTier?: unknown;
     keywordFilter?: unknown;
   };
   const out: ChatSettings = {};
@@ -395,6 +443,18 @@ function normalizeChatSettings(raw: unknown): ChatSettings {
     if (trimmed.length > 0 && isValidTimezone(trimmed)) {
       out.timezone = trimmed;
     }
+  }
+  // An explicit null is a real override ("ignore the global setting here"), so
+  // it is stored; a malformed value is dropped and the chat keeps inheriting.
+  if (body.providerSort === null) out.providerSort = null;
+  else if (isValidProviderSort(body.providerSort)) {
+    out.providerSort = body.providerSort;
+  }
+  if (body.provider === null) out.provider = null;
+  else if (isValidProviderSlug(body.provider)) out.provider = body.provider;
+  if (body.serviceTier === null) out.serviceTier = null;
+  else if (isValidServiceTier(body.serviceTier)) {
+    out.serviceTier = body.serviceTier;
   }
   if (
     body.keywordFilter &&
@@ -618,6 +678,39 @@ export async function handleApi(
   // Everything below this line is admin-only.
   if (!actor.isOwner) return FORBIDDEN;
 
+  // Tells the admin UI which provider-specific controls to render at all.
+  if (req.path === "/api/provider" && req.method === "GET") {
+    return { status: 200, body: deps.provider ?? GENERIC_PROVIDER };
+  }
+
+  // Per-provider price/throughput/latency for one model, proxied server-side.
+  const endpointsMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);
+  if (endpointsMatch && req.method === "GET") {
+    // A malformed percent-escape makes decoding throw; that is a bad request,
+    // not a server fault, so it joins the same 400 as any other bad slug.
+    let permaslug: string;
+    try {
+      permaslug = decodeURIComponent(endpointsMatch[1]!);
+    } catch {
+      return { status: 400, body: { error: "invalid permaslug" } };
+    }
+    if (!isValidPermaslug(permaslug)) {
+      return { status: 400, body: { error: "invalid permaslug" } };
+    }
+    if (!deps.fetchProviderEndpoints) {
+      return { status: 503, body: { error: "endpoint stats not supported" } };
+    }
+    try {
+      const data = await deps.fetchProviderEndpoints(permaslug);
+      return { status: 200, body: data };
+    } catch (err) {
+      // Log the upstream error but return a generic code: the message can carry
+      // internal paths / stack fragments that shouldn't cross the API boundary.
+      console.error("provider endpoint stats fetch failed:", err);
+      return { status: 502, body: { error: "endpoint_stats_failed" } };
+    }
+  }
+
   // The model catalogue feeds the admin model picker (global + per-chat).
   if (req.path === "/api/models" && req.method === "GET") {
     if (!deps.modelCatalog) {
@@ -645,6 +738,17 @@ export async function handleApi(
       }
       if (patch.models !== undefined && !isValidModelsList(patch.models)) {
         return BAD_MODELS;
+      }
+      // `null` clears the field back to "let the gateway decide"; anything else
+      // has to be well-formed, since it ends up in a live request body.
+      if (!nullOrValid(patch.providerSort, isValidProviderSort)) {
+        return BAD_PROVIDER_SORT;
+      }
+      if (!nullOrValid(patch.provider, isValidProviderSlug)) {
+        return BAD_PROVIDER;
+      }
+      if (!nullOrValid(patch.serviceTier, isValidServiceTier)) {
+        return BAD_SERVICE_TIER;
       }
       if (patch.models !== undefined) {
         const bad = await unknownModelsError(deps.modelCatalog, patch.models);

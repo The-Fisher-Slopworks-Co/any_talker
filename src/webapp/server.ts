@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { handleApi, type ApiRequest, type ManagedBotController } from "./api";
+import {
+  handleApi,
+  type ApiDeps,
+  type ApiRequest,
+  type ManagedBotController,
+} from "./api";
 import { verifyInitData } from "./auth";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
@@ -23,15 +28,19 @@ export type ServerDeps = {
   rateLimiter: RateLimiter;
   botManager: ManagedBotController;
   modelCatalog?: ModelCatalog;
+  provider?: ApiDeps["provider"];
+  fetchProviderEndpoints?: ApiDeps["fetchProviderEndpoints"];
 };
 
 export function startServer(deps: ServerDeps) {
-  const apiDeps = {
+  const apiDeps: ApiDeps = {
     storage: deps.storage,
     rateLimiter: deps.rateLimiter,
     ownerId: deps.ownerId,
     modelCatalog: deps.modelCatalog,
     managedBots: deps.botManager,
+    provider: deps.provider,
+    fetchProviderEndpoints: deps.fetchProviderEndpoints,
   };
 
   const handleDynamic = async (req: Request): Promise<Response> => {

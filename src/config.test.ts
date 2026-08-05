@@ -24,6 +24,56 @@ test("loadConfig returns required fields when all env vars present", () => {
   expect(cfg.logDebug).toBe(false);
 });
 
+test("loadConfig infers the provider flavor from the base URL", () => {
+  expect(loadConfig({ ...baseEnv }).aiProviderFlavor).toBe("generic");
+  expect(
+    loadConfig({ ...baseEnv, OPENAI_BASE_URL: "https://openrouter.ai/api/v1" })
+      .aiProviderFlavor,
+  ).toBe("openrouter");
+});
+
+test("AI_PROVIDER_FLAVOR overrides the inferred flavor", () => {
+  // A gateway that fronts OpenRouter has its own hostname, so the override is
+  // the only way to declare the surface it really speaks.
+  const cfg = loadConfig({
+    ...baseEnv,
+    OPENAI_BASE_URL: "https://gw.internal/v1",
+    AI_PROVIDER_FLAVOR: "openrouter",
+  });
+  expect(cfg.aiProviderFlavor).toBe("openrouter");
+});
+
+test("AI_PROVIDER_FLAVOR=auto falls back to inference", () => {
+  const cfg = loadConfig({
+    ...baseEnv,
+    OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
+    AI_PROVIDER_FLAVOR: "auto",
+  });
+  expect(cfg.aiProviderFlavor).toBe("openrouter");
+});
+
+// Failing loudly at boot beats silently mis-declaring the surface: a wrong
+// profile makes every request fail with HTTP 400, or silently drops routing.
+test("loadConfig rejects an unknown AI_PROVIDER_FLAVOR", () => {
+  expect(() =>
+    loadConfig({ ...baseEnv, AI_PROVIDER_FLAVOR: "openai" }),
+  ).toThrow(/AI_PROVIDER_FLAVOR/);
+});
+
+test("loadConfig reads optional app attribution", () => {
+  const bare = loadConfig({ ...baseEnv });
+  expect(bare.openrouterAppUrl).toBeUndefined();
+  expect(bare.openrouterAppTitle).toBeUndefined();
+
+  const cfg = loadConfig({
+    ...baseEnv,
+    OPENROUTER_APP_URL: "https://example.com",
+    OPENROUTER_APP_TITLE: "any_talker",
+    });
+  expect(cfg.openrouterAppUrl).toBe("https://example.com");
+  expect(cfg.openrouterAppTitle).toBe("any_talker");
+});
+
 test("loadConfig honours LOG_FORMAT, LOG_INCOMING_UPDATES and LOG_DEBUG", () => {
   const cfg = loadConfig({
     ...baseEnv,

@@ -5,41 +5,186 @@ import {
   generateText,
   tool as aiTool,
   stepCountIs,
+  type JSONValue,
   type ModelMessage,
   type ToolSet,
 } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { AIClient, AIMessage, AskResult } from "./types";
+import type { AIClient, AIMessage, AskResult, RoutingOptions } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
-import type { ReasoningEffort } from "../shared/types";
+import type { ProviderSort, ReasoningEffort } from "../shared/types";
 import type { PriceLookup } from "./model-catalog";
+import type { ProviderCapabilities } from "./provider-profile";
 import { proxiedFetch } from "../proxy";
 import { aiRequestDurationSeconds, aiRequestsTotal } from "../metrics";
 
 // The provider name doubles as the `providerOptions` key the SDK reads chat
-// options under (it matches the segment before the first "."), so
-// `providerOptions: { [PROVIDER_NAME]: { reasoningEffort } }` lands in the
-// request body as the standard `reasoning_effort` field.
+// options under (it matches the segment before the first "."). Keys the SDK's
+// own chat-options schema knows — `reasoningEffort` — are mapped to their
+// standard body field; every other key is spread into the request body verbatim,
+// which is how the gateway-specific fields below travel.
 const PROVIDER_NAME = "compat";
 
 type CompatProvider = ReturnType<typeof createOpenAICompatible>;
 
-// AI client for any OpenAI-compatible chat-completions endpoint. Only `models[0]`
-// is sent — a generic endpoint has no server-side fallback chain — and the
-// per-request USD cost is computed locally from the catalogue's pricing.
+// App attribution, sent as request headers so a gateway can credit the traffic
+// to this bot. Ignored by endpoints that don't know the headers.
+export type AppAttribution = {
+  url?: string | undefined;
+  title?: string | undefined;
+};
+
+// The `provider` body field a routing-capable gateway accepts: either sort all
+// providers by a metric, or pin one with no fallback.
+export type ProviderRouting =
+  | { sort: ProviderSort }
+  | { order: string[]; allow_fallbacks: boolean };
+
+// A pinned provider wins over a sort: the request is restricted to that single
+// slug with fallbacks disabled, so it never silently lands elsewhere.
+export function buildProviderRouting(
+  provider: string | null | undefined,
+  providerSort: ProviderSort | null | undefined,
+): ProviderRouting | undefined {
+  if (provider) return { order: [provider], allow_fallbacks: false };
+  if (providerSort) return { sort: providerSort };
+  return undefined;
+}
+
+// Assembles the per-request `providerOptions` payload, gated on what the
+// configured endpoint actually supports. Nothing beyond the standard OpenAI
+// surface is emitted for a generic endpoint — a strict one (OpenAI's own API
+// among them) rejects the *whole* request with HTTP 400 over one unknown field.
+// Returns undefined when there is nothing to send.
+export function buildProviderOptions(
+  caps: ProviderCapabilities,
+  opts: {
+    // Model ids after the primary, i.e. the server-side fallback chain.
+    fallbackModels: string[];
+    routing: RoutingOptions;
+    reasoningEffort?: ReasoningEffort | null;
+  },
+): Record<string, JSONValue> | undefined {
+  const out: Record<string, JSONValue> = {};
+
+  if (caps.usageAccounting) {
+    // Belt and braces: usage accounting is on by default on today's gateways,
+    // but asking for it explicitly costs nothing and keeps older ones honest.
+    out.usage = { include: true };
+  }
+  if (caps.modelFallback && opts.fallbackModels.length > 0) {
+    out.models = opts.fallbackModels;
+  }
+  if (caps.providerRouting) {
+    const routing = buildProviderRouting(
+      opts.routing.provider,
+      opts.routing.providerSort,
+    );
+    if (routing) out.provider = routing;
+  }
+  if (caps.serviceTier && opts.routing.serviceTier) {
+    out.service_tier = opts.routing.serviceTier;
+  }
+  if (opts.reasoningEffort) {
+    if (caps.unifiedReasoning) out.reasoning = { effort: opts.reasoningEffort };
+    // Consumed by the SDK's chat-options schema and mapped to `reasoning_effort`.
+    else out.reasoningEffort = opts.reasoningEffort;
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+export function buildAttributionHeaders(
+  attr: AppAttribution,
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (attr.url) headers["HTTP-Referer"] = attr.url;
+  if (attr.title) headers["X-Title"] = attr.title;
+  return headers;
+}
+
+// One `generateText` step, narrowed to the raw response body the cost reader
+// inspects. Structural, so the real `StepResult` satisfies it.
+type CostBearingStep = { response?: { body?: unknown } };
+
+// Reads the USD cost a usage-accounting gateway reported for each step. With
+// tool calls one ask fans out into several billed requests, so the per-step
+// figures are summed the way `totalUsage` sums tokens. Returns null when no step
+// reported a usable number — distinct from a reported zero, which a free model
+// legitimately produces.
+function readReportedCostUsd(steps: readonly CostBearingStep[]): number | null {
+  let total = 0;
+  let reported = false;
+  for (const s of steps) {
+    const body = s.response?.body as { usage?: { cost?: unknown } } | undefined;
+    const cost = body?.usage?.cost;
+    if (typeof cost === "number" && Number.isFinite(cost)) {
+      total += cost;
+      reported = true;
+    }
+  }
+  return reported ? total : null;
+}
+
+// What one ask cost, and whether that figure can be trusted as complete.
+//
+// A usage-accounting gateway states the real price (discounts, cache reads and
+// reasoning tokens included), so it wins. Everything else — and any such gateway
+// that stayed silent — is priced locally from the catalogue: `inputTokens ×
+// promptPrice + outputTokens × completionPrice`. With no catalogue pricing the
+// cost floors at 0 and `priced` goes false, so the ledger's blind spot is
+// visible instead of being mistaken for a free reply.
+export function resolveAskCost(args: {
+  caps: ProviderCapabilities;
+  pricing: PriceLookup;
+  modelId: string;
+  steps: readonly CostBearingStep[];
+  inputTokens: number;
+  outputTokens: number;
+}): { costUsd: number; priced: boolean } {
+  if (args.caps.usageAccounting) {
+    const reported = readReportedCostUsd(args.steps);
+    if (reported !== null) return { costUsd: reported, priced: true };
+  }
+  return {
+    costUsd: computeCostUsd(
+      args.pricing,
+      args.modelId,
+      args.inputTokens,
+      args.outputTokens,
+    ),
+    priced: args.pricing.getPricing(args.modelId) !== null,
+  };
+}
+
+// AI client for any OpenAI-compatible chat-completions endpoint. What it sends
+// beyond the standard surface — a fallback chain, provider routing, a service
+// tier — and whether it trusts the response for cost is decided entirely by the
+// injected `ProviderCapabilities`.
 export class OpenAICompatClient implements AIClient {
   private readonly provider: CompatProvider;
+  private readonly pricing: PriceLookup;
+  private readonly capabilities: ProviderCapabilities;
 
-  constructor(
-    baseURL: string,
-    apiKey: string,
-    private readonly pricing: PriceLookup,
-  ) {
+  constructor(opts: {
+    baseURL: string;
+    apiKey: string;
+    pricing: PriceLookup;
+    capabilities: ProviderCapabilities;
+    attribution?: AppAttribution;
+    // Defaults to the proxy-aware fetch. Injectable so tests can assert the
+    // request body the provider package actually produces — the capability gate
+    // is only as good as that contract.
+    fetch?: typeof globalThis.fetch;
+  }) {
+    this.pricing = opts.pricing;
+    this.capabilities = opts.capabilities;
     this.provider = createOpenAICompatible({
       name: PROVIDER_NAME,
-      baseURL,
-      apiKey,
-      fetch: proxiedFetch,
+      baseURL: opts.baseURL,
+      apiKey: opts.apiKey,
+      fetch: opts.fetch ?? proxiedFetch,
+      headers: buildAttributionHeaders(opts.attribution ?? {}),
     });
   }
 
@@ -48,10 +193,11 @@ export class OpenAICompatClient implements AIClient {
     system: string;
     messages: AIMessage[];
     tools: Tool[];
+    routing?: RoutingOptions;
     reasoningEffort?: ReasoningEffort | null;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult> {
-    const [primary] = opts.models;
+    const [primary, ...fallbacks] = opts.models;
     if (!primary) {
       throw new Error(
         `at least one model id is required (got ${opts.models.length})`,
@@ -70,9 +216,11 @@ export class OpenAICompatClient implements AIClient {
       ]),
     );
 
-    const providerOptions = opts.reasoningEffort
-      ? { [PROVIDER_NAME]: { reasoningEffort: opts.reasoningEffort } }
-      : undefined;
+    const compatOptions = buildProviderOptions(this.capabilities, {
+      fallbackModels: fallbacks,
+      routing: opts.routing ?? {},
+      reasoningEffort: opts.reasoningEffort,
+    });
 
     const start = performance.now();
     let outcome: "success" | "error" = "success";
@@ -83,22 +231,30 @@ export class OpenAICompatClient implements AIClient {
         messages: toModelMessages(opts.messages),
         tools: Object.keys(toolMap).length > 0 ? toolMap : undefined,
         stopWhen: stepCountIs(8),
-        providerOptions,
+        providerOptions: compatOptions
+          ? { [PROVIDER_NAME]: compatOptions }
+          : undefined,
+      });
+
+      const { costUsd, priced } = resolveAskCost({
+        caps: this.capabilities,
+        pricing: this.pricing,
+        modelId: primary,
+        steps: result.steps,
+        inputTokens: result.totalUsage.inputTokens ?? 0,
+        outputTokens: result.totalUsage.outputTokens ?? 0,
       });
 
       return {
         text: result.text,
         totalTokens: result.totalUsage.totalTokens ?? 0,
+        // The primary is what spend is attributed to. A gateway that fell back
+        // to a later id in the chain bills that one instead, so the attribution
+        // (not the total) can be off by one model on a fallback — the reported
+        // cost, when there is one, stays correct either way.
         modelId: primary,
-        costUsd: computeCostUsd(
-          this.pricing,
-          primary,
-          result.totalUsage.inputTokens ?? 0,
-          result.totalUsage.outputTokens ?? 0,
-        ),
-        // Null pricing ⇒ cost floored at $0; flag it so the owner knows the
-        // ledger under-counts for this model.
-        priced: this.pricing.getPricing(primary) !== null,
+        costUsd,
+        priced,
       };
     } catch (err) {
       outcome = "error";

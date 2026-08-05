@@ -7,6 +7,7 @@ import { DualWindowLimiter } from "../ratelimit/dual-window";
 import { currentWindowStarts } from "../ratelimit/window";
 import { handleApi } from "./api";
 import { DEFAULT_SETTINGS } from "../shared/types";
+import { capabilitiesFor } from "../ai/provider-profile";
 import type { UsageStatus } from "../ratelimit/window";
 import type { ModelCatalog, ModelInfo } from "../ai/model-catalog";
 
@@ -146,6 +147,142 @@ describe("model validation against the catalogue", () => {
   });
 });
 
+describe("GET /api/provider", () => {
+  test("reports the configured flavor and its capabilities", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/provider", body: null },
+      {
+        ...deps(),
+        provider: {
+          flavor: "openrouter",
+          capabilities: capabilitiesFor("openrouter"),
+        },
+      },
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      flavor: "openrouter",
+      capabilities: capabilitiesFor("openrouter"),
+    });
+  });
+
+  // The admin UI must not offer a control the endpoint would reject, so an
+  // unconfigured server reports the surface that is always safe to send.
+  test("falls back to the generic profile when unconfigured", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/provider", body: null },
+      deps(),
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      flavor: "generic",
+      capabilities: capabilitiesFor("generic"),
+    });
+  });
+
+  test("is admin-only", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/provider", body: null },
+      deps(),
+      guest("99"),
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /api/openrouter/endpoints/:modelId", () => {
+  const stats = { endpoints: [{ provider_name: "DeepInfra" }] };
+
+  test("proxies the per-provider stats for the owner", async () => {
+    const res = await handleApi(
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/anthropic/claude-sonnet-4-5",
+        body: null,
+      },
+      { ...deps(), fetchProviderEndpoints: async () => stats as never },
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(stats);
+  });
+
+  test("passes the un-encoded author/slug pair through to the fetcher", async () => {
+    let seen = "";
+    await handleApi(
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/anthropic/claude-sonnet-4-5",
+        body: null,
+      },
+      {
+        ...deps(),
+        fetchProviderEndpoints: async (slug: string) => {
+          seen = slug;
+          return stats as never;
+        },
+      },
+      owner,
+    );
+    expect(seen).toBe("anthropic/claude-sonnet-4-5");
+  });
+
+  test("rejects a malformed percent-escape with 400, not a 500", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/openrouter/endpoints/%zz", body: null },
+      { ...deps(), fetchProviderEndpoints: async () => stats as never },
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects a malformed permaslug with 400", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/openrouter/endpoints/../secrets", body: null },
+      { ...deps(), fetchProviderEndpoints: async () => stats as never },
+      owner,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // The fetcher is wired only when the profile advertises endpoint stats, so an
+  // absent fetcher *is* the "endpoint doesn't support this" answer.
+  test("returns 503 when the provider has no endpoint stats", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/openrouter/endpoints/gpt-4o", body: null },
+      deps(),
+      owner,
+    );
+    expect(res.status).toBe(503);
+  });
+
+  test("returns a generic 502 when the upstream fetch fails", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/openrouter/endpoints/gpt-4o", body: null },
+      {
+        ...deps(),
+        fetchProviderEndpoints: async () => {
+          throw new Error("boom at /internal/path");
+        },
+      },
+      owner,
+    );
+    expect(res.status).toBe(502);
+    expect(JSON.stringify(res.body)).not.toContain("internal/path");
+  });
+
+  test("is admin-only", async () => {
+    const res = await handleApi(
+      { method: "GET", path: "/api/openrouter/endpoints/gpt-4o", body: null },
+      { ...deps(), fetchProviderEndpoints: async () => stats as never },
+      guest("99"),
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("GET /api/settings", () => {
   test("returns defaults when storage empty", async () => {
     const res = await handleApi({ method: "GET", path: "/api/settings", body: null }, deps(), owner);
@@ -177,6 +314,79 @@ describe("PUT /api/settings", () => {
       "anthropic/claude-3.5-sonnet",
     ]);
     expect(saved?.rateLimit).toEqual(DEFAULT_SETTINGS.rateLimit);
+  });
+
+  test("saves provider routing and the service tier", async () => {
+    const d = deps();
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: {
+          providerSort: "throughput",
+          provider: "deepinfra/fp4",
+          serviceTier: "flex",
+        },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    const saved = await d.storage.getSettings();
+    expect(saved?.providerSort).toBe("throughput");
+    expect(saved?.provider).toBe("deepinfra/fp4");
+    expect(saved?.serviceTier).toBe("flex");
+  });
+
+  test("an explicit null clears routing back to the gateway's own choice", async () => {
+    const d = deps();
+    await d.storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "price",
+      provider: "deepinfra",
+      serviceTier: "priority",
+    });
+    const res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { providerSort: null, provider: null, serviceTier: null },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    const saved = await d.storage.getSettings();
+    expect(saved?.providerSort).toBeNull();
+    expect(saved?.provider).toBeNull();
+    expect(saved?.serviceTier).toBeNull();
+  });
+
+  test("rejects invalid routing with 400 and leaves the stored value alone", async () => {
+    for (const body of [
+      { providerSort: "cheapest" },
+      { provider: "not a slug" },
+      { provider: "a".repeat(101) },
+      { serviceTier: "platinum" },
+    ]) {
+      const d = deps();
+      await d.storage.saveSettings({
+        ...DEFAULT_SETTINGS,
+        providerSort: "price",
+        provider: "deepinfra",
+        serviceTier: "flex",
+      });
+      const res = await handleApi(
+        { method: "PUT", path: "/api/settings", body },
+        d,
+        owner,
+      );
+      expect(res.status).toBe(400);
+      const saved = await d.storage.getSettings();
+      expect(saved?.providerSort).toBe("price");
+      expect(saved?.provider).toBe("deepinfra");
+      expect(saved?.serviceTier).toBe("flex");
+    }
   });
 
   test("rejects an empty models array with 400", async () => {
@@ -1444,6 +1654,69 @@ describe("/api/admin/chats", () => {
     );
     expect(r.status).toBe(200);
     expect((r.body as { settings: object }).settings).toEqual({});
+  });
+
+  test("PUT stores per-chat routing overrides, including an explicit null", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      firstSeenAt: 1,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: {
+          providerSort: "latency",
+          // Explicit null = "ignore the global pin in this chat", which is a
+          // different instruction from omitting the key (inherit it).
+          provider: null,
+          serviceTier: "priority",
+        },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      providerSort: "latency",
+      provider: null,
+      serviceTier: "priority",
+    });
+  });
+
+  test("PUT drops invalid routing overrides rather than storing them", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "group",
+      title: "T",
+      username: null,
+      firstSeenAt: 1,
+      lastSeenAt: 1,
+    });
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: {
+          systemPrompt: "keep",
+          providerSort: "cheapest",
+          provider: "not a slug",
+          serviceTier: "platinum",
+        },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getChatSettings("-100")).toEqual({
+      systemPrompt: "keep",
+    });
   });
 
   test("PUT saves only the override fields, drops invalid models", async () => {

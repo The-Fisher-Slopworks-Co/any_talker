@@ -46,6 +46,12 @@ export function supportsTools(m: ModelInfo): boolean {
   return m.capabilities?.tools === true;
 }
 
+// Undefined when the catalogue gave no basis to judge, so the caller can omit
+// the row instead of rendering an unfounded "No".
+export function supportsCaching(m: ModelInfo): boolean | undefined {
+  return m.capabilities?.caching;
+}
+
 // Pricing is USD per token; render as "$X.XX / 1M". Returns null when unpriced.
 export function formatPricePerMillion(
   pricePerToken: number | undefined,

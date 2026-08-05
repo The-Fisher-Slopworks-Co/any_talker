@@ -3,7 +3,7 @@
 
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
-import type { AIClient, AIMessage } from "./types";
+import type { AIClient, AIMessage, RoutingOptions } from "./types";
 import type { RateLimitConfig } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import { recordSpend } from "../spending/record";
@@ -42,6 +42,10 @@ export type RunAiTurnInput = {
   models: string[];
   systemPrompt: string;
   rateLimit: RateLimitConfig;
+  // Provider routing / service tier from the effective settings, forwarded
+  // untouched. Which parts actually reach the wire is the client's call — it
+  // gates them on what the configured endpoint supports.
+  routing?: RoutingOptions;
 
   // Identity / addressing.
   userId: string;
@@ -104,6 +108,7 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
     }),
     messages: input.messages,
     tools: getAllTools(),
+    routing: input.routing,
     reasoningEffort: input.detailLevel
       ? detailLevelReasoningEffort(input.detailLevel)
       : undefined,

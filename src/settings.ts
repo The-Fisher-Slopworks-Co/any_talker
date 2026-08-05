@@ -9,7 +9,12 @@ import type {
   BudgetConfig,
   AnomalyConfig,
 } from "./shared/types";
-import { DEFAULT_SETTINGS } from "./shared/types";
+import {
+  DEFAULT_SETTINGS,
+  isValidProviderSlug,
+  isValidProviderSort,
+  isValidServiceTier,
+} from "./shared/types";
 
 // Reads a non-negative finite number, falling back to `def`.
 function num(v: unknown, def: number): number {
@@ -133,15 +138,23 @@ function normalize(s: Settings): Settings {
     s.maxRemindersPerUser >= 1
       ? Math.floor(s.maxRemindersPerUser)
       : DEFAULT_SETTINGS.maxRemindersPerUser;
-  // Field-by-field return (no `...s` spread) so legacy OpenRouter-era fields
-  // (providerSort / provider / serviceTier) are dropped on read and never
-  // re-persisted — schema-on-read, no migration.
+  // Routing is validated on read, not just on write: a hand-edited or corrupted
+  // row would otherwise reach the request body, where a bad value fails every
+  // ask rather than one save. Invalid ⇒ null ⇒ the field is simply not sent.
+  const providerSort = isValidProviderSort(s.providerSort) ? s.providerSort : null;
+  const provider = isValidProviderSlug(s.provider) ? s.provider : null;
+  const serviceTier = isValidServiceTier(s.serviceTier) ? s.serviceTier : null;
+  // Field-by-field return (no `...s` spread) so keys no longer in the schema are
+  // dropped on read and never re-persisted — schema-on-read, no migration.
   return {
     systemPrompt:
       typeof s.systemPrompt === "string"
         ? s.systemPrompt
         : DEFAULT_SETTINGS.systemPrompt,
     models,
+    providerSort,
+    provider,
+    serviceTier,
     whitelistEnabled,
     rateLimit,
     budget,
@@ -160,6 +173,13 @@ export function applyChatOverrides(
   return {
     systemPrompt: chat.systemPrompt ?? global.systemPrompt,
     models: chat.models ?? global.models,
+    // `undefined` means "inherit"; an explicit `null` clears the global value
+    // for this chat, so `??` would silently collapse the two.
+    providerSort:
+      chat.providerSort !== undefined ? chat.providerSort : global.providerSort,
+    provider: chat.provider !== undefined ? chat.provider : global.provider,
+    serviceTier:
+      chat.serviceTier !== undefined ? chat.serviceTier : global.serviceTier,
     // Access-gate policy is global, like the rate limit; no per-chat override.
     whitelistEnabled: global.whitelistEnabled,
     // Rate limit is per-user and global; there is no per-chat override.
