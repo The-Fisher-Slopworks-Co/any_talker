@@ -61,6 +61,24 @@ export type AnomalyConfig = {
 // models, ignored by others).
 export type ReasoningEffort = "low" | "high";
 
+// How a multi-provider gateway should pick among the upstreams serving one
+// model. Only meaningful when the configured endpoint advertises the
+// `providerRouting` capability (see `src/ai/provider-profile.ts`).
+export type ProviderSort = "price" | "throughput" | "latency";
+
+export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
+  "price",
+  "throughput",
+  "latency",
+];
+
+// Service tiers trade cost against latency/availability. Omitting the field
+// (null) uses the standard tier; "flex" is cheaper but slower, and "priority" is
+// faster at a higher price.
+export type ServiceTier = "flex" | "priority";
+
+export const SERVICE_TIER_VALUES: readonly ServiceTier[] = ["flex", "priority"];
+
 export type Gender = "male" | "female";
 
 // The four self-service user attributes the AI can read/edit via the
@@ -77,10 +95,18 @@ export type UserSettingChange = { field: UserSettingField; value: string | null 
 
 export type Settings = {
   systemPrompt: string;
-  // Model ids to try, most-preferred first. A generic OpenAI-compatible endpoint
-  // has no server-side fallback chain, so only `models[0]` is sent per request;
-  // the rest are retained for the admin UI / future client-side fallback.
+  // Model ids to try, most-preferred first. The trailing ids form a server-side
+  // fallback chain on a gateway that supports one; against a plain OpenAI-
+  // compatible endpoint only `models[0]` is sent (see `ProviderCapabilities`).
   models: string[];
+  // Provider routing, honoured only by a gateway that advertises it. `null`
+  // leaves the choice to the gateway.
+  providerSort: ProviderSort | null;
+  // Provider slug to pin routing to (e.g. "deepinfra/fp4"). When set it takes
+  // precedence over `providerSort`: the request goes only to this provider with
+  // no fallback.
+  provider: string | null;
+  serviceTier: ServiceTier | null;
   // Whether the user/chat whitelist is enforced as an access gate. When false,
   // anyone may invoke the bot and the USD budget guard + rate limit are the only
   // protection (the whitelist entries are preserved, just not consulted). The
@@ -165,11 +191,17 @@ export type KeywordFilter = {
   keywords: string[];
 };
 
+// Per-chat overrides. `undefined` means "inherit the global value"; an explicit
+// `null` on a nullable field is itself an override — "ignore the global setting
+// in this chat" — so these are never merged with `??`.
 export type ChatSettings = {
   systemPrompt?: string;
   models?: string[];
   botName?: string;
   timezone?: string;
+  providerSort?: ProviderSort | null;
+  provider?: string | null;
+  serviceTier?: ServiceTier | null;
   keywordFilter?: KeywordFilter;
 };
 
@@ -198,6 +230,9 @@ export type GuestThreadNode = {
 export const DEFAULT_SETTINGS: Settings = {
   systemPrompt: "You are a helpful assistant in a Telegram chat. Be concise.",
   models: ["anthropic/claude-sonnet-4-5"],
+  providerSort: null,
+  provider: null,
+  serviceTier: null,
   whitelistEnabled: true,
   rateLimit: {
     fiveHourTokens: 30000,
@@ -259,6 +294,9 @@ export function isEmptyChatSettings(s: ChatSettings): boolean {
     s.models === undefined &&
     s.botName === undefined &&
     s.timezone === undefined &&
+    s.providerSort === undefined &&
+    s.provider === undefined &&
+    s.serviceTier === undefined &&
     s.keywordFilter === undefined
   );
 }
@@ -275,6 +313,26 @@ export function messageMatchesKeyword(
     const needle = kw.normalize("NFC").toLowerCase();
     return needle.length > 0 && haystack.includes(needle);
   });
+}
+
+export function isValidProviderSort(v: unknown): v is ProviderSort {
+  return v === "price" || v === "throughput" || v === "latency";
+}
+
+export function isValidServiceTier(v: unknown): v is ServiceTier {
+  return v === "flex" || v === "priority";
+}
+
+// Provider slugs are lowercase identifiers, optionally with variant/region
+// segments after a slash (e.g. "deepinfra", "deepinfra/fp4",
+// "google-vertex/us-east5"). Validate the shape rather than an allow-list so we
+// don't have to track a gateway's evolving provider catalogue; the value is only
+// ever placed in a JSON body field, so there's no injection surface.
+const PROVIDER_SLUG_RE =
+  /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9._-]*[a-z0-9])?)*$/i;
+
+export function isValidProviderSlug(v: unknown): v is string {
+  return typeof v === "string" && v.length <= 100 && PROVIDER_SLUG_RE.test(v);
 }
 
 export function isValidGender(v: unknown): v is Gender {

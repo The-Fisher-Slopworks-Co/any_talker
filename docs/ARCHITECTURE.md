@@ -42,8 +42,11 @@ Everything persists through one `Storage` interface backed by **KeyDB** (a
 Redis-compatible store) in production and an in-memory double in tests. The AI
 layer wraps the **Vercel AI SDK** + the **`@ai-sdk/openai-compatible` provider**
 (pointed at any OpenAI-compatible endpoint via `OPENAI_BASE_URL`) and exposes a
-registry of tools the model can call. A `ModelCatalog` fetches the endpoint's
-`/v1/models` for the admin picker and for per-request cost. Cross-cutting
+registry of tools the model can call. A **provider profile** decides which
+non-standard extras that endpoint may be sent (fallback chain, provider routing,
+service tier, cost read-back), so one build serves both a plain OpenAI endpoint
+and a richer gateway. A `ModelCatalog` fetches the endpoint's `/v1/models` for
+the admin picker and for per-request cost. Cross-cutting
 concerns (config, logging, metrics, i18n, proxy) are small standalone modules
 injected where needed.
 
@@ -127,11 +130,11 @@ flowchart TB
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
 | `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
-| `src/ai/` | OpenAI-compatible client, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, message (de)serialization, AI types. | `compat-client.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `serialize.ts`, `types.ts` |
+| `src/ai/` | OpenAI-compatible client, provider capability profile, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, message (de)serialization, AI types. | `compat-client.ts`, `provider-profile.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
 | `src/managed-bots/` | Owner-created character bots (Bot API 9.6): lifecycle manager, persona resolver, native-creation handling, avatar + input validation. | `manager.ts`, `persona.ts`, `avatar.ts`, `validate.ts`, `types.ts` |
 | `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests) + the group→supergroup chat-data migration. | `types.ts`, `keydb.ts`, `memory.ts`, `migrate-chat.ts` |
-| `src/webapp/` | HTTP server, JSON API, Telegram initData auth, model-catalogue route. | `server.ts`, `api.ts`, `auth.ts` |
+| `src/webapp/` | HTTP server, JSON API, Telegram initData auth, model-catalogue route, per-provider endpoint-stats proxy. | `server.ts`, `api.ts`, `auth.ts`, `openrouter-proxy.ts` |
 | `src/webapp/ui/` | React + Tailwind admin Mini App (views, components, api client, i18n). | `app.tsx`, `api-client.ts`, `views/`, `components/`, `lib/` |
 | `src/reminders/` | One-shot reminder scheduling, delivery (re-runs the LLM), stored-record validation. | `scheduler.ts`, `delivery.ts`, `parse.ts`, `types.ts` |
 | `src/checks/` | Recurring daily check-ins: schedule math, firing, resolution, counters. | `runner.ts`, `schedule.ts`, `resolve.ts`, `counter.ts`, `validate.ts`, `format.ts`, `callback-data.ts` |
@@ -266,14 +269,26 @@ identity and persona. **Depends on:** `bot`, `storage`, `ratelimit`, `ai`,
 
 ### AI layer — `src/ai/`
 `OpenAICompatClient.ask(...)` wraps the Vercel AI SDK `generateText` + the
-`@ai-sdk/openai-compatible` provider, pointed at `OPENAI_BASE_URL`. It sends only
-`models[0]` (a generic endpoint has no server-side fallback chain),
-passes `reasoningEffort` as a provider option (→ the standard `reasoning_effort`
-body field), maps domain messages to SDK messages (text/image/audio), and runs
-the tool-calling loop bounded by `stepCountIs(8)`. It returns
-`{ text, totalTokens, costUsd }`, where `costUsd` is computed **locally** from
-`inputTokens × promptPrice + outputTokens × completionPrice` using prices from
-`ModelCatalog` (0 when the model is unpriced). `model-catalog.ts`
+`@ai-sdk/openai-compatible` provider, pointed at `OPENAI_BASE_URL`. It maps
+domain messages to SDK messages (text/image/audio) and runs the tool-calling loop
+bounded by `stepCountIs(8)`.
+
+What it sends beyond the standard OpenAI surface is decided by the injected
+`ProviderCapabilities` from **`provider-profile.ts`** — the fallback chain
+(`models`), provider routing (`provider`), `service_tier`, usage accounting, and
+which of the two reasoning spellings to use. On the `generic` profile none of
+that is emitted, because a strict endpoint answers HTTP 400 to an unknown body
+field; the flavour is inferred from the base-URL host and can be pinned with
+`AI_PROVIDER_FLAVOR`. Gateway-specific fields travel through the SDK's
+`providerOptions` passthrough — no second provider package. See
+[`ai-provider.md`](./ai-provider.md).
+
+It returns `{ text, totalTokens, modelId, costUsd, priced }`. `resolveAskCost`
+takes `costUsd` from the gateway's reported `usage.cost` (summed across steps)
+when the profile promises usage accounting, and otherwise computes it **locally**
+from `inputTokens × promptPrice + outputTokens × completionPrice` using prices
+from `ModelCatalog`; `priced` is false when neither source had a number, so the
+spend ledger's blind spot stays visible. `model-catalog.ts`
 (`createModelCatalog`) fetches `GET {OPENAI_BASE_URL}/models` (TTL-cached),
 normalizes both bare-OpenAI and richer-gateway shapes into `ModelInfo`, and
 exposes a `PriceLookup` port to the client, `list()` to the `/api/models` route,
@@ -377,7 +392,14 @@ admin model picker (the browser can't hit a keyed/non-CORS endpoint
 directly), which uses it for `<datalist>` autocomplete and to flag unknown ids;
 the model-writing routes (`PUT /api/settings`, `/api/admin/chats/:id`)
 re-validate against the catalogue (`unknownModels`) and 400 on
-an id not in `/v1/models`. The React UI (`ui/`) is a state-machine SPA (no URL router) using
+an id not in `/v1/models`. Two more admin-only routes serve the provider profile:
+`GET /api/provider` reports the flavour + capabilities so the UI renders only
+controls the endpoint can honour (absent config ⇒ the generic profile, the one
+always safe to send), and `GET /api/openrouter/endpoints/:modelId` proxies
+per-provider price/throughput/latency through `openrouter-proxy.ts` — registered
+with a fetcher only when the profile advertises `endpointStats`, so an absent
+fetcher is itself the "not supported" answer.
+The React UI (`ui/`) is a state-machine SPA (no URL router) using
 local state + a `useLoadable` hook; the Telegram `BackButton` drives navigation.
 See §6 for the request flow. **Depends on:** `storage`,
 `rateLimiter`, `settings`, `build-info`, `metrics`, `ai/model-catalog`.
@@ -605,6 +627,13 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   (chat completions via `@ai-sdk/openai-compatible`); its `GET /v1/models` is also
   proxied through the backend for the Mini App model picker and read for per-request
   cost. Any compliant endpoint works: OpenAI, a self-hosted gateway (LiteLLM, vLLM), etc.
+  A gateway's non-standard extras are sent only where the **provider profile**
+  (`ai/provider-profile.ts`, inferred from the host, overridable with
+  `AI_PROVIDER_FLAVOR`) says they're accepted — see [`ai-provider.md`](./ai-provider.md).
+- **openrouter.ai REST** (`openrouter` profile only) — per-model provider stats
+  for the admin model card: the documented `/api/v1/models/{slug}/endpoints` plus
+  the **undocumented** `/api/frontend/stats/endpoint` for p50 throughput/latency.
+  Best-effort and cached server-side; any failure degrades to "no numbers".
 - **Firecrawl** — powers `search_web` and `youtube_transcript` (optional; gated
   on `FIRECRAWL_API_KEY`).
 - **Telegram Bot API** — via grammY (long polling) plus raw calls for file
@@ -693,15 +722,21 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
 
 ## 12. Key design decisions & trade-offs
 
-- **Provider-neutral OpenAI-compatible client** — the AI layer targets any
+- **Provider-neutral client with a capability gate** — the AI layer targets any
   endpoint via `OPENAI_BASE_URL` + `@ai-sdk/openai-compatible`, not a specific
-  gateway. Consequences of dropping OpenRouter-proprietary features: (1) **no
-  server-side model fallback** — only `models[0]` is sent; (2) **no provider
-  routing / service tier**; (3) **cost is computed locally** from the catalogue's
-  per-token pricing (`PriceLookup`), degrading to $0 when the endpoint's
-  `/v1/models` carries no pricing (a bare OpenAI list). The `ModelCatalog` is the
-  single source for both the admin picker and cost, fetched server-side because a
-  keyed/non-CORS endpoint can't be reached from the browser.
+  gateway, and a `ProviderCapabilities` profile decides what non-standard extras
+  that endpoint may be sent. On `generic`: (1) **no server-side model fallback** —
+  only `models[0]` is sent; (2) **no provider routing / service tier**; (3) **cost
+  is computed locally** from the catalogue's per-token pricing (`PriceLookup`),
+  degrading to $0 (flagged `priced: false`) when the endpoint's `/v1/models`
+  carries no pricing. On `openrouter` all three are available — the fallback
+  chain, `provider` routing and `service_tier` travel through the SDK's
+  `providerOptions` passthrough, and cost is read back from `usage.cost`. The
+  alternative — a second provider package per gateway — was rejected: the
+  passthrough makes one client enough, and the gate is what keeps a strict
+  endpoint from 400-ing on a field it doesn't know. The `ModelCatalog` is the
+  single source for both the admin picker and local cost, fetched server-side
+  because a keyed/non-CORS endpoint can't be reached from the browser.
 - **Voice transcoded to mp3 via ffmpeg** — the OpenAI-compatible `input_audio`
   field accepts only wav/mp3 (it throws on ogg), so Telegram voice notes are
   transcoded at the download boundary; a transcode failure drops the audio part

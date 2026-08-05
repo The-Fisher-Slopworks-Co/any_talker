@@ -2,7 +2,20 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Tool, ToolCallContext } from "./tools/registry";
-import type { ReasoningEffort } from "../shared/types";
+import type {
+  ProviderSort,
+  ReasoningEffort,
+  ServiceTier,
+} from "../shared/types";
+
+// Where the request should be routed and on what tier, as resolved from the
+// effective settings. Honoured only by an endpoint whose profile advertises
+// these capabilities; ignored (never sent) by everything else.
+export type RoutingOptions = {
+  providerSort?: ProviderSort | null;
+  provider?: string | null;
+  serviceTier?: ServiceTier | null;
+};
 
 export type AIUserContentPart =
   | { type: "text"; text: string }
@@ -45,6 +58,7 @@ export interface AIClient {
     system: string;
     messages: AIMessage[];
     tools: Tool[];
+    routing?: RoutingOptions;
     reasoningEffort?: ReasoningEffort | null;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult>;

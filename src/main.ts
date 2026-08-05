@@ -8,6 +8,7 @@ import { DualWindowLimiter } from "./ratelimit/dual-window";
 import { SpendBudgetGuard } from "./budget/guard";
 import { OpenAICompatClient } from "./ai/compat-client";
 import { createModelCatalog } from "./ai/model-catalog";
+import { capabilitiesFor } from "./ai/provider-profile";
 import { registerTool, type Tool } from "./ai/tools/registry";
 import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
@@ -29,6 +30,7 @@ import { createBot } from "./bot";
 import { syncBotCommands } from "./bot/commands";
 import { ALLOWED_UPDATES } from "./bot/allowed-updates";
 import { startServer } from "./webapp/server";
+import { fetchOpenRouterEndpoints } from "./webapp/openrouter-proxy";
 import { BotManager } from "./managed-bots/manager";
 import { createMainPersonaResolver } from "./managed-bots/persona";
 import type { ReminderRuntime } from "./reminders/scheduler";
@@ -59,11 +61,22 @@ async function main() {
   await modelCatalog
     .refresh()
     .catch((err) => console.warn("model catalogue prefetch failed:", err));
-  const ai = new OpenAICompatClient(
-    config.openaiBaseUrl,
-    config.openaiApiKey,
-    modelCatalog,
-  );
+  // What the configured endpoint may be sent beyond the standard OpenAI surface
+  // (fallback chain, provider routing, service tier) and whether its response is
+  // trusted for cost. Shared by the client and the admin API, so the Mini App
+  // only offers what this deployment can actually honour.
+  const capabilities = capabilitiesFor(config.aiProviderFlavor);
+  console.log(`AI provider profile: ${config.aiProviderFlavor}`);
+  const ai = new OpenAICompatClient({
+    baseURL: config.openaiBaseUrl,
+    apiKey: config.openaiApiKey,
+    pricing: modelCatalog,
+    capabilities,
+    attribution: {
+      url: config.openrouterAppUrl,
+      title: config.openrouterAppTitle,
+    },
+  });
 
   const logged = <TIn, TOut>(t: Tool<TIn, TOut>) =>
     withLogging(t, config.logFormat);
@@ -173,6 +186,12 @@ async function main() {
     rateLimiter,
     botManager,
     modelCatalog,
+    provider: { flavor: config.aiProviderFlavor, capabilities },
+    // Wired only when the profile has per-provider stats to fetch, so the route
+    // reports "not supported" by simply having no fetcher behind it.
+    fetchProviderEndpoints: capabilities.endpointStats
+      ? fetchOpenRouterEndpoints
+      : undefined,
   });
   console.log(`HTTP server listening on :${server.port}`);
 

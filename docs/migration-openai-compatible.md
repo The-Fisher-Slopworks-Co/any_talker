@@ -5,10 +5,19 @@ Copyright (C) 2026 The Fisher Slopworks Co
 
 # Migration: OpenRouter → OpenAI-compatible API
 
+> **Superseded in part.** The OpenRouter-specific features listed as removed
+> below (provider routing, service tiers, the model fallback chain, `usage.cost`
+> read-back, attribution headers, endpoint stats) are back, behind a provider
+> capability profile — one build now serves both. Point `OPENAI_BASE_URL` at
+> `https://openrouter.ai/api/v1` and they light up on their own; see
+> [`ai-provider.md`](./ai-provider.md). **BYOK stayed removed.** The env-var
+> steps below still apply.
+
 What you **must** do to deploy this release:
 
 1. **Update `.env`** (gitignored, not changed for you). Remove
-   `OPENROUTER_API_KEY` / `OPENROUTER_APP_URL` / `OPENROUTER_APP_TITLE`, add:
+   `OPENROUTER_API_KEY` — but **keep** `OPENROUTER_APP_URL` / `OPENROUTER_APP_TITLE`
+   if you had them: attribution was restored and those two are read again. Add:
    ```dotenv
    OPENAI_API_KEY=<your key>
    OPENAI_BASE_URL=https://api.openai.com/v1   # any OpenAI-compatible endpoint, incl. /v1
