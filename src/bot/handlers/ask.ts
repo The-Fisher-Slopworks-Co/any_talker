@@ -116,13 +116,24 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   if (!allowed) return { kind: "denied" };
 
   const audios = input.audios ?? [];
+  const hasQuote = input.quote !== null && input.quote.trim() !== "";
   if (
     input.userText.trim() === "" &&
-    input.replyTarget === null &&
+    !hasQuote &&
     input.images.length === 0 &&
     audios.length === 0
   ) {
-    return { kind: "usage" };
+    if (input.replyTarget === null) return { kind: "usage" };
+    // A reply keeps a bare /ask meaningful only when the replied-to message
+    // itself is new content ("what about this?"). Replying into the bot's own
+    // conversation chain adds nothing the model doesn't already have — the
+    // chain IS the context — so it gets the usage hint too, instead of an AI
+    // turn with an empty question.
+    const node = await convStorage.getConversation(
+      input.chatId,
+      input.replyTarget.messageId,
+    );
+    if (node) return { kind: "usage" };
   }
 
   // Persist this turn into the conversation graph under BOTH the bot's reply

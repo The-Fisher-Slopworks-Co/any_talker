@@ -100,6 +100,74 @@ describe("askHandler", () => {
     ]);
   });
 
+  test("usage hint when text is empty and reply is to the bot's own chain", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+    });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        userText: "",
+        replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    expect(out.kind).toBe("usage");
+  });
+
+  test("empty text replying to a foreign message still asks about it", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai,
+        userText: "",
+        replyTarget: {
+          messageId: 7,
+          text: "can you swim in that?",
+          authorFirstName: "Alex",
+          images: [],
+        },
+      }),
+    );
+    expect(out.kind).toBe("answered");
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    expect(sent[0]!.content).toBe(
+      "Context (replied message from Alex): can you swim in that?",
+    );
+  });
+
+  test("quote-only reply into the bot's own chain is a real question, not usage", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1 with details",
+      parentBotMsgId: null,
+      ts: 1,
+    });
+    const out = await askHandler(
+      baseInput({
+        storage,
+        userText: "",
+        quote: "details",
+        replyTarget: {
+          messageId: 100,
+          text: "A1 with details",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+    expect(out.kind).toBe("answered");
+  });
+
   test("rate-limit hit returns rateLimited", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
