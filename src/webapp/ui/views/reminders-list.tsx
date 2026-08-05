@@ -6,6 +6,7 @@ import type { RemindersResponse } from "../api-client";
 import { SectionFooter, SectionHeader, Stack } from "../components/layout";
 import { LoadingState } from "../components/states";
 import { ReminderCard } from "../components/reminder-card";
+import { TimeNote } from "../components/time-note";
 import { useLoadable } from "../lib/use-loadable";
 
 export function RemindersList({
@@ -39,7 +40,9 @@ export function RemindersList({
         onUserClick={onUserClick}
         emptyText={emptyText}
       />
-      <SectionFooter>{footer}</SectionFooter>
+      <SectionFooter>
+        {footer} <TimeNote />
+      </SectionFooter>
     </Stack>
   );
 }

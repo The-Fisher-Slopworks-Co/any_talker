@@ -8,6 +8,7 @@ import "./styles.css";
 import { api, type MeResponse } from "./api-client";
 import { resolveLang, type Lang } from "../../shared/i18n";
 import { I18nProvider, useI18n } from "./i18n-context";
+import { DateFmtProvider } from "./datetime-context";
 import { LoadingState } from "./components/states";
 import { BuildInfoFooter } from "./components/build-info-footer";
 import { adminSection, type Route } from "./lib/routes";
@@ -192,7 +193,12 @@ function App() {
 
   return (
     <I18nProvider lang={lang}>
-      <AppShell me={me} onMe={setMe} />
+      <DateFmtProvider
+        dateFormat={me?.dateFormat ?? null}
+        timezone={me?.timezone ?? null}
+      >
+        <AppShell me={me} onMe={setMe} />
+      </DateFmtProvider>
     </I18nProvider>
   );
 }

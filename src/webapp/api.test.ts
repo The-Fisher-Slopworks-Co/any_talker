@@ -552,6 +552,7 @@ describe("/api/me", () => {
       timezone: null,
       gender: null,
       language: null,
+      dateFormat: null,
     });
   });
 
@@ -568,6 +569,7 @@ describe("/api/me", () => {
       timezone: null,
       gender: null,
       language: null,
+      dateFormat: null,
     });
     const get = await handleApi(
       { method: "GET", path: "/api/me", body: null },
@@ -580,6 +582,7 @@ describe("/api/me", () => {
       timezone: null,
       gender: null,
       language: null,
+      dateFormat: null,
     });
   });
 
@@ -597,6 +600,7 @@ describe("/api/me", () => {
       timezone: null,
       gender: null,
       language: null,
+      dateFormat: null,
     });
     expect(await d.storage.getUserName("42")).toBeNull();
   });
@@ -681,6 +685,7 @@ describe("/api/me", () => {
       timezone: null,
       gender: null,
       language: null,
+      dateFormat: null,
     });
   });
 
@@ -702,6 +707,7 @@ describe("/api/me", () => {
       timezone: "Europe/Moscow",
       gender: null,
       language: null,
+      dateFormat: null,
     });
     expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
   });
@@ -738,6 +744,7 @@ describe("/api/me", () => {
       timezone: null,
       gender: "female",
       language: null,
+      dateFormat: null,
     });
     expect(await d.storage.getUserGender("42")).toBe("female");
   });
@@ -809,6 +816,7 @@ describe("/api/me", () => {
       timezone: "Europe/Moscow",
       gender: "female",
       language: null,
+      dateFormat: null,
     });
     expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
     expect(await d.storage.getUserGender("42")).toBe("female");
@@ -849,6 +857,7 @@ describe("/api/me", () => {
       timezone: "Europe/Moscow",
       gender: "female",
       language: null,
+      dateFormat: null,
     });
   });
 
@@ -884,6 +893,52 @@ describe("/api/me", () => {
     );
     expect(r.status).toBe(200);
     expect(await d.storage.getUserLang("42")).toBeNull();
+  });
+
+  test("PUT accepts a valid date format and persists it", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { dateFormat: "iso" } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { dateFormat: string }).dateFormat).toBe("iso");
+    expect(await d.storage.getUserDateFormat("42")).toBe("iso");
+  });
+
+  test("PUT rejects an unknown date format with 400", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { dateFormat: "fr-FR" } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(400);
+    expect(await d.storage.getUserDateFormat("42")).toBeNull();
+  });
+
+  test("PUT clears date format when null is provided", async () => {
+    const d = deps();
+    await d.storage.setUserDateFormat("42", "ru-RU");
+    const r = await handleApi(
+      { method: "PUT", path: "/api/me", body: { dateFormat: null } },
+      d,
+      guest("42"),
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.getUserDateFormat("42")).toBeNull();
+  });
+
+  test("GET returns the stored date format", async () => {
+    const d = deps();
+    await d.storage.setUserDateFormat("42", "en-GB");
+    const r = await handleApi(
+      { method: "GET", path: "/api/me", body: null },
+      d,
+      guest("42"),
+    );
+    expect((r.body as { dateFormat: string }).dateFormat).toBe("en-GB");
   });
 });
 

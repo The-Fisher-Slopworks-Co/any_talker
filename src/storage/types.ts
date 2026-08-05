@@ -14,6 +14,7 @@ import type {
   Gender,
 } from "../shared/types";
 import type { Lang } from "../shared/i18n";
+import type { DateFormat } from "../shared/date-format";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 import type { ManagedBot } from "../managed-bots/types";
@@ -86,6 +87,11 @@ export interface Storage {
 
   getUserLang(userId: string): Promise<Lang | null>;
   setUserLang(userId: string, lang: Lang | null): Promise<void>;
+
+  // Web App date/time display format preference. `null` = auto (the viewer's
+  // device locale). User-global like the other attributes above.
+  getUserDateFormat(userId: string): Promise<DateFormat | null>;
+  setUserDateFormat(userId: string, format: DateFormat | null): Promise<void>;
 
   // Accrues `costUsd` to the user's spend for the UTC date of `nowMs`. A
   // non-positive cost is a no-op so free/uncosted replies don't create buckets.

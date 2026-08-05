@@ -24,6 +24,7 @@ import {
 } from "../shared/types";
 import { USAGE_RETENTION_SECONDS } from "../ratelimit/window";
 import { isValidLang, type Lang } from "../shared/i18n";
+import { isValidDateFormat, type DateFormat } from "../shared/date-format";
 import type { Reminder } from "../reminders/types";
 import {
   parseStoredReminder,
@@ -341,6 +342,20 @@ export class KeyDBStorage implements Storage {
     const key = `${PREFIX}user_tz:${userId}`;
     if (timezone === null) await this.client.del(key);
     else await this.client.set(key, timezone);
+  }
+
+  async getUserDateFormat(userId: string): Promise<DateFormat | null> {
+    const raw = await this.client.get(`${PREFIX}user_datefmt:${userId}`);
+    return isValidDateFormat(raw) ? raw : null;
+  }
+
+  async setUserDateFormat(
+    userId: string,
+    format: DateFormat | null,
+  ): Promise<void> {
+    const key = `${PREFIX}user_datefmt:${userId}`;
+    if (format === null) await this.client.del(key);
+    else await this.client.set(key, format);
   }
 
   async getUserGender(userId: string): Promise<Gender | null> {
