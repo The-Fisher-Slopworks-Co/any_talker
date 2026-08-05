@@ -108,6 +108,9 @@ async function main() {
     budgetGuard,
     ai,
     resolver: mainResolver,
+    // Decides whether a Telegram clip is sent to the model whole or as sampled
+    // frames — the catalogue knows which models advertise `video` input.
+    supportsVideoInput: (id) => modelCatalog.supportsVideoInput(id),
     // The main bot's family siblings are exactly the managed (character) bots. It
     // never needs the alone-check (it always owns a plain bare `/ask`), but it
     // uses this to recognize a bare `/ask` replying to a *present* character's
@@ -126,6 +129,7 @@ async function main() {
     rateLimiter,
     budgetGuard,
     ai,
+    supportsVideoInput: (id) => modelCatalog.supportsVideoInput(id),
     ownerId: config.botOwnerId,
     mainApi: bot.api,
     mainBotId: String(mainMe.id),

@@ -2,7 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { serializeMessages, deserializeMessages } from "./serialize";
+import {
+  serializeMessages,
+  deserializeMessages,
+  VIDEO_SNAPSHOT_MARKER,
+} from "./serialize";
 import type { AIMessage } from "./types";
 
 describe("serializeMessages / deserializeMessages", () => {
@@ -78,6 +82,41 @@ describe("serializeMessages / deserializeMessages", () => {
     if (audio.type !== "audio") throw new Error();
     expect(Array.from(audio.audio)).toEqual(Array.from(bytes));
     expect(audio.mediaType).toBe("audio/ogg");
+  });
+
+  test("a video part is replaced by a marker, never stored as bytes", () => {
+    // A stored reminder has no TTL and is re-sent verbatim at delivery, so a
+    // 20 MB clip must not end up base64'd inside it.
+    const msgs: AIMessage[] = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "remind me about this" },
+          {
+            type: "video",
+            video: new Uint8Array([0, 1, 2, 3]),
+            mediaType: "video/mp4",
+          },
+        ],
+      },
+    ];
+    const serialized = serializeMessages(msgs);
+    expect(serialized[0]!.content).toEqual([
+      { type: "text", text: "remind me about this" },
+      { type: "text", text: VIDEO_SNAPSHOT_MARKER },
+    ]);
+    expect(JSON.stringify(serialized)).not.toContain("AAECAw");
+
+    // And the marker survives the round trip as ordinary text.
+    expect(deserializeMessages(serialized)).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "remind me about this" },
+          { type: "text", text: VIDEO_SNAPSHOT_MARKER },
+        ],
+      },
+    ]);
   });
 
   test("serialized form is JSON-safe (no Uint8Array)", () => {

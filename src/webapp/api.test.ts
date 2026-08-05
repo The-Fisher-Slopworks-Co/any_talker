@@ -19,6 +19,7 @@ function fakeCatalog(
     list,
     refresh: async () => {},
     getPricing: () => null,
+    supportsVideoInput: async () => false,
     // By default, derive "unknown" from the same list the catalogue exposes, so
     // a test only has to declare the catalogue once. An empty list means the
     // catalogue is unavailable, which the real implementation treats as
