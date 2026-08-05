@@ -189,6 +189,11 @@ export async function guestAskHandler(
       models: settings.models,
       systemPrompt: settings.systemPrompt,
       rateLimit: settings.rateLimit,
+      routing: {
+        providerSort: settings.providerSort,
+        provider: settings.provider,
+        serviceTier: settings.serviceTier,
+      },
       userId: input.userId,
       ownerId: input.ownerId,
       chatId: input.chatId,

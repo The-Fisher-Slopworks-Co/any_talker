@@ -51,6 +51,10 @@ export type ModelInfo = {
     // Input modalities the model accepts, e.g. ["text", "image", "audio"].
     modalities?: string[];
     tools?: boolean;
+    // Prompt caching, inferred from the presence of per-token cache-read/write
+    // prices. Absent when the entry carries no pricing at all — "no data" must
+    // not render as a confident "not supported".
+    caching?: boolean;
   };
 };
 
@@ -176,7 +180,7 @@ export function parseModelEntry(raw: unknown): ModelInfo | null {
   const pricing = parsePricing(r.pricing);
   if (pricing) info.pricing = pricing;
 
-  const capabilities = parseCapabilities(r);
+  const capabilities = parseCapabilities(r, pricing !== null);
   if (capabilities) info.capabilities = capabilities;
 
   return info;
@@ -206,6 +210,9 @@ function parsePricing(raw: unknown): ModelInfo["pricing"] | null {
 
 function parseCapabilities(
   r: Record<string, unknown>,
+  // Whether the entry's pricing block parsed into usable per-token prices. Only
+  // then is the absence of cache prices evidence of anything — see `parseCaching`.
+  hasUsablePricing: boolean,
 ): ModelInfo["capabilities"] | null {
   const arch = r.architecture as { input_modalities?: unknown } | undefined;
   const modalities = Array.isArray(arch?.input_modalities)
@@ -218,9 +225,24 @@ function parseCapabilities(
         (s): s is string => typeof s === "string",
       )
     : null;
-  if (!modalities && !supported) return null;
+  const caching = hasUsablePricing ? parseCaching(r.pricing) : null;
+  if (!modalities && !supported && caching === null) return null;
   const capabilities: NonNullable<ModelInfo["capabilities"]> = {};
   if (modalities) capabilities.modalities = modalities;
   if (supported) capabilities.tools = supported.includes("tools");
+  if (caching !== null) capabilities.caching = caching;
   return capabilities;
+}
+
+// Whether the model supports prompt caching, read off the pricing block: a
+// gateway that quotes a cache-read or cache-write token price is telling us the
+// feature exists. Only asked when the block's own prices parsed — on a source
+// whose pricing we couldn't read, a missing cache price is silence, not a "no".
+function parseCaching(raw: unknown): boolean | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const p = raw as Record<string, unknown>;
+  return (
+    parseTokenPrice(p.input_cache_read) !== null ||
+    parseTokenPrice(p.input_cache_write) !== null
+  );
 }

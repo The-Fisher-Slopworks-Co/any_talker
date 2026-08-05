@@ -2,11 +2,24 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { resolveLogFormat, type LogFormat } from "./log";
+import {
+  detectProviderFlavor,
+  isValidProviderFlavor,
+  PROVIDER_FLAVORS,
+  type ProviderFlavor,
+} from "./ai/provider-profile";
 
 export type Config = {
   botToken: string;
   openaiApiKey: string;
   openaiBaseUrl: string;
+  // Which non-standard surface the endpoint at `openaiBaseUrl` exposes. Inferred
+  // from the host unless `AI_PROVIDER_FLAVOR` names one.
+  aiProviderFlavor: ProviderFlavor;
+  // App attribution headers, credited on gateways that read them. Optional
+  // everywhere: unset simply means the traffic is anonymous.
+  openrouterAppUrl: string | undefined;
+  openrouterAppTitle: string | undefined;
   firecrawlApiKey: string | undefined;
   firecrawlConcurrency: number;
   botOwnerId: string;
@@ -27,10 +40,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const port = env.PORT ? Number(env.PORT) : 8080;
   if (Number.isNaN(port)) throw new Error(`PORT must be a number, got: ${env.PORT}`);
 
+  const openaiBaseUrl = required("OPENAI_BASE_URL");
+
   return {
     botToken: required("BOT_TOKEN"),
     openaiApiKey: required("OPENAI_API_KEY"),
-    openaiBaseUrl: required("OPENAI_BASE_URL"),
+    openaiBaseUrl,
+    aiProviderFlavor: parseProviderFlavor(env.AI_PROVIDER_FLAVOR, openaiBaseUrl),
+    openrouterAppUrl: nonEmptyOrUndefined(env.OPENROUTER_APP_URL),
+    openrouterAppTitle: nonEmptyOrUndefined(env.OPENROUTER_APP_TITLE),
     firecrawlApiKey: nonEmptyOrUndefined(env.FIRECRAWL_API_KEY),
     firecrawlConcurrency: parsePositiveInt("FIRECRAWL_CONCURRENCY", env.FIRECRAWL_CONCURRENCY, 2),
     botOwnerId: required("BOT_OWNER_ID"),
@@ -47,6 +65,25 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 // idiom (which would also collapse "0" / "false" if those were valid values).
 function nonEmptyOrUndefined(v: string | undefined): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+// Unset or "auto" infers the flavor from the base URL; naming one pins it (for a
+// proxy or gateway whose hostname gives nothing away). An unrecognised value is
+// fatal rather than ignored: silently falling back to the wrong profile either
+// fails every request with HTTP 400 or drops routing without a word.
+function parseProviderFlavor(
+  raw: string | undefined,
+  baseUrl: string,
+): ProviderFlavor {
+  if (raw === undefined || raw === "" || raw === "auto") {
+    return detectProviderFlavor(baseUrl);
+  }
+  if (!isValidProviderFlavor(raw)) {
+    throw new Error(
+      `AI_PROVIDER_FLAVOR must be one of ${PROVIDER_FLAVORS.join("/")}/auto, got: ${raw}`,
+    );
+  }
+  return raw;
 }
 
 function parsePositiveInt(name: string, raw: string | undefined, defaultValue: number): number {

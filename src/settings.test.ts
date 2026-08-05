@@ -52,6 +52,9 @@ describe("applyChatOverrides", () => {
     expect(r).toEqual({
       systemPrompt: "p",
       models: ["x"],
+      providerSort: DEFAULT_SETTINGS.providerSort,
+      provider: DEFAULT_SETTINGS.provider,
+      serviceTier: DEFAULT_SETTINGS.serviceTier,
       // Access-gate policy is global — chat settings never override it.
       whitelistEnabled: DEFAULT_SETTINGS.whitelistEnabled,
       // Rate limit is per-user and global — chat settings never override it.
@@ -65,6 +68,37 @@ describe("applyChatOverrides", () => {
       // Reminder cap is global policy too — never overridden per chat.
       maxRemindersPerUser: DEFAULT_SETTINGS.maxRemindersPerUser,
     });
+  });
+
+  // `undefined` means "not overridden"; an explicit `null` is a real override
+  // that clears the global value for this chat. `??` would collapse the two.
+  test("distinguishes an explicit null routing override from an absent one", () => {
+    const global = {
+      ...DEFAULT_SETTINGS,
+      providerSort: "price" as const,
+      provider: "deepinfra",
+      serviceTier: "flex" as const,
+    };
+    const inherited = applyChatOverrides(global, { systemPrompt: "x" });
+    expect(inherited.providerSort).toBe("price");
+    expect(inherited.provider).toBe("deepinfra");
+    expect(inherited.serviceTier).toBe("flex");
+
+    const cleared = applyChatOverrides(global, {
+      providerSort: null,
+      provider: null,
+      serviceTier: null,
+    });
+    expect(cleared.providerSort).toBeNull();
+    expect(cleared.provider).toBeNull();
+    expect(cleared.serviceTier).toBeNull();
+  });
+
+  test("a chat may pin its own provider over the global sort", () => {
+    const global = { ...DEFAULT_SETTINGS, providerSort: "price" as const };
+    const r = applyChatOverrides(global, { provider: "together" });
+    expect(r.provider).toBe("together");
+    expect(r.providerSort).toBe("price");
   });
 
   test("chat settings never override the global rate limit", () => {
@@ -147,18 +181,47 @@ describe("applyChatOverrides", () => {
     expect(s.whitelistEnabled).toBe(false);
   });
 
-  test("normalize drops legacy OpenRouter-era fields on read", async () => {
+  test("normalize preserves stored provider routing", async () => {
     const storage = new MemoryStorage();
     await storage.saveSettings({
       ...DEFAULT_SETTINGS,
       providerSort: "throughput",
       provider: "deepinfra/fp4",
       serviceTier: "flex",
+    });
+    const s = await getOrInitSettings(storage);
+    expect(s.providerSort).toBe("throughput");
+    expect(s.provider).toBe("deepinfra/fp4");
+    expect(s.serviceTier).toBe("flex");
+  });
+
+  // Schema-on-read: a hand-edited or corrupted row must not reach the request
+  // body, where a bad value would fail every ask instead of one save.
+  test("normalize nulls out invalid stored provider routing", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      providerSort: "cheapest",
+      provider: "not a slug",
+      serviceTier: "platinum",
     } as never);
-    const s = (await getOrInitSettings(storage)) as Record<string, unknown>;
-    expect(s.providerSort).toBeUndefined();
-    expect(s.provider).toBeUndefined();
-    expect(s.serviceTier).toBeUndefined();
+    const s = await getOrInitSettings(storage);
+    expect(s.providerSort).toBeNull();
+    expect(s.provider).toBeNull();
+    expect(s.serviceTier).toBeNull();
+  });
+
+  test("normalize defaults routing to null on rows that predate it", async () => {
+    const storage = new MemoryStorage();
+    const legacy = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
+    delete legacy.providerSort;
+    delete legacy.provider;
+    delete legacy.serviceTier;
+    await storage.saveSettings(legacy as never);
+    const s = await getOrInitSettings(storage);
+    expect(s.providerSort).toBeNull();
+    expect(s.provider).toBeNull();
+    expect(s.serviceTier).toBeNull();
   });
 
   test("normalize backfills the dual-window config from a legacy token-bucket shape", async () => {

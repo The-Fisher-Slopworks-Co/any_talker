@@ -4,7 +4,13 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import type { Chat, ChatSettings, Settings } from "../../../../shared/types";
+import type {
+  Chat,
+  ChatSettings,
+  ProviderSort,
+  ServiceTier,
+  Settings,
+} from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
@@ -15,7 +21,15 @@ import { LoadingState } from "../../components/states";
 import { SaveButton, Toggle } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { OverrideSection } from "../../components/override-section";
+import { ProviderSortField } from "../../components/provider-sort-field";
+import { ProviderSelectField } from "../../components/provider-select-field";
+import { ServiceTierField } from "../../components/service-tier-field";
 import { TimezoneSelect } from "../../components/timezone-select";
+import {
+  fetchProviderProfile,
+  GENERIC_PROFILE,
+  type ProviderCapabilities,
+} from "../../provider-capabilities";
 import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
 import {
   INPUT_CLS,
@@ -24,6 +38,7 @@ import {
   ROW_VALUE_CLS,
 } from "../../components/row";
 import { chatTitle } from "../../lib/labels";
+import { buildChatSettingsPayload } from "../../lib/chat-settings-payload";
 
 export function ChatEditView({ chatId }: { chatId: string }) {
   const { t: s } = useI18n();
@@ -39,8 +54,19 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   const [botNameValue, setBotNameValue] = useState("");
   const [tzOverride, setTzOverride] = useState(false);
   const [tzValue, setTzValue] = useState("UTC");
+  const [psOverride, setPsOverride] = useState(false);
+  const [psValue, setPsValue] = useState<ProviderSort | null>(null);
+  const [provOverride, setProvOverride] = useState(false);
+  const [provValue, setProvValue] = useState<string | null>(null);
+  const [stOverride, setStOverride] = useState(false);
+  const [stValue, setStValue] = useState<ServiceTier | null>(null);
   const [kfEnabled, setKfEnabled] = useState(false);
   const [kfValue, setKfValue] = useState("");
+  // Routing sections render only where the endpoint can honour them; until the
+  // profile arrives, assume the surface that is always safe.
+  const [caps, setCaps] = useState<ProviderCapabilities>(
+    GENERIC_PROFILE.capabilities,
+  );
 
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -60,16 +86,45 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         setBotNameValue(d.settings.botName ?? "");
         setTzOverride(d.settings.timezone !== undefined);
         setTzValue(d.settings.timezone ?? g.timezone);
+        // `??` won't do here: an override may legitimately *be* null, which is
+        // a different state from having no override at all.
+        setPsOverride(d.settings.providerSort !== undefined);
+        setPsValue(
+          d.settings.providerSort !== undefined
+            ? d.settings.providerSort
+            : g.providerSort,
+        );
+        setProvOverride(d.settings.provider !== undefined);
+        setProvValue(
+          d.settings.provider !== undefined ? d.settings.provider : g.provider,
+        );
+        setStOverride(d.settings.serviceTier !== undefined);
+        setStValue(
+          d.settings.serviceTier !== undefined
+            ? d.settings.serviceTier
+            : g.serviceTier,
+        );
         setKfEnabled(d.settings.keywordFilter?.enabled ?? false);
         setKfValue((d.settings.keywordFilter?.keywords ?? []).join(", "));
       })
       .catch(() => setNotFound(true));
   }, [chatId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchProviderProfile().then((p) => {
+      if (!cancelled) setCaps(p.capabilities);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (notFound) return <LoadingState text={s.ui_chat_not_found} />;
   if (!chat || !global || !original) return <LoadingState />;
 
-  const trimmedModels = modelsValue
+  // Only the ids the card actually shows — see the same note in prompt-tab.
+  const trimmedModels = (caps.modelFallback ? modelsValue : modelsValue.slice(0, 1))
     .map((m) => m.trim())
     .filter((m) => m.length > 0);
   const trimmedBotName = botNameValue.trim();
@@ -78,20 +133,28 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     .map((k) => k.trim())
     .filter((k) => k.length > 0);
 
-  const buildPayload = (): ChatSettings => {
-    const next: ChatSettings = {};
-    if (promptOverride) next.systemPrompt = promptValue;
-    if (modelsOverride && trimmedModels.length > 0) next.models = trimmedModels;
-    if (trimmedBotName.length > 0) next.botName = trimmedBotName;
-    if (tzOverride) next.timezone = tzValue;
-    if (kfEnabled || parsedKeywords.length > 0) {
-      next.keywordFilter = {
-        enabled: kfEnabled,
+  const buildPayload = (): ChatSettings =>
+    buildChatSettingsPayload(
+      {
+        promptOverride,
+        promptValue,
+        modelsOverride,
+        models: trimmedModels,
+        botName: trimmedBotName,
+        tzOverride,
+        tzValue,
+        psOverride,
+        psValue,
+        provOverride,
+        provValue,
+        stOverride,
+        stValue,
+        kfEnabled,
         keywords: parsedKeywords,
-      };
-    }
-    return next;
-  };
+      },
+      caps,
+      original,
+    );
 
   const payload = buildPayload();
   const wasOverridden = (key: keyof ChatSettings) => original[key] !== undefined;
@@ -99,10 +162,16 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     promptOverride !== wasOverridden("systemPrompt") ||
     modelsOverride !== wasOverridden("models") ||
     tzOverride !== wasOverridden("timezone") ||
+    (caps.providerRouting && psOverride !== wasOverridden("providerSort")) ||
+    (caps.providerRouting && provOverride !== wasOverridden("provider")) ||
+    (caps.serviceTier && stOverride !== wasOverridden("serviceTier")) ||
     (promptOverride && payload.systemPrompt !== original.systemPrompt) ||
     (modelsOverride &&
       JSON.stringify(payload.models) !== JSON.stringify(original.models)) ||
     (tzOverride && payload.timezone !== original.timezone) ||
+    (psOverride && payload.providerSort !== original.providerSort) ||
+    (provOverride && payload.provider !== original.provider) ||
+    (stOverride && payload.serviceTier !== original.serviceTier) ||
     trimmedBotName !== (original.botName ?? "") ||
     JSON.stringify(payload.keywordFilter ?? null) !==
       JSON.stringify(original.keywordFilter ?? null);
@@ -123,6 +192,24 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       setBotNameValue(result.settings.botName ?? "");
       setTzOverride(result.settings.timezone !== undefined);
       setTzValue(result.settings.timezone ?? global.timezone);
+      setPsOverride(result.settings.providerSort !== undefined);
+      setPsValue(
+        result.settings.providerSort !== undefined
+          ? result.settings.providerSort
+          : global.providerSort,
+      );
+      setProvOverride(result.settings.provider !== undefined);
+      setProvValue(
+        result.settings.provider !== undefined
+          ? result.settings.provider
+          : global.provider,
+      );
+      setStOverride(result.settings.serviceTier !== undefined);
+      setStValue(
+        result.settings.serviceTier !== undefined
+          ? result.settings.serviceTier
+          : global.serviceTier,
+      );
       setKfEnabled(result.settings.keywordFilter?.enabled ?? false);
       setKfValue((result.settings.keywordFilter?.keywords ?? []).join(", "));
     } finally {
@@ -207,7 +294,9 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         onToggle={setModelsOverride}
         footer={
           modelsOverride
-            ? s.ui_chat_models_on_footer
+            ? caps.modelFallback
+              ? s.ui_chat_models_fallback_footer
+              : s.ui_chat_models_on_footer
             : s.ui_chat_models_off_footer(global.models.join(", "))
         }
       >
@@ -215,6 +304,12 @@ export function ChatEditView({ chatId }: { chatId: string }) {
           models={modelsValue}
           onChange={setModelsValue}
           onValidityChange={setModelsValid}
+          fallback={caps.modelFallback}
+          providerSort={
+            caps.endpointStats
+              ? (psOverride ? psValue : global.providerSort)
+              : null
+          }
         />
       </OverrideSection>
 
@@ -230,6 +325,63 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       >
         <TimezoneSelect value={tzValue} onChange={setTzValue} />
       </OverrideSection>
+
+      {caps.providerRouting && (
+        <>
+          <OverrideSection
+            title={s.ui_chat_provider_routing}
+            override={psOverride}
+            onToggle={setPsOverride}
+            footer={
+              psOverride
+                ? s.ui_chat_provider_routing_on_footer
+                : s.ui_chat_provider_routing_off_footer(
+                    global.providerSort ?? s.ui_sort_default,
+                  )
+            }
+          >
+            <ProviderSortField value={psValue} onChange={setPsValue} />
+          </OverrideSection>
+
+          <OverrideSection
+            title={s.ui_chat_provider}
+            override={provOverride}
+            onToggle={setProvOverride}
+            footer={
+              provOverride
+                ? s.ui_chat_provider_on_footer
+                : s.ui_chat_provider_off_footer(
+                    global.provider ?? s.ui_provider_auto,
+                  )
+            }
+          >
+            <ProviderSelectField
+              modelId={
+                (modelsOverride ? trimmedModels[0] : global.models[0]) ?? ""
+              }
+              value={provValue}
+              onChange={setProvValue}
+            />
+          </OverrideSection>
+        </>
+      )}
+
+      {caps.serviceTier && (
+        <OverrideSection
+          title={s.ui_chat_service_tier}
+          override={stOverride}
+          onToggle={setStOverride}
+          footer={
+            stOverride
+              ? s.ui_chat_service_tier_on_footer
+              : s.ui_chat_service_tier_off_footer(
+                  global.serviceTier ?? s.ui_tier_default,
+                )
+          }
+        >
+          <ServiceTierField value={stValue} onChange={setStValue} />
+        </OverrideSection>
+      )}
 
       <SectionHeader>{s.ui_chat_keyword_filter}</SectionHeader>
       <Card>
