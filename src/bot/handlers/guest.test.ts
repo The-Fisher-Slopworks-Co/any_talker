@@ -260,6 +260,150 @@ describe("guestAskHandler", () => {
     ]);
   });
 
+  test("mismatched thread is dropped: reply to another conversation's answer uses the fallback", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    // The replier's own thread ends in "пока", but they replied to a bot
+    // answer from a different conversation ("Привет").
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Пока", botAnswer: "пока" }],
+      ts: 500,
+    };
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        replyTarget: { messageId: 7, text: "Привет", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      { role: "user", content: "Context (replied message from Bot): Привет" },
+      {
+        role: "user",
+        content: JSON.stringify({ author: "Jane", text: "hello" }),
+      },
+    ]);
+  });
+
+  test("mismatched thread: persistThread starts a fresh thread without the stale turns", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "fresh answer", totalTokens: 1 });
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Пока", botAnswer: "пока" }],
+      ts: 500,
+    };
+    const out = await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        now: 2000,
+        replyTarget: { messageId: 7, text: "Привет", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    if (out.kind !== "answered") throw new Error("expected answered");
+    await out.persistThread();
+    const stored = await storage.getGuestThread("c1");
+    expect(stored?.turns).toEqual([
+      {
+        userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
+        botAnswer: "fresh answer",
+      },
+    ]);
+  });
+
+  test("thread survives rendering differences (markdown stripped, bot-name prefix added)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "**Привет,** _Jane_!" }],
+      ts: 500,
+    };
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        // What Telegram shows: bot-name prefix + rendered body, markdown gone.
+        replyTarget: {
+          messageId: 7,
+          text: "Helper\n\nПривет, Jane!",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "**Привет,** _Jane_!" },
+      {
+        role: "user",
+        content: JSON.stringify({ author: "Jane", text: "hello" }),
+      },
+    ]);
+  });
+
+  test("reply to a text-less bot message drops the thread (nothing to verify against)", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "A1" }],
+      ts: 500,
+    };
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        replyTarget: { messageId: 7, text: null, authorFirstName: "Bot", images: [] },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages[0]).toEqual({
+      role: "user",
+      content: "Context (replied message from Bot): <media>",
+    });
+  });
+
+  test("emoji-only answer is unverifiable: the thread is kept", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    const priorThread = {
+      chatId: "c1",
+      turns: [{ userQuestion: "Q1", botAnswer: "👍" }],
+      ts: 500,
+    };
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread,
+        replyTarget: { messageId: 7, text: "👍", authorFirstName: "Bot", images: [] },
+      }),
+    );
+    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    expect(call.messages).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "👍" },
+      {
+        role: "user",
+        content: JSON.stringify({ author: "Jane", text: "hello" }),
+      },
+    ]);
+  });
+
   test("empty text with a replyTarget is answered, not denied (bare-mention reply)", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
