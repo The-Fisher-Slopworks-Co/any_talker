@@ -57,6 +57,31 @@ const baseInput = (overrides: Partial<RunAiTurnInput> = {}): RunAiTurnInput => {
 describe("runAiTurn — request assembly", () => {
   afterEach(() => _resetRegistryForTest());
 
+  test("forwards the caller's provider routing to the client", async () => {
+    const ai = new FakeAI();
+    await runAiTurn(
+      baseInput({
+        ai,
+        routing: {
+          providerSort: "price",
+          provider: "deepinfra",
+          serviceTier: "flex",
+        },
+      }),
+    );
+    expect(ai.calls[0]?.routing).toEqual({
+      providerSort: "price",
+      provider: "deepinfra",
+      serviceTier: "flex",
+    });
+  });
+
+  test("omits routing entirely when the caller has none", async () => {
+    const ai = new FakeAI();
+    await runAiTurn(baseInput({ ai }));
+    expect(ai.calls[0]?.routing).toBeUndefined();
+  });
+
   test("wires every registered tool into the ai.ask call", async () => {
     _resetRegistryForTest();
     const dummy: Tool = {

@@ -190,9 +190,31 @@ type Strings = {
   ui_prompt_timezone_footer: string;
   ui_prompt_expandable_threshold: string;
   ui_prompt_expandable_threshold_footer: string;
+  // Shown only when the configured provider supports server-side fallback.
+  ui_prompt_models_fallback_footer: string;
+  ui_prompt_provider_routing: string;
+  ui_prompt_provider_routing_footer: string;
+  ui_prompt_service_tier: string;
+  ui_prompt_service_tier_footer: string;
 
   ui_models_model_id: string;
   ui_models_not_in_catalog: string;
+  ui_models_fallback_n: (n: number) => string;
+  ui_models_remove_fallback: string;
+  ui_models_add_fallback: string;
+
+  ui_sort_default: string;
+  ui_sort_price: string;
+  ui_sort_throughput: string;
+  ui_sort_latency: string;
+
+  ui_provider_label: string;
+  ui_provider_auto: string;
+  ui_provider_loading: string;
+
+  ui_tier_default: string;
+  ui_tier_flex: string;
+  ui_tier_priority: string;
 
   ui_modelinfo_loading: string;
   ui_modelinfo_input: string;
@@ -200,6 +222,12 @@ type Strings = {
   ui_modelinfo_image: string;
   ui_modelinfo_modalities: string;
   ui_modelinfo_tools: string;
+  ui_modelinfo_caching: string;
+  ui_modelinfo_resolving_provider: string;
+  ui_modelinfo_no_provider_data: (sort: string) => string;
+  ui_modelinfo_provider_prefix: string;
+  ui_modelinfo_tokps: string;
+  ui_modelinfo_ms: string;
 
   ui_ratelimit_limits: string;
   ui_ratelimit_5h_tokens: string;
@@ -256,7 +284,18 @@ type Strings = {
   ui_chat_system_prompt_off_footer: (chars: number) => string;
   ui_chat_models: string;
   ui_chat_models_on_footer: string;
+  // Replaces the above when the provider supports a server-side fallback chain.
+  ui_chat_models_fallback_footer: string;
   ui_chat_models_off_footer: (list: string) => string;
+  ui_chat_provider_routing: string;
+  ui_chat_provider_routing_on_footer: string;
+  ui_chat_provider_routing_off_footer: (sort: string) => string;
+  ui_chat_provider: string;
+  ui_chat_provider_on_footer: string;
+  ui_chat_provider_off_footer: (provider: string) => string;
+  ui_chat_service_tier: string;
+  ui_chat_service_tier_on_footer: string;
+  ui_chat_service_tier_off_footer: (tier: string) => string;
   ui_chat_tz: string;
   ui_chat_tz_on_footer: string;
   ui_chat_tz_off_footer: (tz: string) => string;
@@ -640,9 +679,33 @@ const en: Strings = {
   ui_prompt_expandable_threshold: "Collapse threshold",
   ui_prompt_expandable_threshold_footer:
     "Replies longer than this many characters are hidden under an expandable quote. Set to 0 to collapse everything.",
+  ui_prompt_models_fallback_footer:
+    "Primary model first; fallbacks are tried in order if it fails.",
+  ui_prompt_provider_routing: "Provider Routing",
+  ui_prompt_provider_routing_footer:
+    "How the gateway picks a provider for the model. Auto leaves it to the gateway; the others sort by price, throughput, or latency. Pinning a provider overrides the sort and disables fallback.",
+  ui_prompt_service_tier: "Service Tier",
+  ui_prompt_service_tier_footer:
+    "Processing tier for requests. Default is standard processing; Flex is cheaper but slower with lower availability; Priority is faster at a higher cost.",
 
   ui_models_model_id: "Model ID",
   ui_models_not_in_catalog: "This model isn’t in /v1/models.",
+  ui_models_fallback_n: (n) => `#${n}`,
+  ui_models_remove_fallback: "Remove fallback",
+  ui_models_add_fallback: "Add fallback",
+
+  ui_sort_default: "Auto",
+  ui_sort_price: "Price",
+  ui_sort_throughput: "Throughput",
+  ui_sort_latency: "Latency",
+
+  ui_provider_label: "Provider",
+  ui_provider_auto: "Auto (use sort)",
+  ui_provider_loading: "Loading providers…",
+
+  ui_tier_default: "Default",
+  ui_tier_flex: "Flex",
+  ui_tier_priority: "Priority",
 
   ui_modelinfo_loading: "Loading model info…",
   ui_modelinfo_input: "Input",
@@ -650,6 +713,13 @@ const en: Strings = {
   ui_modelinfo_image: "Image",
   ui_modelinfo_modalities: "Modalities",
   ui_modelinfo_tools: "Tools",
+  ui_modelinfo_caching: "Caching",
+  ui_modelinfo_resolving_provider: "Resolving provider…",
+  ui_modelinfo_no_provider_data: (sort) =>
+    `No provider data for sort=${sort}; showing catalogue values.`,
+  ui_modelinfo_provider_prefix: "Provider: ",
+  ui_modelinfo_tokps: "tok/s",
+  ui_modelinfo_ms: "ms",
 
   ui_ratelimit_limits: "Limits",
   ui_ratelimit_5h_tokens: "5-hour limit",
@@ -687,7 +757,7 @@ const en: Strings = {
   ui_spending_month: "Last 30 days",
   ui_spending_month_short: (amount) => `30d: ${amount}`,
   ui_spending_footer:
-    "Money spent on AI requests, in USD, computed from model pricing. Periods are trailing windows by UTC date.",
+    "Money spent on AI requests, in USD — the provider's own reported cost where it gives one, otherwise computed from model pricing. Periods are trailing windows by UTC date.",
 
   ui_chats_all: "All Chats",
   ui_chats_empty: "No chats yet — they appear after the first message.",
@@ -713,7 +783,22 @@ const en: Strings = {
     `Using global character (${chars} chars).`,
   ui_chat_models: "Models",
   ui_chat_models_on_footer: "Model used for this chat.",
+  ui_chat_models_fallback_footer:
+    "Models used for this chat — primary first; fallbacks are tried in order if it fails.",
   ui_chat_models_off_footer: (list) => `Using global: ${list}`,
+  ui_chat_provider_routing: "Provider Routing",
+  ui_chat_provider_routing_on_footer:
+    "How the gateway picks a provider for the model in this chat.",
+  ui_chat_provider_routing_off_footer: (sort) =>
+    `Using global routing (${sort}).`,
+  ui_chat_provider: "Specific Provider",
+  ui_chat_provider_on_footer:
+    "Pin requests in this chat to one provider (no fallback), overriding the sort.",
+  ui_chat_provider_off_footer: (provider) =>
+    `Using global provider (${provider}).`,
+  ui_chat_service_tier: "Service Tier",
+  ui_chat_service_tier_on_footer: "Processing tier for requests in this chat.",
+  ui_chat_service_tier_off_footer: (tier) => `Using global tier (${tier}).`,
   ui_chat_tz: "Timezone",
   ui_chat_tz_on_footer: "Used unless a user has set their own timezone.",
   ui_chat_tz_off_footer: (tz) => `Using global timezone (${tz}).`,
@@ -1056,9 +1141,33 @@ const ru: Strings = {
   ui_prompt_expandable_threshold: "Порог сворачивания",
   ui_prompt_expandable_threshold_footer:
     "Ответы длиннее указанного числа символов прячутся под раскрывающуюся цитату. 0 — сворачивать всегда.",
+  ui_prompt_models_fallback_footer:
+    "Сначала основная модель; запасные пробуются по очереди при ошибке.",
+  ui_prompt_provider_routing: "Маршрутизация провайдеров",
+  ui_prompt_provider_routing_footer:
+    "Как шлюз выбирает провайдера для модели. «Авто» — выбор за шлюзом; остальные сортируют по цене, скорости или задержке. Закрепление провайдера отменяет сортировку и отключает запасные варианты.",
+  ui_prompt_service_tier: "Тариф обслуживания",
+  ui_prompt_service_tier_footer:
+    "Тариф обработки запросов. «По умолчанию» — стандартная обработка; Flex дешевле, но медленнее и менее доступен; Priority быстрее, но дороже.",
 
   ui_models_model_id: "ID модели",
   ui_models_not_in_catalog: "Этой модели нет в /v1/models.",
+  ui_models_fallback_n: (n) => `#${n}`,
+  ui_models_remove_fallback: "Удалить запасную",
+  ui_models_add_fallback: "Добавить запасную",
+
+  ui_sort_default: "Авто",
+  ui_sort_price: "Цена",
+  ui_sort_throughput: "Скорость",
+  ui_sort_latency: "Задержка",
+
+  ui_provider_label: "Провайдер",
+  ui_provider_auto: "Авто (по сортировке)",
+  ui_provider_loading: "Загрузка провайдеров…",
+
+  ui_tier_default: "По умолчанию",
+  ui_tier_flex: "Flex",
+  ui_tier_priority: "Priority",
 
   ui_modelinfo_loading: "Загрузка информации о модели…",
   ui_modelinfo_input: "Ввод",
@@ -1066,6 +1175,13 @@ const ru: Strings = {
   ui_modelinfo_image: "Изображение",
   ui_modelinfo_modalities: "Модальности",
   ui_modelinfo_tools: "Инструменты",
+  ui_modelinfo_caching: "Кэширование",
+  ui_modelinfo_resolving_provider: "Определяем провайдера…",
+  ui_modelinfo_no_provider_data: (sort) =>
+    `Нет данных провайдера для сортировки sort=${sort}; показаны значения каталога.`,
+  ui_modelinfo_provider_prefix: "Провайдер: ",
+  ui_modelinfo_tokps: "ток/с",
+  ui_modelinfo_ms: "мс",
 
   ui_ratelimit_limits: "Лимиты",
   ui_ratelimit_5h_tokens: "Лимит за 5 часов",
@@ -1104,7 +1220,7 @@ const ru: Strings = {
   ui_spending_month: "За 30 дней",
   ui_spending_month_short: (amount) => `30д: ${amount}`,
   ui_spending_footer:
-    "Деньги, потраченные на запросы к ИИ, в USD, рассчитанные по ценам моделей. Периоды — скользящие окна по датам UTC.",
+    "Деньги, потраченные на запросы к ИИ, в USD: стоимость, которую сообщил провайдер, либо расчёт по ценам моделей, если он её не сообщает. Периоды — скользящие окна по датам UTC.",
 
   ui_chats_all: "Все чаты",
   ui_chats_empty: "Чатов пока нет — они появятся после первого сообщения.",
@@ -1130,7 +1246,24 @@ const ru: Strings = {
     `Используется глобальный персонаж (${chars} симв.).`,
   ui_chat_models: "Модели",
   ui_chat_models_on_footer: "Модель, используемая для этого чата.",
+  ui_chat_models_fallback_footer:
+    "Модели для этого чата: сначала основная, запасные пробуются по очереди при ошибке.",
   ui_chat_models_off_footer: (list) => `Используется глобально: ${list}`,
+  ui_chat_provider_routing: "Маршрутизация провайдеров",
+  ui_chat_provider_routing_on_footer:
+    "Как шлюз выбирает провайдера для модели в этом чате.",
+  ui_chat_provider_routing_off_footer: (sort) =>
+    `Используется глобальная маршрутизация (${sort}).`,
+  ui_chat_provider: "Конкретный провайдер",
+  ui_chat_provider_on_footer:
+    "Закрепить запросы этого чата за одним провайдером (без запасных), игнорируя сортировку.",
+  ui_chat_provider_off_footer: (provider) =>
+    `Используется глобальный провайдер (${provider}).`,
+  ui_chat_service_tier: "Тариф обслуживания",
+  ui_chat_service_tier_on_footer:
+    "Тариф обработки запросов в этом чате.",
+  ui_chat_service_tier_off_footer: (tier) =>
+    `Используется глобальный тариф (${tier}).`,
   ui_chat_tz: "Часовой пояс",
   ui_chat_tz_on_footer:
     "Используется, если у пользователя нет своего пояса.",

@@ -26,8 +26,60 @@ describe("parseModelEntry", () => {
         completionPerToken: 0.000015,
         imagePerToken: 0.0048,
       },
-      capabilities: { modalities: ["text", "image"], tools: true },
+      capabilities: {
+        modalities: ["text", "image"],
+        tools: true,
+        // Readable pricing that quotes no cache prices is a real "no".
+        caching: false,
+      },
     });
+  });
+
+  // A gateway that quotes separate cache-read/write token prices is, by that
+  // very fact, telling us the model supports prompt caching.
+  test("infers prompt caching from per-token cache prices", () => {
+    const withRead = parseModelEntry({
+      id: "m",
+      pricing: {
+        prompt: "0.000003",
+        completion: "0.000015",
+        input_cache_read: "0.0000003",
+      },
+    });
+    expect(withRead?.capabilities?.caching).toBe(true);
+
+    const withWrite = parseModelEntry({
+      id: "m",
+      pricing: {
+        prompt: "0.000003",
+        completion: "0.000015",
+        input_cache_write: "0.00000375",
+      },
+    });
+    expect(withWrite?.capabilities?.caching).toBe(true);
+  });
+
+  test("reports caching as unsupported when no cache price is quoted", () => {
+    const info = parseModelEntry({
+      id: "m",
+      pricing: { prompt: "0.000003", completion: "0.000015" },
+      supported_parameters: ["tools"],
+    });
+    expect(info?.capabilities?.caching).toBe(false);
+  });
+
+  // A bare OpenAI entry says nothing either way, and "no data" must not be
+  // rendered as a confident "no".
+  test("leaves caching unknown when the entry carries no pricing at all", () => {
+    expect(parseModelEntry({ id: "gpt-4o" })?.capabilities).toBeUndefined();
+  });
+
+  test("leaves caching unknown when the pricing block itself is unreadable", () => {
+    const info = parseModelEntry({
+      id: "m",
+      pricing: { prompt: "n/a", completion: "n/a" },
+    });
+    expect(info?.capabilities?.caching).toBeUndefined();
   });
 
   test("returns null when id is missing or not a string", () => {

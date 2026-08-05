@@ -8,11 +8,18 @@ Telegram bot with AI integration via any OpenAI-compatible API.
    - `BOT_TOKEN` — from @BotFather
    - `OPENAI_API_KEY` — API key for your chosen endpoint
    - `OPENAI_BASE_URL` — any OpenAI-compatible chat-completions endpoint,
-     including the version segment (e.g. `https://api.openai.com/v1`, or a
-     self-hosted gateway like LiteLLM / vLLM). Per-request USD cost is computed
-     from the pricing this endpoint's `GET /v1/models` returns (0 if it
-     returns none). See [`docs/ai-provider.md`](docs/ai-provider.md).
+     including the version segment (e.g. `https://api.openai.com/v1`,
+     `https://openrouter.ai/api/v1`, or a self-hosted gateway like LiteLLM /
+     vLLM). Per-request USD cost comes from the gateway when it reports one, and
+     is otherwise computed from the pricing this endpoint's `GET /v1/models`
+     returns (0 if it returns none).
    - `BOT_OWNER_ID` — your Telegram user ID
+
+   On OpenRouter the bot additionally offers a model fallback chain, provider
+   routing, service tiers, exact per-request cost, and per-provider stats in the
+   admin model picker. It detects that from the base URL; `AI_PROVIDER_FLAVOR`
+   pins it when a proxy hides the host. Nothing non-standard is ever sent to a
+   plain OpenAI endpoint. See [`docs/ai-provider.md`](docs/ai-provider.md).
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 
@@ -149,6 +156,12 @@ are supported as `host:port`).
   limit stay in force as the safety net, and the whitelist entries are preserved (not consulted) so
   it can be turned back on unchanged.
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
+- **Gateway-aware model settings** — the admin model picker validates ids against the endpoint's
+  `/v1/models` and shows price, modalities, tool and prompt-caching support. On a gateway that
+  supports them (OpenRouter), it additionally offers a **fallback chain**, **provider routing**
+  (sort by price/throughput/latency, or pin one provider with no fallback), **service tiers**
+  (flex/priority) and the resolved provider's live price/throughput/latency — globally and per chat.
+  Controls the configured endpoint can't honour are not rendered and never sent.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
   guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest
