@@ -8,6 +8,11 @@ import type {
   SerializedAIUserContentPart,
 } from "./types";
 
+// Stands in for a video part in a stored snapshot. Model-facing text, like the
+// reply-context headers in `bot/context-builder.ts`.
+export const VIDEO_SNAPSHOT_MARKER =
+  "[a video clip was attached here; it is not kept in this saved context]";
+
 export function serializeMessages(msgs: AIMessage[]): SerializedAIMessage[] {
   return msgs.map((m) => {
     if (m.role === "assistant") return { role: "assistant", content: m.content };
@@ -23,11 +28,18 @@ export function serializeMessages(msgs: AIMessage[]): SerializedAIMessage[] {
           mediaType: p.mediaType,
         };
       }
-      return {
-        type: "audio",
-        audio_base64: Buffer.from(p.audio).toString("base64"),
-        mediaType: p.mediaType,
-      };
+      if (p.type === "audio") {
+        return {
+          type: "audio",
+          audio_base64: Buffer.from(p.audio).toString("base64"),
+          mediaType: p.mediaType,
+        };
+      }
+      // A clip is dropped from the snapshot, not stored: see
+      // `SerializedAIUserContentPart`. The marker keeps the turn readable —
+      // when this context is replayed at reminder delivery, the model still
+      // knows a video was part of the conversation it is reminding about.
+      return { type: "text", text: VIDEO_SNAPSHOT_MARKER };
     });
     return { role: "user", content: parts };
   });

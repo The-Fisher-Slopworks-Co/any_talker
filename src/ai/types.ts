@@ -20,12 +20,20 @@ export type RoutingOptions = {
 export type AIUserContentPart =
   | { type: "text"; text: string }
   | { type: "image"; image: Uint8Array; mediaType: string }
-  | { type: "audio"; audio: Uint8Array; mediaType: string };
+  | { type: "audio"; audio: Uint8Array; mediaType: string }
+  // A whole clip, sent as-is. Only produced for a model that advertises `video`
+  // input (see `ModelCatalog.supportsVideoInput`); everything else gets sampled
+  // frames as ordinary image parts instead.
+  | { type: "video"; video: Uint8Array; mediaType: string };
 
 export type AIMessage =
   | { role: "user"; content: string | AIUserContentPart[] }
   | { role: "assistant"; content: string };
 
+// The stored form (reminder context snapshots). Deliberately has no video
+// variant: a whole clip is up to 20 MB, and base64'ing that into a reminder
+// record — which has no TTL and is re-sent verbatim at delivery — is not a
+// trade worth making. `serializeMessages` swaps a clip for a text marker.
 export type SerializedAIUserContentPart =
   | { type: "text"; text: string }
   | { type: "image"; image_base64: string; mediaType: string }

@@ -12,6 +12,7 @@ import {
 } from "./compat-client";
 import { capabilitiesFor } from "./provider-profile";
 import type { PriceLookup, ModelPricing } from "./model-catalog";
+import type { AIMessage } from "./types";
 
 const lookup = (pricing: ModelPricing | null): PriceLookup => ({
   getPricing: () => pricing,
@@ -371,5 +372,156 @@ describe("buildAttributionHeaders", () => {
       "X-Title": "only",
     });
     expect(buildAttributionHeaders({})).toEqual({});
+  });
+});
+
+// Captures the request body the SDK actually puts on the wire. This is the only
+// place the video escape hatch is observable: `@ai-sdk/openai-compatible` has no
+// video mapping of its own (not in 2.x, not in 3.x), so a clip travels through
+// `providerOptions`, and only the emitted JSON proves it came out the far side
+// as a `video_url` part. If an SDK upgrade changes that mechanism, these tests
+// fail instead of the bot silently dropping every video.
+function capturingClient() {
+  const bodies: Record<string, unknown>[] = [];
+  const stub = async (
+    _url: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return new Response(
+      JSON.stringify({
+        id: "1",
+        object: "chat.completion",
+        created: 0,
+        model: "m",
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: "ok" },
+            finish_reason: "stop",
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  };
+  const client = new OpenAICompatClient({
+    baseURL: "https://x/v1",
+    apiKey: "k",
+    pricing: lookup(null),
+    capabilities: GENERIC,
+    fetch: stub as typeof globalThis.fetch,
+  });
+  return { client, bodies };
+}
+
+const ask = (client: OpenAICompatClient, messages: AIMessage[]) =>
+  client.ask({
+    models: ["google/gemini-3.5-flash"],
+    system: "sys",
+    messages,
+    tools: [],
+    toolCallContext: {} as never,
+  });
+
+const contentOf = (body: Record<string, unknown>, index: number) =>
+  (body.messages as { content: unknown }[])[index]!.content;
+
+describe("request body", () => {
+  test("a clip goes out as a native video_url part", async () => {
+    const { client, bodies } = capturingClient();
+    await ask(client, [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "what happens here" },
+          {
+            type: "video",
+            video: new Uint8Array([0, 1, 2, 3]),
+            mediaType: "video/mp4",
+          },
+        ],
+      },
+    ]);
+
+    expect(bodies[0]!.messages).toEqual([
+      { role: "system", content: "sys" },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "what happens here" },
+          {
+            type: "video_url",
+            video_url: { url: "data:video/mp4;base64,AAECAw==" },
+          },
+        ],
+      },
+    ]);
+  });
+
+  test("images and audio riding along with a clip keep their own wire shapes", async () => {
+    const { client, bodies } = capturingClient();
+    await ask(client, [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "album" },
+          {
+            type: "image",
+            image: new Uint8Array([1, 2]),
+            mediaType: "image/jpeg",
+          },
+          {
+            type: "audio",
+            audio: new Uint8Array([3, 4]),
+            mediaType: "audio/mp3",
+          },
+          {
+            type: "video",
+            video: new Uint8Array([5, 6]),
+            mediaType: "video/mp4",
+          },
+        ],
+      },
+    ]);
+
+    expect(contentOf(bodies[0]!, 1)).toEqual([
+      { type: "text", text: "album" },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,AQI=" } },
+      { type: "input_audio", input_audio: { data: "AwQ=", format: "mp3" } },
+      { type: "video_url", video_url: { url: "data:video/mp4;base64,BQY=" } },
+    ]);
+  });
+
+  test("a clip-free message still goes through the SDK's own mapping", async () => {
+    const { client, bodies } = capturingClient();
+    await ask(client, [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "look" },
+          {
+            type: "image",
+            image: new Uint8Array([1, 2]),
+            mediaType: "image/jpeg",
+          },
+        ],
+      },
+    ]);
+
+    expect(contentOf(bodies[0]!, 1)).toEqual([
+      { type: "text", text: "look" },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,AQI=" } },
+    ]);
+  });
+
+  test("plain text is still sent as a bare string", async () => {
+    const { client, bodies } = capturingClient();
+    await ask(client, [{ role: "user", content: "hi" }]);
+    expect(bodies[0]!.messages).toEqual([
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]);
   });
 });

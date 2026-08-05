@@ -26,7 +26,7 @@ constructs the shared services — `KeyDBStorage`, `DualWindowLimiter`,
 tools, then starts five long-lived things:
 
 1. **The grammY bot(s)** in long-polling mode — receives Telegram updates, runs
-   the `/ask` and guest-mode flows, photo/voice/contact handlers, and the
+   the `/ask` and guest-mode flows, photo/voice/video/contact handlers, and the
    recurring check inline-button callbacks. A `BotManager` (`managed-bots/`) runs
    **additional character bots** the owner created via the Bot API 9.6 Managed
    Bots flow — each its own token, avatar, name, system prompt, reminders and
@@ -128,7 +128,7 @@ flowchart TB
 |---|---|---|
 | `src/main.ts` | Composition root: load config, wire services, register tools, start bot + HTTP + schedulers; hot-reload teardown. | `main.ts` |
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
-| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
+| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenAI-compatible client, provider capability profile, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, message (de)serialization, AI types. | `compat-client.ts`, `provider-profile.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
@@ -166,12 +166,12 @@ hot-reload. **Depends on:** nearly every subsystem. **Depended on by:** nothing
 order is the request lifecycle (see §6). Two dispatchers convert handler outcomes
 into Telegram sends:
 - `dispatchAsk` — the `/ask` (`short`) and `/askwise` (`wise`) flows; resolves
-  reply context, downloads images/voice, starts a typing indicator, calls
+  reply context, downloads images/voice/video, starts a typing indicator, calls
   `askHandler`, and on `"answered"` sends the Rich Markdown reply via Bot API
   10.1 `sendRichMessage` (plain `sendMessage` fallback) and persists the
   conversation node.
 - `dispatchGuest` — Bot API 10.0 guest queries; mirrors the ask flows:
-  downloads the query's own photo/voice (voice transcoded ogg→mp3), resolves
+  downloads the query's own photo/voice/video (voice transcoded ogg→mp3), resolves
   reply context (the stored guest thread for a reply to this bot's own answer,
   otherwise the replied-to message — text and media — via the same
   unknown-reply fallback `/ask` uses). Guest threads are keyed by the guest
@@ -189,6 +189,44 @@ into Telegram sends:
   message that carries the mention caption — sibling album messages produce no
   guest update at all (verified live) — so an album resolves to at most its
   single embedded photo and the album index is never populated for guest chats.
+
+**Video** (`video.ts`) takes one of two routes, chosen by the model that will
+answer (`settings.models[0]`) via `ModelCatalog.supportsVideoInput`:
+
+- **native** — the model advertises `video` among its input modalities (Gemini
+  and ~50 other models on OpenRouter), so the clip is sent **whole** as a
+  `video_url` data URL: real motion, real audio, no local decoding. The SDK is
+  the obstacle here, not the endpoint: `@ai-sdk/openai-compatible` has no video
+  mapping in any version and throws on `video/*` file parts, so
+  `ai/compat-client.ts` emits the part through the provider's own escape hatch
+  (`providerOptions.openaiCompatible` is spread over the built message *after*
+  `content`, so a `content` key there replaces it). `compat-client.test.ts`
+  asserts the emitted request body, so an SDK upgrade that breaks the mechanism
+  fails loudly instead of silently dropping video.
+- **frames** — every other model. The clip is decomposed into the part kinds
+  such a model does take: evenly spaced JPEG frames (≤640 px, 6 for the clip an
+  ask is *about*, 3 for a reply target or album item) plus the soundtrack as
+  mono 16 kHz mp3, capped at 5 minutes. Both ffmpeg passes read a temp file
+  rather than stdin, because an mp4 with a trailing `moov` atom cannot be
+  demuxed from a non-seekable pipe. So the stills don't read as loose photos,
+  the user envelope gains an `attachments` line ("N frames sampled in
+  chronological order from a video (42s), plus that clip's soundtrack as
+  audio"), part of `userQuestion` so the chain keeps it.
+
+Anything that can't resolve the mode (no catalogue, unknown model, resolver
+error) falls back to frames, which every vision model understands. `video`,
+`video_note` and `animation` are all handled (a video note carries no caption,
+so it can only arrive as a reply target; animations skip the audio pass). Two
+limits are checked before anything is downloaded, and both name themselves to
+the user: **60 seconds** (a cost ceiling — native video bills by clip length, so
+a few minutes would swallow a user's whole token window in one ask) and
+Telegram's **20 MB** `getFile` ceiling. A clip whose stated duration is 0
+("unknown") is not refused. An album carrying **several** clips is forced to frames — ten 20 MB clips
+base64'd into one request is not a request worth sending. Neither a whole clip
+nor a frame has a Telegram file id, so the clip's **thumbnail** id is what gets
+persisted in `userImageFileIds` — a follow-up turn keeps a still instead of
+losing the visual. Outcomes (`native` / `frames` / failures) are counted in
+`bot_video_extractions_total`.
 
 Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
 bot-side authorization gate (owner / user-whitelist / chat-whitelist), consulted
@@ -271,7 +309,9 @@ identity and persona. **Depends on:** `bot`, `storage`, `ratelimit`, `ai`,
 `OpenAICompatClient.ask(...)` wraps the Vercel AI SDK `generateText` + the
 `@ai-sdk/openai-compatible` provider, pointed at `OPENAI_BASE_URL`. It maps
 domain messages to SDK messages (text/image/audio) and runs the tool-calling loop
-bounded by `stepCountIs(8)`.
+bounded by `stepCountIs(8)`. A video part has no SDK mapping at all, so a message
+carrying one is emitted as a hand-built `video_url` content array through the
+provider's message-part `providerOptions` escape hatch (see the Bot section).
 
 What it sends beyond the standard OpenAI surface is decided by the injected
 `ProviderCapabilities` from **`provider-profile.ts`** — the fallback chain
@@ -458,11 +498,11 @@ sequenceDiagram
     participant T as Tools
     participant S as Storage / KeyDB
 
-    TG->>MW: update (/ask text | photo+caption | voice+caption)
+    TG->>MW: update (/ask text | photo+caption | voice+caption | video+caption)
     MW->>MW: log update · resolve lang (ctx.t) · upsert user/chat
     MW->>MW: guest? keyword-filtered? (short-circuit if so)
     MW->>D: command/message handler
-    D->>D: resolve reply chain, download images/voice, start typing
+    D->>D: resolve reply chain, download images/voice/video, start typing
     D->>H: askHandler(dispatch, deps)
     H->>S: load effective settings + timezone
     H->>ACC: isAllowed(owner/whitelist, if whitelistEnabled)?
@@ -548,7 +588,7 @@ persisted entities:
 | Users / chats directory | `at:users` · `at:chats` | hash | — | `User` / `Chat` per field, incl. `firstSeenAt` (legacy rows backfilled to epoch 0 on read ⇒ never "new") |
 | Conversation node | `at:msg:{chatId}:{msgId}` — one node per turn, written under both the bot-reply id and the user's ask message id (DMs add the `mbot:{botId}:` scope; groups stay shared) | string | 30 days | `{ userQuestion, botAnswer, parentBotMsgId, ts, userImageFileIds? }`; failed turns store the rate-limit/error notice as `botAnswer` |
 | Photo cache | `at:photo_cache:{fileId}` | base64 string | 7 days | raw bytes (TTL renewed on read) |
-| Album photos | `at:album:{chatId}:{mediaGroupId}` | hash | 30 days | `messageId → fileId` |
+| Album photos | `at:album:{chatId}:{mediaGroupId}` | hash | 30 days | `messageId → fileId` (a video item is indexed by its thumbnail id) |
 | Guest thread | `at:guest_thread:{chatId}` | string | 30 days | `{ turns: [{userQuestion, botAnswer, userImageFileIds?}], ts }` |
 | Reminder payload | `at:reminder:{id}` | string | — | `Reminder` (incl. serialized `contextMessages`) |
 | Reminder indexes | `at:reminders:due` · `at:user_reminders:{userId}` | ZSET · SET | — | due-by-`fireAtMs` index · per-user id set |
@@ -651,7 +691,8 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
 - `ai` (Vercel AI SDK) + `@ai-sdk/openai-compatible` — tool-calling loop and
   provider abstraction; the AI layer is built around these.
 - `ffmpeg` (system binary; `apk add` in the Docker image) — transcodes Telegram
-  ogg/opus voice notes to mp3 before they're sent as `input_audio`.
+  ogg/opus voice notes to mp3 before they're sent as `input_audio`, and samples
+  frames + the soundtrack out of videos (`bot/video.ts`).
 - `zod` — tool parameter schemas and stored-reminder validation.
 - `@mozilla/readability` + `linkedom` + `turndown` — `fetch_page` HTML → Markdown.
 - `react` + `react-dom` + `tailwindcss` (v4) + `bun-plugin-tailwind` — the Mini App.
@@ -742,6 +783,19 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   transcoded at the download boundary; a transcode failure drops the audio part
   rather than sending unusable ogg. Trade-off: a system `ffmpeg` dependency in
   the image.
+- **Video sent natively when the model takes it, sampled when it doesn't** — a
+  clip is worth far more whole (Gemini reads motion and speech off it) than as
+  stills, so the catalogue's `input_modalities` decides per request. The frames
+  path stays as the fallback rather than being dropped, because the bot targets
+  *any* OpenAI-compatible endpoint and most models still don't take video.
+  Trade-offs: native video is expensive (Gemini bills ~260 tokens per second of
+  clip, so a long video can eat a user's whole token window in one ask), and the
+  fallback loses motion between frames.
+- **The video part rides on `providerOptions`** — no version of
+  `@ai-sdk/openai-compatible` maps `video/*`, so the alternative to the escape
+  hatch was a second provider package or a hand-rolled client, both of which
+  would fork the tool-calling loop. The mechanism is pinned by a request-body
+  test so an SDK upgrade can't silently drop clips.
 - **Bun-native, no build step** — TypeScript runs directly and the Mini App is
   bundled on the fly; simpler pipeline, at the cost of tying the project to Bun.
 - **DI + pure handlers + tagged outcomes** — every handler is a pure function
