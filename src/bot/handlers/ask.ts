@@ -110,6 +110,11 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     storage.getUserTimezone(input.userId),
   ]);
   const timezone = userTimezone ?? settings.timezone;
+  // The one clock reading this turn uses. Both envelope builds below — the one
+  // sent to the model and the one persisted for later turns — take this exact
+  // value: a stored turn that disagreed with what the model saw would change
+  // the prompt prefix on the next turn and cost the cache the whole history.
+  const sentAt = { ms: input.now, timezone };
 
   // Access gate: owner always passes; otherwise the whitelist is consulted only
   // while `whitelistEnabled` (the budget guard is the safety net when it's off).
@@ -167,6 +172,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         quote: input.quote,
         text: input.userText,
         attachments: input.attachments,
+        sentAt,
       }),
       botAnswer,
       parentBotMsgId,
@@ -232,6 +238,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     videos,
     attachments: input.attachments,
     replyTarget: input.replyTarget,
+    sentAt,
     fetchPhoto: input.fetchPhoto,
   });
 
