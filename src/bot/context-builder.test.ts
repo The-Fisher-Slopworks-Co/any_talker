@@ -22,6 +22,7 @@ describe("buildContext", () => {
   test("no reply: just current user JSON envelope", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -36,6 +37,7 @@ describe("buildContext", () => {
   test("envelope contains author, quote, text in that exact order", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -55,9 +57,45 @@ describe("buildContext", () => {
     ]);
   });
 
+  // The current moment reaches the model through the envelope rather than the
+  // system prompt, so the prompt's cacheable prefix doesn't change every minute.
+  test("stamps the turn with its send time in the user's timezone", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      sentAt: { ms: Date.UTC(2026, 4, 8, 15, 42), timezone: "Europe/Moscow" },
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "hello",
+      quote: "quoted",
+      replyTarget: null,
+      images: [],
+    });
+    const obj = JSON.parse(msgs[0]!.content as string);
+    expect(obj.time).toBe("2026-05-08 18:42");
+    // The stamp sits with the other metadata, ahead of the text itself.
+    expect(Object.keys(obj)).toEqual(["author", "time", "quote", "text"]);
+  });
+
+  test("omits the time field when no send time is given", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      sentAt: null,
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "hello",
+      quote: null,
+      replyTarget: null,
+      images: [],
+    });
+    expect(JSON.parse(msgs[0]!.content as string).time).toBeUndefined();
+  });
+
   test("author falls back to first name when last name missing", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: { firstName: "Alice", lastName: null, nameOverride: null, gender: null },
@@ -72,6 +110,7 @@ describe("buildContext", () => {
   test("nameOverride takes precedence over firstName + lastName", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: { firstName: "John", lastName: "Doe", nameOverride: "Pseudonym", gender: null },
@@ -86,6 +125,7 @@ describe("buildContext", () => {
   test("empty/whitespace nameOverride falls back to firstName + lastName", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: { firstName: "John", lastName: "Doe", nameOverride: "   ", gender: null },
@@ -100,6 +140,7 @@ describe("buildContext", () => {
   test("gender field appears between author and text when set", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: { firstName: "Саша", lastName: null, nameOverride: null, gender: "female" },
@@ -121,6 +162,7 @@ describe("buildContext", () => {
   test("gender is omitted when null", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -136,6 +178,7 @@ describe("buildContext", () => {
   test("quote field is omitted when not provided", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -151,6 +194,7 @@ describe("buildContext", () => {
   test("reply to non-bot message includes synthetic context", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -177,6 +221,7 @@ describe("buildContext", () => {
       ts: 1,
     });
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -207,6 +252,7 @@ describe("buildContext", () => {
       ts: 2,
     });
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -227,6 +273,7 @@ describe("buildContext", () => {
   test("missing ancestor stops walk and includes synthetic for current node", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -255,6 +302,7 @@ describe("buildContext", () => {
       prevId = i;
     }
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -272,6 +320,7 @@ describe("buildContext", () => {
   test("attachments describe media the parts alone don't explain (video frames)", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -292,6 +341,7 @@ describe("buildContext", () => {
   test("the reply fallback carries the reply's own media note", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -315,6 +365,7 @@ describe("buildContext", () => {
   test("reply target without text uses <media> placeholder", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -332,6 +383,7 @@ describe("buildContext", () => {
   test("empty userText with non-bot reply: synthetic context becomes the prompt", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -354,6 +406,7 @@ describe("buildContext", () => {
       ts: 1,
     });
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -376,6 +429,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const replyBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe1]);
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -405,6 +459,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -428,6 +483,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const bytes = new Uint8Array([0x4f, 0x67, 0x67, 0x53]); // OggS magic
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -452,6 +508,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const bytes = new Uint8Array([1, 2, 3]);
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -472,6 +529,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const replyBytes = new Uint8Array([0x4f, 0x67, 0x67, 0x53]);
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -499,6 +557,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const bytes = new Uint8Array([1, 2, 3]);
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -520,6 +579,7 @@ describe("buildContext", () => {
       ts: 1,
     });
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -541,6 +601,7 @@ describe("buildContext", () => {
     const b = new Uint8Array([0xff, 0xd8, 0x02]);
     const c = new Uint8Array([0xff, 0xd8, 0x03]);
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -567,6 +628,7 @@ describe("buildContext", () => {
     const a = new Uint8Array([1]);
     const b = new Uint8Array([2]);
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -609,6 +671,7 @@ describe("buildContext", () => {
       return null;
     };
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -643,6 +706,7 @@ describe("buildContext", () => {
       userImageFileIds: ["missing"],
     });
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,
@@ -665,6 +729,7 @@ describe("buildContext", () => {
       userImageFileIds: ["f1"],
     });
     const msgs = await buildContext({
+      sentAt: null,
       storage,
       chatId: "c1",
       sender: SENDER,

@@ -52,17 +52,43 @@ describe("buildInstruction", () => {
     expect(out).toMatch(/\n\n# Персонаж/);
   });
 
-  test("appends a datetime section when timezone is provided", () => {
-    const now = new Date("2026-05-08T15:42:00Z");
-    const out = buildInstruction("X", { timezone: "Europe/Moscow", now });
-    expect(out).toContain("# Текущие дата и время");
+  test("appends a time section naming the timezone when one is provided", () => {
+    const out = buildInstruction("X", { timezone: "Europe/Moscow" });
+    expect(out).toContain("# Время");
     expect(out).toContain("Таймзона пользователя: Europe/Moscow.");
-    expect(out).toMatch(/Сейчас 2026-05-08 18:42 \(/);
+    expect(out).toContain("`time`");
   });
 
-  test("omits datetime section when no timezone provided", () => {
+  test("omits time section when no timezone provided", () => {
     const out = buildInstruction("X");
-    expect(out).not.toContain("# Текущие дата и время");
+    expect(out).not.toContain("# Время");
+  });
+
+  // The instruction is the prompt-cache prefix: two builds a minute apart must
+  // be byte-identical, or every turn re-charges the whole history behind it.
+  test("carries no current moment, so the prompt is stable over time", () => {
+    const opts = {
+      timezone: "Europe/Moscow",
+      lang: "ru" as const,
+      detailLevel: "short" as const,
+      facts: [{ key: "city", value: "Moscow" }],
+    };
+    expect(buildInstruction("X", opts)).toBe(buildInstruction("X", opts));
+    // No wall-clock stamp anywhere in the prompt.
+    expect(buildInstruction("X", opts)).not.toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+  });
+
+  // Facts change mid-conversation (`remember_fact`); keeping them last means a
+  // change costs the cache only the tail of the prompt.
+  test("places the volatile facts section last", () => {
+    const out = buildInstruction("X", {
+      timezone: "Europe/Moscow",
+      lang: "ru",
+      detailLevel: "wise",
+      facts: [{ key: "city", value: "Moscow" }],
+    });
+    const headings = (out.match(/^# .*/gm) ?? []).at(-1);
+    expect(headings).toBe("# Что я знаю о пользователе");
   });
 
   test("appends English language section when lang=en", () => {
