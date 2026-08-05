@@ -35,6 +35,11 @@ class FakeAI implements AIClient {
   }
 }
 
+// Every envelope carries the moment its turn was sent (that stamp lives in the
+// message, not in the system prompt, so the prompt stays cacheable). The
+// fixtures sit a few ms past the epoch in the default UTC timezone.
+const SENT_AT = "1970-01-01 00:00";
+
 const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
   const storage = overrides.storage ?? new MemoryStorage();
   return {
@@ -180,7 +185,7 @@ describe("guestAskHandler", () => {
       chatId: "c1",
       turns: [
         {
-          userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
+          userQuestion: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
           botAnswer: "the answer",
         },
       ],
@@ -209,7 +214,7 @@ describe("guestAskHandler", () => {
       { role: "user", content: "Context (replied message from Bob): how are you?" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", text: "hello" }),
+        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
       },
     ]);
   });
@@ -255,7 +260,7 @@ describe("guestAskHandler", () => {
       { role: "assistant", content: "A1" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", text: "hello" }),
+        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
       },
     ]);
   });
@@ -284,7 +289,7 @@ describe("guestAskHandler", () => {
       { role: "user", content: "Context (replied message from Bot): Привет" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", text: "hello" }),
+        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
       },
     ]);
   });
@@ -312,7 +317,7 @@ describe("guestAskHandler", () => {
     const stored = await storage.getGuestThread("c1");
     expect(stored?.turns).toEqual([
       {
-        userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
+        userQuestion: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
         botAnswer: "fresh answer",
       },
     ]);
@@ -347,7 +352,7 @@ describe("guestAskHandler", () => {
       { role: "assistant", content: "**Привет,** _Jane_!" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", text: "hello" }),
+        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
       },
     ]);
   });
@@ -399,7 +404,7 @@ describe("guestAskHandler", () => {
       { role: "assistant", content: "👍" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", text: "hello" }),
+        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
       },
     ]);
   });
@@ -447,7 +452,7 @@ describe("guestAskHandler", () => {
       {
         role: "user",
         content: [
-          { type: "text", text: JSON.stringify({ author: "Jane", text: "hello" }) },
+          { type: "text", text: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }) },
           { type: "image", image: img, mediaType: "image/jpeg" },
           { type: "audio", audio: voice, mediaType: "audio/mp3" },
         ],
@@ -549,6 +554,7 @@ describe("guestAskHandler", () => {
         role: "user",
         content: JSON.stringify({
           author: "Jane",
+          time: SENT_AT,
           quote: "как дела",
           text: "hello",
         }),
@@ -572,7 +578,7 @@ describe("guestAskHandler", () => {
       { role: "assistant", content: "A1" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", text: "hello" }),
+        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
       },
     ]);
   });
@@ -595,7 +601,7 @@ describe("guestAskHandler", () => {
     expect(stored?.turns).toEqual([
       { userQuestion: "Q1", botAnswer: "A1" },
       {
-        userQuestion: JSON.stringify({ author: "Jane", text: "hello" }),
+        userQuestion: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
         botAnswer: "second answer",
       },
     ]);

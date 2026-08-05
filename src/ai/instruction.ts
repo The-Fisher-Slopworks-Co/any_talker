@@ -36,6 +36,7 @@ const MESSAGE_FORMAT = `# Формат сообщений
 ## Обычное сообщение от пользователя
 - \`author\`: имя отправителя
 - \`gender\`: пол отправителя, \`"male"\` или \`"female"\` (если указан); используй для согласования рода в обращениях
+- \`time\`: момент отправки сообщения в таймзоне пользователя (см. раздел «Время»)
 - \`text\`: основной текст сообщения
 - \`quote\`: цитируемый текст из сообщения, на которое отвечает пользователь (если есть)
 - \`attachments\`: пояснение к приложенным медиа, когда оно требуется (поле есть только в этом случае). Видео обычно приходит целым роликом, но если текущая модель видео не принимает — вместо него придёт набор кадров, снятых по порядку из одного ролика, плюс звуковая дорожка; это не отдельные фотографии
@@ -46,6 +47,7 @@ const MESSAGE_FORMAT = `# Формат сообщений
 Перед таким событием в истории сообщений обычно находится снимок исходного разговора (включая прикреплённые изображения, цитаты и предыдущие реплики), который привёл к постановке напоминания. Опирайся на этот контекст, чтобы понять, о чём именно напоминать.
 
 Поля события:
+- \`time\`: момент, в который событие пришло к тебе, то есть текущий (в таймзоне пользователя)
 - \`scheduled_for\`: момент, на который было поставлено напоминание (в таймзоне пользователя)
 - \`scheduled_at\`: момент, когда напоминание было создано (в той же таймзоне)
 - \`note\`: твоя собственная заметка о том, о чём напомнить
@@ -122,32 +124,36 @@ function factsSection(facts: Array<{ key: string; value: string }>): string {
 ${lines}`;
 }
 
-function datetimeSection(timezone: string, now: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZoneName: "shortOffset",
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  const date = `${get("year")}-${get("month")}-${get("day")}`;
-  const time = `${get("hour")}:${get("minute")}`;
-  const offset = get("timeZoneName").replace(/^GMT/, "UTC");
-  return `# Текущие дата и время
+// The clock deliberately does NOT live in this prompt.
+//
+// A provider's prompt cache only ever covers a prefix, so the first byte that
+// changes between two requests ends the cacheable region — and everything after
+// it (here: the rest of the instruction AND the entire conversation history,
+// which is the bulk of a long thread) is re-charged at full price. A "now" with
+// minute precision sitting in the system prompt therefore invalidated the cache
+// on every single turn. The current moment travels in each message's envelope
+// instead (`time`, see `bot/context-builder.ts`), where it is immutable once
+// written: a stored turn keeps the stamp it was sent with, so the prefix up to
+// the newest message stays byte-identical across turns and stays cacheable.
+//
+// What remains here is the timezone — the one part that is a property of the
+// user rather than of the moment, and that changes at most when they move.
+function timeSection(timezone: string): string {
+  return `# Время
 
-Сейчас ${date} ${time} (${offset}).
-Таймзона пользователя: ${timezone}.`;
+Таймзона пользователя: ${timezone}. Все моменты времени в сообщениях указаны в ней.
+
+Текущего времени в этой инструкции нет. Каждое входящее сообщение несёт поле \`time\` — момент, когда оно было отправлено. Считай, что «сейчас» — это \`time\` последнего сообщения; у предыдущих сообщений это поле показывает, когда они были отправлены, так что по нему видно, сколько времени прошло между репликами.`;
 }
 
+// Sections are ordered stable-first, so the prompt-cache prefix reaches as far
+// as it can: nothing here changes from turn to turn except the user's facts,
+// which is why they come last (a `remember_fact` mid-conversation then costs the
+// cache only the facts block, not the detail-level section behind it).
 export function buildInstruction(
   characterDescription: string,
   opts: {
     timezone?: string;
-    now?: Date;
     lang?: Lang;
     detailLevel?: DetailLevel;
     facts?: Array<{ key: string; value: string }>;
@@ -159,16 +165,16 @@ export function buildInstruction(
     characterSection(characterDescription),
   ];
   if (opts.timezone) {
-    sections.push(datetimeSection(opts.timezone, opts.now ?? new Date()));
+    sections.push(timeSection(opts.timezone));
   }
   if (opts.lang) {
     sections.push(languageSection(opts.lang));
   }
-  if (opts.facts && opts.facts.length > 0) {
-    sections.push(factsSection(opts.facts));
-  }
   if (opts.detailLevel) {
     sections.push(detailLevelSection(opts.detailLevel));
+  }
+  if (opts.facts && opts.facts.length > 0) {
+    sections.push(factsSection(opts.facts));
   }
   return sections.join("\n\n");
 }

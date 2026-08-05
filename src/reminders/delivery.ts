@@ -11,7 +11,7 @@ import { deserializeMessages } from "../ai/serialize";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
 import { richApi } from "../bot/rich";
-import { formatLocalParts } from "../shared/tz";
+import { localDateTimeString } from "../shared/tz";
 import { migratedChatId } from "../shared/chat-migration";
 import { composeFullName } from "../shared/types";
 import { readValidDisplayName } from "../shared/display-name";
@@ -174,6 +174,7 @@ async function composeReminderMessage(
   const lang = reminder.lang;
 
   const envelope = buildReminderEnvelope({
+    nowMs,
     fireAtMs: reminder.fireAtMs,
     createdAtMs: reminder.createdAtMs,
     timezone,
@@ -240,6 +241,7 @@ async function composeReminderMessage(
 }
 
 type EnvelopeArgs = {
+  nowMs: number;
   fireAtMs: number;
   createdAtMs: number;
   timezone: string;
@@ -251,6 +253,11 @@ type EnvelopeArgs = {
 function buildReminderEnvelope(args: EnvelopeArgs): string {
   const obj: Record<string, string> = {
     system_event: "reminder_fired",
+    // The system prompt no longer states the current moment (it would break the
+    // prompt cache — see `ai/instruction.ts`), so this event carries its own
+    // `time` the way a user message does. It is not the same as
+    // `scheduled_for`: a retried delivery fires later than it was due.
+    time: localDateTimeString(args.nowMs, args.timezone),
     scheduled_for: formatLocalDateTime(args.fireAtMs, args.timezone),
     scheduled_at: formatLocalDateTime(args.createdAtMs, args.timezone),
     note: args.note,
@@ -260,8 +267,8 @@ function buildReminderEnvelope(args: EnvelopeArgs): string {
   return JSON.stringify(obj);
 }
 
+// The scheduling fields name their timezone inline: they are read against a
+// reminder created long ago, possibly before the user moved.
 function formatLocalDateTime(ms: number, timezone: string): string {
-  const p = formatLocalParts(ms, timezone);
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)} ${timezone}`;
+  return `${localDateTimeString(ms, timezone)} ${timezone}`;
 }
