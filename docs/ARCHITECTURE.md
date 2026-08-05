@@ -171,7 +171,16 @@ into Telegram sends:
   downloads the query's own photo/voice (voice transcoded ogg→mp3), resolves
   reply context (the stored guest thread for a reply to this bot's own answer,
   otherwise the replied-to message — text and media — via the same
-  unknown-reply fallback `/ask` uses), and replies once via the raw
+  unknown-reply fallback `/ask` uses). Guest threads are keyed by the guest
+  business-DM id — one thread **per user**, not per message — and
+  `answerGuestQuery` never returns the posted message's id, so a reply can
+  target a bot answer the replier's own thread knows nothing about (e.g.
+  another user's conversation). The handler therefore continues a stored
+  thread only when the replied-to text matches the thread's last answer
+  (`threadMatchesReply`, normalized comparison since the posted message
+  carries rendering chrome); on mismatch the thread is dropped for that turn
+  and the replied-to message itself becomes the context via the fallback.
+  The answer is sent once via the raw
   `answerGuestQuery` API call, carrying the answer as a Bot API 10.1
   `InputRichMessageContent` (Rich Markdown). Telegram delivers only the album
   message that carries the mention caption — sibling album messages produce no
