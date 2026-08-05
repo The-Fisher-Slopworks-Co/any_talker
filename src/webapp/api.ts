@@ -17,6 +17,7 @@ import type {
 } from "../shared/types";
 import { isValidTimezone, isValidGender } from "../shared/types";
 import { isValidLang, type Lang } from "../shared/i18n";
+import { isValidDateFormat, type DateFormat } from "../shared/date-format";
 import {
   validateDisplayName,
   readValidDisplayName,
@@ -181,6 +182,11 @@ const BAD_GENDER: ApiResponse = {
 const BAD_LANG: ApiResponse = {
   status: 400,
   body: { error: "invalid language" },
+};
+
+const BAD_DATE_FORMAT: ApiResponse = {
+  status: 400,
+  body: { error: "invalid date format" },
 };
 
 function normalizeEnumInput<T extends string>(
@@ -427,12 +433,14 @@ export async function handleApi(
 
   if (req.path === "/api/me") {
     if (req.method === "GET") {
-      const [displayName, timezone, gender, language] = await Promise.all([
-        readValidDisplayName(deps.storage, actor.userId),
-        deps.storage.getUserTimezone(actor.userId),
-        deps.storage.getUserGender(actor.userId),
-        deps.storage.getUserLang(actor.userId),
-      ]);
+      const [displayName, timezone, gender, language, dateFormat] =
+        await Promise.all([
+          readValidDisplayName(deps.storage, actor.userId),
+          deps.storage.getUserTimezone(actor.userId),
+          deps.storage.getUserGender(actor.userId),
+          deps.storage.getUserLang(actor.userId),
+          deps.storage.getUserDateFormat(actor.userId),
+        ]);
       return {
         status: 200,
         body: {
@@ -441,22 +449,25 @@ export async function handleApi(
           timezone,
           gender,
           language,
+          dateFormat,
         },
       };
     }
     if (req.method === "PUT") {
       const body = (req.body ?? {}) as Record<string, unknown>;
-      const [currentName, currentTz, currentGender, currentLang] =
+      const [currentName, currentTz, currentGender, currentLang, currentDf] =
         await Promise.all([
           readValidDisplayName(deps.storage, actor.userId),
           deps.storage.getUserTimezone(actor.userId),
           deps.storage.getUserGender(actor.userId),
           deps.storage.getUserLang(actor.userId),
+          deps.storage.getUserDateFormat(actor.userId),
         ]);
       let displayName = currentName;
       let timezone = currentTz;
       let gender: Gender | null = currentGender;
       let language: Lang | null = currentLang;
+      let dateFormat: DateFormat | null = currentDf;
       const writes: Promise<void>[] = [];
 
       if ("displayName" in body) {
@@ -487,6 +498,12 @@ export async function handleApi(
         language = nextLang;
         writes.push(deps.storage.setUserLang(actor.userId, language));
       }
+      if ("dateFormat" in body) {
+        const nextDf = normalizeEnumInput(body.dateFormat, isValidDateFormat);
+        if (nextDf === "invalid") return BAD_DATE_FORMAT;
+        dateFormat = nextDf;
+        writes.push(deps.storage.setUserDateFormat(actor.userId, dateFormat));
+      }
 
       await Promise.all(writes);
       return {
@@ -497,6 +514,7 @@ export async function handleApi(
           timezone,
           gender,
           language,
+          dateFormat,
         },
       };
     }

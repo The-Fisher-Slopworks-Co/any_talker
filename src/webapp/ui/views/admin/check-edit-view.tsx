@@ -3,6 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
+import { useDateFmt } from "../../datetime-context";
+import { TimeNote } from "../../components/time-note";
 import { api } from "../../api-client";
 import type {
   CheckCounterMode,
@@ -86,6 +88,7 @@ export function CheckEditView({
   onClose: () => void;
 }) {
   const { t: s } = useI18n();
+  const { format } = useDateFmt();
   const isNew = checkId === null;
   const [check, setCheck] = useState<RecurringCheck | null>(null);
   const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT);
@@ -147,7 +150,7 @@ export function CheckEditView({
   };
 
   const lastFiredText = check?.lastFiredAtMs
-    ? new Date(check.lastFiredAtMs).toLocaleString()
+    ? format(check.lastFiredAtMs)
     : s.ui_check_last_fired_never;
 
   return (
@@ -400,6 +403,9 @@ export function CheckEditView({
               </span>
             </div>
           </Card>
+          <SectionFooter>
+            <TimeNote />
+          </SectionFooter>
         </>
       )}
 

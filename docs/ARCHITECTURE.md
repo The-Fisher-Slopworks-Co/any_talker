@@ -141,7 +141,7 @@ flowchart TB
 | `src/observability/` | Budget observability: pure spike detection, the owner digest formatter, the narrow owner-DM `NotifyApi`, and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
-| `src/shared/` | i18n catalog, timezone math, display-name validation, user-fact key/value constraints, interval scheduler, group→supergroup chat-id migration detection, shared domain types. | `i18n.ts`, `tz.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `chat-migration.ts`, `types.ts` |
+| `src/shared/` | i18n catalog, timezone math, Web App date/time display format (catalogue + formatter), display-name validation, user-fact key/value constraints, interval scheduler, group→supergroup chat-id migration detection, shared domain types. | `i18n.ts`, `tz.ts`, `date-format.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `chat-migration.ts`, `types.ts` |
 | `src/log.ts` · `src/proxy.ts` · `src/build-info.ts` | Structured logging, HTTP-proxy resolution, version/git metadata. | — |
 | `src/types/` | Ambient declarations (Bot API 10.0 guest mode + 10.1 rich messages; HTML/CSS module imports). | `telegram-guest.d.ts`, `telegram-rich.d.ts`, `html-modules.d.ts` |
 
@@ -506,7 +506,7 @@ persisted entities:
 | Chat settings | `at:chat_settings:{chatId}` | string | — | partial `ChatSettings` overrides; key deleted when empty |
 | Whitelist | `at:whitelist:{users\|chats}` | string | — | `WhitelistEntry[]` (`{id, label?}`) |
 | Per-user rate-limit usage | `at:usage:{userId}` | string | ~9 days (week + slack) | `{ fiveHour: {windowStart, used}, weekly: {windowStart, used} }` (per-user, global; window phase derived from the user id) |
-| User attributes | `at:user_{name,tz,gender,lang}:{userId}` | string (raw) | — | scalar strings, validated on read |
+| User attributes | `at:user_{name,tz,gender,lang,datefmt}:{userId}` | string (raw) | — | scalar strings, validated on read (`datefmt` is the Web App's date/time display format; absent = viewer's device locale) |
 | Per-user spend | `at:spend:{userId}:{YYYY-MM-DD}` | float counter | 35 days | USD per UTC day (`INCRBYFLOAT`); summarized to day/week/month |
 | Per-chat / global / per-model spend | `at:spend_chat:{chatId}:{date}` · `at:spend_global:{date}` · `at:spend_model:{modelId}:{date}` | float counter | 35 days | Same day-bucket shape as per-user spend, written alongside it by `spending/record.ts`. Global is the kill-switch's source of truth. |
 | Spend model directory · unpriced models | `at:spend_models` · `at:unpriced_models` | SET | — | Every model id that recorded spend · models that answered without pricing (spend under-counted) |

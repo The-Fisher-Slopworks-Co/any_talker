@@ -162,6 +162,13 @@ type Strings = {
   ui_main_timezone: string;
   ui_main_use_my_tz: string;
   ui_main_tz_footer: string;
+  ui_main_time_format: string;
+  ui_main_time_format_auto: string;
+  ui_main_time_format_footer: string;
+  // Note shown wherever the Web App renders timestamps: which timezone they
+  // are displayed in (the viewer's device, or the profile override).
+  ui_time_note_local: string;
+  ui_time_note_tz: (tz: string) => string;
   ui_main_language: string;
   ui_main_language_footer: string;
   ui_main_lang_english: string;
@@ -603,7 +610,13 @@ const en: Strings = {
   ui_main_timezone: "Timezone",
   ui_main_use_my_tz: "Use my timezone",
   ui_main_tz_footer:
-    "Sent to the AI as the current date/time. Off uses the chat or global timezone.",
+    "Sent to the AI as the current date/time; also used for times shown in this app. Off uses the chat or global timezone for the AI and your device's timezone here.",
+  ui_main_time_format: "Time Format",
+  ui_main_time_format_auto: "Auto (as on your device)",
+  ui_main_time_format_footer:
+    "How dates and times are shown in this app. Auto follows your device's format.",
+  ui_time_note_local: "Times are shown in your device's local timezone.",
+  ui_time_note_tz: (tz) => `Times are shown in the ${tz} timezone.`,
   ui_main_language: "Language",
   ui_main_language_footer:
     "Language for the bot UI and AI replies.",
@@ -1019,7 +1032,14 @@ const ru: Strings = {
   ui_main_timezone: "Часовой пояс",
   ui_main_use_my_tz: "Использовать мой пояс",
   ui_main_tz_footer:
-    "Передаётся ИИ как текущие дата и время. Выкл — используется пояс чата или глобальный.",
+    "Передаётся ИИ как текущие дата и время; также используется для времени в этом приложении. Выкл — для ИИ берётся пояс чата или глобальный, здесь — пояс устройства.",
+  ui_main_time_format: "Формат времени",
+  ui_main_time_format_auto: "Авто (как на устройстве)",
+  ui_main_time_format_footer:
+    "Как отображаются дата и время в этом приложении. Авто — по настройкам устройства.",
+  ui_time_note_local:
+    "Время указано в локальном часовом поясе вашего устройства.",
+  ui_time_note_tz: (tz) => `Время указано в часовом поясе ${tz}.`,
   ui_main_language: "Язык",
   ui_main_language_footer:
     "Язык интерфейса бота и ответов ИИ.",

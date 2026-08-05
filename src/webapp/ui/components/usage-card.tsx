@@ -2,12 +2,14 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { useI18n } from "../i18n-context";
+import { useDateFmt } from "../datetime-context";
 import type { UsageStatus, WindowStatus } from "../../../ratelimit/window";
 import { Card } from "./layout";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
 
 function WindowRows({ label, w }: { label: string; w: WindowStatus }) {
   const { t: s } = useI18n();
+  const { format } = useDateFmt();
   return (
     <>
       <div className={ROW_CLS}>
@@ -19,7 +21,7 @@ function WindowRows({ label, w }: { label: string; w: WindowStatus }) {
       <div className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_resets}</span>
         <span className={ROW_VALUE_CLS}>
-          {new Date(w.resetMs).toLocaleString()}
+          {format(w.resetMs)}
         </span>
       </div>
     </>
