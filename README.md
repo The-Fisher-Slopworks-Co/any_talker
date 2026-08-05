@@ -23,8 +23,10 @@ Telegram bot with AI integration via any OpenAI-compatible API.
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 
-> Voice-note understanding requires `ffmpeg` on the host (the Docker image
-> installs it): Telegram ogg/opus is transcoded to mp3 before being sent.
+> Voice notes require `ffmpeg` on the host (the Docker image installs it):
+> Telegram ogg/opus is transcoded to mp3 before being sent. ffmpeg is also what
+> reduces a video to frames + soundtrack on models that don't take video input;
+> models that do get the clip whole and need no ffmpeg at all.
 
 ## Run
 
@@ -106,6 +108,7 @@ following metric families:
 | `bot_budget_denied_total` | counter | `reason` | Requests denied by a USD budget cap (global/chat/new-user) |
 | `bot_reminders_delivered_total` | counter | `outcome` | Reminder scheduler results |
 | `bot_checks_processed_total` | counter | `outcome` | Recurring-check fires/timeouts/answers |
+| `bot_video_extractions_total` | counter | `outcome` | Video attachments turned into model input (native / frames / too long / too large / failed) |
 | `http_requests_total` | counter | `method`, `route`, `status` | Web App / API traffic |
 | `http_request_duration_seconds` | histogram | `method`, `route` | Web App / API latency |
 | `process_uptime_seconds` | gauge | — | Process uptime |
@@ -126,6 +129,16 @@ are supported as `host:port`).
 ## Features
 
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
+- Media understanding — attach the `/ask` as a caption on a **photo** (albums included), a **voice
+  note**, a **video**, or a **GIF**, or reply with `/ask` to any of those (video notes included).
+  Photos go to the model as-is; voice notes are transcoded to mp3. A **video is sent whole** when
+  the configured model accepts video input (Gemini & co — the bot reads that off the endpoint's
+  `/models` modalities), so the model sees real motion and hears the soundtrack; on a model without
+  video input it falls back to a handful of evenly spaced frames plus the audio track. Clips longer
+  than **60 seconds**, or above Telegram's 20 MB download ceiling, are refused with a note saying
+  which limit was hit. The duration cap is a cost guard: native video is billed by clip length
+  (Gemini charges ~260 tokens per second), so a few minutes of footage would swallow a user's whole
+  token window in one ask.
 - Tool calling — built-in `random_number` tool; add new tools via `registerTool()`.
 - Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, edit a
   reminder's note or time, or cancel them by description; the AI drives this via the

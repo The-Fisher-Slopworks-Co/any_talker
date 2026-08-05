@@ -10,7 +10,13 @@ import {
   type ToolSet,
 } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { AIClient, AIMessage, AskResult, RoutingOptions } from "./types";
+import type {
+  AIClient,
+  AIMessage,
+  AIUserContentPart,
+  AskResult,
+  RoutingOptions,
+} from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
 import type { ProviderSort, ReasoningEffort } from "../shared/types";
 import type { PriceLookup } from "./model-catalog";
@@ -174,7 +180,7 @@ export class OpenAICompatClient implements AIClient {
     attribution?: AppAttribution;
     // Defaults to the proxy-aware fetch. Injectable so tests can assert the
     // request body the provider package actually produces — the capability gate
-    // is only as good as that contract.
+    // is only as good as that contract, and so is the video escape hatch below.
     fetch?: typeof globalThis.fetch;
   }) {
     this.pricing = opts.pricing;
@@ -285,10 +291,40 @@ export function computeCostUsd(
 // generic `file` parts; the openai-compatible provider converts an `audio/*`
 // file part into the `input_audio` body field — but it accepts only wav/mp3, so
 // callers must transcode Telegram's ogg voice notes before they reach here.
+//
+// Video is the exception. Endpoints do take it (OpenRouter's `video_url` part,
+// which Gemini consumes natively), but `@ai-sdk/openai-compatible` has no video
+// mapping at all — not in the installed 2.x, not in 3.x — and throws
+// `UnsupportedFunctionalityError` on any `video/*` file part. So a message
+// carrying a clip is emitted through the provider's own escape hatch instead:
+// `providerOptions.openaiCompatible` is spread over the built message *after*
+// `content`, so a `content` key there replaces what the converter produced. The
+// SDK-visible content stays a single text part (which the converter is happy
+// with) and the body that goes out is the array we built by hand.
+//
+// `compat-client.test.ts` asserts the emitted request body, so an SDK upgrade
+// that changes this mechanism fails loudly instead of silently dropping video.
 function toModelMessages(messages: AIMessage[]): ModelMessage[] {
   return messages.map((m) => {
     if (m.role === "assistant") return { role: "assistant", content: m.content };
     if (typeof m.content === "string") return { role: "user", content: m.content };
+
+    if (m.content.some((p) => p.type === "video")) {
+      const text = m.content.find((p) => p.type === "text");
+      return {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: text?.type === "text" ? text.text : "",
+            providerOptions: {
+              openaiCompatible: { content: toOpenAIContent(m.content) },
+            },
+          },
+        ],
+      };
+    }
+
     return {
       role: "user",
       content: m.content.map((part) => {
@@ -299,8 +335,45 @@ function toModelMessages(messages: AIMessage[]): ModelMessage[] {
             return { type: "image", image: part.image, mediaType: part.mediaType };
           case "audio":
             return { type: "file", data: part.audio, mediaType: part.mediaType };
+          case "video":
+            // Unreachable: a video-carrying message took the branch above.
+            throw new Error("video part must go through the escape hatch");
         }
       }),
     };
   });
+}
+
+// The OpenAI chat-completions content array, built by hand for the one case the
+// SDK converter can't express. Mirrors what the provider emits for text/image/
+// audio so a mixed message (an album with a clip in it) still looks identical.
+function toOpenAIContent(parts: AIUserContentPart[]): JSONValue[] {
+  return parts.map((part) => {
+    switch (part.type) {
+      case "text":
+        return { type: "text", text: part.text };
+      case "image":
+        return {
+          type: "image_url",
+          image_url: { url: dataUrl(part.mediaType, part.image) },
+        };
+      case "audio":
+        return {
+          type: "input_audio",
+          input_audio: {
+            data: Buffer.from(part.audio).toString("base64"),
+            format: part.mediaType === "audio/wav" ? "wav" : "mp3",
+          },
+        };
+      case "video":
+        return {
+          type: "video_url",
+          video_url: { url: dataUrl(part.mediaType, part.video) },
+        };
+    }
+  });
+}
+
+function dataUrl(mediaType: string, bytes: Uint8Array): string {
+  return `data:${mediaType};base64,${Buffer.from(bytes).toString("base64")}`;
 }

@@ -19,6 +19,7 @@ import type { PersonaResolver } from "../../managed-bots/persona";
 import type { ToolEffect } from "../../ai/tools/registry";
 import type { DetailLevel } from "../../ai/instruction";
 import type { Lang } from "../../shared/i18n";
+import type { VideoClip } from "../video";
 import type { WindowKind, BudgetDenyReason } from "../../shared/types";
 
 export type AskInput = {
@@ -41,6 +42,12 @@ export type AskInput = {
   quote: string | null;
   images: Uint8Array[];
   audios?: Uint8Array[];
+  // Whole clips, sent when the answering model advertises video input. Empty in
+  // frames mode, where the clip already arrived as `images` + `audios`.
+  videos?: VideoClip[];
+  // Describes media the parts alone don't explain — video frames (see
+  // `bot/video.ts`). Goes into the user envelope, so it is persisted too.
+  attachments?: string;
   imageFileIds: string[];
   replyImageFileIds: string[];
   replyTarget: ReplyTarget | null;
@@ -116,12 +123,14 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   if (!allowed) return { kind: "denied" };
 
   const audios = input.audios ?? [];
+  const videos = input.videos ?? [];
   const hasQuote = input.quote !== null && input.quote.trim() !== "";
   if (
     input.userText.trim() === "" &&
     !hasQuote &&
     input.images.length === 0 &&
-    audios.length === 0
+    audios.length === 0 &&
+    videos.length === 0
   ) {
     if (input.replyTarget === null) return { kind: "usage" };
     // A reply keeps a bare /ask meaningful only when the replied-to message
@@ -157,6 +166,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         sender: input.sender,
         quote: input.quote,
         text: input.userText,
+        attachments: input.attachments,
       }),
       botAnswer,
       parentBotMsgId,
@@ -219,6 +229,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     quote: input.quote,
     images: input.images,
     audios,
+    videos,
+    attachments: input.attachments,
     replyTarget: input.replyTarget,
     fetchPhoto: input.fetchPhoto,
   });

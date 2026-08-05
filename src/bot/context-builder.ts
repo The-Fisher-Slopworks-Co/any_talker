@@ -6,6 +6,7 @@ import type { AIMessage, AIUserContentPart } from "../ai/types";
 import type { Gender } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
+import type { VideoClip } from "./video";
 
 export type ReplyTarget = {
   messageId: number;
@@ -13,6 +14,11 @@ export type ReplyTarget = {
   authorFirstName: string | null;
   images: Uint8Array[];
   audios?: Uint8Array[];
+  // Whole clips, when the answering model takes video natively.
+  videos?: VideoClip[];
+  // What the attached media actually is, when that isn't self-evident — in
+  // frames mode a video arrives as stills, which would read as loose photos.
+  mediaNote?: string;
 };
 
 // Picks the storage view that holds a chat's conversation graph.
@@ -62,6 +68,8 @@ export type BuildContextArgs = {
   quote: string | null;
   images: Uint8Array[];
   audios?: Uint8Array[];
+  videos?: VideoClip[];
+  attachments?: string;
   replyTarget: ReplyTarget | null;
   maxDepth?: number;
   fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
@@ -71,6 +79,9 @@ export function buildUserEnvelope(args: {
   sender: Sender;
   quote: string | null;
   text: string;
+  // Describes media that isn't self-evident from the parts themselves (video
+  // frames). Persisted with the turn, so a follow-up reads the same envelope.
+  attachments?: string;
 }): string {
   const override = args.sender.nameOverride?.trim() ?? "";
   const author =
@@ -81,6 +92,7 @@ export function buildUserEnvelope(args: {
   const obj: Record<string, string> = { author };
   if (args.sender.gender !== null) obj.gender = args.sender.gender;
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
+  if (args.attachments) obj.attachments = args.attachments;
   obj.text = args.text;
   return JSON.stringify(obj);
 }
@@ -89,6 +101,7 @@ export function withMedia(
   text: string,
   images: Uint8Array[],
   audios: Uint8Array[],
+  videos: VideoClip[] = [],
 ): AIUserContentPart[] {
   const parts: AIUserContentPart[] = [{ type: "text", text }];
   for (const image of images) {
@@ -96,6 +109,11 @@ export function withMedia(
   }
   for (const audio of audios) {
     parts.push({ type: "audio", audio, mediaType: VOICE_MEDIA_TYPE });
+  }
+  // Whole clips, for a model that takes video natively; a model that doesn't
+  // never gets one — the dispatcher hands over sampled frames as images instead.
+  for (const clip of videos) {
+    parts.push({ type: "video", video: clip.bytes, mediaType: clip.mediaType });
   }
   return parts;
 }
@@ -107,12 +125,18 @@ export function withMedia(
 export function buildReplyFallbackMessage(replyTarget: ReplyTarget): AIMessage {
   const author = replyTarget.authorFirstName ?? "unknown";
   const text = replyTarget.text ?? "<media>";
-  const header = `Context (replied message from ${author}): ${text}`;
+  const note = replyTarget.mediaNote ? `, ${replyTarget.mediaNote}` : "";
+  const header = `Context (replied message from ${author}${note}): ${text}`;
   const replyAudios = replyTarget.audios ?? [];
-  if (replyTarget.images.length > 0 || replyAudios.length > 0) {
+  const replyVideos = replyTarget.videos ?? [];
+  if (
+    replyTarget.images.length > 0 ||
+    replyAudios.length > 0 ||
+    replyVideos.length > 0
+  ) {
     return {
       role: "user",
-      content: withMedia(header, replyTarget.images, replyAudios),
+      content: withMedia(header, replyTarget.images, replyAudios, replyVideos),
     };
   }
   return { role: "user", content: header };
@@ -121,6 +145,7 @@ export function buildReplyFallbackMessage(replyTarget: ReplyTarget): AIMessage {
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
   const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
   const audios = args.audios ?? [];
+  const videos = args.videos ?? [];
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   const messages: AIMessage[] = [];
 
@@ -156,11 +181,20 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
     hasQuote ||
     images.length > 0 ||
     audios.length > 0 ||
+    videos.length > 0 ||
     endsWithAssistant
   ) {
-    const envelope = buildUserEnvelope({ sender, quote, text: userText });
-    if (images.length > 0 || audios.length > 0) {
-      messages.push({ role: "user", content: withMedia(envelope, images, audios) });
+    const envelope = buildUserEnvelope({
+      sender,
+      quote,
+      text: userText,
+      attachments: args.attachments,
+    });
+    if (images.length > 0 || audios.length > 0 || videos.length > 0) {
+      messages.push({
+        role: "user",
+        content: withMedia(envelope, images, audios, videos),
+      });
     } else {
       messages.push({ role: "user", content: envelope });
     }

@@ -269,6 +269,49 @@ describe("buildContext", () => {
     expect(msgs[0]).toEqual({ role: "user", content: `Q${depth - 4}` });
   });
 
+  test("attachments describe media the parts alone don't explain (video frames)", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what happens here",
+      quote: null,
+      replyTarget: null,
+      images: [new Uint8Array([1]), new Uint8Array([2])],
+      attachments: "2 frames sampled in chronological order from a video (9s)",
+    });
+    const parts = msgs[0]!.content as { type: string; text?: string }[];
+    expect(JSON.parse(parts[0]!.text!)).toEqual({
+      author: "John Doe",
+      attachments: "2 frames sampled in chronological order from a video (9s)",
+      text: "what happens here",
+    });
+  });
+
+  test("the reply fallback carries the reply's own media note", async () => {
+    const storage = new MemoryStorage();
+    const msgs = await buildContext({
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "what does he say",
+      quote: null,
+      replyTarget: {
+        messageId: 12,
+        text: null,
+        authorFirstName: "Alice",
+        images: [new Uint8Array([1])],
+        mediaNote: "1 frame sampled from a round video note (5s)",
+      },
+      images: [],
+    });
+    const parts = msgs[0]!.content as { type: string; text?: string }[];
+    expect(parts[0]!.text).toBe(
+      "Context (replied message from Alice, 1 frame sampled from a round video note (5s)): <media>",
+    );
+  });
+
   test("reply target without text uses <media> placeholder", async () => {
     const storage = new MemoryStorage();
     const msgs = await buildContext({

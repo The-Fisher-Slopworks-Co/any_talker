@@ -36,6 +36,9 @@ export type BotManagerDeps = {
   rateLimiter: RateLimiter;
   budgetGuard: BudgetGuard;
   ai: AIClient;
+  // Passed straight through to every character bot: whether the answering model
+  // takes video input (decides whole clip vs sampled frames).
+  supportsVideoInput?: (modelId: string) => Promise<boolean>;
   ownerId: string;
   // The main bot's api — used to broker managed bot tokens (getManagedBotToken).
   mainApi: Api;
@@ -143,6 +146,7 @@ export class BotManager {
       budgetGuard: this.deps.budgetGuard,
       ai: this.deps.ai,
       resolver: createManagedPersonaResolver(this.deps.storage, record.botId),
+      supportsVideoInput: this.deps.supportsVideoInput,
       persona: { botId: record.botId },
       siblingBotIds: () => this.siblingBotIds(record.botId),
       logFormat: this.deps.logFormat,

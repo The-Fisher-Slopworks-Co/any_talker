@@ -149,6 +149,20 @@ export const photoCacheErrorsTotal = registry.register(
   ),
 );
 
+// --- Media metrics ---------------------------------------------------------
+
+// Videos are the one attachment with a real failure surface (a 20 MB download,
+// and in frames mode two ffmpeg passes on top), so the outcomes are counted
+// rather than only logged. `native` vs `frames` also shows how often the
+// configured model can take a clip whole.
+export const videoExtractionsTotal = registry.register(
+  new Counter(
+    "bot_video_extractions_total",
+    "Telegram video attachments turned into model input, by outcome (native / frames / too_large / too_long / download_failed / extract_failed).",
+    ["outcome"],
+  ),
+);
+
 // --- Self-instrumentation --------------------------------------------------
 
 export const metricsCollectorErrorsTotal = registry.register(

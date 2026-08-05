@@ -40,6 +40,13 @@ const pad2 = (n: number) => n.toString().padStart(2, "0");
 type Strings = {
   bot_photo_cant_fetch: string;
   bot_voice_cant_fetch: string;
+  bot_video_cant_fetch: string;
+  // A clip over Telegram's getFile ceiling can't be downloaded at all, so the
+  // user is told the actual limit rather than a generic failure.
+  bot_video_too_large: (maxMb: number) => string;
+  // Same idea for the duration cap: name the limit so the user can trim and
+  // resend rather than guess why nothing happened.
+  bot_video_too_long: (maxSeconds: number) => string;
   bot_ask_usage: string;
   bot_rate_limited: (limitedBy: WindowKind, msUntilReset: number) => string;
   // Shown to a user denied by a hard USD budget cap. Deliberately generic — it
@@ -520,6 +527,11 @@ function settingsUpdatedRu(changes: UserSettingChange[]): string {
 const en: Strings = {
   bot_photo_cant_fetch: "⚠️ Couldn't fetch the attached photo.",
   bot_voice_cant_fetch: "⚠️ Couldn't fetch the voice message.",
+  bot_video_cant_fetch: "⚠️ Couldn't process the attached video.",
+  bot_video_too_large: (maxMb) =>
+    `⚠️ The video is too large — Telegram only lets bots download files up to ${maxMb} MB.`,
+  bot_video_too_long: (maxSeconds) =>
+    `⚠️ The video is too long — I take clips up to ${maxSeconds} seconds.`,
   bot_ask_usage:
     "Usage: /ask <text> (short), /askwise <text> (detailed) — or reply to a message with either.",
   bot_rate_limited: (limitedBy, ms) =>
@@ -988,6 +1000,11 @@ const en: Strings = {
 const ru: Strings = {
   bot_photo_cant_fetch: "⚠️ Не удалось загрузить прикреплённое фото.",
   bot_voice_cant_fetch: "⚠️ Не удалось загрузить голосовое сообщение.",
+  bot_video_cant_fetch: "⚠️ Не удалось обработать прикреплённое видео.",
+  bot_video_too_large: (maxMb) =>
+    `⚠️ Видео слишком большое — Telegram разрешает ботам скачивать файлы не больше ${maxMb} МБ.`,
+  bot_video_too_long: (maxSeconds) =>
+    `⚠️ Видео слишком длинное — принимаю ролики не длиннее ${maxSeconds} секунд.`,
   bot_ask_usage:
     "Использование: /ask <текст> (коротко), /askwise <текст> (подробно) — или ответь на сообщение любой из этих команд.",
   bot_rate_limited: (limitedBy, ms) =>
