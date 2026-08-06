@@ -130,7 +130,7 @@ flowchart TB
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
 | `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
-| `src/ai/` | OpenAI-compatible client, provider capability profile, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, message (de)serialization, AI types. | `compat-client.ts`, `provider-profile.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `serialize.ts`, `types.ts` |
+| `src/ai/` | OpenAI-compatible client, provider capability profile, model catalogue + pricing, system-prompt builder, the shared LLM turn runner, the conversation session key, message (de)serialization, AI types. | `compat-client.ts`, `provider-profile.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `session.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
 | `src/managed-bots/` | Owner-created character bots (Bot API 9.6): lifecycle manager, persona resolver, native-creation handling, avatar + input validation. | `manager.ts`, `persona.ts`, `avatar.ts`, `validate.ts`, `types.ts` |
 | `src/storage/` | `Storage` interface (+ per-character `forBot` scoping) + KeyDB impl (prod) + in-memory double (tests) + the group→supergroup chat-data migration. | `types.ts`, `keydb.ts`, `memory.ts`, `migrate-chat.ts` |
@@ -315,9 +315,10 @@ provider's message-part `providerOptions` escape hatch (see the Bot section).
 
 What it sends beyond the standard OpenAI surface is decided by the injected
 `ProviderCapabilities` from **`provider-profile.ts`** — the fallback chain
-(`models`), provider routing (`provider`), `service_tier`, usage accounting, and
-which of the two reasoning spellings to use. On the `generic` profile none of
-that is emitted, because a strict endpoint answers HTTP 400 to an unknown body
+(`models`), provider routing (`provider`), `service_tier`, usage accounting, the
+sticky-routing session key (`session_id`), and which of the two reasoning
+spellings to use. On the `generic` profile none of that is emitted, because a
+strict endpoint answers HTTP 400 to an unknown body
 field; the flavour is inferred from the base-URL host and can be pinned with
 `AI_PROVIDER_FLAVOR`. Gateway-specific fields travel through the SDK's
 `providerOptions` passthrough — no second provider package. See
@@ -348,13 +349,22 @@ stable-first, with the user's facts (which `remember_fact` can change
 mid-conversation) last. Two consequences worth keeping: whatever is added to
 `buildInstruction` must be constant for the life of a conversation, and a turn's
 persisted envelope must be byte-identical to the one that was sent to the model
-(`ask.ts` derives both from one `sentAt`, and a test pins it). `turn.ts` (`runAiTurn`) is the **one deep
+(`ask.ts` derives both from one `sentAt`, and a test pins it). A stable prefix
+only pays off if the request reaches the provider that cached it, which is what
+**`session.ts`** is for: `conversationSessionId(botId, chatId)` is sent as
+`session_id` where the profile allows, and the gateway routes that session
+stickily. The unit is one character in one chat — the scope over which the
+system prompt is constant — so parallel reply chains in a group share a
+provider rather than scattering across several.
+
+`turn.ts` (`runAiTurn`) is the **one deep
 interface the three LLM call sites share** — `/ask`, guest mode, and reminder
 delivery: given domain inputs (persona, messages, source, detail level, facts,
 identity/locale) it assembles the request (`buildInstruction` + `getAllTools()` +
-the `ToolCallContext` literal, including the mutable `effects` array), calls
-`ai.ask`, then does the post-call accounting — owner-exempt token deduction with
-the detail-level multiplier, and the four-ledger `recordSpend` fan-out (with the
+the session key + the `ToolCallContext` literal, including the mutable `effects`
+array), calls `ai.ask`, then does the post-call accounting — owner-exempt token
+deduction with the detail-level multiplier, and the four-ledger `recordSpend`
+fan-out (with the
 `?? null`/`?? 0`/`?? true` defaults, best-effort by `.catch`). It returns
 `{ text, totalTokens, modelId, costUsd, priced, effects }`; it does **not** own
 the access/budget/rate-limit gates, message assembly, the try/catch that maps an

@@ -31,6 +31,11 @@ import { aiRequestDurationSeconds, aiRequestsTotal } from "../metrics";
 // which is how the gateway-specific fields below travel.
 const PROVIDER_NAME = "compat";
 
+// The documented ceiling on `session_id`. A longer value is rejected, and the
+// rejection costs the whole request — so the id is clamped here, at the wire
+// boundary, rather than every caller being trusted to keep it short.
+const MAX_SESSION_ID_LENGTH = 256;
+
 type CompatProvider = ReturnType<typeof createOpenAICompatible>;
 
 // App attribution, sent as request headers so a gateway can credit the traffic
@@ -69,6 +74,8 @@ export function buildProviderOptions(
     fallbackModels: string[];
     routing: RoutingOptions;
     reasoningEffort?: ReasoningEffort | null;
+    // Stable id of the conversation this request belongs to (`ai/session.ts`).
+    sessionId?: string | null;
   },
 ): Record<string, JSONValue> | undefined {
   const out: Record<string, JSONValue> = {};
@@ -90,6 +97,12 @@ export function buildProviderOptions(
   }
   if (caps.serviceTier && opts.routing.serviceTier) {
     out.service_tier = opts.routing.serviceTier;
+  }
+  if (caps.sessionId && opts.sessionId) {
+    // Sticky routing: keeps the conversation on the provider whose prompt cache
+    // is already warm for it. Advisory, and deliberately so — a pinned provider
+    // still wins, since an explicit `provider.order` outranks stickiness.
+    out.session_id = opts.sessionId.slice(0, MAX_SESSION_ID_LENGTH);
   }
   if (opts.reasoningEffort) {
     if (caps.unifiedReasoning) out.reasoning = { effort: opts.reasoningEffort };
@@ -201,6 +214,7 @@ export class OpenAICompatClient implements AIClient {
     tools: Tool[];
     routing?: RoutingOptions;
     reasoningEffort?: ReasoningEffort | null;
+    sessionId?: string | null;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult> {
     const [primary, ...fallbacks] = opts.models;
@@ -226,6 +240,7 @@ export class OpenAICompatClient implements AIClient {
       fallbackModels: fallbacks,
       routing: opts.routing ?? {},
       reasoningEffort: opts.reasoningEffort,
+      sessionId: opts.sessionId,
     });
 
     const start = performance.now();
