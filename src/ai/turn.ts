@@ -7,6 +7,7 @@ import type { AIClient, AIMessage, RoutingOptions } from "./types";
 import type { RateLimitConfig } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import { recordSpend } from "../spending/record";
+import { conversationSessionId } from "./session";
 import { getAllTools, type ToolCallSource, type ToolEffect } from "./tools/registry";
 import {
   buildInstruction,
@@ -47,7 +48,9 @@ export type RunAiTurnInput = {
   // gates them on what the configured endpoint supports.
   routing?: RoutingOptions;
 
-  // Identity / addressing.
+  // Identity / addressing. `botId` + `chatId` also derive the provider session
+  // key (see `ai/session.ts`) — the three call sites get one consistent rule
+  // instead of each inventing its own notion of "the same conversation".
   userId: string;
   ownerId: string;
   chatId: string;
@@ -112,6 +115,7 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
     reasoningEffort: input.detailLevel
       ? detailLevelReasoningEffort(input.detailLevel)
       : undefined,
+    sessionId: conversationSessionId(input.botId, input.chatId),
     toolCallContext: {
       source: input.source,
       chatId: input.chatId,

@@ -68,6 +68,10 @@ export interface AIClient {
     tools: Tool[];
     routing?: RoutingOptions;
     reasoningEffort?: ReasoningEffort | null;
+    // Stable id of the conversation this turn belongs to, for a gateway that
+    // routes a session stickily to keep its prompt cache warm (`ai/session.ts`).
+    // Like `routing`, it only reaches the wire where the profile allows it.
+    sessionId?: string | null;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult>;
 }
