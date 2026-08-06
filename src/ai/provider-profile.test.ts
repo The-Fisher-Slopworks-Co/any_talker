@@ -72,6 +72,7 @@ describe("capabilitiesFor", () => {
       usageAccounting: true,
       endpointStats: true,
       unifiedReasoning: true,
+      sessionId: true,
     });
   });
 
@@ -85,6 +86,7 @@ describe("capabilitiesFor", () => {
       usageAccounting: false,
       endpointStats: false,
       unifiedReasoning: false,
+      sessionId: false,
     });
   });
 

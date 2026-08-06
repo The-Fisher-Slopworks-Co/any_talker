@@ -36,6 +36,11 @@ export type ProviderCapabilities = {
   // rather than OpenAI's flat `reasoning_effort`. Exactly one spelling is sent —
   // both at once would be two names for one setting in a single body.
   unifiedReasoning: boolean;
+  // `session_id` body field — a stable id for the conversation a request belongs
+  // to. The gateway uses it as the sticky-routing key, so every turn of one
+  // conversation lands on the upstream provider that already holds a warm prompt
+  // cache for it instead of drifting between providers and paying full price.
+  sessionId: boolean;
 };
 
 const PROFILES: Record<ProviderFlavor, ProviderCapabilities> = {
@@ -46,6 +51,7 @@ const PROFILES: Record<ProviderFlavor, ProviderCapabilities> = {
     usageAccounting: true,
     endpointStats: true,
     unifiedReasoning: true,
+    sessionId: true,
   }),
   // Everything off — the plain OpenAI chat-completions contract and nothing more.
   generic: Object.freeze({
@@ -55,6 +61,7 @@ const PROFILES: Record<ProviderFlavor, ProviderCapabilities> = {
     usageAccounting: false,
     endpointStats: false,
     unifiedReasoning: false,
+    sessionId: false,
   }),
 };
 
