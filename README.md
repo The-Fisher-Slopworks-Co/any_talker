@@ -16,10 +16,12 @@ Telegram bot with AI integration via any OpenAI-compatible API.
    - `BOT_OWNER_ID` — your Telegram user ID
 
    On OpenRouter the bot additionally offers a model fallback chain, provider
-   routing, service tiers, exact per-request cost, and per-provider stats in the
-   admin model picker. It detects that from the base URL; `AI_PROVIDER_FLAVOR`
-   pins it when a proxy hides the host. Nothing non-standard is ever sent to a
-   plain OpenAI endpoint. See [`docs/ai-provider.md`](docs/ai-provider.md).
+   routing, service tiers, exact per-request cost, per-provider stats in the
+   admin model picker, and sticky per-conversation routing so a chat keeps
+   hitting the same provider's warm prompt cache. It detects that from the base
+   URL; `AI_PROVIDER_FLAVOR` pins it when a proxy hides the host. Nothing
+   non-standard is ever sent to a plain OpenAI endpoint. See
+   [`docs/ai-provider.md`](docs/ai-provider.md).
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 

@@ -35,6 +35,7 @@ standard surface. Two profiles:
 | `usageAccounting` | ✅ | ❌ | Per-request USD cost read back from `usage.cost` |
 | `endpointStats` | ✅ | ❌ | Per-provider price/throughput/latency in the admin model card |
 | `unifiedReasoning` | ✅ | ❌ | `reasoning: { effort }` instead of the flat `reasoning_effort` |
+| `sessionId` | ✅ | ❌ | `session_id`, the sticky-routing key that keeps a conversation on one provider |
 
 **Why the gate is load-bearing:** a strict endpoint — OpenAI's own API among them
 — answers `HTTP 400 Unrecognized request argument` when the body carries a field
@@ -59,6 +60,7 @@ it only renders controls the deployment can honour.
 | Multimodal audio input (`input_audio`) | Accepts **only wav/mp3** — Telegram ogg/opus voice notes are transcoded to mp3 first (`src/bot/transcode.ts`, ffmpeg). |
 | Multimodal video input (`video_url`) | Sent as a base64 data URL, but only to a model whose catalogue entry lists `video` among its input modalities (verified live against OpenRouter + Gemini); any other model gets sampled frames instead. This is a **per-model** gate, not a provider-profile one: `video_url` is a content-part shape, so a strict endpoint rejects the model, not the whole body. `@ai-sdk/openai-compatible` cannot express a video part in any version, so the client emits it through message-part `providerOptions.openaiCompatible.content` — pinned by a request-body test in `compat-client.test.ts`. |
 | `GET /v1/models` | Server-side catalogue + pricing (`src/ai/model-catalog.ts`). Tolerates a bare `{data:[{id}]}` list and richer gateway shapes with `pricing` / `architecture.input_modalities` / `supported_parameters`; prompt-caching support is inferred from `pricing.input_cache_read` / `input_cache_write`. |
+| Session stickiness (`session_id`) | `tg:{botId\|main}:{chatId}` (`src/ai/session.ts`), derived in `runAiTurn` so /ask, guest mode and reminder delivery all agree on what "the same conversation" is. The gateway routes a session to the provider whose prompt cache is already warm for it. Advisory: a **pinned provider wins**, because an explicit `provider.order` outranks stickiness. Clamped to the documented 256 chars at the wire boundary. |
 | Token usage (`input`/`output`/`total`) | `input`/`output` drive local cost; `total` drives the rate limiter. |
 | App attribution | `HTTP-Referer` / `X-Title` from `OPENROUTER_APP_URL` / `OPENROUTER_APP_TITLE`, sent as request headers. Ignored by endpoints that don't read them. |
 

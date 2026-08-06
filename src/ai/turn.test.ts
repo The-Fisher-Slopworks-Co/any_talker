@@ -8,6 +8,7 @@ import { DualWindowLimiter } from "../ratelimit/dual-window";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { RateLimiter } from "../ratelimit/types";
 import { runAiTurn, type RunAiTurnInput } from "./turn";
+import { conversationSessionId } from "./session";
 import {
   registerTool,
   _resetRegistryForTest,
@@ -80,6 +81,24 @@ describe("runAiTurn — request assembly", () => {
     const ai = new FakeAI();
     await runAiTurn(baseInput({ ai }));
     expect(ai.calls[0]?.routing).toBeUndefined();
+  });
+
+  // The sticky-routing key every call site gets for free, so a conversation
+  // keeps landing on the provider whose prompt cache is warm for it.
+  test("derives the session id from the answering bot and the chat", async () => {
+    const ai = new FakeAI();
+    await runAiTurn(baseInput({ ai, botId: "777", chatId: "-100123" }));
+    expect(ai.calls[0]?.sessionId).toBe(
+      conversationSessionId("777", "-100123"),
+    );
+  });
+
+  test("the main bot's session id is distinct from a managed bot's", async () => {
+    const main = new FakeAI();
+    const managed = new FakeAI();
+    await runAiTurn(baseInput({ ai: main, botId: null, chatId: "-100123" }));
+    await runAiTurn(baseInput({ ai: managed, botId: "777", chatId: "-100123" }));
+    expect(main.calls[0]?.sessionId).not.toBe(managed.calls[0]?.sessionId);
   });
 
   test("wires every registered tool into the ai.ask call", async () => {

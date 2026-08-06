@@ -70,6 +70,7 @@ describe("buildProviderOptions", () => {
       fallbackModels: ["b", "c"],
       routing: { providerSort: "price", provider: "deepinfra", serviceTier: "flex" },
       reasoningEffort: "high",
+      sessionId: "tg:main:-100123",
     });
     expect(opts).toEqual({ reasoningEffort: "high" });
   });
@@ -85,6 +86,7 @@ describe("buildProviderOptions", () => {
       fallbackModels: ["b", "c"],
       routing: { providerSort: "price", provider: null, serviceTier: "flex" },
       reasoningEffort: "low",
+      sessionId: "tg:main:-100123",
     });
     expect(opts).toEqual({
       models: ["b", "c"],
@@ -92,6 +94,7 @@ describe("buildProviderOptions", () => {
       service_tier: "flex",
       usage: { include: true },
       reasoning: { effort: "low" },
+      session_id: "tg:main:-100123",
     });
   });
 
@@ -121,6 +124,28 @@ describe("buildProviderOptions", () => {
     });
     expect(generic).toHaveProperty("reasoningEffort", "high");
     expect(generic).not.toHaveProperty("reasoning");
+  });
+
+  test("omits the session when the caller has none", () => {
+    for (const sessionId of [undefined, null, ""]) {
+      const opts = buildProviderOptions(OPENROUTER, {
+        fallbackModels: [],
+        routing: {},
+        sessionId,
+      });
+      expect(opts).not.toHaveProperty("session_id");
+    }
+  });
+
+  // A `session_id` past the documented 256-char ceiling is rejected, and the
+  // rejection costs the whole request — so it is clamped, never passed through.
+  test("clamps an over-long session id to the documented ceiling", () => {
+    const opts = buildProviderOptions(OPENROUTER, {
+      fallbackModels: [],
+      routing: {},
+      sessionId: "s".repeat(300),
+    });
+    expect(opts?.session_id).toBe("s".repeat(256));
   });
 
   test("omits reasoning entirely when no effort is requested", () => {
@@ -263,6 +288,7 @@ describe("OpenAICompatClient — the body that actually goes out", () => {
     capabilities: Parameters<typeof buildProviderOptions>[0];
     models: string[];
     routing?: Parameters<typeof buildProviderOptions>[1]["routing"];
+    sessionId?: string;
     usage?: Record<string, unknown>;
   }) {
     let body: Record<string, unknown> = {};
@@ -288,6 +314,7 @@ describe("OpenAICompatClient — the body that actually goes out", () => {
       tools: [],
       routing: opts.routing,
       reasoningEffort: "high",
+      sessionId: opts.sessionId,
       toolCallContext: {} as never,
     });
     return { body, headers, result };
@@ -298,11 +325,19 @@ describe("OpenAICompatClient — the body that actually goes out", () => {
       capabilities: GENERIC,
       models: ["gpt-4o", "gpt-4o-mini"],
       routing: { providerSort: "price", provider: "deepinfra", serviceTier: "flex" },
+      sessionId: "tg:main:-100123",
     });
     expect(body.model).toBe("gpt-4o");
     expect(body.reasoning_effort).toBe("high");
     // The whole request would 400 on any of these.
-    for (const key of ["models", "provider", "service_tier", "usage", "reasoning"]) {
+    for (const key of [
+      "models",
+      "provider",
+      "service_tier",
+      "usage",
+      "reasoning",
+      "session_id",
+    ]) {
       expect(body).not.toHaveProperty(key);
     }
   });
@@ -312,6 +347,7 @@ describe("OpenAICompatClient — the body that actually goes out", () => {
       capabilities: OPENROUTER,
       models: ["a/primary", "b/backup"],
       routing: { providerSort: "price", provider: null, serviceTier: "flex" },
+      sessionId: "tg:main:-100123",
     });
     expect(body.model).toBe("a/primary");
     expect(body.models).toEqual(["b/backup"]);
@@ -319,6 +355,7 @@ describe("OpenAICompatClient — the body that actually goes out", () => {
     expect(body.service_tier).toBe("flex");
     expect(body.usage).toEqual({ include: true });
     expect(body.reasoning).toEqual({ effort: "high" });
+    expect(body.session_id).toBe("tg:main:-100123");
     expect(body).not.toHaveProperty("reasoning_effort");
   });
 
