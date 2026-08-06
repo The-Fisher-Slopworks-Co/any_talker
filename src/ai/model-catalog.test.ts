@@ -112,7 +112,7 @@ describe("createModelCatalog", () => {
     ],
   };
 
-  test("list returns normalized entries and getPricing resolves prices", async () => {
+  test("list returns normalized entries", async () => {
     const catalog = createModelCatalog({
       baseURL: "https://api.example.com/v1",
       apiKey: "k",
@@ -121,26 +121,6 @@ describe("createModelCatalog", () => {
     await catalog.refresh();
     const list = await catalog.list();
     expect(list.map((m) => m.id)).toEqual(["m1", "m2"]);
-    expect(catalog.getPricing("m1")).toEqual({
-      promptPerToken: 0.000001,
-      completionPerToken: 0.000002,
-    });
-    // m2 has no pricing → null; unknown model → null.
-    expect(catalog.getPricing("m2")).toBeNull();
-    expect(catalog.getPricing("nope")).toBeNull();
-  });
-
-  test("getPricing strips a trailing :variant tag", async () => {
-    const catalog = createModelCatalog({
-      baseURL: "https://api.example.com/v1",
-      apiKey: "k",
-      fetch: async () => jsonResponse(priced),
-    });
-    await catalog.refresh();
-    expect(catalog.getPricing("m1:nitro")).toEqual({
-      promptPerToken: 0.000001,
-      completionPerToken: 0.000002,
-    });
   });
 
   test("builds the URL from baseURL + /models with an auth header", async () => {
@@ -166,10 +146,9 @@ describe("createModelCatalog", () => {
       apiKey: "k",
       fetch: async () => jsonResponse({ error: "nope" }, 500),
     });
-    // list() swallows the error and serves an empty catalogue; getPricing → null.
+    // list() swallows the error and serves an empty catalogue.
     const list = await catalog.list();
     expect(list).toEqual([]);
-    expect(catalog.getPricing("m1")).toBeNull();
   });
 
   test("caches within the TTL (a second list() reuses the fetch)", async () => {

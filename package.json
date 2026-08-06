@@ -21,9 +21,9 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^2.0.51",
     "@mozilla/readability": "^0.6.0",
-    "ai": "latest",
+    "@openrouter/agent": "0.8.0",
+    "@openrouter/sdk": "0.13.67",
     "bun-plugin-tailwind": "^0.1.2",
     "grammy": "^1.43.0",
     "linkedom": "^0.18.12",
@@ -31,6 +31,6 @@
     "react-dom": "latest",
     "tailwindcss": "^4.2.4",
     "turndown": "^7.2.4",
-    "zod": "latest"
+    "zod": "^4.4.3"
   }
 }

@@ -6,7 +6,6 @@ import type {
   ProviderSort,
   ServiceTier,
 } from "../../../shared/types";
-import type { ProviderCapabilities } from "../../../ai/provider-profile";
 
 // The chat-edit form's state, already trimmed and normalized by the view. Each
 // `*Override` flag is the section's toggle: on ⇒ this chat sets its own value,
@@ -32,17 +31,11 @@ export type ChatSettingsDraft = {
 // Builds the body for `PUT /api/admin/chats/:id`.
 //
 // That route **replaces** the record rather than patching it, so an omitted key
-// is a deletion. That makes the capability gate load-bearing in an unobvious
-// way: a routing section the endpoint can't honour isn't rendered, so its state
-// is meaningless — but dropping the field would delete a stored override the
-// admin never saw, on a save meant for something else entirely. Unsupported
-// routing is therefore carried through verbatim; the value costs nothing while
-// inert and works again the moment the deployment points back at a gateway that
-// supports it.
+// is a deletion — which is exactly what an override toggled off should mean.
+// Every section is rendered, so the draft is the whole truth about this chat
+// and nothing has to be carried through from the stored record.
 export function buildChatSettingsPayload(
   draft: ChatSettingsDraft,
-  caps: ProviderCapabilities,
-  original: ChatSettings,
 ): ChatSettings {
   const next: ChatSettings = {};
   if (draft.promptOverride) next.systemPrompt = draft.promptValue;
@@ -50,23 +43,11 @@ export function buildChatSettingsPayload(
   if (draft.botName.length > 0) next.botName = draft.botName;
   if (draft.tzOverride) next.timezone = draft.tzValue;
 
-  if (caps.providerRouting) {
-    // `null` is a real override — "ignore the global pin in this chat" — so it
-    // is written like any other value.
-    if (draft.psOverride) next.providerSort = draft.psValue;
-    if (draft.provOverride) next.provider = draft.provValue;
-  } else {
-    if (original.providerSort !== undefined) {
-      next.providerSort = original.providerSort;
-    }
-    if (original.provider !== undefined) next.provider = original.provider;
-  }
-
-  if (caps.serviceTier) {
-    if (draft.stOverride) next.serviceTier = draft.stValue;
-  } else if (original.serviceTier !== undefined) {
-    next.serviceTier = original.serviceTier;
-  }
+  // `null` is a real override — "ignore the global pin in this chat" — so it
+  // is written like any other value.
+  if (draft.psOverride) next.providerSort = draft.psValue;
+  if (draft.provOverride) next.provider = draft.provValue;
+  if (draft.stOverride) next.serviceTier = draft.stValue;
 
   if (draft.kfEnabled || draft.keywords.length > 0) {
     next.keywordFilter = { enabled: draft.kfEnabled, keywords: draft.keywords };

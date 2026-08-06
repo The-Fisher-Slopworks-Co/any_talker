@@ -2,9 +2,6 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 // Per-model provider stats, fetched from openrouter.ai on the bot's own server.
-// Wired into the API only when the configured provider profile advertises
-// `endpointStats` (see `src/ai/provider-profile.ts`), so a deployment pointed at
-// a plain OpenAI-compatible endpoint never reaches for these URLs.
 //
 // It lives server-side rather than in the Mini App because the browser would hit
 // CORS, and it caches per model so opening the admin model picker repeatedly

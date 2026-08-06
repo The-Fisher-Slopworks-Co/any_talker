@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-// Telegram voice notes are ogg/opus, but the OpenAI-compatible `input_audio`
-// body field accepts only wav/mp3 — the provider throws on anything else. This
-// transcodes ogg → mp3 via the host ffmpeg, streaming through pipes (no temp
-// files). On any failure it returns null and the caller drops the audio part
-// (sending the original ogg would make the provider throw and fail the ask).
+// Telegram voice notes are ogg/opus, but OpenRouter's `input_audio` item
+// accepts only wav/mp3 and throws on anything else. This transcodes ogg → mp3
+// via the host ffmpeg, streaming through pipes (no temp files). On any failure
+// it returns null and the caller drops the audio part (sending the original
+// ogg would throw and fail the ask).
 
-// The mp3 media type the transcoded bytes carry downstream. Must be one of the
-// formats the openai-compatible provider maps to `input_audio` (wav | mp3).
+// The mp3 media type the transcoded bytes carry downstream. Must stay one of
+// the two formats an `input_audio` item accepts (wav | mp3).
 export const TRANSCODED_AUDIO_MEDIA_TYPE = "audio/mp3";
 
 const TRANSCODE_TIMEOUT_MS = 15_000;

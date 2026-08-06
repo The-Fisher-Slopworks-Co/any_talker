@@ -44,8 +44,7 @@ export type RunAiTurnInput = {
   systemPrompt: string;
   rateLimit: RateLimitConfig;
   // Provider routing / service tier from the effective settings, forwarded
-  // untouched. Which parts actually reach the wire is the client's call — it
-  // gates them on what the configured endpoint supports.
+  // untouched; OpenRouter honours all of them.
   routing?: RoutingOptions;
 
   // Identity / addressing. `botId` + `chatId` also derive the provider session
