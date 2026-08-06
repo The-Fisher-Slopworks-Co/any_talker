@@ -196,7 +196,6 @@ type Strings = {
   ui_whitelist_footer_chats: string;
 
   ui_prompt_models: string;
-  ui_prompt_models_footer: string;
   ui_prompt_system_prompt: string;
   ui_prompt_system_prompt_footer: string;
   ui_prompt_placeholder: string;
@@ -204,7 +203,7 @@ type Strings = {
   ui_prompt_timezone_footer: string;
   ui_prompt_expandable_threshold: string;
   ui_prompt_expandable_threshold_footer: string;
-  // Shown only when the configured provider supports server-side fallback.
+  // Footer for the fallback-chain field.
   ui_prompt_models_fallback_footer: string;
   ui_prompt_provider_routing: string;
   ui_prompt_provider_routing_footer: string;
@@ -297,8 +296,7 @@ type Strings = {
   ui_chat_system_prompt_on_footer: string;
   ui_chat_system_prompt_off_footer: (chars: number) => string;
   ui_chat_models: string;
-  ui_chat_models_on_footer: string;
-  // Replaces the above when the provider supports a server-side fallback chain.
+  // Footer for the per-chat fallback-chain field.
   ui_chat_models_fallback_footer: string;
   ui_chat_models_off_footer: (list: string) => string;
   ui_chat_provider_routing: string;
@@ -555,7 +553,7 @@ const en: Strings = {
   bot_digest_top_models: "By model:",
   bot_digest_denials: "Most-denied users:",
   bot_digest_unpriced: (models) =>
-    `⚠️ Unpriced models (spend under-counted): ${models}`,
+    `⚠️ Models with no cost reported (spend under-counted): ${models}`,
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -628,7 +626,7 @@ const en: Strings = {
   ui_spend_denials: "Most-denied users (today)",
   ui_spend_new_users: "New users (7 days)",
   ui_spend_new_chats: "New chats (7 days)",
-  ui_spend_unpriced: "unpriced",
+  ui_spend_unpriced: "no cost reported",
   ui_spend_empty: "Nothing yet.",
   ui_admin_whitelist: "Whitelist",
   ui_admin_whitelist_desc: "Allowed users and chats",
@@ -692,8 +690,6 @@ const en: Strings = {
     "Add entries from a chat's page via \"Add to whitelist\".",
 
   ui_prompt_models: "Models",
-  ui_prompt_models_footer:
-    "The model the bot uses. Only the first model is sent; the endpoint has no server-side fallback.",
   ui_prompt_system_prompt: "System Prompt",
   ui_prompt_system_prompt_footer:
     "Character description embedded into the system instruction.",
@@ -714,7 +710,7 @@ const en: Strings = {
     "Processing tier for requests. Default is standard processing; Flex is cheaper but slower with lower availability; Priority is faster at a higher cost.",
 
   ui_models_model_id: "Model ID",
-  ui_models_not_in_catalog: "This model isn’t in /v1/models.",
+  ui_models_not_in_catalog: "This model isn’t in OpenRouter’s model list.",
   ui_models_fallback_n: (n) => `#${n}`,
   ui_models_remove_fallback: "Remove fallback",
   ui_models_add_fallback: "Add fallback",
@@ -782,7 +778,7 @@ const en: Strings = {
   ui_spending_month: "Last 30 days",
   ui_spending_month_short: (amount) => `30d: ${amount}`,
   ui_spending_footer:
-    "Money spent on AI requests, in USD — the provider's own reported cost where it gives one, otherwise computed from model pricing. Periods are trailing windows by UTC date.",
+    "Money spent on AI requests, in USD — OpenRouter's own reported cost; models it reported no cost for are listed as under-counted. Periods are trailing windows by UTC date.",
 
   ui_chats_all: "All Chats",
   ui_chats_empty: "No chats yet — they appear after the first message.",
@@ -807,7 +803,6 @@ const en: Strings = {
   ui_chat_system_prompt_off_footer: (chars) =>
     `Using global character (${chars} chars).`,
   ui_chat_models: "Models",
-  ui_chat_models_on_footer: "Model used for this chat.",
   ui_chat_models_fallback_footer:
     "Models used for this chat — primary first; fallbacks are tried in order if it fails.",
   ui_chat_models_off_footer: (list) => `Using global: ${list}`,
@@ -1028,7 +1023,7 @@ const ru: Strings = {
   bot_digest_top_models: "По моделям:",
   bot_digest_denials: "Чаще всего отклонялись:",
   bot_digest_unpriced: (models) =>
-    `⚠️ Модели без прайса (траты занижены): ${models}`,
+    `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:
@@ -1101,7 +1096,7 @@ const ru: Strings = {
   ui_spend_denials: "Чаще всего отклонялись (сегодня)",
   ui_spend_new_users: "Новые юзеры (7 дней)",
   ui_spend_new_chats: "Новые чаты (7 дней)",
-  ui_spend_unpriced: "без прайса",
+  ui_spend_unpriced: "нет данных о стоимости",
   ui_spend_empty: "Пока пусто.",
   ui_admin_whitelist: "Белый список",
   ui_admin_whitelist_desc: "Разрешённые пользователи и чаты",
@@ -1166,8 +1161,6 @@ const ru: Strings = {
     "Добавляйте записи со страницы чата через «Добавить в белый список».",
 
   ui_prompt_models: "Модели",
-  ui_prompt_models_footer:
-    "Модель, которую использует бот. Отправляется только первая — у эндпоинта нет серверных запасных вариантов.",
   ui_prompt_system_prompt: "Системный промпт",
   ui_prompt_system_prompt_footer:
     "Описание персонажа, встраиваемое в системную инструкцию.",
@@ -1188,7 +1181,7 @@ const ru: Strings = {
     "Тариф обработки запросов. «По умолчанию» — стандартная обработка; Flex дешевле, но медленнее и менее доступен; Priority быстрее, но дороже.",
 
   ui_models_model_id: "ID модели",
-  ui_models_not_in_catalog: "Этой модели нет в /v1/models.",
+  ui_models_not_in_catalog: "Этой модели нет в списке моделей OpenRouter.",
   ui_models_fallback_n: (n) => `#${n}`,
   ui_models_remove_fallback: "Удалить запасную",
   ui_models_add_fallback: "Добавить запасную",
@@ -1257,7 +1250,7 @@ const ru: Strings = {
   ui_spending_month: "За 30 дней",
   ui_spending_month_short: (amount) => `30д: ${amount}`,
   ui_spending_footer:
-    "Деньги, потраченные на запросы к ИИ, в USD: стоимость, которую сообщил провайдер, либо расчёт по ценам моделей, если он её не сообщает. Периоды — скользящие окна по датам UTC.",
+    "Деньги, потраченные на запросы к ИИ, в USD: стоимость, которую сообщил OpenRouter; модели, по которым он её не сообщил, помечаются как занижающие траты. Периоды — скользящие окна по датам UTC.",
 
   ui_chats_all: "Все чаты",
   ui_chats_empty: "Чатов пока нет — они появятся после первого сообщения.",
@@ -1282,7 +1275,6 @@ const ru: Strings = {
   ui_chat_system_prompt_off_footer: (chars) =>
     `Используется глобальный персонаж (${chars} симв.).`,
   ui_chat_models: "Модели",
-  ui_chat_models_on_footer: "Модель, используемая для этого чата.",
   ui_chat_models_fallback_footer:
     "Модели для этого чата: сначала основная, запасные пробуются по очереди при ошибке.",
   ui_chat_models_off_footer: (list) => `Используется глобально: ${list}`,

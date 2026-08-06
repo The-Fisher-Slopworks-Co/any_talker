@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type {
@@ -21,11 +21,6 @@ import { ProviderSortField } from "../../components/provider-sort-field";
 import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
 import { TimezoneSelect } from "../../components/timezone-select";
-import {
-  fetchProviderProfile,
-  GENERIC_PROFILE,
-  type ProviderCapabilities,
-} from "../../provider-capabilities";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 
 export function PromptTab({
@@ -51,27 +46,9 @@ export function PromptTab({
     String(settings.expandableBlockquoteThreshold),
   );
   const [saving, setSaving] = useState(false);
-  // Which routing controls the configured endpoint can honour. Until it answers,
-  // assume none: showing a control that turns out to be unsupported is worse
-  // than showing it a moment late.
-  const [caps, setCaps] = useState<ProviderCapabilities>(
-    GENERIC_PROFILE.capabilities,
-  );
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchProviderProfile().then((p) => {
-      if (!cancelled) setCaps(p.capabilities);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Save exactly what the card shows. Ids past the first are invisible without a
-  // fallback chain, and one of them being stale (left from a gateway that had
-  // one) would fail the save with an "unknown model" the admin can't see.
-  const trimmed = (caps.modelFallback ? models : models.slice(0, 1))
+  // Save exactly what the card shows.
+  const trimmed = models
     .map((m) => m.trim())
     .filter((m) => m.length > 0);
   const modelsDirty =
@@ -102,10 +79,9 @@ export function PromptTab({
         models: trimmed,
         systemPrompt: prompt,
         timezone,
-        // Sent only where they mean something; a generic endpoint has no routing
-        // to configure, so an untouched control must not write a value.
-        ...(caps.providerRouting ? { providerSort, provider } : {}),
-        ...(caps.serviceTier ? { serviceTier } : {}),
+        providerSort,
+        provider,
+        serviceTier,
         expandableBlockquoteThreshold: parsedThreshold,
       });
       onSaved(next);
@@ -127,38 +103,26 @@ export function PromptTab({
         models={models}
         onChange={setModels}
         onValidityChange={setModelsValid}
-        fallback={caps.modelFallback}
-        providerSort={caps.endpointStats ? providerSort : null}
+        fallback={true}
+        providerSort={providerSort}
       />
-      <SectionFooter>
-        {caps.modelFallback
-          ? s.ui_prompt_models_fallback_footer
-          : s.ui_prompt_models_footer}
-      </SectionFooter>
+      <SectionFooter>{s.ui_prompt_models_fallback_footer}</SectionFooter>
 
-      {caps.providerRouting && (
-        <>
-          <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
-          <ProviderSortField value={providerSort} onChange={setProviderSort} />
-          <ProviderSelectField
-            // The first *non-empty* id, not the first row: with a chain, an
-            // emptied primary row would otherwise disable the picker even though
-            // a real model is configured below it.
-            modelId={trimmed[0] ?? ""}
-            value={provider}
-            onChange={setProvider}
-          />
-          <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
-        </>
-      )}
+      <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
+      <ProviderSortField value={providerSort} onChange={setProviderSort} />
+      <ProviderSelectField
+        // The first *non-empty* id, not the first row: with a chain, an emptied
+        // primary row would otherwise disable the picker even though a real
+        // model is configured below it.
+        modelId={trimmed[0] ?? ""}
+        value={provider}
+        onChange={setProvider}
+      />
+      <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
 
-      {caps.serviceTier && (
-        <>
-          <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>
-          <ServiceTierField value={serviceTier} onChange={setServiceTier} />
-          <SectionFooter>{s.ui_prompt_service_tier_footer}</SectionFooter>
-        </>
-      )}
+      <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>
+      <ServiceTierField value={serviceTier} onChange={setServiceTier} />
+      <SectionFooter>{s.ui_prompt_service_tier_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_system_prompt}</SectionHeader>
       <Card>

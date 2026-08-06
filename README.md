@@ -1,27 +1,27 @@
 # any_talker
 
-Telegram bot with AI integration via any OpenAI-compatible API.
+Telegram bot with AI integration via OpenRouter.
 
 ## Setup
 
 1. Copy `.env.example` to `.env` and fill required vars:
    - `BOT_TOKEN` — from @BotFather
-   - `OPENAI_API_KEY` — API key for your chosen endpoint
-   - `OPENAI_BASE_URL` — any OpenAI-compatible chat-completions endpoint,
-     including the version segment (e.g. `https://api.openai.com/v1`,
-     `https://openrouter.ai/api/v1`, or a self-hosted gateway like LiteLLM /
-     vLLM). Per-request USD cost comes from the gateway when it reports one, and
-     is otherwise computed from the pricing this endpoint's `GET /v1/models`
-     returns (0 if it returns none).
+   - `OPENROUTER_API_KEY` — from https://openrouter.ai/keys
    - `BOT_OWNER_ID` — your Telegram user ID
 
-   On OpenRouter the bot additionally offers a model fallback chain, provider
-   routing, service tiers, exact per-request cost, per-provider stats in the
-   admin model picker, and sticky per-conversation routing so a chat keeps
-   hitting the same provider's warm prompt cache. It detects that from the base
-   URL; `AI_PROVIDER_FLAVOR` pins it when a proxy hides the host. Nothing
-   non-standard is ever sent to a plain OpenAI endpoint. See
-   [`docs/ai-provider.md`](docs/ai-provider.md).
+   `OPENROUTER_BASE_URL` is optional and defaults to
+   `https://openrouter.ai/api/v1`; set it only when a proxy or a self-hosted
+   gateway fronts OpenRouter under its own hostname (include the version
+   segment). Per-request USD cost is the figure OpenRouter reports for the whole
+   tool-calling loop; a model it reports no cost for is flagged as
+   under-counted rather than priced from a local table.
+
+   The bot uses OpenRouter's model fallback chain, provider routing, service
+   tiers, per-provider stats in the admin model picker, and sticky
+   per-conversation routing so a chat keeps hitting the same provider's warm
+   prompt cache. See [`docs/ai-provider.md`](docs/ai-provider.md); upgrading
+   from an older release, see
+   [`docs/migration-openrouter-agent.md`](docs/migration-openrouter-agent.md).
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 
@@ -48,7 +48,7 @@ and bundles a small observability stack (VictoriaMetrics + VictoriaLogs +
 Vector). On a fresh server with DNS pointed at it:
 
 ```bash
-cp .env.example .env          # fill BOT_TOKEN, OPENAI_API_KEY, OPENAI_BASE_URL,
+cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY,
                               # BOT_OWNER_ID, DOMAIN, LETSENCRYPT_EMAIL
 cp Caddyfile.example Caddyfile
 docker compose -f docker-compose.prod.yml up -d
@@ -133,9 +133,10 @@ are supported as `host:port`).
 - `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
 - Media understanding — attach the `/ask` as a caption on a **photo** (albums included), a **voice
   note**, a **video**, or a **GIF**, or reply with `/ask` to any of those (video notes included).
-  Photos go to the model as-is; voice notes are transcoded to mp3. A **video is sent whole** when
-  the configured model accepts video input (Gemini & co — the bot reads that off the endpoint's
-  `/models` modalities), so the model sees real motion and hears the soundtrack; on a model without
+  Photos go to the model as-is; voice notes are transcoded to mp3. A **video is sent whole** as a
+  native `input_video` item when the configured model accepts video input (Gemini & co — the bot
+  reads that off OpenRouter's `/models` modalities), so the model sees real motion and hears the
+  soundtrack; on a model without
   video input it falls back to a handful of evenly spaced frames plus the audio track. Clips longer
   than **60 seconds**, or above Telegram's 20 MB download ceiling, are refused with a note saying
   which limit was hit. The duration cap is a cost guard: native video is billed by clip length
@@ -162,7 +163,8 @@ are supported as `host:port`).
   (**Budget caps** tab); disable enforcement with one toggle. Spend is tracked per user/chat/global/
   model — including reminder-delivery LLM re-runs, which now book cost too.
 - **Budget observability** — a **Spend dashboard** (admin UI) with the global total, top spenders
-  (users + chats), per-model breakdown (unpriced models flagged), most-denied users, and new
+  (users + chats), per-model breakdown (models OpenRouter reported no cost for are flagged, so the
+  total reads as a floor), most-denied users, and new
   users/chats. Plus proactive owner DMs: instant alarms (global cap breached, bot added to a new
   group, a user/chat spend spike) and a periodic **budget digest** (interval + spike thresholds
   configurable). Alarms are deduped to once per period.
@@ -171,12 +173,11 @@ are supported as `host:port`).
   limit stay in force as the safety net, and the whitelist entries are preserved (not consulted) so
   it can be turned back on unchanged.
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
-- **Gateway-aware model settings** — the admin model picker validates ids against the endpoint's
-  `/v1/models` and shows price, modalities, tool and prompt-caching support. On a gateway that
-  supports them (OpenRouter), it additionally offers a **fallback chain**, **provider routing**
-  (sort by price/throughput/latency, or pin one provider with no fallback), **service tiers**
-  (flex/priority) and the resolved provider's live price/throughput/latency — globally and per chat.
-  Controls the configured endpoint can't honour are not rendered and never sent.
+- **Model settings** — the admin model picker validates ids against OpenRouter's model list and
+  shows price, modalities, tool and prompt-caching support. It also offers a **fallback chain**,
+  **provider routing** (sort by price/throughput/latency, or pin one provider with no fallback),
+  **service tiers** (flex/priority) and the resolved provider's live price/throughput/latency —
+  globally and per chat.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
   guest-mode UI. Single-turn replies sent via `answerGuestQuery`; non-whitelisted guest

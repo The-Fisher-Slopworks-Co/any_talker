@@ -28,7 +28,6 @@ export type ServerDeps = {
   rateLimiter: RateLimiter;
   botManager: ManagedBotController;
   modelCatalog?: ModelCatalog;
-  provider?: ApiDeps["provider"];
   fetchProviderEndpoints?: ApiDeps["fetchProviderEndpoints"];
 };
 
@@ -39,7 +38,6 @@ export function startServer(deps: ServerDeps) {
     ownerId: deps.ownerId,
     modelCatalog: deps.modelCatalog,
     managedBots: deps.botManager,
-    provider: deps.provider,
     fetchProviderEndpoints: deps.fetchProviderEndpoints,
   };
 

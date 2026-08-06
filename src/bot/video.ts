@@ -5,9 +5,9 @@
 //
 // **Native** is the good one: Gemini (and 50-odd other models on OpenRouter)
 // consume video directly, so a clip that is going to such a model is sent whole
-// as a `video_url` part — full motion, full audio, no local decoding. The
+// as an `input_video` item — full motion, full audio, no local decoding. The
 // catalogue's `input_modalities` says which models those are
-// (`ModelCatalog.supportsVideoInput`), and `ai/compat-client.ts` does the
+// (`ModelCatalog.supportsVideoInput`), and `ai/responses-input.ts` does the
 // emitting.
 //
 // **Frames** is the fallback for every model that does not take video: the clip

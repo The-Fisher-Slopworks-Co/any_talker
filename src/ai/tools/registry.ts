@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { z } from "zod";
+import type { $ZodObject, $ZodShape } from "zod/v4/core";
 import type { Lang } from "../../shared/i18n";
 import type { UserSettingChange } from "../../shared/types";
 import type { AIMessage } from "../types";
@@ -39,10 +40,16 @@ export type ToolCallContext = {
   contextMessages?: AIMessage[];
 };
 
+// A tool's input schema. `@openrouter/agent`'s `tool()` requires a zod v4
+// *object* schema; every tool here already uses `z.object(...)` (a `.refine()`d
+// object still satisfies the bound), so narrowing costs nothing and keeps
+// `execute`'s input typed.
+export type ToolParameters<TInput> = $ZodObject<$ZodShape> & z.ZodType<TInput>;
+
 export type Tool<TInput = unknown, TOutput = unknown> = {
   name: string;
   description: string;
-  parameters: z.ZodType<TInput>;
+  parameters: ToolParameters<TInput>;
   execute: (input: TInput, ctx: ToolCallContext) => Promise<TOutput> | TOutput;
 };
 

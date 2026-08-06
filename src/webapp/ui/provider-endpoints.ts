@@ -7,7 +7,6 @@
 // and speed. Fetched through the bot's own server (`/api/openrouter/endpoints`),
 // which owns the upstream call and its cache; the browser would hit CORS.
 //
-// Only reachable when the configured provider profile advertises endpoint stats.
 // Every failure degrades to "no data" rather than an error state: the underlying
 // stats source is undocumented and 404s for some models by design.
 
