@@ -1,63 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { test, expect } from "bun:test";
+import { test, expect, spyOn } from "bun:test";
 import { loadConfig } from "./config";
 
 const baseEnv = {
   BOT_TOKEN: "tok",
-  OPENAI_API_KEY: "sk-test",
-  OPENAI_BASE_URL: "https://api.example.com/v1",
+  OPENROUTER_API_KEY: "sk-test",
+  OPENROUTER_BASE_URL: "https://api.example.com/v1",
   BOT_OWNER_ID: "12345",
 };
 
 test("loadConfig returns required fields when all env vars present", () => {
   const cfg = loadConfig({ ...baseEnv });
   expect(cfg.botToken).toBe("tok");
-  expect(cfg.openaiApiKey).toBe("sk-test");
-  expect(cfg.openaiBaseUrl).toBe("https://api.example.com/v1");
+  expect(cfg.openrouterApiKey).toBe("sk-test");
+  expect(cfg.openrouterBaseUrl).toBe("https://api.example.com/v1");
   expect(cfg.botOwnerId).toBe("12345");
   expect(cfg.keydbUrl).toBe("redis://localhost:6379");
   expect(cfg.port).toBe(8080);
   expect(cfg.logFormat).toBe("pretty");
   expect(cfg.logIncomingUpdates).toBe(true);
   expect(cfg.logDebug).toBe(false);
-});
-
-test("loadConfig infers the provider flavor from the base URL", () => {
-  expect(loadConfig({ ...baseEnv }).aiProviderFlavor).toBe("generic");
-  expect(
-    loadConfig({ ...baseEnv, OPENAI_BASE_URL: "https://openrouter.ai/api/v1" })
-      .aiProviderFlavor,
-  ).toBe("openrouter");
-});
-
-test("AI_PROVIDER_FLAVOR overrides the inferred flavor", () => {
-  // A gateway that fronts OpenRouter has its own hostname, so the override is
-  // the only way to declare the surface it really speaks.
-  const cfg = loadConfig({
-    ...baseEnv,
-    OPENAI_BASE_URL: "https://gw.internal/v1",
-    AI_PROVIDER_FLAVOR: "openrouter",
-  });
-  expect(cfg.aiProviderFlavor).toBe("openrouter");
-});
-
-test("AI_PROVIDER_FLAVOR=auto falls back to inference", () => {
-  const cfg = loadConfig({
-    ...baseEnv,
-    OPENAI_BASE_URL: "https://openrouter.ai/api/v1",
-    AI_PROVIDER_FLAVOR: "auto",
-  });
-  expect(cfg.aiProviderFlavor).toBe("openrouter");
-});
-
-// Failing loudly at boot beats silently mis-declaring the surface: a wrong
-// profile makes every request fail with HTTP 400, or silently drops routing.
-test("loadConfig rejects an unknown AI_PROVIDER_FLAVOR", () => {
-  expect(() =>
-    loadConfig({ ...baseEnv, AI_PROVIDER_FLAVOR: "openai" }),
-  ).toThrow(/AI_PROVIDER_FLAVOR/);
 });
 
 test("loadConfig reads optional app attribution", () => {
@@ -97,24 +61,61 @@ test("loadConfig rejects unparseable LOG_INCOMING_UPDATES", () => {
   ).toThrow(/LOG_INCOMING_UPDATES/);
 });
 
-test("loadConfig throws on missing OPENAI_API_KEY", () => {
+test("loadConfig throws on missing OPENROUTER_API_KEY", () => {
   expect(() =>
     loadConfig({
       BOT_TOKEN: "tok",
-      OPENAI_BASE_URL: "https://api.example.com/v1",
+      OPENROUTER_BASE_URL: "https://api.example.com/v1",
       BOT_OWNER_ID: "1",
     } as Record<string, string>),
-  ).toThrow(/OPENAI_API_KEY/);
+  ).toThrow(/OPENROUTER_API_KEY/);
 });
 
-test("loadConfig throws on missing OPENAI_BASE_URL", () => {
-  expect(() =>
-    loadConfig({
+// The bot only talks to OpenRouter now, so the base URL has exactly one right
+// answer and naming it is reserved for a proxy in front of it.
+test("loadConfig defaults the base URL to OpenRouter", () => {
+  const cfg = loadConfig({
+    BOT_TOKEN: "tok",
+    OPENROUTER_API_KEY: "sk-test",
+    BOT_OWNER_ID: "1",
+  } as Record<string, string>);
+  expect(cfg.openrouterBaseUrl).toBe("https://openrouter.ai/api/v1");
+});
+
+// One release of grace: an existing deployment keeps booting on the old names
+// instead of dying at startup, and is told to rename them.
+test("loadConfig falls back to the legacy OPENAI_* names", () => {
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const cfg = loadConfig({
       BOT_TOKEN: "tok",
-      OPENAI_API_KEY: "sk-test",
+      OPENAI_API_KEY: "sk-legacy",
+      OPENAI_BASE_URL: "https://gw.internal/v1",
       BOT_OWNER_ID: "1",
-    } as Record<string, string>),
-  ).toThrow(/OPENAI_BASE_URL/);
+    } as Record<string, string>);
+    expect(cfg.openrouterApiKey).toBe("sk-legacy");
+    expect(cfg.openrouterBaseUrl).toBe("https://gw.internal/v1");
+    expect(warn).toHaveBeenCalled();
+  } finally {
+    warn.mockRestore();
+  }
+});
+
+// The new names win, and no deprecation warning is emitted for them.
+test("loadConfig prefers the OPENROUTER_* names over the legacy ones", () => {
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const cfg = loadConfig({
+      ...baseEnv,
+      OPENAI_API_KEY: "sk-legacy",
+      OPENAI_BASE_URL: "https://gw.internal/v1",
+    });
+    expect(cfg.openrouterApiKey).toBe("sk-test");
+    expect(cfg.openrouterBaseUrl).toBe("https://api.example.com/v1");
+    expect(warn).not.toHaveBeenCalled();
+  } finally {
+    warn.mockRestore();
+  }
 });
 
 test("loadConfig parses optional overrides", () => {

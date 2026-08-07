@@ -1,6 +1,6 @@
 ## Project
 
-Telegram bot with AI integration via an OpenAI-compatible API (grammY + Bun + KeyDB).
+Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
 See `README.md` for setup, running, deployment, observability, and the
 user-facing feature/metrics catalog. This file covers how to work in the code.
 
@@ -32,7 +32,7 @@ bun test           # tests (co-located *.test.ts)
 
 - `main.ts` — composition root: loads config, wires storage/ai/rateLimiter, registers tools, starts bot + HTTP server + schedulers.
 - `bot/` — grammY bot, handlers (`handlers/ask.ts`, `guest.ts`, …), middleware, Telegram formatting.
-- `ai/` — OpenAI-compatible client (`compat-client.ts`), model catalogue + pricing (`model-catalog.ts`), instruction builder, and `tools/` (registry + each tool).
+- `ai/` — OpenRouter client (`openrouter-client.ts`) and its message mapper (`responses-input.ts`), model catalogue (`model-catalog.ts`), instruction builder, and `tools/` (registry + each tool).
 - `storage/` — `Storage` interface (`types.ts`); `KeyDBStorage` (prod) and `MemoryStorage` (`memory.ts`, used by tests).
 - `webapp/` — admin Web App: HTTP API (`api.ts`, `auth.ts`) + React UI (`ui/`).
 - `reminders/`, `checks/`, `ratelimit/`, `spending/`, `metrics/`, `shared/` — supporting subsystems.
@@ -47,7 +47,7 @@ bun test           # tests (co-located *.test.ts)
 - **i18n:** languages are `en` | `ru`. Never hardcode user-facing strings — add keys to `src/shared/i18n.ts` and use `ctx.t` in handlers.
 - **Dependency injection:** `createBot(deps)` / `startServer(deps)` take injected `storage`, `ai`, `rateLimiter`. Keep handlers as pure functions for testability.
 - **Tagged outcomes:** handlers return `{ kind: "answered" | "denied" | "rateLimited" | "error" | ... }` objects the dispatcher switches on, rather than sending replies themselves.
-- **Adding an AI tool:** define a `Tool` (Zod `parameters`, `execute(input, ctx)`), then `registerTool(withLogging(tool))` in `main.ts`. See `src/ai/tools/registry.ts`.
+- **Adding an AI tool:** define a `Tool` (Zod `parameters` — must be a `z.object(...)`, `execute(input, ctx)`), then `registerTool(withLogging(tool))` in `main.ts`. See `src/ai/tools/registry.ts`.
 - **Tests:** `bun test`, co-located as `*.test.ts`; use `MemoryStorage` instead of KeyDB.
 
 ## Bun

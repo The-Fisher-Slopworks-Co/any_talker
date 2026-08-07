@@ -5,6 +5,11 @@ Copyright (C) 2026 The Fisher Slopworks Co
 
 # Migration: OpenRouter → OpenAI-compatible API
 
+> **Superseded.** This release is history: the bot has since moved back to
+> OpenRouter only, and the env vars below have been renamed. Follow
+> [`migration-openrouter-agent.md`](./migration-openrouter-agent.md) instead —
+> the steps here are kept only as a record of a past upgrade.
+
 > **Superseded in part.** The OpenRouter-specific features listed as removed
 > below (provider routing, service tiers, the model fallback chain, `usage.cost`
 > read-back, attribution headers, endpoint stats) are back, behind a provider

@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-// Server-side model catalogue + pricing for the configured OpenAI-compatible
-// endpoint. Fetches `GET {baseURL}/models` and caches it (TTL), then serves two
-// consumers from one object:
+// Server-side model catalogue for OpenRouter. Fetches `GET {baseURL}/models`
+// and caches it (TTL), then serves two consumers from one object:
 //   - the admin Mini App model picker, via the `/api/models` route, and
-//   - per-request USD cost computation in the AI client, via `PriceLookup`.
+//   - the native-video gate, via `supportsVideoInput`.
 //
-// A bare OpenAI `/v1/models` response is a flat id list with no pricing; richer
-// gateways (LiteLLM, OpenRouter-style) add per-token pricing and capability
-// metadata. Parsing tolerates both shapes: pricing/capabilities surface only
-// when present, and cost computation degrades to 0 when pricing is absent.
+// Parsing tolerates a thin `/models` response too: pricing and capability
+// metadata surface only when the entry carries them.
 
 import { resolveModelId } from "./model-id";
 
@@ -24,21 +21,9 @@ type FetchLike = (
   init?: { headers?: Record<string, string>; signal?: AbortSignal },
 ) => Promise<Response>;
 
-// Per-token price in USD, as read from the catalogue.
-export type ModelPricing = {
-  promptPerToken: number;
-  completionPerToken: number;
-};
-
-// The narrow capability the AI client needs: look up a model's price. Keeping
-// this a separate port decouples the client from how the catalogue is
-// fetched/cached and makes cost logic trivial to unit-test.
-export interface PriceLookup {
-  getPricing(modelId: string): ModelPricing | null;
-}
-
 // A normalized catalogue entry surfaced to the Mini App. Everything but `id` is
-// optional because a bare OpenAI endpoint omits pricing and capabilities.
+// optional because an individual `/models` entry may carry no pricing or
+// capability block.
 export type ModelInfo = {
   id: string;
   name?: string;
@@ -58,18 +43,18 @@ export type ModelInfo = {
   };
 };
 
-export interface ModelCatalog extends PriceLookup {
+export interface ModelCatalog {
   // Full catalogue for the `/api/models` route; refreshes if the cache is stale.
   list(): Promise<ModelInfo[]>;
-  // Force a refresh (used at boot to warm the cache + pricing map).
+  // Force a refresh (used at boot to warm the cache).
   refresh(): Promise<void>;
   // Returns the subset of `modelIds` the catalogue does not know (resolving
-  // ":variant" suffixes like the pricing lookup). Returns [] — i.e. "all
-  // allowed" — when the catalogue is empty or unavailable, so callers degrade
-  // gracefully and never block a save just because no list could be fetched.
+  // ":variant" suffixes). Returns [] — i.e. "all allowed" — when the catalogue
+  // is empty or unavailable, so callers degrade gracefully and never block a
+  // save just because no list could be fetched.
   unknownModels(modelIds: string[]): Promise<string[]>;
   // Whether the model advertises `video` among its input modalities — the bot
-  // sends a clip as a `video_url` part when it does, and falls back to sampled
+  // sends a clip as an `input_video` item when it does, and falls back to sampled
   // frames when it doesn't. Unknown model or no capability metadata ⇒ false, so
   // an endpoint that publishes no modalities gets the portable path.
   supportsVideoInput(modelId: string): Promise<boolean>;
@@ -89,7 +74,6 @@ export function createModelCatalog(opts: {
 
   let entries: ModelInfo[] = [];
   let entryMap = new Map<string, ModelInfo>();
-  let priceMap = new Map<string, ModelPricing>();
   let fetchedAtMs = 0;
   let inflight: Promise<void> | null = null;
 
@@ -109,22 +93,14 @@ export function createModelCatalog(opts: {
       const raw = Array.isArray(json.data) ? json.data : [];
       const parsed: ModelInfo[] = [];
       const ids = new Map<string, ModelInfo>();
-      const prices = new Map<string, ModelPricing>();
       for (const item of raw) {
         const info = parseModelEntry(item);
         if (!info) continue;
         parsed.push(info);
         ids.set(info.id, info);
-        if (info.pricing) {
-          prices.set(info.id, {
-            promptPerToken: info.pricing.promptPerToken,
-            completionPerToken: info.pricing.completionPerToken,
-          });
-        }
       }
       entries = parsed;
       entryMap = ids;
-      priceMap = prices;
       fetchedAtMs = Date.now();
     } finally {
       clearTimeout(timer);
@@ -146,7 +122,7 @@ export function createModelCatalog(opts: {
       await refresh();
     } catch {
       // Keep serving the last good (or empty) catalogue on failure rather than
-      // throwing; the picker shows whatever was cached and pricing degrades.
+      // throwing; the picker shows whatever was cached.
     }
   }
 
@@ -167,15 +143,12 @@ export function createModelCatalog(opts: {
       );
     },
     async supportsVideoInput(modelId: string): Promise<boolean> {
-      // Refreshes if stale (unlike `getPricing`, which stays sync on the hot
-      // path): this is consulted once per video ask, next to a multi-megabyte
-      // download, and a cold catalogue would silently downgrade every clip.
+      // Refreshes if stale: this is consulted once per video ask, next to a
+      // multi-megabyte download, and a cold catalogue would silently downgrade
+      // every clip.
       await ensureFresh();
       const entry = resolveModelId(entryMap, modelId.trim());
       return entry?.capabilities?.modalities?.includes("video") ?? false;
-    },
-    getPricing(modelId: string): ModelPricing | null {
-      return resolveModelId(priceMap, modelId);
     },
   };
 }

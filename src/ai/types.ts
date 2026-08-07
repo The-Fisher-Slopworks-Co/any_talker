@@ -9,8 +9,7 @@ import type {
 } from "../shared/types";
 
 // Where the request should be routed and on what tier, as resolved from the
-// effective settings. Honoured only by an endpoint whose profile advertises
-// these capabilities; ignored (never sent) by everything else.
+// effective settings. Always sent; OpenRouter honours them.
 export type RoutingOptions = {
   providerSort?: ProviderSort | null;
   provider?: string | null;
@@ -44,19 +43,20 @@ export type SerializedAIMessage =
   | { role: "assistant"; content: string };
 
 export type AskResult = {
+  // May be empty — a tool-using run can come back with an empty final turn;
+  // callers treat that as an error (`ask.ts`), and the ask is still charged.
   text: string;
   totalTokens: number;
-  // The model id that actually answered (`models[0]`). Lets spend be attributed
-  // per model. Optional so fixtures that don't care still type.
+  // The model id spend is attributed to (`models[0]`, not necessarily the model
+  // that answered). Optional so fixtures that don't care still type.
   modelId?: string;
-  // USD cost computed locally from the catalogue's per-token pricing
-  // (inputTokens × promptPrice + outputTokens × completionPrice). Zero when the
-  // model has no pricing data. Optional so fixtures/callers that don't care
-  // still type.
+  // USD cost OpenRouter reported for the whole tool-calling loop
+  // (`SessionEnd.totalUsage.cost`). 0 when it reported none. Optional so
+  // fixtures/callers that don't care still type.
   costUsd?: number;
-  // False when the model had no pricing entry, so `costUsd` is a floor of $0 and
-  // real spend is under-counted. Surfaced to the owner so the blind spot is
-  // visible. Optional (absent ⇒ treat as priced) for fixtures.
+  // False when OpenRouter reported no cost for this ask, so `costUsd` is a
+  // floor of $0 and spend is under-counted. Surfaced to the owner so the blind
+  // spot is visible. Optional (absent ⇒ treat as priced) for fixtures.
   priced?: boolean;
 };
 
@@ -68,9 +68,8 @@ export interface AIClient {
     tools: Tool[];
     routing?: RoutingOptions;
     reasoningEffort?: ReasoningEffort | null;
-    // Stable id of the conversation this turn belongs to, for a gateway that
-    // routes a session stickily to keep its prompt cache warm (`ai/session.ts`).
-    // Like `routing`, it only reaches the wire where the profile allows it.
+    // Stable id of the conversation this turn belongs to, so OpenRouter routes
+    // the session stickily and keeps its prompt cache warm (`ai/session.ts`).
     sessionId?: string | null;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult>;

@@ -6,9 +6,8 @@ import { getEffectiveProxyForUrl, proxiedFetch } from "./proxy";
 import { KeyDBStorage } from "./storage/keydb";
 import { DualWindowLimiter } from "./ratelimit/dual-window";
 import { SpendBudgetGuard } from "./budget/guard";
-import { OpenAICompatClient } from "./ai/compat-client";
+import { OpenRouterClient } from "./ai/openrouter-client";
 import { createModelCatalog } from "./ai/model-catalog";
-import { capabilitiesFor } from "./ai/provider-profile";
 import { registerTool, type Tool } from "./ai/tools/registry";
 import { withLogging } from "./ai/tools/logging";
 import { randomNumberTool } from "./ai/tools/random-number";
@@ -42,6 +41,10 @@ async function main() {
   if (tgProxy) {
     console.log(`HTTP proxy enabled: api.telegram.org → ${tgProxy}`);
   }
+  const aiProxy = getEffectiveProxyForUrl(config.openrouterBaseUrl);
+  if (aiProxy) {
+    console.log(`HTTP proxy enabled: AI endpoint → ${aiProxy}`);
+  }
 
   const storage = await KeyDBStorage.connect(config.keydbUrl);
   const rateLimiter = new DualWindowLimiter(storage);
@@ -49,29 +52,23 @@ async function main() {
   // ledgers are global, like the rate limiter's). Enforced alongside the token
   // limiter on every /ask and guest query.
   const budgetGuard = new SpendBudgetGuard(storage);
-  // One catalogue object serves two roles: pricing source for cost computation
-  // in the AI client, and the model list behind the Mini App's `/api/models`.
+  // One catalogue object serves the Mini App's `/api/models` and the
+  // native-video gate.
   const modelCatalog = createModelCatalog({
-    baseURL: config.openaiBaseUrl,
-    apiKey: config.openaiApiKey,
+    baseURL: config.openrouterBaseUrl,
+    apiKey: config.openrouterApiKey,
     fetch: proxiedFetch,
   });
-  // Warm the cache so the first ask can price its tokens; best-effort, the
-  // catalogue self-heals on the next `/api/models` hit if this fails.
+  // Warm the cache so the first video ask can read modalities without a cold
+  // fetch; best-effort, the catalogue self-heals on the next `/api/models` hit
+  // if this fails.
   await modelCatalog
     .refresh()
     .catch((err) => console.warn("model catalogue prefetch failed:", err));
-  // What the configured endpoint may be sent beyond the standard OpenAI surface
-  // (fallback chain, provider routing, service tier) and whether its response is
-  // trusted for cost. Shared by the client and the admin API, so the Mini App
-  // only offers what this deployment can actually honour.
-  const capabilities = capabilitiesFor(config.aiProviderFlavor);
-  console.log(`AI provider profile: ${config.aiProviderFlavor}`);
-  const ai = new OpenAICompatClient({
-    baseURL: config.openaiBaseUrl,
-    apiKey: config.openaiApiKey,
-    pricing: modelCatalog,
-    capabilities,
+  console.log(`AI endpoint: ${config.openrouterBaseUrl}`);
+  const ai = new OpenRouterClient({
+    apiKey: config.openrouterApiKey,
+    baseURL: config.openrouterBaseUrl,
     attribution: {
       url: config.openrouterAppUrl,
       title: config.openrouterAppTitle,
@@ -190,12 +187,7 @@ async function main() {
     rateLimiter,
     botManager,
     modelCatalog,
-    provider: { flavor: config.aiProviderFlavor, capabilities },
-    // Wired only when the profile has per-provider stats to fetch, so the route
-    // reports "not supported" by simply having no fetcher behind it.
-    fetchProviderEndpoints: capabilities.endpointStats
-      ? fetchOpenRouterEndpoints
-      : undefined,
+    fetchProviderEndpoints: fetchOpenRouterEndpoints,
   });
   console.log(`HTTP server listening on :${server.port}`);
 
