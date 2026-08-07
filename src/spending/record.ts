@@ -15,17 +15,17 @@ export type SpendRecord = {
   // model skips per-model attribution but still records user/chat/global spend.
   modelId: string | null;
   costUsd: number;
-  // False when the model had no pricing (cost is a $0 floor) — flags the model
-  // as unpriced so the owner learns the ledger under-counts.
+  // False when OpenRouter reported no cost for the ask (cost is a $0 floor) —
+  // flags the model so the owner learns the ledger under-counts.
   priced: boolean;
 };
 
 // Records `entry` across the user/chat/global/model ledgers (each a no-op for a
 // non-positive cost) and flags an unpriced model regardless of cost — an
-// unpriced reply's cost is $0 precisely because pricing is missing, so the flag
-// must not be gated on cost. Best-effort by contract: callers wrap in `.catch`
-// so a storage hiccup on display/enforcement accounting never fails a reply
-// already produced.
+// unpriced reply's cost is $0 precisely because OpenRouter reported none, so
+// the flag must not be gated on cost. Best-effort by contract: callers wrap in
+// `.catch` so a storage hiccup on display/enforcement accounting never fails a
+// reply already produced.
 export async function recordSpend(
   storage: Storage,
   entry: SpendRecord,

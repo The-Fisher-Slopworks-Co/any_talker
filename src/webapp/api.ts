@@ -39,11 +39,6 @@ import { getOrInitSettings } from "../settings";
 import { gatherSpendOverview } from "../spending/overview";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
 import type { ModelCatalog } from "../ai/model-catalog";
-import {
-  capabilitiesFor,
-  type ProviderCapabilities,
-  type ProviderFlavor,
-} from "../ai/provider-profile";
 import { isValidPermaslug, type FetchProviderEndpoints } from "./openrouter-proxy";
 
 export type ApiRequest = {
@@ -76,18 +71,9 @@ export type ApiDeps = {
   ownerId: string;
   modelCatalog?: ModelCatalog;
   managedBots?: ManagedBotController;
-  // What the configured AI endpoint supports beyond the standard OpenAI surface.
-  // Served to the Mini App so it only offers controls this deployment can
-  // honour. Absent ⇒ the generic profile, the one that is always safe to send.
-  provider?: { flavor: ProviderFlavor; capabilities: ProviderCapabilities };
-  // Wired only when that profile advertises `endpointStats`, so an absent
-  // fetcher is itself the answer "this endpoint has no per-provider stats".
+  // Always wired in `main.ts`; an absent fetcher only happens on a DI mistake,
+  // which the route answers with 503.
   fetchProviderEndpoints?: FetchProviderEndpoints;
-};
-
-const GENERIC_PROVIDER = {
-  flavor: "generic" as const,
-  capabilities: capabilitiesFor("generic"),
 };
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
@@ -677,11 +663,6 @@ export async function handleApi(
 
   // Everything below this line is admin-only.
   if (!actor.isOwner) return FORBIDDEN;
-
-  // Tells the admin UI which provider-specific controls to render at all.
-  if (req.path === "/api/provider" && req.method === "GET") {
-    return { status: 200, body: deps.provider ?? GENERIC_PROVIDER };
-  }
 
   // Per-provider price/throughput/latency for one model, proxied server-side.
   const endpointsMatch = req.path.match(/^\/api\/openrouter\/endpoints\/(.+)$/);

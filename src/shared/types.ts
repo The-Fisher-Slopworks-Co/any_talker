@@ -56,14 +56,12 @@ export type AnomalyConfig = {
   spikeMinBaselineUsd: number;
 };
 
-// Reasoning effort passed through to the model per request, mapped to the
-// standard `reasoning_effort` chat-completions field (honored by reasoning
+// Reasoning effort passed through to the model per request, sent as
+// OpenRouter's unified `reasoning: { effort }` field (honored by reasoning
 // models, ignored by others).
 export type ReasoningEffort = "low" | "high";
 
-// How a multi-provider gateway should pick among the upstreams serving one
-// model. Only meaningful when the configured endpoint advertises the
-// `providerRouting` capability (see `src/ai/provider-profile.ts`).
+// How OpenRouter should pick among the upstreams serving one model.
 export type ProviderSort = "price" | "throughput" | "latency";
 
 export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
@@ -95,12 +93,10 @@ export type UserSettingChange = { field: UserSettingField; value: string | null 
 
 export type Settings = {
   systemPrompt: string;
-  // Model ids to try, most-preferred first. The trailing ids form a server-side
-  // fallback chain on a gateway that supports one; against a plain OpenAI-
-  // compatible endpoint only `models[0]` is sent (see `ProviderCapabilities`).
+  // Model ids to try, most-preferred first. The trailing ids form OpenRouter's
+  // server-side fallback chain, tried in order when the primary fails.
   models: string[];
-  // Provider routing, honoured only by a gateway that advertises it. `null`
-  // leaves the choice to the gateway.
+  // Provider routing. `null` leaves the choice to OpenRouter.
   providerSort: ProviderSort | null;
   // Provider slug to pin routing to (e.g. "deepinfra/fp4"). When set it takes
   // precedence over `providerSort`: the request goes only to this provider with

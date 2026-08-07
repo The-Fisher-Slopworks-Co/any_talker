@@ -7,7 +7,6 @@ import { DualWindowLimiter } from "../ratelimit/dual-window";
 import { currentWindowStarts } from "../ratelimit/window";
 import { handleApi } from "./api";
 import { DEFAULT_SETTINGS } from "../shared/types";
-import { capabilitiesFor } from "../ai/provider-profile";
 import type { UsageStatus } from "../ratelimit/window";
 import type { ModelCatalog, ModelInfo } from "../ai/model-catalog";
 
@@ -18,7 +17,6 @@ function fakeCatalog(
   return {
     list,
     refresh: async () => {},
-    getPricing: () => null,
     supportsVideoInput: async () => false,
     // By default, derive "unknown" from the same list the catalogue exposes, so
     // a test only has to declare the catalogue once. An empty list means the
@@ -148,51 +146,6 @@ describe("model validation against the catalogue", () => {
   });
 });
 
-describe("GET /api/provider", () => {
-  test("reports the configured flavor and its capabilities", async () => {
-    const res = await handleApi(
-      { method: "GET", path: "/api/provider", body: null },
-      {
-        ...deps(),
-        provider: {
-          flavor: "openrouter",
-          capabilities: capabilitiesFor("openrouter"),
-        },
-      },
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      flavor: "openrouter",
-      capabilities: capabilitiesFor("openrouter"),
-    });
-  });
-
-  // The admin UI must not offer a control the endpoint would reject, so an
-  // unconfigured server reports the surface that is always safe to send.
-  test("falls back to the generic profile when unconfigured", async () => {
-    const res = await handleApi(
-      { method: "GET", path: "/api/provider", body: null },
-      deps(),
-      owner,
-    );
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      flavor: "generic",
-      capabilities: capabilitiesFor("generic"),
-    });
-  });
-
-  test("is admin-only", async () => {
-    const res = await handleApi(
-      { method: "GET", path: "/api/provider", body: null },
-      deps(),
-      guest("99"),
-    );
-    expect(res.status).toBe(403);
-  });
-});
-
 describe("GET /api/openrouter/endpoints/:modelId", () => {
   const stats = { endpoints: [{ provider_name: "DeepInfra" }] };
 
@@ -248,8 +201,8 @@ describe("GET /api/openrouter/endpoints/:modelId", () => {
     expect(res.status).toBe(400);
   });
 
-  // The fetcher is wired only when the profile advertises endpoint stats, so an
-  // absent fetcher *is* the "endpoint doesn't support this" answer.
+  // `main.ts` always wires the fetcher, so an absent one only happens on a DI
+  // mistake — answered with 503 rather than a 500 out of the route body.
   test("returns 503 when the provider has no endpoint stats", async () => {
     const res = await handleApi(
       { method: "GET", path: "/api/openrouter/endpoints/gpt-4o", body: null },
