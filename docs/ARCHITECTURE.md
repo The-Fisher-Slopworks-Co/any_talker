@@ -141,7 +141,7 @@ flowchart TB
 | `src/ratelimit/` | Per-user dual fixed-window rate limiter (5-hour + weekly token budgets, per-user phase-shifted). | `dual-window.ts`, `window.ts`, `types.ts` |
 | `src/budget/` | Hard USD budget guard — the enforcement safety net that denies non-owner requests when a global/chat/new-user spend cap is breached. Port + impl, mirroring `ratelimit/`. | `guard.ts`, `types.ts` |
 | `src/spending/` | UTC-day-bucketed spend windows (per-user/chat/global/model), the multi-ledger spend recorder, and the shared spend-overview aggregator (powers the digest + dashboard). | `window.ts`, `record.ts`, `overview.ts` |
-| `src/observability/` | Budget observability: pure spike detection, the owner digest formatter, the narrow owner-DM `NotifyApi`, and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
+| `src/observability/` | Budget observability: pure spike detection, the owner digest formatter (Rich Markdown tables), the narrow owner-DM `NotifyApi` (plain + rich send), and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
 | `src/shared/` | i18n catalog, timezone math, Web App date/time display format (catalogue + formatter), display-name validation, user-fact key/value constraints, interval scheduler, group→supergroup chat-id migration detection, shared domain types. | `i18n.ts`, `tz.ts`, `date-format.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `chat-migration.ts`, `types.ts` |
@@ -930,7 +930,15 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   Delivery is hybrid: instant owner DMs for alarms (global cap breach, new group,
   spend spike, each `claimAlert`-deduped to once/period), a batched digest for
   routine reporting. All owner-facing surfaces (digest, dashboard) reuse one
-  `spending/overview.ts` aggregator.
+  `spending/overview.ts` aggregator, which the digest asks to drop private chats
+  (a private chat is one user, so those rows only restate the top-users table).
+- **The digest is a Rich Markdown document, the alarms are plain text**
+  (`observability/digest.ts`) — rankings render as tables, one column per spend
+  window, sent via Bot API 10.1 `sendRichMessage` with the same plain
+  `sendMessage` fallback reminder delivery uses. Amounts carry six decimals and
+  sit in inline code: on a cheap model mix two decimals rounded nearly every row
+  to `$0.00`, and a bare `$…$` pair would otherwise parse as a LaTeX run. Labels
+  are escaped for table syntax, since chat titles genuinely contain `|` and `_`.
 - **Custom Prometheus implementation** — `metrics/registry.ts` explicitly avoids
   `prom-client` (hand-rolled exposition + cardinality guards); fewer deps, more
   in-house code to maintain.

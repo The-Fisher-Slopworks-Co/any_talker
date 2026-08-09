@@ -8,8 +8,14 @@ import { composeFullName } from "../shared/types";
 
 // Server-side USD formatter for owner DMs (spike alerts + digest). The webapp
 // has its own `formatUsd` in `ui/lib/labels.ts` for the browser bundle.
+//
+// Six decimals, not two: on a cheap model mix a whole day of a chat's traffic
+// costs less than a cent, so `toFixed(2)` rendered nearly every digest row as
+// "$0.00" — the figures the owner most needs to compare were exactly the ones
+// rounded away. A micro-dollar is finer than any single reply's cost, so no row
+// loses information here.
 export function formatUsd(n: number): string {
-  return `$${n.toFixed(2)}`;
+  return `$${n.toFixed(6)}`;
 }
 
 export type SpendRow = { id: string; label: string; spend: SpendSummary };
@@ -50,7 +56,14 @@ const byMonthThenDay = (a: SpendRow, b: SpendRow): number =>
 export async function gatherSpendOverview(
   storage: Storage,
   nowMs: number,
-  opts: { limit: number; newSinceMs: number },
+  opts: {
+    limit: number;
+    newSinceMs: number;
+    // Drops private chats from `topChats`. The digest sets it because a private
+    // chat is one user, so those rows only restate the top-users table; the
+    // dashboard leaves it off and shows every chat.
+    excludePrivateChats?: boolean;
+  },
 ): Promise<SpendOverview> {
   const [users, chats, modelIds, unpricedModels, denied, global] =
     await Promise.all([
@@ -74,9 +87,16 @@ export async function gatherSpendOverview(
     .sort(byMonthThenDay)
     .slice(0, opts.limit);
 
+  // Private chats are dropped before `slice`, so excluding them still yields a
+  // full top-N of group chats rather than a short list.
   const topChats = chats
-    .map((c, i): SpendRow => ({ id: c.id, label: chatLabel(c), spend: chatSpends[i]! }))
-    .filter((r) => r.spend.month > 0)
+    .map((c, i) => ({ chat: c, spend: chatSpends[i]! }))
+    .filter(
+      ({ chat, spend }) =>
+        spend.month > 0 &&
+        !(opts.excludePrivateChats && chat.type === "private"),
+    )
+    .map(({ chat, spend }): SpendRow => ({ id: chat.id, label: chatLabel(chat), spend }))
     .sort(byMonthThenDay)
     .slice(0, opts.limit);
 

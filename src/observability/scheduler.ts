@@ -16,7 +16,7 @@ import {
   formatUsd,
 } from "../spending/overview";
 import { detectSpike, type SpikeConfig } from "./spike";
-import { buildDigestText } from "./digest";
+import { buildDigestMarkdown } from "./digest";
 import type { NotifyApi } from "./types";
 import { t, type Lang } from "../shared/i18n";
 
@@ -133,14 +133,34 @@ async function maybeSendDigest(
   const overview = await gatherSpendOverview(deps.storage, deps.nowMs, {
     limit: DIGEST_LIMIT,
     newSinceMs: state.lastSentAtMs,
+    excludePrivateChats: true,
   });
-  const text = buildDigestText(overview, lang);
+  const markdown = buildDigestMarkdown(overview, lang);
   // Advance the clock whether or not we send, so a quiet interval doesn't cause
   // a re-gather on every subsequent tick.
   await deps.storage.setDigestState({ lastSentAtMs: deps.nowMs });
-  if (text) {
+  if (markdown) await sendDigest(deps, markdown);
+}
+
+// Rich send with a plain-text fallback, mirroring reminder delivery: if the
+// method or the markdown is rejected, the same source still reads acceptably as
+// text (a pipe-delimited table), which beats dropping the digest.
+async function sendDigest(
+  deps: ObservabilityTickDeps,
+  markdown: string,
+): Promise<void> {
+  try {
+    await deps.api.sendRichMessage({
+      chat_id: deps.ownerId,
+      rich_message: { markdown },
+    });
+  } catch (errRich) {
+    console.error(
+      "[observability] digest sendRichMessage failed, sending plain:",
+      errRich,
+    );
     await deps.api
-      .sendMessage(deps.ownerId, text)
+      .sendMessage(deps.ownerId, markdown)
       .catch((err) => console.error("[observability] digest DM failed:", err));
   }
 }
