@@ -1,107 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# Everything a pull request runs. Building and shipping the image lives in
+# release.yml, which pull requests don't trigger at all — see check.yml for why
+# that split exists rather than an `if:` on those jobs.
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   check:
-    name: Type check & tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Type check
-        run: bun run typecheck
-
-      - name: Run tests
-        run: bun test
-
-  docker:
-    name: Build & publish Docker image
-    needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Lowercase image name
-        id: img
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Validate commit SHA
-        run: |
-          if [ -z "${{ github.sha }}" ]; then
-            echo "github.sha is empty; refusing to build with an empty GIT_COMMIT label" >&2
-            exit 1
-          fi
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ steps.img.outputs.name }}
-          tags: |
-            type=raw,value=latest
-            type=sha,format=long
-            type=sha,prefix=,format=short
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            GIT_COMMIT=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
-
-  deploy:
-    name: Trigger deploy webhook
-    needs: docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify deploy webhook
-        env:
-          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
-        run: |
-          curl -fsS -X POST \
-            --retry 5 --retry-all-errors --retry-delay 2 \
-            --max-time 30 \
-            "$DEPLOY_WEBHOOK_URL"
+    uses: ./.github/workflows/check.yml
