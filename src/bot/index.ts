@@ -18,6 +18,7 @@ import { proxiedFetch } from "../proxy";
 import { askHandler } from "./handlers/ask";
 import type { DetailLevel } from "../ai/instruction";
 import { contactHandler } from "./handlers/contact";
+import { digestCommandHandler, matchDigestCommand } from "./handlers/digest";
 import { guestAskHandler } from "./handlers/guest";
 import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
@@ -1207,7 +1208,48 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   // `ctx.businessMessage` (not `ctx.message`), and the whole ask flow keys off
   // `ctx.message` — like the `message:photo`/`message:voice` handlers — so a
   // `/ask` there already no-op'd before this change.
+  // The owner's on-demand budget digest. Checked before `matchAsk` and handled
+  // inline (rather than as a second `message:text` listener) because this
+  // handler doesn't call `next()` — a separate listener registered first would
+  // swallow every ask.
+  const dispatchDigestCommand = async (ctx: BotContext): Promise<void> => {
+    const from = ctx.from;
+    if (!from) return;
+    const outcome = await digestCommandHandler({
+      storage: deps.storage,
+      ownerId: deps.ownerId,
+      isPrivateChat: ctx.chat?.type === "private",
+      fromUserId: String(from.id),
+      lang: ctx.lang,
+      nowMs: Date.now(),
+    });
+
+    switch (outcome.kind) {
+      case "ignored":
+        return;
+      case "empty":
+        await ctx.reply(ctx.t.bot_digest_empty);
+        return;
+      case "digest":
+        // Rich send with the same plain fallback the scheduled digest uses.
+        try {
+          await richApi(ctx.api).sendRichMessage({
+            chat_id: from.id,
+            rich_message: { markdown: outcome.markdown },
+          });
+        } catch (err) {
+          console.error("digest sendRichMessage failed, sending plain:", err);
+          await ctx.reply(outcome.markdown);
+        }
+        return;
+    }
+  };
+
   bot.on("message:text", async (ctx) => {
+    if (matchDigestCommand(ctx.message.text, ctx.me.username)) {
+      await dispatchDigestCommand(ctx);
+      return;
+    }
     const match = matchAsk(ctx.message.text, ctx.me.username);
     if (!match) return;
     if (!(await shouldAnswer(ctx, match, ctx.message.reply_to_message))) return;

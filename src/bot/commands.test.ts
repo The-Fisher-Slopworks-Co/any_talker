@@ -7,6 +7,8 @@ import {
   BOT_COMMAND_SCOPES,
   BOT_COMMANDS_EN,
   BOT_COMMANDS_RU,
+  OWNER_COMMANDS_EN,
+  OWNER_COMMANDS_RU,
   syncBotCommands,
   type SyncCommandsApi,
 } from "./commands";
@@ -172,5 +174,46 @@ describe("syncBotCommands", () => {
       },
     };
     await expect(syncBotCommands(api)).rejects.toThrow("network");
+  });
+
+  test("adds /digest under a chat scope for the owner only", async () => {
+    const calls: Array<{
+      commands: readonly BotCommand[];
+      other?: { language_code?: string; scope?: BotCommandScope };
+    }> = [];
+    const api: SyncCommandsApi = {
+      async setMyCommands(commands, other) {
+        calls.push({ commands, other });
+      },
+    };
+
+    await syncBotCommands(api, "12345");
+
+    const ownerCalls = calls.filter((c) => c.other?.scope?.type === "chat");
+    expect(ownerCalls).toHaveLength(3);
+    for (const c of ownerCalls) {
+      expect(c.other?.scope).toEqual({ type: "chat", chat_id: "12345" });
+    }
+    expect(ownerCalls.map((c) => c.commands)).toEqual([
+      OWNER_COMMANDS_EN,
+      OWNER_COMMANDS_EN,
+      OWNER_COMMANDS_RU,
+    ]);
+    // Every other scope keeps the public list — /digest is owner-only.
+    for (const c of calls.filter((x) => x.other?.scope?.type !== "chat")) {
+      expect(c.commands.map((cmd) => cmd.command)).not.toContain("digest");
+    }
+  });
+
+  test("owner lists extend the public ones with /digest", () => {
+    expect(OWNER_COMMANDS_EN.slice(0, BOT_COMMANDS_EN.length)).toEqual([
+      ...BOT_COMMANDS_EN,
+    ]);
+    expect(OWNER_COMMANDS_RU.slice(0, BOT_COMMANDS_RU.length)).toEqual([
+      ...BOT_COMMANDS_RU,
+    ]);
+    for (const list of [OWNER_COMMANDS_EN, OWNER_COMMANDS_RU]) {
+      expect(list.map((c) => c.command)).toContain("digest");
+    }
   });
 });

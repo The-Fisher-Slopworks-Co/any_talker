@@ -167,7 +167,8 @@ are supported as `host:port`).
   total reads as a floor), most-denied users, and new
   users/chats. Plus proactive owner DMs: instant alarms (global cap breached, bot added to a new
   group, a user/chat spend spike) and a periodic **budget digest** (interval + spike thresholds
-  configurable). Alarms are deduped to once per period.
+  configurable). Alarms are deduped to once per period. The owner can also pull the digest at any
+  time with **`/digest`** in a DM — it renders the same tables without disturbing the schedule.
 - Whitelist (chats and users). Owner always bypasses it. Enforcement is a single toggle in the admin
   UI (**Whitelist** tab): turn it off to open the bot to everyone — the USD budget guard and rate
   limit stay in force as the safety net, and the whitelist entries are preserved (not consulted) so

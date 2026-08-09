@@ -128,7 +128,7 @@ flowchart TB
 |---|---|---|
 | `src/main.ts` | Composition root: load config, wire services, register tools, start bot + HTTP + schedulers; hot-reload teardown. | `main.ts` |
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
-| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
+| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback,digest}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenRouter client + its Responses-input mapper, model catalogue, system-prompt builder, the shared LLM turn runner, the conversation session key, message (de)serialization, AI types. | `openrouter-client.ts`, `responses-input.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `session.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
@@ -939,6 +939,13 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   sit in inline code: on a cheap model mix two decimals rounded nearly every row
   to `$0.00`, and a bare `$…$` pair would otherwise parse as a LaTeX run. Labels
   are escaped for table syntax, since chat titles genuinely contain `|` and `_`.
+- **`/digest` reads, it doesn't reschedule** (`bot/handlers/digest.ts`) — the
+  owner-only command re-projects the same overview on demand and deliberately
+  leaves `at:digest_state` alone, so pulling a digest neither resets the cadence
+  nor blanks the "new since last digest" span of the next scheduled one. It is
+  matched inside the existing `message:text` listener (which doesn't call
+  `next()`), and registered in the command menu only under a chat scope for the
+  owner, since the handler ignores everyone else.
 - **Custom Prometheus implementation** — `metrics/registry.ts` explicitly avoids
   `prom-client` (hand-rolled exposition + cardinality guards); fewer deps, more
   in-house code to maintain.
