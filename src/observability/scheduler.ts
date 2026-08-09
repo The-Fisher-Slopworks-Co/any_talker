@@ -16,7 +16,7 @@ import {
   formatUsd,
 } from "../spending/overview";
 import { detectSpike, type SpikeConfig } from "./spike";
-import { buildDigestText } from "./digest";
+import { buildDigestMarkdown } from "./digest";
 import type { NotifyApi } from "./types";
 import { t, type Lang } from "../shared/i18n";
 
@@ -33,8 +33,9 @@ export type ObservabilityTickDeps = {
 // admin-configurable (`AnomalyConfig.digestIntervalHours`); this only bounds how
 // often we look. Fixed in code like the reminder/checks scheduler intervals.
 const DEFAULT_INTERVAL_MS = 5 * 60_000;
-// Digest rows shown per section.
-const DIGEST_LIMIT = 5;
+// Digest rows shown per section. Exported so the on-demand `/digest` command
+// renders the same-sized tables as the scheduled one.
+export const DIGEST_LIMIT = 5;
 // One alert per subject per UTC day (a bit over 24h to bridge day boundaries).
 // Exported so the dispatcher's global-cap-breach alert dedupes on the same window.
 export const ALERT_TTL_SECONDS = 26 * 60 * 60;
@@ -133,14 +134,34 @@ async function maybeSendDigest(
   const overview = await gatherSpendOverview(deps.storage, deps.nowMs, {
     limit: DIGEST_LIMIT,
     newSinceMs: state.lastSentAtMs,
+    excludePrivateChats: true,
   });
-  const text = buildDigestText(overview, lang);
+  const markdown = buildDigestMarkdown(overview, lang);
   // Advance the clock whether or not we send, so a quiet interval doesn't cause
   // a re-gather on every subsequent tick.
   await deps.storage.setDigestState({ lastSentAtMs: deps.nowMs });
-  if (text) {
+  if (markdown) await sendDigest(deps, markdown);
+}
+
+// Rich send with a plain-text fallback, mirroring reminder delivery: if the
+// method or the markdown is rejected, the same source still reads acceptably as
+// text (a pipe-delimited table), which beats dropping the digest.
+async function sendDigest(
+  deps: ObservabilityTickDeps,
+  markdown: string,
+): Promise<void> {
+  try {
+    await deps.api.sendRichMessage({
+      chat_id: deps.ownerId,
+      rich_message: { markdown },
+    });
+  } catch (errRich) {
+    console.error(
+      "[observability] digest sendRichMessage failed, sending plain:",
+      errRich,
+    );
     await deps.api
-      .sendMessage(deps.ownerId, text)
+      .sendMessage(deps.ownerId, markdown)
       .catch((err) => console.error("[observability] digest DM failed:", err));
   }
 }
