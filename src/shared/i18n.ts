@@ -76,6 +76,14 @@ type Strings = {
   bot_digest_top_models: string;
   bot_digest_denials: string;
   bot_digest_unpriced: (models: string) => string;
+  // Column headers for the digest's Rich Markdown tables.
+  bot_digest_col_user: string;
+  bot_digest_col_chat: string;
+  bot_digest_col_model: string;
+  bot_digest_col_month: string;
+  bot_digest_col_week: string;
+  bot_digest_col_today: string;
+  bot_digest_col_denials: string;
   bot_ai_error: string;
   bot_details_summary: string;
   bot_contact_no_user_id: string;
@@ -548,12 +556,19 @@ const en: Strings = {
     `Spend — today ${day} · 7d ${week} · 30d ${month}`,
   bot_digest_new_users: (n) => `🆕 New users: ${n}`,
   bot_digest_new_chats: (n) => `🆕 New chats: ${n}`,
-  bot_digest_top_users: "Top spenders (users):",
-  bot_digest_top_chats: "Top spenders (chats):",
-  bot_digest_top_models: "By model:",
-  bot_digest_denials: "Most-denied users:",
+  bot_digest_top_users: "Top spenders (users)",
+  bot_digest_top_chats: "Top spenders (group chats)",
+  bot_digest_top_models: "By model",
+  bot_digest_denials: "Most-denied users",
   bot_digest_unpriced: (models) =>
     `⚠️ Models with no cost reported (spend under-counted): ${models}`,
+  bot_digest_col_user: "User",
+  bot_digest_col_chat: "Chat",
+  bot_digest_col_model: "Model",
+  bot_digest_col_month: "30d",
+  bot_digest_col_week: "7d",
+  bot_digest_col_today: "Today",
+  bot_digest_col_denials: "Denials",
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -1018,10 +1033,17 @@ const ru: Strings = {
     `Траты — сегодня ${day} · 7д ${week} · 30д ${month}`,
   bot_digest_new_users: (n) => `🆕 Новых юзеров: ${n}`,
   bot_digest_new_chats: (n) => `🆕 Новых чатов: ${n}`,
-  bot_digest_top_users: "Топ по тратам (юзеры):",
-  bot_digest_top_chats: "Топ по тратам (чаты):",
-  bot_digest_top_models: "По моделям:",
-  bot_digest_denials: "Чаще всего отклонялись:",
+  bot_digest_top_users: "Топ по тратам (юзеры)",
+  bot_digest_top_chats: "Топ по тратам (групповые чаты)",
+  bot_digest_top_models: "По моделям",
+  bot_digest_denials: "Чаще всего отклонялись",
+  bot_digest_col_user: "Юзер",
+  bot_digest_col_chat: "Чат",
+  bot_digest_col_model: "Модель",
+  bot_digest_col_month: "30д",
+  bot_digest_col_week: "7д",
+  bot_digest_col_today: "Сегодня",
+  bot_digest_col_denials: "Отказов",
   bot_digest_unpriced: (models) =>
     `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
