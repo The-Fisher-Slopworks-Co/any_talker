@@ -20,13 +20,29 @@ export const BOT_COMMANDS_RU: readonly BotCommand[] = [
   { command: "askwise", description: "Спросить (подробно)" },
 ];
 
+// The owner's own DM additionally lists `/digest`. Kept out of every other
+// scope because the handler ignores non-owners anyway, and a menu entry that
+// silently does nothing is worse than no entry.
+export const OWNER_COMMANDS_EN: readonly BotCommand[] = [
+  ...BOT_COMMANDS_EN,
+  { command: "digest", description: "Budget digest, now" },
+];
+
+export const OWNER_COMMANDS_RU: readonly BotCommand[] = [
+  ...BOT_COMMANDS_RU,
+  { command: "digest", description: "Сводка по бюджету, сейчас" },
+];
+
 export const BOT_COMMAND_SCOPES: readonly BotCommandScope[] = [
   { type: "all_private_chats" },
   { type: "all_group_chats" },
   { type: "all_chat_administrators" },
 ];
 
-export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {
+export async function syncBotCommands(
+  api: SyncCommandsApi,
+  ownerId?: string,
+): Promise<void> {
   await api.setMyCommands(BOT_COMMANDS_EN);
   await api.setMyCommands(BOT_COMMANDS_EN, { language_code: "en" });
   await api.setMyCommands(BOT_COMMANDS_RU, { language_code: "ru" });
@@ -35,4 +51,11 @@ export async function syncBotCommands(api: SyncCommandsApi): Promise<void> {
     await api.setMyCommands(BOT_COMMANDS_EN, { scope, language_code: "en" });
     await api.setMyCommands(BOT_COMMANDS_RU, { scope, language_code: "ru" });
   }
+  if (ownerId === undefined) return;
+  // A chat scope outranks `all_private_chats`, so this replaces (not appends
+  // to) the default list in the owner's DM — hence spreading the base list.
+  const scope: BotCommandScope = { type: "chat", chat_id: ownerId };
+  await api.setMyCommands(OWNER_COMMANDS_EN, { scope });
+  await api.setMyCommands(OWNER_COMMANDS_EN, { scope, language_code: "en" });
+  await api.setMyCommands(OWNER_COMMANDS_RU, { scope, language_code: "ru" });
 }

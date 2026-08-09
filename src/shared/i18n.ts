@@ -84,6 +84,9 @@ type Strings = {
   bot_digest_col_week: string;
   bot_digest_col_today: string;
   bot_digest_col_denials: string;
+  // Reply to `/digest` when the period held nothing worth reporting (the
+  // scheduled digest simply stays silent in that case).
+  bot_digest_empty: string;
   bot_ai_error: string;
   bot_details_summary: string;
   bot_contact_no_user_id: string;
@@ -569,6 +572,7 @@ const en: Strings = {
   bot_digest_col_week: "7d",
   bot_digest_col_today: "Today",
   bot_digest_col_denials: "Denials",
+  bot_digest_empty: "Nothing to report — no spend, new users or denials yet.",
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -1046,6 +1050,7 @@ const ru: Strings = {
   bot_digest_col_denials: "Отказов",
   bot_digest_unpriced: (models) =>
     `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
+  bot_digest_empty: "Пока не о чем отчитываться — ни трат, ни новых юзеров, ни отказов.",
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:

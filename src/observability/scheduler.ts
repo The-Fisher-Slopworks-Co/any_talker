@@ -33,8 +33,9 @@ export type ObservabilityTickDeps = {
 // admin-configurable (`AnomalyConfig.digestIntervalHours`); this only bounds how
 // often we look. Fixed in code like the reminder/checks scheduler intervals.
 const DEFAULT_INTERVAL_MS = 5 * 60_000;
-// Digest rows shown per section.
-const DIGEST_LIMIT = 5;
+// Digest rows shown per section. Exported so the on-demand `/digest` command
+// renders the same-sized tables as the scheduled one.
+export const DIGEST_LIMIT = 5;
 // One alert per subject per UTC day (a bit over 24h to bridge day boundaries).
 // Exported so the dispatcher's global-cap-breach alert dedupes on the same window.
 export const ALERT_TTL_SECONDS = 26 * 60 * 60;
