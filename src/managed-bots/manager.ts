@@ -163,7 +163,7 @@ export class BotManager {
       .catch((err) => console.error(`[managed-bots] setMyName failed:`, err));
     // Register the `/ask` command menu for this bot too (best-effort), so a
     // managed bot exposes the same commands as the main bot in its own DMs.
-    await syncBotCommands(bot.api).catch((err) =>
+    await syncBotCommands(bot.api, this.deps.ownerId).catch((err) =>
       console.error(`[managed-bots] syncBotCommands failed:`, err),
     );
     // grammY rethrows a fatal getUpdates error (401 unauthorized / 409

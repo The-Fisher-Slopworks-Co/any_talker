@@ -128,7 +128,7 @@ flowchart TB
 |---|---|---|
 | `src/main.ts` | Composition root: load config, wire services, register tools, start bot + HTTP + schedulers; hot-reload teardown. | `main.ts` |
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
-| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
+| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback,digest}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenRouter client + its Responses-input mapper, model catalogue, system-prompt builder, the shared LLM turn runner, the conversation session key, message (de)serialization, AI types. | `openrouter-client.ts`, `responses-input.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `session.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
@@ -141,7 +141,7 @@ flowchart TB
 | `src/ratelimit/` | Per-user dual fixed-window rate limiter (5-hour + weekly token budgets, per-user phase-shifted). | `dual-window.ts`, `window.ts`, `types.ts` |
 | `src/budget/` | Hard USD budget guard — the enforcement safety net that denies non-owner requests when a global/chat/new-user spend cap is breached. Port + impl, mirroring `ratelimit/`. | `guard.ts`, `types.ts` |
 | `src/spending/` | UTC-day-bucketed spend windows (per-user/chat/global/model), the multi-ledger spend recorder, and the shared spend-overview aggregator (powers the digest + dashboard). | `window.ts`, `record.ts`, `overview.ts` |
-| `src/observability/` | Budget observability: pure spike detection, the owner digest formatter, the narrow owner-DM `NotifyApi`, and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
+| `src/observability/` | Budget observability: pure spike detection, the owner digest formatter (Rich Markdown tables), the narrow owner-DM `NotifyApi` (plain + rich send), and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
 | `src/settings.ts` | Global/per-chat settings load, normalize, and override merge. | `settings.ts` |
 | `src/metrics/` | Hand-rolled Prometheus registry + every instrument. | `registry.ts`, `instruments.ts`, `index.ts` |
 | `src/shared/` | i18n catalog, timezone math, Web App date/time display format (catalogue + formatter), display-name validation, user-fact key/value constraints, interval scheduler, group→supergroup chat-id migration detection, shared domain types. | `i18n.ts`, `tz.ts`, `date-format.ts`, `display-name.ts`, `user-facts.ts`, `interval-scheduler.ts`, `chat-migration.ts`, `types.ts` |
@@ -930,7 +930,22 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   Delivery is hybrid: instant owner DMs for alarms (global cap breach, new group,
   spend spike, each `claimAlert`-deduped to once/period), a batched digest for
   routine reporting. All owner-facing surfaces (digest, dashboard) reuse one
-  `spending/overview.ts` aggregator.
+  `spending/overview.ts` aggregator, which the digest asks to drop private chats
+  (a private chat is one user, so those rows only restate the top-users table).
+- **The digest is a Rich Markdown document, the alarms are plain text**
+  (`observability/digest.ts`) — rankings render as tables, one column per spend
+  window, sent via Bot API 10.1 `sendRichMessage` with the same plain
+  `sendMessage` fallback reminder delivery uses. Amounts carry six decimals and
+  sit in inline code: on a cheap model mix two decimals rounded nearly every row
+  to `$0.00`, and a bare `$…$` pair would otherwise parse as a LaTeX run. Labels
+  are escaped for table syntax, since chat titles genuinely contain `|` and `_`.
+- **`/digest` reads, it doesn't reschedule** (`bot/handlers/digest.ts`) — the
+  owner-only command re-projects the same overview on demand and deliberately
+  leaves `at:digest_state` alone, so pulling a digest neither resets the cadence
+  nor blanks the "new since last digest" span of the next scheduled one. It is
+  matched inside the existing `message:text` listener (which doesn't call
+  `next()`), and registered in the command menu only under a chat scope for the
+  owner, since the handler ignores everyone else.
 - **Custom Prometheus implementation** — `metrics/registry.ts` explicitly avoids
   `prom-client` (hand-rolled exposition + cardinality guards); fewer deps, more
   in-house code to maintain.

@@ -159,7 +159,7 @@ async function main() {
   });
 
   await bot.api.deleteWebhook();
-  await syncBotCommands(bot.api).catch((err) => {
+  await syncBotCommands(bot.api, config.botOwnerId).catch((err) => {
     console.error("syncBotCommands failed:", err);
   });
   // The main bot is the family hub (token brokering, owner notifications), so
