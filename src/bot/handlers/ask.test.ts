@@ -124,6 +124,44 @@ describe("askHandler", () => {
     expect(out.kind).toBe("usage");
   });
 
+  test("bare /ask replying to a chain node that carries media is a real question", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    // The user's own /ask-captioned photo, persisted under the ask message id
+    // with its image file id — exactly what persistTurn stores (issue #81).
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["file-1"],
+    });
+    const ai = new FakeAI();
+    const photo = new Uint8Array([0xff, 0xd8]);
+    const out = await askHandler(
+      baseInput({
+        storage,
+        ai,
+        userText: "",
+        replyTarget: {
+          messageId: 100,
+          text: "Q1 caption",
+          authorFirstName: "John",
+          images: [photo],
+        },
+        fetchPhoto: async () => photo,
+      }),
+    );
+    expect(out.kind).toBe("answered");
+    const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+    // The chain supplies the photo, and the prompt still ends on a user turn.
+    expect(sent[0]!.content).toEqual([
+      { type: "text", text: "Q1" },
+      { type: "image", image: photo, mediaType: "image/jpeg" },
+    ]);
+    expect(sent.length).toBe(3);
+  });
+
   test("empty text replying to a foreign message still asks about it", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });

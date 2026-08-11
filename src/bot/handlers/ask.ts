@@ -142,12 +142,21 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     // itself is new content ("what about this?"). Replying into the bot's own
     // conversation chain adds nothing the model doesn't already have — the
     // chain IS the context — so it gets the usage hint too, instead of an AI
-    // turn with an empty question.
-    const node = await convStorage.getConversation(
-      input.chatId,
-      input.replyTarget.messageId,
-    );
-    if (node) return { kind: "usage" };
+    // turn with an empty question. Media on the replied-to message is the
+    // exception: a chain node can be the user's own /ask-captioned photo, and
+    // a bare /ask replying to it means "look at this" — the same gesture that
+    // already works on a photo outside the chain (issue #81).
+    const replyHasMedia =
+      input.replyTarget.images.length > 0 ||
+      (input.replyTarget.audios?.length ?? 0) > 0 ||
+      (input.replyTarget.videos?.length ?? 0) > 0;
+    if (!replyHasMedia) {
+      const node = await convStorage.getConversation(
+        input.chatId,
+        input.replyTarget.messageId,
+      );
+      if (node) return { kind: "usage" };
+    }
   }
 
   // Persist this turn into the conversation graph under BOTH the bot's reply
