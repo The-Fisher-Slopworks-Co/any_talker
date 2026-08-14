@@ -18,6 +18,20 @@ export function formatUsd(n: number): string {
   return `$${n.toFixed(6)}`;
 }
 
+// Half a micro-dollar — the smallest amount `formatUsd` can still render as
+// non-zero. Below it every window of a row prints "$0.000000", so the row is
+// three columns of noise in the digest and the dashboard. Rows like that are
+// normal: the user/chat/model directories outlive the daily spend buckets they
+// were recorded from (35-day retention vs. a permanent set), so an entity that
+// last spent months ago keeps a permanently empty row.
+const VISIBLE_USD = 5e-7;
+
+// `month` is the widest window and covers the other two, so it alone decides
+// whether a row shows any spend at all.
+function hasVisibleSpend(s: SpendSummary): boolean {
+  return s.month >= VISIBLE_USD;
+}
+
 export type SpendRow = { id: string; label: string; spend: SpendSummary };
 export type ModelRow = { modelId: string; spend: SpendSummary; unpriced: boolean };
 export type DeniedRow = { userId: string; label: string; count: number };
@@ -83,7 +97,7 @@ export async function gatherSpendOverview(
 
   const topUsers = users
     .map((u, i): SpendRow => ({ id: u.id, label: userLabel(u), spend: userSpends[i]! }))
-    .filter((r) => r.spend.month > 0)
+    .filter((r) => hasVisibleSpend(r.spend))
     .sort(byMonthThenDay)
     .slice(0, opts.limit);
 
@@ -93,7 +107,7 @@ export async function gatherSpendOverview(
     .map((c, i) => ({ chat: c, spend: chatSpends[i]! }))
     .filter(
       ({ chat, spend }) =>
-        spend.month > 0 &&
+        hasVisibleSpend(spend) &&
         !(opts.excludePrivateChats && chat.type === "private"),
     )
     .map(({ chat, spend }): SpendRow => ({ id: chat.id, label: chatLabel(chat), spend }))
@@ -109,6 +123,10 @@ export async function gatherSpendOverview(
         unpriced: unpricedSet.has(m),
       }),
     )
+    // An unpriced model survives an all-zero row: its $0 is "OpenRouter
+    // reported no cost", not "no traffic", and the row's ⚠️ marker is the only
+    // place the dashboard says so.
+    .filter((r) => hasVisibleSpend(r.spend) || r.unpriced)
     .sort((a, b) => b.spend.month - a.spend.month)
     .slice(0, opts.limit);
 
