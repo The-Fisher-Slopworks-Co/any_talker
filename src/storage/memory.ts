@@ -35,6 +35,8 @@ import {
 type Backing = {
   settings: { value: Settings | null };
   whitelist: Record<WhitelistKind, Map<string, WhitelistEntry>>;
+  // User blacklist, keyed by userId (global — not affected by `forBot` scope).
+  blacklist: Map<string, WhitelistEntry>;
   // Per-user usage, keyed by userId (global — not affected by `forBot` scope).
   usage: Map<string, UserUsage>;
   conversations: Map<string, ConversationNode>;
@@ -78,6 +80,7 @@ function createBacking(): Backing {
   return {
     settings: { value: null },
     whitelist: { users: new Map(), chats: new Map() },
+    blacklist: new Map(),
     usage: new Map(),
     conversations: new Map(),
     guestThreads: new Map(),
@@ -248,6 +251,22 @@ export class MemoryStorage implements Storage {
 
   async isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean> {
     return this.b.whitelist[kind].has(id);
+  }
+
+  async listBlacklist(): Promise<WhitelistEntry[]> {
+    return [...this.b.blacklist.values()];
+  }
+
+  async addBlacklist(entry: WhitelistEntry): Promise<void> {
+    this.b.blacklist.set(entry.id, { ...entry });
+  }
+
+  async removeBlacklist(id: string): Promise<void> {
+    this.b.blacklist.delete(id);
+  }
+
+  async isBlacklisted(id: string): Promise<boolean> {
+    return this.b.blacklist.has(id);
   }
 
   async getUserUsage(userId: string): Promise<UserUsage | null> {

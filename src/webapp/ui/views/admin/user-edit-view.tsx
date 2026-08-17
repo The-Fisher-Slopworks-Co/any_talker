@@ -30,6 +30,7 @@ import { RowButton, SaveButton, Toggle } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { TimezoneSelect } from "../../components/timezone-select";
 import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
+import { BlacklistToggleButton } from "../../components/blacklist-toggle-button";
 import {
   INPUT_CLS,
   ROW_CLS,
@@ -161,6 +162,11 @@ export function UserEditView({ userId }: { userId: string }) {
           id={user.id}
           label={effectiveName}
           initial={data.whitelisted}
+        />
+        <BlacklistToggleButton
+          id={user.id}
+          label={effectiveName}
+          initial={data.blacklisted}
         />
       </Card>
       <SectionFooter>

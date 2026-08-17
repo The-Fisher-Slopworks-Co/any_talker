@@ -151,6 +151,20 @@ describe("runReminderTick", () => {
     expect(ai.calls).toBe(0);
   });
 
+  test("blacklisted user's reminder is dropped without AI or TG calls", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.addBlacklist({ id: "u1" });
+    const api = new FakeApi();
+    const ai = new FakeAI();
+
+    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+
+    expect(api.calls).toEqual([]);
+    expect(ai.calls).toBe(0);
+    expect(await storage.fetchDueReminders(10_000)).toEqual([]);
+  });
+
   test("delivers multiple due reminders in one tick", async () => {
     const storage = new MemoryStorage();
     await storage.saveReminder(reminder({ id: "a", fireAtMs: 100 }));
