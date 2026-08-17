@@ -234,7 +234,10 @@ whitelist (user / chat) is consulted only while `settings.whitelistEnabled` — 
 single admin toggle that opens the bot to everyone (leaving the budget guard +
 rate limit as the protection) without discarding the whitelist entries. Guest
 mode applies the same order inline (owner → blacklist → user whitelist; there
-is no chat membership to consult). AI replies
+is no chat membership to consult). A denial is silent toward the chat, so the
+`denied` outcome carries the gate's reason (`blacklisted` / `not_whitelisted`)
+and the dispatcher emits an `ask_access_denied` info log line (user id, chat
+id, reason) — the logs, not the chat, answer "why did the bot stay quiet". AI replies
 are **Rich Markdown** (Bot API 10.1): the model emits Markdown (see
 `ai/instruction.ts`), `format.ts:buildRichMarkdown` assembles the payload
 (bot-name prefix + effects block as escaped Rich HTML, long answers collapsed

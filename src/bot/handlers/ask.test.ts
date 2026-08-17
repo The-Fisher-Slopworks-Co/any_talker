@@ -71,7 +71,15 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
 describe("askHandler", () => {
   test("denied when not whitelisted and not owner", async () => {
     const out: AskOutcome = await askHandler(baseInput());
-    expect(out.kind).toBe("denied");
+    expect(out).toEqual({ kind: "denied", reason: "not_whitelisted" });
+  });
+
+  test("blacklisted user denied with the reason for the log", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.addBlacklist({ id: "42" });
+    const out: AskOutcome = await askHandler(baseInput({ storage }));
+    expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
 
   test("usage hint when text is empty and no reply", async () => {
