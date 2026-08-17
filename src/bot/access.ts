@@ -15,6 +15,10 @@ export async function isAllowed(args: {
 }): Promise<boolean> {
   const { storage, ownerId, userId, chatId, whitelistEnabled } = args;
   if (userId === ownerId) return true;
+  // The blacklist always applies (only the owner is immune): a blocked user is
+  // denied even while the whitelist is off, and a whitelist entry (their own or
+  // the chat's) never overrides it.
+  if (await storage.isBlacklisted(userId)) return false;
   if (!whitelistEnabled) return true;
   if (await storage.isWhitelisted("users", userId)) return true;
   if (await storage.isWhitelisted("chats", chatId)) return true;

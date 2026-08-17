@@ -50,6 +50,37 @@ describe("MemoryStorage whitelist", () => {
   });
 });
 
+describe("MemoryStorage blacklist", () => {
+  test("starts empty", async () => {
+    const s = new MemoryStorage();
+    expect(await s.listBlacklist()).toEqual([]);
+    expect(await s.isBlacklisted("1")).toBe(false);
+  });
+
+  test("add then list and check; add is idempotent on id, last label wins", async () => {
+    const s = new MemoryStorage();
+    await s.addBlacklist({ id: "42", label: "a" });
+    await s.addBlacklist({ id: "42", label: "b" });
+    expect(await s.listBlacklist()).toEqual([{ id: "42", label: "b" }]);
+    expect(await s.isBlacklisted("42")).toBe(true);
+    expect(await s.isBlacklisted("43")).toBe(false);
+  });
+
+  test("remove removes the entry", async () => {
+    const s = new MemoryStorage();
+    await s.addBlacklist({ id: "42" });
+    await s.removeBlacklist("42");
+    expect(await s.isBlacklisted("42")).toBe(false);
+  });
+
+  test("is shared across forBot scopes (global, like the whitelist)", async () => {
+    const s = new MemoryStorage();
+    await s.forBot("777").addBlacklist({ id: "42" });
+    expect(await s.isBlacklisted("42")).toBe(true);
+    expect(await s.forBot(null).isBlacklisted("42")).toBe(true);
+  });
+});
+
 describe("MemoryStorage usage", () => {
   test("accrues to both windows, rolling a window over on a new start", async () => {
     const s = new MemoryStorage();

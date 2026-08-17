@@ -94,6 +94,14 @@ describe("guestAskHandler", () => {
     if (out.kind === "answered") expect(out.text).toBe("hi");
   });
 
+  test("blacklisted user denied even when whitelisted", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.addBlacklist({ id: "42" });
+    const out = await guestAskHandler(baseInput({ storage }));
+    expect(out.kind).toBe("denied");
+  });
+
   test("an empty AI answer is an error turn, not an answered one (Telegram rejects empty messages)", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
