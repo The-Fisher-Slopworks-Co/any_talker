@@ -206,6 +206,11 @@ type Strings = {
   ui_whitelist_footer_users: string;
   ui_whitelist_footer_chats: string;
 
+  ui_blacklist_add: string;
+  ui_blacklist_remove: string;
+  ui_blacklist_blocked_users: string;
+  ui_blacklist_footer: string;
+
   ui_prompt_models: string;
   ui_prompt_system_prompt: string;
   ui_prompt_system_prompt_footer: string;
@@ -708,6 +713,12 @@ const en: Strings = {
   ui_whitelist_footer_chats:
     "Add entries from a chat's page via \"Add to whitelist\".",
 
+  ui_blacklist_add: "Add to blacklist",
+  ui_blacklist_remove: "Remove from blacklist",
+  ui_blacklist_blocked_users: "Blocked Users",
+  ui_blacklist_footer:
+    "Blocked users are always denied — even when the whitelist is off, and even in whitelisted chats. Their pending reminders are dropped. Add entries from a user's page via \"Add to blacklist\".",
+
   ui_prompt_models: "Models",
   ui_prompt_system_prompt: "System Prompt",
   ui_prompt_system_prompt_footer:
@@ -1186,6 +1197,12 @@ const ru: Strings = {
     "Добавляйте записи со страницы пользователя через «Добавить в белый список».",
   ui_whitelist_footer_chats:
     "Добавляйте записи со страницы чата через «Добавить в белый список».",
+
+  ui_blacklist_add: "Добавить в чёрный список",
+  ui_blacklist_remove: "Убрать из чёрного списка",
+  ui_blacklist_blocked_users: "Заблокированные пользователи",
+  ui_blacklist_footer:
+    "Заблокированным пользователям бот отказывает всегда — даже при выключенном белом списке и даже в разрешённых чатах. Их отложенные напоминания не доставляются. Добавляйте записи со страницы пользователя через «Добавить в чёрный список».",
 
   ui_prompt_models: "Модели",
   ui_prompt_system_prompt: "Системный промпт",

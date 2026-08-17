@@ -227,10 +227,14 @@ losing the visual. Outcomes (`native` / `frames` / failures) are counted in
 `bot_video_extractions_total`.
 
 Handlers (`handlers/`) are pure and return tagged outcomes. `access.ts` is the
-bot-side authorization gate (owner / user-whitelist / chat-whitelist), consulted
-after settings resolve and only while `settings.whitelistEnabled` — a single
-admin toggle that opens the bot to everyone (leaving the budget guard + rate
-limit as the protection) without discarding the whitelist entries. AI replies
+bot-side authorization gate: the owner always passes, a **blacklisted user is
+always denied** (the user blacklist applies regardless of `whitelistEnabled`
+and overrides any whitelist entry, the user's own or the chat's), and the
+whitelist (user / chat) is consulted only while `settings.whitelistEnabled` — a
+single admin toggle that opens the bot to everyone (leaving the budget guard +
+rate limit as the protection) without discarding the whitelist entries. Guest
+mode applies the same order inline (owner → blacklist → user whitelist; there
+is no chat membership to consult). AI replies
 are **Rich Markdown** (Bot API 10.1): the model emits Markdown (see
 `ai/instruction.ts`), `format.ts:buildRichMarkdown` assembles the payload
 (bot-name prefix + effects block as escaped Rich HTML, long answers collapsed
@@ -490,7 +494,9 @@ See §6 for the request flow. **Depends on:** `storage`,
 Both are thin adapters over `shared/interval-scheduler.ts` (fire immediately,
 then on an interval; skip — never queue — a tick if the previous is still
 in-flight; default 30 s). The **reminder** scheduler fetches due reminders and
-delivers each; `deliverReminder` **re-runs the LLM** with the stored context plus
+delivers each — except a **blacklisted** user's, which is deleted undelivered
+(delivery re-runs the LLM, and a blocked user must not keep spending through
+reminders queued before the block; counted as `outcome="blocked"`); `deliverReminder` **re-runs the LLM** with the stored context plus
 a `reminder_fired` envelope (it is not a stored-text echo), giving at-least-once
 delivery. That envelope carries a `time` of its own — the system prompt states no
 current moment (see the AI layer), and a retried delivery fires later than the
@@ -619,6 +625,7 @@ persisted entities:
 | Global settings | `at:settings` | string | — | `Settings` (systemPrompt, models[], rateLimit, budget, anomaly, timezone, maxRemindersPerUser, …) |
 | Chat settings | `at:chat_settings:{chatId}` | string | — | partial `ChatSettings` overrides; key deleted when empty |
 | Whitelist | `at:whitelist:{users\|chats}` | string | — | `WhitelistEntry[]` (`{id, label?}`) |
+| User blacklist | `at:blacklist:users` | string | — | `WhitelistEntry[]` (`{id, label?}`); users only, global (unscoped). A listed user is always denied (owner immune); their due reminders are dropped undelivered |
 | Per-user rate-limit usage | `at:usage:{userId}` | string | ~9 days (week + slack) | `{ fiveHour: {windowStart, used}, weekly: {windowStart, used} }` (per-user, global; window phase derived from the user id) |
 | User attributes | `at:user_{name,tz,gender,lang,datefmt}:{userId}` | string (raw) | — | scalar strings, validated on read (`datefmt` is the Web App's date/time display format; absent = viewer's device locale) |
 | Per-user spend | `at:spend:{userId}:{YYYY-MM-DD}` | float counter | 35 days | USD per UTC day (`INCRBYFLOAT`); summarized to day/week/month |
@@ -744,7 +751,9 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
 ## 9. Cross-cutting concerns
 
 - **Authorization** — two gates rooted in `BOT_OWNER_ID`. Bot side:
-  `bot/access.ts` (owner or whitelisted user or whitelisted chat). Web App side:
+  `bot/access.ts` (owner → user-blacklist deny → whitelisted user or chat; the
+  blacklist also gates guest mode and drops a blocked user's due reminders in
+  the scheduler). Web App side:
   `webapp/auth.ts` verifies signed Telegram `initData`, then `server.ts` derives
   `actor = { userId, isOwner }`; `api.ts` enforces user-vs-owner tiers.
 - **Configuration** — all env reads funnel through `config.ts` (plus `NODE_ENV`,

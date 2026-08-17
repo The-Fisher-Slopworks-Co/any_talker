@@ -295,6 +295,28 @@ export class KeyDBStorage implements Storage {
     return list.some((e) => e.id === id);
   }
 
+  async listBlacklist(): Promise<WhitelistEntry[]> {
+    const raw = await this.client.get(`${PREFIX}blacklist:users`);
+    return raw ? (JSON.parse(raw) as WhitelistEntry[]) : [];
+  }
+
+  async addBlacklist(entry: WhitelistEntry): Promise<void> {
+    const list = await this.listBlacklist();
+    const next = [...list.filter((e) => e.id !== entry.id), { ...entry }];
+    await this.client.set(`${PREFIX}blacklist:users`, JSON.stringify(next));
+  }
+
+  async removeBlacklist(id: string): Promise<void> {
+    const list = await this.listBlacklist();
+    const next = list.filter((e) => e.id !== id);
+    await this.client.set(`${PREFIX}blacklist:users`, JSON.stringify(next));
+  }
+
+  async isBlacklisted(id: string): Promise<boolean> {
+    const list = await this.listBlacklist();
+    return list.some((e) => e.id === id);
+  }
+
   // Usage is a shared per-user key (unscoped, like spend): the budget is global,
   // not per chat or per character bot.
   async getUserUsage(userId: string): Promise<UserUsage | null> {

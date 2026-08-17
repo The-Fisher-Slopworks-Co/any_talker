@@ -85,4 +85,62 @@ describe("isAllowed", () => {
       }),
     ).toBe(true);
   });
+
+  test("blacklisted user denied even with whitelist disabled", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist({ id: "42" });
+    expect(
+      await isAllowed({
+        storage,
+        ownerId: "1",
+        userId: "42",
+        chatId: "x",
+        whitelistEnabled: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("blacklist wins over the user's own whitelist entry", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.addBlacklist({ id: "42" });
+    expect(
+      await isAllowed({
+        storage,
+        ownerId: "1",
+        userId: "42",
+        chatId: "x",
+        whitelistEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  test("blacklist wins over a whitelisted chat", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("chats", { id: "-100" });
+    await storage.addBlacklist({ id: "42" });
+    expect(
+      await isAllowed({
+        storage,
+        ownerId: "1",
+        userId: "42",
+        chatId: "-100",
+        whitelistEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  test("a blacklist entry for the owner's id has no effect", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist({ id: "1" });
+    expect(
+      await isAllowed({
+        storage,
+        ownerId: "1",
+        userId: "1",
+        chatId: "any",
+        whitelistEnabled: true,
+      }),
+    ).toBe(true);
+  });
 });

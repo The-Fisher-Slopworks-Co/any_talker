@@ -77,6 +77,53 @@ function WhitelistList({
   );
 }
 
+function BlacklistList({
+  entries,
+  onOpen,
+  onRemove,
+}: {
+  entries: WhitelistEntry[];
+  onOpen: (id: string) => void;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const { t: s } = useI18n();
+  return (
+    <>
+      <SectionHeader>{s.ui_blacklist_blocked_users}</SectionHeader>
+      <Card>
+        {entries.length === 0 ? (
+          <EmptyState>{s.ui_whitelist_no_entries}</EmptyState>
+        ) : (
+          entries.map((e) => (
+            <div
+              key={e.id}
+              className={`${ROW_CLS} cursor-pointer active:bg-[var(--tg-separator)]`}
+              onClick={() => onOpen(e.id)}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="truncate">{e.label || `id:${e.id}`}</div>
+                <div className="text-[13px] text-tg-hint truncate">
+                  id {e.id}
+                </div>
+              </div>
+              <button
+                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onRemove(e.id);
+                }}
+              >
+                {s.ui_remove}
+              </button>
+            </div>
+          ))
+        )}
+      </Card>
+      <SectionFooter>{s.ui_blacklist_footer}</SectionFooter>
+    </>
+  );
+}
+
 export function WhitelistTab({
   settings,
   onSaved,
@@ -90,6 +137,10 @@ export function WhitelistTab({
 }) {
   const { t: s } = useI18n();
   const { data, setData } = useLoadable(() => api.getWhitelist(), []);
+  const { data: blacklist, setData: setBlacklist } = useLoadable(
+    () => api.getBlacklist(),
+    [],
+  );
   // Optimistic local mirror so the switch flips instantly; reverted if the save
   // fails. Whitelist enforcement is a global policy — one PUT per toggle.
   const [enabled, setEnabled] = useState(settings.whitelistEnabled);
@@ -145,6 +196,19 @@ export function WhitelistTab({
             }}
           />
         </>
+      )}
+
+      {blacklist === null ? (
+        <LoadingState />
+      ) : (
+        <BlacklistList
+          entries={blacklist.users}
+          onOpen={onOpenUser}
+          onRemove={async (id) => {
+            const users = await api.removeBlacklist(id);
+            setBlacklist({ users });
+          }}
+        />
       )}
     </Stack>
   );
