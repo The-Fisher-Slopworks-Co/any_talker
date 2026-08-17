@@ -3,101 +3,101 @@
 
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
-import { isAllowed } from "./access";
+import { checkAccess } from "./access";
 
-describe("isAllowed", () => {
+describe("checkAccess", () => {
   test("owner always allowed regardless of whitelist", async () => {
     const storage = new MemoryStorage();
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "1",
         chatId: "any",
         whitelistEnabled: true,
       }),
-    ).toBe(true);
+    ).toEqual({ allowed: true });
   });
 
   test("non-owner with whitelisted user passes in any chat", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "x",
         whitelistEnabled: true,
       }),
-    ).toBe(true);
+    ).toEqual({ allowed: true });
   });
 
   test("non-owner in whitelisted chat passes", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("chats", { id: "-100" });
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "-100",
         whitelistEnabled: true,
       }),
-    ).toBe(true);
+    ).toEqual({ allowed: true });
   });
 
-  test("neither user nor chat whitelisted: denied", async () => {
+  test("neither user nor chat whitelisted: denied as not_whitelisted", async () => {
     const storage = new MemoryStorage();
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "x",
         whitelistEnabled: true,
       }),
-    ).toBe(false);
+    ).toEqual({ allowed: false, reason: "not_whitelisted" });
   });
 
   test("whitelist disabled: non-whitelisted non-owner is allowed", async () => {
     const storage = new MemoryStorage();
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "x",
         whitelistEnabled: false,
       }),
-    ).toBe(true);
+    ).toEqual({ allowed: true });
   });
 
   test("whitelist disabled: still short-circuits for the owner", async () => {
     const storage = new MemoryStorage();
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "1",
         chatId: "any",
         whitelistEnabled: false,
       }),
-    ).toBe(true);
+    ).toEqual({ allowed: true });
   });
 
   test("blacklisted user denied even with whitelist disabled", async () => {
     const storage = new MemoryStorage();
     await storage.addBlacklist({ id: "42" });
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "x",
         whitelistEnabled: false,
       }),
-    ).toBe(false);
+    ).toEqual({ allowed: false, reason: "blacklisted" });
   });
 
   test("blacklist wins over the user's own whitelist entry", async () => {
@@ -105,14 +105,14 @@ describe("isAllowed", () => {
     await storage.addWhitelist("users", { id: "42" });
     await storage.addBlacklist({ id: "42" });
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "x",
         whitelistEnabled: true,
       }),
-    ).toBe(false);
+    ).toEqual({ allowed: false, reason: "blacklisted" });
   });
 
   test("blacklist wins over a whitelisted chat", async () => {
@@ -120,27 +120,27 @@ describe("isAllowed", () => {
     await storage.addWhitelist("chats", { id: "-100" });
     await storage.addBlacklist({ id: "42" });
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "42",
         chatId: "-100",
         whitelistEnabled: true,
       }),
-    ).toBe(false);
+    ).toEqual({ allowed: false, reason: "blacklisted" });
   });
 
   test("a blacklist entry for the owner's id has no effect", async () => {
     const storage = new MemoryStorage();
     await storage.addBlacklist({ id: "1" });
     expect(
-      await isAllowed({
+      await checkAccess({
         storage,
         ownerId: "1",
         userId: "1",
         chatId: "any",
         whitelistEnabled: true,
       }),
-    ).toBe(true);
+    ).toEqual({ allowed: true });
   });
 });

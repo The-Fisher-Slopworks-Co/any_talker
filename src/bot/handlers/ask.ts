@@ -7,7 +7,7 @@ import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
 import { recordDenial } from "../../spending/record";
 import { runAiTurn } from "../../ai/turn";
-import { isAllowed } from "../access";
+import { checkAccess, type AccessDenyReason } from "../access";
 import {
   buildContext,
   buildUserEnvelope,
@@ -58,7 +58,9 @@ export type AskInput = {
 };
 
 export type AskOutcome =
-  | { kind: "denied" }
+  // `reason` is for the dispatcher's log line only; the chat-side deny stays
+  // silent either way.
+  | { kind: "denied"; reason: AccessDenyReason }
   | { kind: "usage" }
   | {
       // Denied by a hard USD budget cap. `reason` is for metrics/alerting only;
@@ -116,16 +118,17 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // the prompt prefix on the next turn and cost the cache the whole history.
   const sentAt = { ms: input.now, timezone };
 
-  // Access gate: owner always passes; otherwise the whitelist is consulted only
-  // while `whitelistEnabled` (the budget guard is the safety net when it's off).
-  const allowed = await isAllowed({
+  // Access gate: owner always passes; a blacklisted user is always denied;
+  // otherwise the whitelist is consulted only while `whitelistEnabled` (the
+  // budget guard is the safety net when it's off).
+  const access = await checkAccess({
     storage,
     ownerId: input.ownerId,
     userId: input.userId,
     chatId: input.chatId,
     whitelistEnabled: settings.whitelistEnabled,
   });
-  if (!allowed) return { kind: "denied" };
+  if (!access.allowed) return { kind: "denied", reason: access.reason };
 
   const audios = input.audios ?? [];
   const videos = input.videos ?? [];

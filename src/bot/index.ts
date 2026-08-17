@@ -292,6 +292,15 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     console.log(formatLog({ level: "debug", msg, fields }, deps.logFormat));
   };
 
+  // Access denials are silent toward the chat, so the log line is the only
+  // place that says WHY the bot stayed quiet (blacklisted vs not whitelisted).
+  // Deliberately not debug-gated: it must be answerable from prod logs.
+  const logAccessDenied = (fields: LogFields) => {
+    console.log(
+      formatLog({ level: "info", msg: "ask_access_denied", fields }, deps.logFormat),
+    );
+  };
+
   // Scope + routing mode for this bot. Managed bots respond only to `/ask@self`
   // (require an explicit mention); the main bot also answers a bare `/ask`.
   const botId = deps.persona?.botId ?? null;
@@ -693,6 +702,15 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
       switch (outcome.kind) {
         case "denied":
+          // "empty" is a blank query, not an access decision — no log needed.
+          if (outcome.reason !== "empty") {
+            logAccessDenied({
+              source: "guest",
+              chat_id: msg.chat.id,
+              user_id: userId,
+              reason: outcome.reason,
+            });
+          }
           return;
         case "budgetLimited":
           void alertGlobalCapBreach(ctx.api, outcome.reason);
@@ -1005,6 +1023,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
       switch (outcome.kind) {
         case "denied":
+          logAccessDenied({
+            source: "ask",
+            chat_id: chatId,
+            user_id: userId,
+            reason: outcome.reason,
+          });
           return;
         case "usage":
           await ctx.reply(ctx.t.bot_ask_usage);

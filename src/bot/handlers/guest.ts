@@ -26,6 +26,12 @@ import {
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
 import type { VideoClip } from "../video";
+import type { AccessDenyReason } from "../access";
+
+// Guest mode's silent denials: the access-gate reasons plus "empty" (nothing
+// to answer about — no text, no reply, no media). `reason` feeds the
+// dispatcher's log line; the guest sees no message in any of these cases.
+export type GuestDenyReason = AccessDenyReason | "empty";
 
 export type GuestAskInput = {
   storage: Storage;
@@ -66,7 +72,7 @@ export type GuestAskInput = {
 };
 
 export type GuestAskOutcome =
-  | { kind: "denied" }
+  | { kind: "denied"; reason: GuestDenyReason }
   | { kind: "budgetLimited"; reason: BudgetDenyReason }
   | { kind: "rateLimited"; limitedBy: WindowKind; msUntilReset: number }
   | {
@@ -133,7 +139,7 @@ export async function guestAskHandler(
     audios.length === 0 &&
     videos.length === 0
   ) {
-    return { kind: "denied" };
+    return { kind: "denied", reason: "empty" };
   }
 
   const [{ settings, botName }, userTimezone] = await Promise.all([
@@ -148,10 +154,12 @@ export async function guestAskHandler(
   // chat membership, so only the user list applies). The budget guard is the
   // safety net when off.
   if (!isOwner) {
-    if (await storage.isBlacklisted(input.userId)) return { kind: "denied" };
+    if (await storage.isBlacklisted(input.userId)) {
+      return { kind: "denied", reason: "blacklisted" };
+    }
     if (settings.whitelistEnabled) {
       const isWhitelisted = await storage.isWhitelisted("users", input.userId);
-      if (!isWhitelisted) return { kind: "denied" };
+      if (!isWhitelisted) return { kind: "denied", reason: "not_whitelisted" };
     }
   }
 
