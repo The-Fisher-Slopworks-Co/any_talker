@@ -626,6 +626,101 @@ describe("whitelist endpoints", () => {
   });
 });
 
+describe("blacklist endpoints", () => {
+  test("list returns empty initially", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/blacklist", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ users: [] });
+  });
+
+  test("add and list", async () => {
+    const d = deps();
+    const added = await handleApi(
+      { method: "POST", path: "/api/blacklist", body: { id: "42", label: "mallory" } },
+      d,
+      owner,
+    );
+    expect(added.status).toBe(200);
+    const r = await handleApi(
+      { method: "GET", path: "/api/blacklist", body: null },
+      d,
+      owner,
+    );
+    expect(r.body).toEqual({ users: [{ id: "42", label: "mallory" }] });
+    expect(await d.storage.isBlacklisted("42")).toBe(true);
+  });
+
+  test("remove", async () => {
+    const d = deps();
+    await handleApi(
+      { method: "POST", path: "/api/blacklist", body: { id: "42" } },
+      d,
+      owner,
+    );
+    const r = await handleApi(
+      { method: "DELETE", path: "/api/blacklist/42", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual([]);
+    expect(await d.storage.isBlacklisted("42")).toBe(false);
+  });
+
+  test("rejects a missing id", async () => {
+    const r = await handleApi(
+      { method: "POST", path: "/api/blacklist", body: {} },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(400);
+  });
+
+  test("rejects blacklisting the owner", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "POST", path: "/api/blacklist", body: { id: ownerId } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+    expect(await d.storage.isBlacklisted(ownerId)).toBe(false);
+  });
+
+  test("non-owner gets 403", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/blacklist", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+
+  test("GET /api/admin/users/:id reports blacklisted", async () => {
+    const d = deps();
+    await d.storage.upsertUser({
+      id: "42",
+      firstName: "Mallory",
+      lastName: null,
+      username: null,
+      firstSeenAt: 1,
+      lastSeenAt: 1,
+    });
+    await d.storage.addBlacklist({ id: "42" });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/users/42", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ whitelisted: false, blacklisted: true });
+  });
+});
+
 describe("ratelimit endpoints", () => {
   test("GET /api/ratelimit/me returns zeroed usage with the configured limits", async () => {
     const r = await handleApi(

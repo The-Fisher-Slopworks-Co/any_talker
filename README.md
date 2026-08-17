@@ -173,6 +173,10 @@ are supported as `host:port`).
   UI (**Whitelist** tab): turn it off to open the bot to everyone — the USD budget guard and rate
   limit stay in force as the safety net, and the whitelist entries are preserved (not consulted) so
   it can be turned back on unchanged.
+- **User blacklist.** Blocked users are always denied — even while the whitelist is off, even in a
+  whitelisted chat, and in guest mode — and their pending reminders are dropped instead of
+  delivered. Only the owner is immune. Managed from the same admin tab (blocked-users list) and via
+  "Add to blacklist" on a user's page.
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
 - **Model settings** — the admin model picker validates ids against OpenRouter's model list and
   shows price, modalities, tool and prompt-caching support. It also offers a **fallback chain**,

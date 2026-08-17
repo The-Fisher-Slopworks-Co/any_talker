@@ -830,6 +830,35 @@ export async function handleApi(
     }
   }
 
+  // User blacklist (users only — no chat blacklist). Mutations return the
+  // fresh list, like the whitelist routes.
+  if (req.path === "/api/blacklist" && req.method === "GET") {
+    const users = await deps.storage.listBlacklist();
+    return { status: 200, body: { users } };
+  }
+  if (req.path === "/api/blacklist" && req.method === "POST") {
+    const body = (req.body ?? {}) as Partial<WhitelistEntry>;
+    if (typeof body.id !== "string" || body.id.length === 0) {
+      return { status: 400, body: { error: "id required" } };
+    }
+    // Blacklisting the owner would be a silent no-op (the access gates check
+    // ownership first), so reject it loudly instead of storing a dead entry.
+    if (body.id === deps.ownerId) {
+      return { status: 400, body: { error: "cannot blacklist the owner" } };
+    }
+    await deps.storage.addBlacklist({ id: body.id, label: body.label });
+    const users = await deps.storage.listBlacklist();
+    return { status: 200, body: users };
+  }
+  {
+    const m = req.path.match(/^\/api\/blacklist\/(.+)$/);
+    if (m && req.method === "DELETE") {
+      await deps.storage.removeBlacklist(m[1]!);
+      const users = await deps.storage.listBlacklist();
+      return { status: 200, body: users };
+    }
+  }
+
   if (req.path === "/api/admin/users" && req.method === "GET") {
     const now = Date.now();
     const users = await deps.storage.listUsers();
@@ -899,19 +928,35 @@ export async function handleApi(
   if (userMatch) {
     const id = userMatch[1]!;
     if (req.method === "GET") {
-      const [user, displayName, timezone, gender, language, whitelisted] =
-        await Promise.all([
-          deps.storage.getUser(id),
-          readValidDisplayName(deps.storage, id),
-          deps.storage.getUserTimezone(id),
-          deps.storage.getUserGender(id),
-          deps.storage.getUserLang(id),
-          deps.storage.isWhitelisted("users", id),
-        ]);
+      const [
+        user,
+        displayName,
+        timezone,
+        gender,
+        language,
+        whitelisted,
+        blacklisted,
+      ] = await Promise.all([
+        deps.storage.getUser(id),
+        readValidDisplayName(deps.storage, id),
+        deps.storage.getUserTimezone(id),
+        deps.storage.getUserGender(id),
+        deps.storage.getUserLang(id),
+        deps.storage.isWhitelisted("users", id),
+        deps.storage.isBlacklisted(id),
+      ]);
       if (!user) return { status: 404, body: { error: "user not found" } };
       return {
         status: 200,
-        body: { user, displayName, timezone, gender, language, whitelisted },
+        body: {
+          user,
+          displayName,
+          timezone,
+          gender,
+          language,
+          whitelisted,
+          blacklisted,
+        },
       };
     }
     if (req.method === "PUT") {
