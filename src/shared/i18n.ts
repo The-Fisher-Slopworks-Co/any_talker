@@ -87,16 +87,15 @@ type Strings = {
   // Reply to `/digest` when the period held nothing worth reporting (the
   // scheduled digest simply stays silent in that case).
   bot_digest_empty: string;
-  // `/usage` (DM only): a header, then per rate-limit window one line each —
-  // which window, the share of its budget already spent, and how long until it
+  // `/usage` (DM only): a header, then two lines per rate-limit window — the
+  // window and the share of its budget already spent, then how long until it
   // comes back. Deliberately
   // percentage-only: the raw token counts are operational detail and never
   // leave the admin surfaces (see `ratelimit/share.ts`).
   // The header carries the meaning of the bare percentage below it ("of your
   // limit, spent"), so each window line doesn't have to repeat it.
   bot_usage_header: string;
-  bot_usage_window: (window: WindowKind) => string;
-  bot_usage_used: (usedPercent: number) => string;
+  bot_usage_line: (window: WindowKind, usedPercent: number) => string;
   bot_usage_reset: (msUntilReset: number) => string;
   // Shown instead of the bars when the viewer is the (exempt) owner: their
   // usage is never accrued, so a 0% bar would be meaningless rather than true.
@@ -602,8 +601,8 @@ const en: Strings = {
   bot_digest_col_denials: "Denials",
   bot_digest_empty: "Nothing to report — no spend, new users or denials yet.",
   bot_usage_header: "📊 Limit used",
-  bot_usage_window: (window) => (window === "weekly" ? "Week" : "5 hours"),
-  bot_usage_used: (used) => `${used}%`,
+  bot_usage_line: (window, used) =>
+    `${window === "weekly" ? "Week" : "5 hours"}: ${used}%`,
   bot_usage_reset: (ms) => `~${etaEn(ms)} until reset`,
   bot_usage_exempt: "The limits don't apply to you.",
   bot_ai_error: "⚠️ AI error. Try again later.",
@@ -1097,8 +1096,8 @@ const ru: Strings = {
     `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
   bot_digest_empty: "Пока не о чем отчитываться — ни трат, ни новых юзеров, ни отказов.",
   bot_usage_header: "📊 Израсходовано лимита",
-  bot_usage_window: (window) => (window === "weekly" ? "Неделя" : "5 часов"),
-  bot_usage_used: (used) => `${used}%`,
+  bot_usage_line: (window, used) =>
+    `${window === "weekly" ? "Неделя" : "5 часов"}: ${used}%`,
   bot_usage_reset: (ms) => `~${etaRu(ms)} до сброса`,
   bot_usage_exempt: "На тебя лимиты не распространяются.",
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",

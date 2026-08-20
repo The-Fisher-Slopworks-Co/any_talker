@@ -72,27 +72,25 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage);
     expect(outcome.kind).toBe("usage");
     if (outcome.kind !== "usage") throw new Error("unreachable");
-    expect(outcome.text).toContain("5 hours\n0%");
-    expect(outcome.text).toContain("Week\n0%");
+    expect(outcome.text).toContain("5 hours: 0%");
+    expect(outcome.text).toContain("Week: 0%");
     expect(outcome.text).toContain("until reset");
   });
 
-  test("is a header plus a line each for window, share and reset", async () => {
+  test("is a header plus two lines per window", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
     const lines = outcome.text.split("\n");
-    expect(lines).toHaveLength(9);
+    expect(lines).toHaveLength(7);
     expect(lines[0]).toBe("📊 Limit used");
     expect(lines[1]).toBe("");
-    expect(lines[2]).toBe("5 hours");
-    expect(lines[3]).toBe("25%");
-    expect(lines[4]).toMatch(/^~\d+ [a-z]+ until reset$/);
-    expect(lines[5]).toBe("");
-    expect(lines[6]).toBe("Week");
-    expect(lines[7]).toBe("3%");
-    expect(lines[8]).toMatch(/^~\d+ [a-z]+ until reset$/);
+    expect(lines[2]).toBe("5 hours: 25%");
+    expect(lines[3]).toMatch(/^~\d+ [a-z]+ until reset$/);
+    expect(lines[4]).toBe("");
+    expect(lines[5]).toBe("Week: 3%");
+    expect(lines[6]).toMatch(/^~\d+ [a-z]+ until reset$/);
   });
 
   // The bare "25%" only reads as "spent" because the header says so.
@@ -128,8 +126,8 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage, { lang: "ru" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
     expect(outcome.text).toContain("📊 Израсходовано лимита");
-    expect(outcome.text).toMatch(/5 часов\n25%\n~\d+ \S+ до сброса/);
-    expect(outcome.text).toMatch(/Неделя\n3%\n~\d+ \S+ до сброса/);
+    expect(outcome.text).toMatch(/5 часов: 25%\n~\d+ \S+ до сброса/);
+    expect(outcome.text).toMatch(/Неделя: 3%\n~\d+ \S+ до сброса/);
     expect(outcome.text.match(/Израсходовано/g)).toHaveLength(1);
   });
 
@@ -155,7 +153,7 @@ describe("usageCommandHandler", () => {
     await spend(storage, "owner", 500);
     const outcome = await run(storage, { fromUserId: "owner" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("5 hours\n50%");
+    expect(outcome.text).toContain("5 hours: 50%");
   });
 
   test("does not accrue usage — asking is free", async () => {
