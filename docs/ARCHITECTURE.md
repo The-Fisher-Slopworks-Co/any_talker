@@ -128,7 +128,7 @@ flowchart TB
 |---|---|---|
 | `src/main.ts` | Composition root: load config, wire services, register tools, start bot + HTTP + schedulers; hot-reload teardown. | `main.ts` |
 | `src/config.ts` | Env-var loading & validation → `Config`. | `config.ts` |
-| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback,digest}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
+| `src/bot/` | grammY bot, middleware chain, dispatchers, handlers, voice transcoding, video decomposition, Telegram formatting. | `index.ts`, `handlers/{ask,guest,contact,check-callback,digest,usage}.ts`, `access.ts`, `context-builder.ts`, `transcode.ts`, `video.ts`, `format.ts`, `rich.ts`, `html.ts`, `media-group-buffer.ts` |
 | `src/bot/middleware/` | Per-update middleware: language resolution, keyword auto-delete. | `lang.ts`, `keyword-filter.ts` |
 | `src/ai/` | OpenRouter client + its Responses-input mapper, model catalogue, system-prompt builder, the shared LLM turn runner, the conversation session key, message (de)serialization, AI types. | `openrouter-client.ts`, `responses-input.ts`, `model-catalog.ts`, `instruction.ts`, `turn.ts`, `session.ts`, `serialize.ts`, `types.ts` |
 | `src/ai/tools/` | Tool registry + `withLogging` wrapper + SSRF-safe HTTP + each tool. | `registry.ts`, `logging.ts`, `http.ts`, `search-web.ts`, `fetch-page.ts`, `calculator.ts`, `currency-convert.ts`, `youtube-transcript.ts`, `user-facts.ts`, `user-settings.ts`, `reminders/` |
@@ -138,7 +138,7 @@ flowchart TB
 | `src/webapp/ui/` | React + Tailwind admin Mini App (views, components, api client, i18n). | `app.tsx`, `api-client.ts`, `views/`, `components/`, `lib/` |
 | `src/reminders/` | One-shot reminder scheduling, delivery (re-runs the LLM), stored-record validation. | `scheduler.ts`, `delivery.ts`, `parse.ts`, `types.ts` |
 | `src/checks/` | Recurring daily check-ins: schedule math, firing, resolution, counters. | `runner.ts`, `schedule.ts`, `resolve.ts`, `counter.ts`, `validate.ts`, `format.ts`, `callback-data.ts` |
-| `src/ratelimit/` | Per-user dual fixed-window rate limiter (5-hour + weekly token budgets, per-user phase-shifted). | `dual-window.ts`, `window.ts`, `types.ts` |
+| `src/ratelimit/` | Per-user dual fixed-window rate limiter (5-hour + weekly token budgets, per-user phase-shifted), plus the percentage-only projection the user-facing surfaces render. | `dual-window.ts`, `window.ts`, `share.ts`, `types.ts` |
 | `src/budget/` | Hard USD budget guard — the enforcement safety net that denies non-owner requests when a global/chat/new-user spend cap is breached. Port + impl, mirroring `ratelimit/`. | `guard.ts`, `types.ts` |
 | `src/spending/` | UTC-day-bucketed spend windows (per-user/chat/global/model), the multi-ledger spend recorder, and the shared spend-overview aggregator (powers the digest + dashboard). | `window.ts`, `record.ts`, `overview.ts` |
 | `src/observability/` | Budget observability: pure spike detection, the owner digest formatter (Rich Markdown tables), the narrow owner-DM `NotifyApi` (plain + rich send), and the scan+digest scheduler. | `spike.ts`, `digest.ts`, `scheduler.ts`, `types.ts` |
@@ -456,7 +456,11 @@ App `initData` (HMAC-SHA256, constant-time compare, 24h freshness) — auth is
 **stateless** (re-verified every request, no sessions). `api.ts` is a pure
 `handleApi(req, deps, actor)` with a two-tier authorization model: user-scoped
 routes, then `if (!actor.isOwner) return FORBIDDEN` gating all admin routes.
-The user-scoped tier includes a per-character **memory vault**: `GET
+The user-scoped tier includes `GET /api/me/usage`, which answers with a
+**percentage-only** `UsageShare` (`ratelimit/share.ts`) — the same figures the
+`/usage` command reports, feeding the Web App's top header; the raw token
+counts stay on the owner-gated `/api/ratelimit/*` routes. It also includes a
+per-character **memory vault**: `GET
 /api/me/bots` lists the bot family as a narrow DTO (never the raw `ManagedBot`,
 which carries `systemPrompt`/`ownerUserId`), and `GET|POST
 /api/me/facts/:scope` + `PUT|DELETE /api/me/facts/:scope/:key` (scope =
@@ -958,6 +962,17 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   matched inside the existing `message:text` listener (which doesn't call
   `next()`), and registered in the command menu only under a chat scope for the
   owner, since the handler ignores everyone else.
+- **A user sees percentages, never token counts** (`ratelimit/share.ts`) — `/usage`
+  in a DM and the Web App header both render a `UsageShare`, a type that carries
+  only `usedPercent`/`remainingPercent` and the reset timestamp. The raw
+  `used`/`limit` figures stay behind the owner-gated `/api/ratelimit/*` routes
+  and the admin `UsageCard`. Enforcing this in the *type* rather than in each
+  formatter is the point: `GET /api/me/usage` is reachable by every
+  authenticated user, so a shape that cannot express a token count is what keeps
+  the budget internals from leaking into it by accident. `/usage` is matched
+  inside the same `message:text` listener as `/digest`, reads only (asking where
+  you stand never accrues usage), is silent outside DMs, and is registered in the
+  command menu only under the private-chat scope.
 - **Custom Prometheus implementation** — `metrics/registry.ts` explicitly avoids
   `prom-client` (hand-rolled exposition + cardinality guards); fewer deps, more
   in-house code to maintain.
