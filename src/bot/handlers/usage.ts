@@ -65,13 +65,12 @@ export async function usageCommandHandler(
     exempt,
   );
 
-  // One short line each: which window, the share spent, how long until it
-  // resets. The percentage is bare — the header above says what it is a share
-  // of, so repeating "used" on every window line would only add noise.
+  // Two lines per window: the window with its share, then how long until it
+  // resets. The percentage carries no "used" of its own — the header above says
+  // what it is a share of, so repeating it per window would only add noise.
   const block = (kind: WindowKind, w: WindowShare) =>
     [
-      s.bot_usage_window(kind),
-      s.bot_usage_used(w.usedPercent),
+      s.bot_usage_line(kind, w.usedPercent),
       s.bot_usage_reset(Math.max(0, w.resetMs - input.nowMs)),
     ].join("\n");
 
