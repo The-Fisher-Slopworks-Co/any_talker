@@ -19,6 +19,7 @@ import { askHandler } from "./handlers/ask";
 import type { DetailLevel } from "../ai/instruction";
 import { contactHandler } from "./handlers/contact";
 import { digestCommandHandler, matchDigestCommand } from "./handlers/digest";
+import { usageCommandHandler, matchUsageCommand } from "./handlers/usage";
 import { guestAskHandler } from "./handlers/guest";
 import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
@@ -1269,9 +1270,31 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     }
   };
 
+  // `/usage` — the user's own rate-limit standing, in percent. Handled inline
+  // alongside `/digest` for the same reason: this listener owns `message:text`
+  // and doesn't call `next()`.
+  const dispatchUsageCommand = async (ctx: BotContext): Promise<void> => {
+    const from = ctx.from;
+    if (!from) return;
+    const outcome = await usageCommandHandler({
+      storage: deps.storage,
+      ownerId: deps.ownerId,
+      isPrivateChat: ctx.chat?.type === "private",
+      fromUserId: String(from.id),
+      lang: ctx.lang,
+      nowMs: Date.now(),
+    });
+    if (outcome.kind === "ignored") return;
+    await ctx.reply(outcome.text);
+  };
+
   bot.on("message:text", async (ctx) => {
     if (matchDigestCommand(ctx.message.text, ctx.me.username)) {
       await dispatchDigestCommand(ctx);
+      return;
+    }
+    if (matchUsageCommand(ctx.message.text, ctx.me.username)) {
+      await dispatchUsageCommand(ctx);
       return;
     }
     const match = matchAsk(ctx.message.text, ctx.me.username);
