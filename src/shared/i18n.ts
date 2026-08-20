@@ -87,13 +87,15 @@ type Strings = {
   // Reply to `/digest` when the period held nothing worth reporting (the
   // scheduled digest simply stays silent in that case).
   bot_digest_empty: string;
-  // `/usage` (DM only): the user's own standing in both rate-limit windows.
-  // Deliberately percentage-only — the raw token counts are operational detail
-  // and never leave the admin surfaces (see `ratelimit/share.ts`).
-  bot_usage_header: string;
-  bot_usage_window_5h: string;
-  bot_usage_window_weekly: string;
-  bot_usage_line: (usedPercent: number, msUntilReset: number) => string;
+  // `/usage` (DM only): one line per rate-limit window — the share of that
+  // window's budget already spent and when it comes back. Deliberately
+  // percentage-only: the raw token counts are operational detail and never
+  // leave the admin surfaces (see `ratelimit/share.ts`).
+  bot_usage_line: (
+    window: WindowKind,
+    usedPercent: number,
+    msUntilReset: number,
+  ) => string;
   // Shown instead of the bars when the viewer is the (exempt) owner: their
   // usage is never accrued, so a 0% bar would be meaningless rather than true.
   bot_usage_exempt: string;
@@ -597,12 +599,9 @@ const en: Strings = {
   bot_digest_col_today: "Today",
   bot_digest_col_denials: "Denials",
   bot_digest_empty: "Nothing to report — no spend, new users or denials yet.",
-  bot_usage_header: "📊 Your limits",
-  bot_usage_window_5h: "5-hour window",
-  bot_usage_window_weekly: "Weekly window",
-  bot_usage_line: (used, ms) =>
-    `${used}% used · resets in ~${etaEn(ms)}`,
-  bot_usage_exempt: "📊 You're exempt from the limits — spend away.",
+  bot_usage_line: (window, used, ms) =>
+    `${window === "weekly" ? "Week" : "5 hours"}: ${used}% used, resets in ~${etaEn(ms)}`,
+  bot_usage_exempt: "The limits don't apply to you.",
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -1093,12 +1092,9 @@ const ru: Strings = {
   bot_digest_unpriced: (models) =>
     `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
   bot_digest_empty: "Пока не о чем отчитываться — ни трат, ни новых юзеров, ни отказов.",
-  bot_usage_header: "📊 Твои лимиты",
-  bot_usage_window_5h: "Окно 5 часов",
-  bot_usage_window_weekly: "Недельное окно",
-  bot_usage_line: (used, ms) =>
-    `израсходовано ${used}% · сброс через ~${etaRu(ms)}`,
-  bot_usage_exempt: "📊 На тебя лимиты не распространяются — трать сколько нужно.",
+  bot_usage_line: (window, used, ms) =>
+    `${window === "weekly" ? "Неделя" : "5 часов"}: израсходовано ${used}%, сброс через ~${etaRu(ms)}`,
+  bot_usage_exempt: "На тебя лимиты не распространяются.",
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:
