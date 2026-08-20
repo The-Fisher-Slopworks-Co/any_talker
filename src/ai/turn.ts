@@ -4,7 +4,7 @@
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient, AIMessage, RoutingOptions } from "./types";
-import type { RateLimitConfig } from "../shared/types";
+import type { RateLimitConfig, ToolCallRecord } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import { recordSpend } from "../spending/record";
 import { conversationSessionId } from "./session";
@@ -95,6 +95,11 @@ export type AiTurnResult = {
   // updated, …). The same array handed to the tool context — callers render or
   // return it. Empty when no effect-producing tool fired.
   effects: ToolEffect[];
+  // What each tool was called with and returned this turn, in execution order.
+  // Callers that own a conversation history persist it with the turn so the
+  // next one can replay it (`bot/handlers/ask.ts`, `bot/handlers/guest.ts`).
+  // Empty when no tool ran, or when the client does not record them.
+  toolCalls: ToolCallRecord[];
 };
 
 export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
@@ -170,5 +175,6 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
     costUsd,
     priced,
     effects,
+    toolCalls: result.toolCalls ?? [],
   };
 }

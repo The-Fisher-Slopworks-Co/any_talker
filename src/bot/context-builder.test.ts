@@ -5,6 +5,15 @@ import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
 import { buildContext } from "./context-builder";
 
+// The message union now also covers replayed tool calls, which carry `output`
+// rather than `content`. A hit here means a fixture built one where a
+// user/assistant message was expected.
+function contentOf<T extends { role: string }>(m: T): unknown {
+  if (!("content" in m)) throw new Error(`no content on a ${m.role} message`);
+  return (m as { content: unknown }).content;
+}
+
+
 const SENDER = {
   firstName: "John",
   lastName: "Doe",
@@ -46,11 +55,11 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(msgs[0]!.content).toBe(
+    expect(contentOf(msgs[0]!)).toBe(
       JSON.stringify({ author: "John Doe", quote: "to be or not to be", text: "what does this mean" }),
     );
     // Field order check (the keys must come out as author, quote, text):
-    expect(Object.keys(JSON.parse(msgs[0]!.content as string))).toEqual([
+    expect(Object.keys(JSON.parse(contentOf(msgs[0]!) as string))).toEqual([
       "author",
       "quote",
       "text",
@@ -71,7 +80,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    const obj = JSON.parse(msgs[0]!.content as string);
+    const obj = JSON.parse(contentOf(msgs[0]!) as string);
     expect(obj.time).toBe("2026-05-08 18:42");
     // The stamp sits with the other metadata, ahead of the text itself.
     expect(Object.keys(obj)).toEqual(["author", "time", "quote", "text"]);
@@ -89,7 +98,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(JSON.parse(msgs[0]!.content as string).time).toBeUndefined();
+    expect(JSON.parse(contentOf(msgs[0]!) as string).time).toBeUndefined();
   });
 
   test("author falls back to first name when last name missing", async () => {
@@ -104,7 +113,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(JSON.parse(msgs[0]!.content as string).author).toBe("Alice");
+    expect(JSON.parse(contentOf(msgs[0]!) as string).author).toBe("Alice");
   });
 
   test("nameOverride takes precedence over firstName + lastName", async () => {
@@ -119,7 +128,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(JSON.parse(msgs[0]!.content as string).author).toBe("Pseudonym");
+    expect(JSON.parse(contentOf(msgs[0]!) as string).author).toBe("Pseudonym");
   });
 
   test("empty/whitespace nameOverride falls back to firstName + lastName", async () => {
@@ -134,7 +143,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(JSON.parse(msgs[0]!.content as string).author).toBe("John Doe");
+    expect(JSON.parse(contentOf(msgs[0]!) as string).author).toBe("John Doe");
   });
 
   test("gender field appears between author and text when set", async () => {
@@ -149,10 +158,10 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(msgs[0]!.content).toBe(
+    expect(contentOf(msgs[0]!)).toBe(
       JSON.stringify({ author: "Саша", gender: "female", text: "привет" }),
     );
-    expect(Object.keys(JSON.parse(msgs[0]!.content as string))).toEqual([
+    expect(Object.keys(JSON.parse(contentOf(msgs[0]!) as string))).toEqual([
       "author",
       "gender",
       "text",
@@ -171,7 +180,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    const parsed = JSON.parse(msgs[0]!.content as string);
+    const parsed = JSON.parse(contentOf(msgs[0]!) as string);
     expect("gender" in parsed).toBe(false);
   });
 
@@ -187,7 +196,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    const parsed = JSON.parse(msgs[0]!.content as string);
+    const parsed = JSON.parse(contentOf(msgs[0]!) as string);
     expect("quote" in parsed).toBe(false);
   });
 
@@ -330,7 +339,7 @@ describe("buildContext", () => {
       images: [new Uint8Array([1]), new Uint8Array([2])],
       attachments: "2 frames sampled in chronological order from a video (9s)",
     });
-    const parts = msgs[0]!.content as { type: string; text?: string }[];
+    const parts = contentOf(msgs[0]!) as { type: string; text?: string }[];
     expect(JSON.parse(parts[0]!.text!)).toEqual({
       author: "John Doe",
       attachments: "2 frames sampled in chronological order from a video (9s)",
@@ -356,7 +365,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    const parts = msgs[0]!.content as { type: string; text?: string }[];
+    const parts = contentOf(msgs[0]!) as { type: string; text?: string }[];
     expect(parts[0]!.text).toBe(
       "Context (replied message from Alice, 1 frame sampled from a round video note (5s)): <media>",
     );
@@ -519,7 +528,7 @@ describe("buildContext", () => {
       audios: [bytes],
     });
     expect(msgs).toHaveLength(1);
-    expect(msgs[0]!.content).toEqual([
+    expect(contentOf(msgs[0]!)).toEqual([
       { type: "text", text: envelope({ text: "" }) },
       { type: "audio", audio: bytes, mediaType: "audio/mp3" },
     ]);
@@ -567,7 +576,7 @@ describe("buildContext", () => {
       images: [bytes],
     });
     expect(msgs).toHaveLength(1);
-    expect(Array.isArray(msgs[0]!.content)).toBe(true);
+    expect(Array.isArray(contentOf(msgs[0]!))).toBe(true);
   });
 
   test("quote-only message (empty text) still produces envelope when reply is to bot msg", async () => {
@@ -739,5 +748,133 @@ describe("buildContext", () => {
       replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
     });
     expect(msgs[0]).toEqual({ role: "user", content: "Q" });
+  });
+});
+
+// A turn's tool calls used to live only inside the one request that made them:
+// the node kept the question and the answer, so a follow-up asking "you missed
+// someone" was answered from the bot's own summary of a fetched page rather
+// than the page. These pin the replay.
+describe("buildContext — replayed tool calls", () => {
+  const CALL = {
+    callId: "call_1",
+    name: "fetch_page",
+    arguments: '{"url":"https://e.x"}',
+    output: '"Alice 113\\nBob 111\\nCarol 107"',
+  };
+
+  const chainArgs = (storage: MemoryStorage, userText: string) => ({
+    sentAt: null,
+    storage,
+    chatId: "c1",
+    sender: SENDER,
+    userText,
+    quote: null,
+    replyTarget: {
+      messageId: 100,
+      text: "A1",
+      authorFirstName: "Bot",
+      images: [],
+    },
+    images: [],
+  });
+
+  test("a turn's calls come back between its question and answer", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      toolCalls: [CALL],
+    });
+
+    const msgs = await buildContext(chainArgs(storage, "you missed someone"));
+    expect(msgs).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "tool", ...CALL },
+      { role: "assistant", content: "A1" },
+      { role: "user", content: envelope({ text: "you missed someone" }) },
+    ]);
+  });
+
+  // Every node written before this existed has no `toolCalls`, and a turn that
+  // ran none has none either. Both must produce the old two-message shape.
+  test("a turn with no calls is unchanged", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      toolCalls: [],
+    });
+
+    const msgs = await buildContext(chainArgs(storage, "follow-up"));
+    expect(msgs).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+      { role: "user", content: envelope({ text: "follow-up" }) },
+    ]);
+  });
+
+  test("each turn in a chain replays its own calls, in order", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      toolCalls: [{ ...CALL, callId: "call_1", name: "first" }],
+    });
+    await storage.saveConversation("c1", 200, {
+      userQuestion: "Q2",
+      botAnswer: "A2",
+      parentBotMsgId: 100,
+      ts: 2,
+      toolCalls: [{ ...CALL, callId: "call_2", name: "second" }],
+    });
+
+    const msgs = await buildContext({
+      ...chainArgs(storage, "third"),
+      replyTarget: {
+        messageId: 200,
+        text: "A2",
+        authorFirstName: "Bot",
+        images: [],
+      },
+    });
+    expect(msgs.map((m) => m.role)).toEqual([
+      "user",
+      "tool",
+      "assistant",
+      "user",
+      "tool",
+      "assistant",
+      "user",
+    ]);
+    expect(msgs[1]).toMatchObject({ callId: "call_1", name: "first" });
+    expect(msgs[4]).toMatchObject({ callId: "call_2", name: "second" });
+  });
+
+  // A turn may have fired several; each is its own call/result pair.
+  test("several calls in one turn each become their own message", async () => {
+    const storage = new MemoryStorage();
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      toolCalls: [CALL, { ...CALL, callId: "call_2", name: "search_web" }],
+    });
+
+    const msgs = await buildContext(chainArgs(storage, "follow-up"));
+    expect(msgs.map((m) => m.role)).toEqual([
+      "user",
+      "tool",
+      "tool",
+      "assistant",
+      "user",
+    ]);
   });
 });

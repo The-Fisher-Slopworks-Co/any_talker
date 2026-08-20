@@ -140,7 +140,11 @@ are supported as `host:port`).
   which limit was hit. The duration cap is a cost guard: native video is billed by clip length
   (Gemini charges ~260 tokens per second), so a few minutes of footage would swallow a user's whole
   token window in one ask.
-- Tool calling — built-in `random_number` tool; add new tools via `registerTool()`.
+- Tool calling — built-in `random_number` tool; add new tools via `registerTool()`. Each call and
+  its result are stored with the turn and replayed on follow-ups as real `function_call` /
+  `function_call_output` items, so "you missed someone" is answered from the page the bot fetched
+  rather than from its own summary of it. Results are capped at 4096 chars (arguments are not —
+  they are model output, already bounded); at most 8 calls per turn are kept.
 - Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, edit a
   reminder's note or time, or cancel them by description; the AI drives this via the
   `schedule_reminder_*` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user

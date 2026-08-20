@@ -201,12 +201,37 @@ export type ChatSettings = {
   keywordFilter?: KeywordFilter;
 };
 
+// One tool call and its result, kept with the turn they happened in and
+// replayed on later turns as the provider's own `function_call` /
+// `function_call_output` items — not as prose about them.
+//
+// The pair is one record on purpose: a replayed `function_call` with no
+// matching `function_call_output` is a malformed request, so there is no way to
+// store one without the other.
+export type ToolCallRecord = {
+  // The provider's id for this call, replayed verbatim. Only has to be
+  // consistent within one request — it is what pairs the call to its output.
+  callId: string;
+  name: string;
+  // The raw JSON argument string the model emitted, byte for byte. Not capped:
+  // it is model output, already bounded by the turn's output-token ceiling, and
+  // truncating it would leave the replayed call unparseable.
+  arguments: string;
+  // The exact string the tool's result was serialized to for the model. Capped
+  // (`ai/tool-calls.ts`) — this one comes from the outside world.
+  output: string;
+};
+
 export type ConversationNode = {
   userQuestion: string;
   botAnswer: string;
   parentBotMsgId: number | null;
   ts: number;
   userImageFileIds?: string[];
+  // Tools this turn ran, in execution order. Absent on turns that ran none —
+  // and on every node written before tool transcripts existed, which is why it
+  // is optional rather than an empty array.
+  toolCalls?: ToolCallRecord[];
 };
 
 export type GuestThreadTurn = {
@@ -215,6 +240,8 @@ export type GuestThreadTurn = {
   // Telegram file_ids of the images that accompanied the question (own photo +
   // replied-to photos), re-fetched on follow-up turns — as in ConversationNode.
   userImageFileIds?: string[];
+  // As in ConversationNode: the tools this turn ran, replayed on follow-ups.
+  toolCalls?: ToolCallRecord[];
 };
 
 export type GuestThreadNode = {

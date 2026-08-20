@@ -149,3 +149,117 @@ describe("dataUrl", () => {
     expect(dataUrl("image/png", new Uint8Array())).toBe("data:image/png;base64,");
   });
 });
+
+// A stored tool call has to reach the provider as a call. One record expands
+// into the pair the Responses API defines — never one without the other, which
+// is why call and result are stored together.
+describe("toResponsesInput — replayed tool calls", () => {
+  const CALL: AIMessage = {
+    role: "tool",
+    callId: "call_1",
+    name: "fetch_page",
+    arguments: '{"url":"https://e.x"}',
+    output: '"# Page"',
+  };
+
+  test("one record becomes function_call + function_call_output", () => {
+    expect(toResponsesInput([CALL])).toEqual([
+      {
+        type: "function_call",
+        callId: "call_1",
+        name: "fetch_page",
+        arguments: '{"url":"https://e.x"}',
+      },
+      { type: "function_call_output", callId: "call_1", output: '"# Page"' },
+    ]);
+  });
+
+  test("the pair keeps its place among the surrounding messages", () => {
+    const items = toResponsesInput([
+      { role: "user", content: "Q1" },
+      CALL,
+      { role: "assistant", content: "A1" },
+      { role: "user", content: "Q2" },
+    ]);
+    expect(items.map((i) => (i as { type?: string; role?: string }).type ?? (i as { role: string }).role))
+      .toEqual(["user", "function_call", "function_call_output", "assistant", "user"]);
+  });
+
+  // The id and the argument string are the provider's own words; re-encoding
+  // them could change bytes the provider matched on.
+  test("arguments and the call id are passed through untouched", () => {
+    const odd: AIMessage = {
+      role: "tool",
+      callId: "call_x",
+      name: "t",
+      arguments: '{ "a" : 1,  "b":"  spaced  " }',
+      output: "null",
+    };
+    const callItem = toResponsesInput([odd])[0] as unknown as {
+      arguments: string;
+      callId: string;
+    };
+    expect(callItem.arguments).toBe('{ "a" : 1,  "b":"  spaced  " }');
+    expect(callItem.callId).toBe("call_x");
+  });
+});
+
+// Not every provider issues call ids that are unique across responses, and the
+// chain replays up to 20 turns into one request. A repeated id would leave the
+// provider unable to tell which result answered which call.
+describe("toResponsesInput — call id collisions", () => {
+  const stored = (callId: string, name: string): AIMessage => ({
+    role: "tool",
+    callId,
+    name,
+    arguments: "{}",
+    output: `"${name}"`,
+  });
+
+  test("a repeated id is made unique, and the pair moves together", () => {
+    const items = toResponsesInput([
+      stored("call_1", "first"),
+      stored("call_1", "second"),
+      stored("call_1", "third"),
+    ]) as Array<{ callId: string; name?: string }>;
+
+    expect(items.map((i) => i.callId)).toEqual([
+      "call_1",
+      "call_1",
+      "call_1_2",
+      "call_1_2",
+      "call_1_3",
+      "call_1_3",
+    ]);
+    // Every id appears exactly twice: once as the call, once as its result.
+    const counts = new Map<string, number>();
+    for (const i of items) counts.set(i.callId, (counts.get(i.callId) ?? 0) + 1);
+    expect([...counts.values()]).toEqual([2, 2, 2]);
+  });
+
+  // The renamed form must not collide with a real id further down the list.
+  test("a synthesized id that is itself taken keeps searching", () => {
+    const items = toResponsesInput([
+      stored("call_1", "a"),
+      stored("call_1_2", "b"),
+      stored("call_1", "c"),
+    ]) as Array<{ callId: string }>;
+    expect(new Set(items.map((i) => i.callId)).size).toBe(3);
+    expect(items.map((i) => i.callId)).toContain("call_1_3");
+  });
+
+  // Ids that are already unique must not move: rewriting them would change the
+  // cacheable prefix of every chain.
+  test("distinct ids are left alone", () => {
+    const items = toResponsesInput([
+      stored("call_a", "a"),
+      stored("call_b", "b"),
+    ]) as Array<{ callId: string }>;
+    expect(items.map((i) => i.callId)).toEqual([
+      "call_a",
+      "call_a",
+      "call_b",
+      "call_b",
+    ]);
+  });
+});

@@ -11,6 +11,7 @@ import {
   buildReplyFallbackMessage,
   buildUserEnvelope,
   loadChainImages,
+  toolCallMessages,
   withMedia,
   type ReplyTarget,
   type Sender,
@@ -228,6 +229,9 @@ export async function guestAskHandler(
     } else {
       messages.push({ role: "user", content: turn.userQuestion });
     }
+    // Between question and answer, where the calls happened — as in
+    // `buildContext`'s reply-chain replay.
+    if (turn.toolCalls) messages.push(...toolCallMessages(turn.toolCalls));
     messages.push({ role: "assistant", content: turn.botAnswer });
   }
   // A stored thread already contains the replied-to bot answer; the raw
@@ -316,6 +320,7 @@ export async function guestAskHandler(
           botAnswer: body,
           userImageFileIds:
             allImageFileIds.length > 0 ? allImageFileIds : undefined,
+          toolCalls: result.toolCalls.length > 0 ? result.toolCalls : undefined,
         },
       ].slice(-MAX_REPLY_CHAIN_DEPTH);
       await storage.saveGuestThread(input.chatId, {
