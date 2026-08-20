@@ -65,9 +65,9 @@ export async function usageCommandHandler(
     exempt,
   );
 
-  // One short line each: which window, the share spent, when it resets. Nothing
-  // else — a header restating the question the user just asked only pushes the
-  // answer further down the screen.
+  // One short line each: which window, the share spent, how long until it
+  // resets. The percentage is bare — the header above says what it is a share
+  // of, so repeating "used" on every window line would only add noise.
   const block = (kind: WindowKind, w: WindowShare) =>
     [
       s.bot_usage_window(kind),
@@ -78,6 +78,7 @@ export async function usageCommandHandler(
   return {
     kind: "usage",
     text: [
+      s.bot_usage_header,
       block("fiveHour", share.fiveHour),
       block("weekly", share.weekly),
     ].join("\n\n"),

@@ -963,9 +963,9 @@ validates against a Zod `StoredReminderSchema` and quarantines corrupt records;
   `next()`), and registered in the command menu only under a chat scope for the
   owner, since the handler ignores everyone else.
 - **A user sees percentages, never token counts** (`ratelimit/share.ts`) — `/usage`
-  in a DM (per window, a line each: which window, the share spent, when it
-  resets — nothing else) and the Web App header (the same two figures as bars)
-  both render a `UsageShare`, a type that carries
+  in a DM (a header, then per window a line each: which window, the share spent,
+  time until reset) and the Web App header (the same two figures as bars) both
+  render a `UsageShare`, a type that carries
   only `usedPercent`/`remainingPercent` and the reset timestamp. The raw
   `used`/`limit` figures stay behind the owner-gated `/api/ratelimit/*` routes
   and the admin `UsageCard`. Enforcing this in the *type* rather than in each
