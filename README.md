@@ -19,9 +19,7 @@ Telegram bot with AI integration via OpenRouter.
    The bot uses OpenRouter's model fallback chain, provider routing, service
    tiers, per-provider stats in the admin model picker, and sticky
    per-conversation routing so a chat keeps hitting the same provider's warm
-   prompt cache. See [`docs/ai-provider.md`](docs/ai-provider.md); upgrading
-   from an older release, see
-   [`docs/migration-openrouter-agent.md`](docs/migration-openrouter-agent.md).
+   prompt cache.
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
 
