@@ -103,8 +103,6 @@ export async function usageCommandHandler(
       input.lang,
       input.nowMs,
     ),
-    "",
-    s.bot_usage_footer,
   ].join("\n");
 
   return { kind: "usage", text };
