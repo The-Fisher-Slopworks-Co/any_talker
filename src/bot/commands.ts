@@ -20,16 +20,29 @@ export const BOT_COMMANDS_RU: readonly BotCommand[] = [
   { command: "askwise", description: "Спросить (подробно)" },
 ];
 
+// Private chats additionally list `/usage`. It is DM-only (the handler ignores
+// it in groups — how close you are to your limit is nobody else's business), so
+// listing it in the group menus would advertise an entry that does nothing.
+export const PRIVATE_COMMANDS_EN: readonly BotCommand[] = [
+  ...BOT_COMMANDS_EN,
+  { command: "usage", description: "Your limits, in percent" },
+];
+
+export const PRIVATE_COMMANDS_RU: readonly BotCommand[] = [
+  ...BOT_COMMANDS_RU,
+  { command: "usage", description: "Твои лимиты, в процентах" },
+];
+
 // The owner's own DM additionally lists `/digest`. Kept out of every other
 // scope because the handler ignores non-owners anyway, and a menu entry that
 // silently does nothing is worse than no entry.
 export const OWNER_COMMANDS_EN: readonly BotCommand[] = [
-  ...BOT_COMMANDS_EN,
+  ...PRIVATE_COMMANDS_EN,
   { command: "digest", description: "Budget digest, now" },
 ];
 
 export const OWNER_COMMANDS_RU: readonly BotCommand[] = [
-  ...BOT_COMMANDS_RU,
+  ...PRIVATE_COMMANDS_RU,
   { command: "digest", description: "Сводка по бюджету, сейчас" },
 ];
 
@@ -39,6 +52,18 @@ export const BOT_COMMAND_SCOPES: readonly BotCommandScope[] = [
   { type: "all_chat_administrators" },
 ];
 
+// The list a given scope gets: DM scopes see the private list, group scopes the
+// base one. The default (scope-less) upload stays the base list — it is the
+// fallback for chat types no explicit scope covers, all of them group-like.
+function commandsFor(
+  scope: BotCommandScope | undefined,
+  lang: "en" | "ru",
+): readonly BotCommand[] {
+  const isPrivate = scope?.type === "all_private_chats";
+  if (lang === "ru") return isPrivate ? PRIVATE_COMMANDS_RU : BOT_COMMANDS_RU;
+  return isPrivate ? PRIVATE_COMMANDS_EN : BOT_COMMANDS_EN;
+}
+
 export async function syncBotCommands(
   api: SyncCommandsApi,
   ownerId?: string,
@@ -47,9 +72,15 @@ export async function syncBotCommands(
   await api.setMyCommands(BOT_COMMANDS_EN, { language_code: "en" });
   await api.setMyCommands(BOT_COMMANDS_RU, { language_code: "ru" });
   for (const scope of BOT_COMMAND_SCOPES) {
-    await api.setMyCommands(BOT_COMMANDS_EN, { scope });
-    await api.setMyCommands(BOT_COMMANDS_EN, { scope, language_code: "en" });
-    await api.setMyCommands(BOT_COMMANDS_RU, { scope, language_code: "ru" });
+    await api.setMyCommands(commandsFor(scope, "en"), { scope });
+    await api.setMyCommands(commandsFor(scope, "en"), {
+      scope,
+      language_code: "en",
+    });
+    await api.setMyCommands(commandsFor(scope, "ru"), {
+      scope,
+      language_code: "ru",
+    });
   }
   if (ownerId === undefined) return;
   // A chat scope outranks `all_private_chats`, so this replaces (not appends
