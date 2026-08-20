@@ -74,17 +74,21 @@ describe("usageCommandHandler", () => {
     if (outcome.kind !== "usage") throw new Error("unreachable");
     expect(outcome.text).toContain("5 hours: 0% used");
     expect(outcome.text).toContain("Week: 0% used");
+    expect(outcome.text).toContain("Resets in ~");
   });
 
-  test("is one line per window and nothing else", async () => {
+  test("puts each window's share and reset on their own lines", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
     const lines = outcome.text.split("\n");
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatch(/^5 hours: 25% used, resets in ~\d+ [a-z]+$/);
-    expect(lines[1]).toMatch(/^Week: 3% used, resets in ~\d+ [a-z]+$/);
+    expect(lines).toHaveLength(5);
+    expect(lines[0]).toBe("5 hours: 25% used");
+    expect(lines[1]).toMatch(/^Resets in ~\d+ [a-z]+$/);
+    expect(lines[2]).toBe("");
+    expect(lines[3]).toBe("Week: 3% used");
+    expect(lines[4]).toMatch(/^Resets in ~\d+ [a-z]+$/);
   });
 
   test("never leaks a token count", async () => {
@@ -103,7 +107,7 @@ describe("usageCommandHandler", () => {
     const storage = await withLimits(1000, 10_000);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toMatch(/resets in ~/);
+    expect(outcome.text.match(/Resets in ~/g)).toHaveLength(2);
   });
 
   test("answers in Russian for a Russian-speaking user", async () => {
@@ -111,8 +115,8 @@ describe("usageCommandHandler", () => {
     await spend(storage, USER, 250);
     const outcome = await run(storage, { lang: "ru" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("5 часов: израсходовано 25%, сброс через ~");
-    expect(outcome.text).toContain("Неделя: израсходовано 3%, сброс через ~");
+    expect(outcome.text).toContain("5 часов: израсходовано 25%\nСброс через ~");
+    expect(outcome.text).toContain("Неделя: израсходовано 3%\nСброс через ~");
   });
 
   test("tells an exempt owner they have no limits", async () => {
