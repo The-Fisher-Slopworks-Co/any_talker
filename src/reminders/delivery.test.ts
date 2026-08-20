@@ -11,6 +11,15 @@ import type { AIClient, AIMessage, AskResult } from "../ai/types";
 import type { Tool, ToolCallContext } from "../ai/tools/registry";
 import { _resetRegistryForTest } from "../ai/tools/registry";
 
+// The message union now also covers replayed tool calls, which carry `output`
+// rather than `content`. These fixtures never build one, so a hit here means a
+// broken fixture, not a case to handle.
+function contentOf<T extends { role: string }>(m: T): unknown {
+  if (!("content" in m)) throw new Error(`no content on a ${m.role} message`);
+  return (m as { content: unknown }).content;
+}
+
+
 type AskArgs = {
   models: string[];
   system: string;
@@ -131,7 +140,7 @@ describe("deliverReminder (AI-driven)", () => {
     expect(ai.calls).toHaveLength(1);
     const askMsg = ai.calls[0]!.messages[0]!;
     expect(askMsg.role).toBe("user");
-    const envelope = JSON.parse(askMsg.content as string);
+    const envelope = JSON.parse(contentOf(askMsg) as string);
     expect(envelope.system_event).toBe("reminder_fired");
     expect(envelope.note).toBe("купить молоко");
     expect(envelope.scheduled_for).toMatch(/^2026-05-20 /);
@@ -198,7 +207,7 @@ describe("deliverReminder (AI-driven)", () => {
     await storage.setUserGender("u1", "female");
     const r = reminderAsk();
     await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
-    const envelope = JSON.parse(ai.calls[0]!.messages[0]!.content as string);
+    const envelope = JSON.parse(contentOf(ai.calls[0]!.messages[0]!) as string);
     expect(envelope.user_name).toBe("Alice");
     expect(envelope.user_gender).toBe("female");
   });
@@ -218,7 +227,7 @@ describe("deliverReminder (AI-driven)", () => {
     });
     const r = reminderAsk();
     await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
-    const envelope = JSON.parse(ai.calls[0]!.messages[0]!.content as string);
+    const envelope = JSON.parse(contentOf(ai.calls[0]!.messages[0]!) as string);
     expect(envelope.user_name).toBe("Bob Smith");
   });
 
@@ -385,9 +394,9 @@ describe("deliverReminder (AI-driven)", () => {
     await deliverReminder(deps(ai, api), r, r.fireAtMs);
     const sent = ai.calls[0]!.messages;
     expect(sent).toHaveLength(3);
-    expect(sent[0]!.content).toContain("Eugene");
-    expect(sent[1]!.content).toContain("Через минуту");
-    const envelope = JSON.parse(sent[2]!.content as string);
+    expect(contentOf(sent[0]!)).toContain("Eugene");
+    expect(contentOf(sent[1]!)).toContain("Через минуту");
+    const envelope = JSON.parse(contentOf(sent[2]!) as string);
     expect(envelope.system_event).toBe("reminder_fired");
   });
 
@@ -410,7 +419,7 @@ describe("deliverReminder (AI-driven)", () => {
     });
     await deliverReminder(deps(ai, api), r, r.fireAtMs);
     const first = ai.calls[0]!.messages[0]!;
-    const parts = first.content as Array<{ type: string }>;
+    const parts = contentOf(first) as Array<{ type: string }>;
     expect(parts[1]).toMatchObject({ type: "image", mediaType: "image/jpeg" });
     const img = parts[1] as unknown as { image: Uint8Array };
     expect(Array.from(img.image)).toEqual([5, 6, 7, 8]);

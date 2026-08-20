@@ -18,8 +18,13 @@ import { HTTPClient } from "@openrouter/sdk";
 import type { Fetcher } from "@openrouter/sdk";
 import type { AIClient, AIMessage, AskResult, RoutingOptions } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
-import type { ProviderSort, ReasoningEffort } from "../shared/types";
+import type {
+  ProviderSort,
+  ReasoningEffort,
+  ToolCallRecord,
+} from "../shared/types";
 import { toResponsesInput } from "./responses-input";
+import { extractToolCalls } from "./tool-calls";
 import { proxiedFetch } from "../proxy";
 import { aiRequestDurationSeconds, aiRequestsTotal } from "../metrics";
 
@@ -220,6 +225,26 @@ export class OpenRouterClient implements AIClient {
     // only and would under-count every tool-using ask.
     let totals: SessionUsageTotals | undefined;
 
+    // The input is built once and kept: the call ids it carries are what the
+    // agent's state will echo back, and they are not always the stored ones —
+    // `toResponsesInput` renames a call id that would repeat within a request.
+    // Reading the set off the emitted items rather than off `opts.messages`
+    // keeps the two in step whatever it renamed.
+    const input = toResponsesInput(opts.messages);
+
+    // Call ids this request REPLAYS from earlier turns. The agent's state is the
+    // whole conversation, input included, so without this the ancestors' calls
+    // would be re-harvested onto every descendant node.
+    const replayedCallIds = new Set(
+      input.flatMap((item) =>
+        typeof item === "object" &&
+        item !== null &&
+        (item as { type?: unknown }).type === "function_call"
+          ? [(item as { callId: string }).callId]
+          : [],
+      ),
+    );
+
     const start = performance.now();
     let outcome: "success" | "error" = "success";
     try {
@@ -234,7 +259,7 @@ export class OpenRouterClient implements AIClient {
           }),
           // Never an input item: this is the cacheable prompt prefix.
           instructions: opts.system,
-          input: toResponsesInput(opts.messages),
+          input,
           // Never emit `"tools": []` — that is a different request.
           ...(tools.length > 0 ? { tools } : {}),
           // Counts TOOL ROUNDS, not model calls — see MAX_TOOL_ROUNDS for the
@@ -246,6 +271,12 @@ export class OpenRouterClient implements AIClient {
           // into an en|ru conversation governed by a strict response format;
           // "" reproduces the old `generateText` wire exactly.
           allowFinalResponse: "",
+          // An in-memory, write-nothing accessor. Its only purpose is to make
+          // `getState()` available below: without one the agent keeps no state
+          // object and the call throws. `load` returning null starts every ask
+          // fresh, and the SDK strips `state` from the outgoing request, so
+          // this changes nothing on the wire.
+          state: { load: async () => null, save: async () => {} },
           hooks: {
             SessionEnd: [
               {
@@ -265,6 +296,20 @@ export class OpenRouterClient implements AIClient {
       // set `strictFinalResponse`, because a throw here would drop a real,
       // billed ask out of the ledger.
       const text = await result.getText();
+      // The tool calls this run made, read off the conversation the agent
+      // actually assembled — real call ids and the exact serialization the
+      // model was handed, neither of which a wrapper around `execute` can see.
+      // Best-effort by contract: the answer is produced and billed by now, so a
+      // surprise here must not turn a good ask into a failure.
+      let toolCalls: ToolCallRecord[] = [];
+      try {
+        const state = await result.getState();
+        if (Array.isArray(state.messages)) {
+          toolCalls = extractToolCalls(state.messages, replayedCallIds);
+        }
+      } catch (err) {
+        console.error("reading tool calls off the agent state failed:", err);
+      }
       const { costUsd, priced } = resolveAskCost(totals);
 
       return {
@@ -277,6 +322,7 @@ export class OpenRouterClient implements AIClient {
         modelId: primary,
         costUsd,
         priced,
+        toolCalls,
       };
     } catch (err) {
       outcome = "error";

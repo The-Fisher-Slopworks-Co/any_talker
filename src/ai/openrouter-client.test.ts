@@ -22,6 +22,7 @@ import {
 import type { AIMessage } from "./types";
 import type { Tool, ToolCallContext } from "./tools/registry";
 import { aiRequestsTotal } from "../metrics";
+import { TOOL_CALLS_MAX_PER_TURN, TOOL_OUTPUT_MAX } from "./tool-calls";
 
 const SDK_ENV_VARS = [
   "OPENROUTER_API_KEY",
@@ -784,5 +785,234 @@ describe("OpenRouterClient — the loop bound and the final turn", () => {
     expect(result.costUsd).toBeGreaterThan(0);
     expect(result.priced).toBe(true);
     expect(counterValue("success") - before).toBe(1);
+  });
+});
+
+// Tool calls used to exist only inside the agent's loop: nothing crossed the
+// `AskResult` boundary, so a follow-up turn answered from the bot's own summary
+// of a fetch rather than the fetch. They are read off the agent's conversation
+// state, which is the only place the provider's real call ids and the exact
+// serialization the model saw are both available.
+describe("OpenRouterClient — the tool calls it reports", () => {
+  // Drives one tool round, then answers.
+  function oneRoundClient(tool: { name: string; args: unknown }) {
+    return capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn === 1
+                ? { cost: 0.001, toolCall: { ...tool, callId: "call_abc" } }
+                : { cost: 0.001 },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+  }
+
+  test("no tools, no calls", async () => {
+    const { client } = capturingClient();
+    const result = await client.ask(askOpts({ tools: [] }));
+    expect(result.toolCalls).toEqual([]);
+  });
+
+  // The id and the raw argument string are the provider's own, kept verbatim so
+  // the replay pairs the call to its result exactly as this turn did.
+  test("a round reports the call id, name, raw arguments and result", async () => {
+    const { client } = oneRoundClient({ name: "echo", args: { value: "hi" } });
+    const result = await client.ask(askOpts({ tools: [echoTool] }));
+    expect(result.toolCalls).toEqual([
+      {
+        callId: "call_abc",
+        name: "echo",
+        arguments: '{"value":"hi"}',
+        output: '{"echoed":"hi"}',
+      },
+    ]);
+  });
+
+  // A thrown tool still reaches the model as that call's result, so the turn
+  // was shaped by it and the replay has to carry whatever the model was shown.
+  test("a thrown tool is reported with the result the model was given", async () => {
+    const boom: Tool = {
+      name: "echo",
+      description: "always fails",
+      parameters: z.object({ value: z.string() }),
+      execute: () => {
+        throw new Error("upstream down");
+      },
+    };
+    const { client } = oneRoundClient({ name: "echo", args: { value: "hi" } });
+    const result = await client.ask(askOpts({ tools: [boom] }));
+
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls![0]!.output).toContain("upstream down");
+    // A failed tool is a result, not a dead turn.
+    expect(result.text).toBe("hello");
+  });
+
+  // Results come from the outside world; a page or a transcript would otherwise
+  // sit in storage under a 30-day TTL and ride along in every later prompt.
+  test("an oversized result is cut, and stays a valid JSON string", async () => {
+    const huge: Tool = {
+      name: "echo",
+      description: "returns a lot",
+      parameters: z.object({ value: z.string() }),
+      execute: () => "x".repeat(TOOL_OUTPUT_MAX * 3),
+    };
+    const { client } = oneRoundClient({ name: "echo", args: { value: "hi" } });
+    const result = await client.ask(askOpts({ tools: [huge] }));
+
+    const output = result.toolCalls![0]!.output;
+    expect(output.length).toBeLessThan(TOOL_OUTPUT_MAX + 200);
+    const decoded: unknown = JSON.parse(output);
+    expect(typeof decoded).toBe("string");
+    expect(decoded as string).toContain(`${TOOL_OUTPUT_MAX * 3} chars total`);
+  });
+
+  // The state is the whole conversation, replayed input included. Without the
+  // guard every follow-up would re-report its ancestors' calls and each node
+  // down the chain would store a copy of everything before it.
+  test("calls replayed from earlier turns are not reported again", async () => {
+    const { client } = oneRoundClient({ name: "echo", args: { value: "hi" } });
+    const result = await client.ask(
+      askOpts({
+        tools: [echoTool],
+        messages: [
+          { role: "user", content: "Q1" },
+          {
+            role: "tool",
+            callId: "call_old",
+            name: "echo",
+            arguments: '{"value":"old"}',
+            output: '"older result"',
+          },
+          { role: "assistant", content: "A1" },
+          { role: "user", content: "Q2" },
+        ] as AIMessage[],
+      }),
+    );
+
+    expect(result.toolCalls!.map((c) => c.callId)).toEqual(["call_abc"]);
+  });
+
+  // `toResponsesInput` renames a replayed id that would repeat within the
+  // request. If the guard read the stored ids instead of the emitted ones, the
+  // renamed ancestor would look new and be copied onto this turn's node too.
+  test("a renamed replayed call is still recognised as replayed", async () => {
+    const { client } = oneRoundClient({ name: "echo", args: { value: "hi" } });
+    const result = await client.ask(
+      askOpts({
+        tools: [echoTool],
+        messages: [
+          { role: "user", content: "Q1" },
+          {
+            role: "tool",
+            callId: "call_dup",
+            name: "echo",
+            arguments: "{}",
+            output: '"one"',
+          },
+          {
+            role: "tool",
+            callId: "call_dup",
+            name: "echo",
+            arguments: "{}",
+            output: '"two"',
+          },
+          { role: "user", content: "Q2" },
+        ] as AIMessage[],
+      }),
+    );
+
+    expect(result.toolCalls!.map((c) => c.callId)).toEqual(["call_abc"]);
+  });
+
+  // A sequential runaway tops out at 7 executions (`MAX_TOOL_ROUNDS` + 1), under
+  // the cap. Parallel calls are what can blow past it: one round may fire
+  // several at once.
+  test("parallel rounds stop at the per-turn ceiling", async () => {
+    const parallelRound = (turn: number, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        type: "function_call",
+        id: `fc_${turn}_${i}`,
+        call_id: `call_${turn}_${i}`,
+        name: "echo",
+        arguments: JSON.stringify({ value: `t${turn}_${i}` }),
+        status: "completed",
+      }));
+
+    const { client } = capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn <= 3
+                ? { cost: 0.001, output: parallelRound(turn, 4) }
+                : { cost: 0.001 },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts({ tools: [echoTool] }));
+    // 12 executions offered, the first 8 kept: the early calls fetched the
+    // material the answer was built on, so the tail is what gets dropped.
+    expect(result.toolCalls!.length).toBe(TOOL_CALLS_MAX_PER_TURN);
+    expect(result.toolCalls![0]!.arguments).toBe('{"value":"t1_0"}');
+    expect(result.toolCalls!.at(-1)!.arguments).toBe('{"value":"t2_3"}');
+  });
+});
+
+// The whole point of storing them: a replayed call has to reach the provider as
+// a call, in the pair shape the API defines.
+describe("OpenRouterClient — replayed calls on the wire", () => {
+  // `state` is passed only to make `getState()` available; the SDK strips it
+  // from the request. If a version stopped doing that, the body would carry two
+  // functions — silently dropped by JSON, but a request this bot never meant to
+  // send.
+  test("the state accessor never reaches the wire", async () => {
+    const { client, calls } = capturingClient();
+    await client.ask(askOpts({ tools: [] }));
+    expect(calls[0]!.body).not.toHaveProperty("state");
+  });
+
+  test("a stored call goes out as function_call + function_call_output", async () => {
+    const { client, calls } = capturingClient();
+    await client.ask(
+      askOpts({
+        messages: [
+          { role: "user", content: "Q1" },
+          {
+            role: "tool",
+            callId: "call_old",
+            name: "fetch_page",
+            arguments: '{"url":"https://e.x"}',
+            output: '"# Page"',
+          },
+          { role: "assistant", content: "A1" },
+          { role: "user", content: "Q2" },
+        ] as AIMessage[],
+      }),
+    );
+
+    expect(calls[0]!.body.input).toEqual([
+      { role: "user", content: "Q1" },
+      {
+        type: "function_call",
+        call_id: "call_old",
+        name: "fetch_page",
+        arguments: '{"url":"https://e.x"}',
+      },
+      {
+        type: "function_call_output",
+        call_id: "call_old",
+        output: '"# Page"',
+      },
+      { role: "assistant", content: "A1" },
+      { role: "user", content: "Q2" },
+    ]);
   });
 });
