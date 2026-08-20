@@ -156,8 +156,8 @@ are supported as `host:port`).
 - Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
   (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
-- **`/usage`** (DM only) — any user can ask where they stand: one line per window with the share of
-  that budget already spent and when it resets. The Web App shows the same two figures as progress
+- **`/usage`** (DM only) — any user can ask where they stand: per window, the share of that budget
+  already spent and when it resets. The Web App shows the same two figures as progress
   bars in a header above every screen. Both surfaces are **percentage-only by construction** — they
   are built from a type that carries no token counts at all, so the raw budget figures stay on the
   owner-gated admin routes.

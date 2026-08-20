@@ -65,17 +65,20 @@ export async function usageCommandHandler(
     exempt,
   );
 
-  // One line per window, nothing else: the share spent and when it resets is
-  // the whole answer, and a header restating the question the user just asked
-  // only pushes it further down the screen.
-  const line = (kind: WindowKind, w: WindowShare) =>
-    s.bot_usage_line(kind, w.usedPercent, Math.max(0, w.resetMs - input.nowMs));
+  // Per window: the share spent, then the reset on its own line. Nothing else —
+  // a header restating the question the user just asked only pushes the answer
+  // further down the screen.
+  const block = (kind: WindowKind, w: WindowShare) =>
+    [
+      s.bot_usage_line(kind, w.usedPercent),
+      s.bot_usage_reset(Math.max(0, w.resetMs - input.nowMs)),
+    ].join("\n");
 
   return {
     kind: "usage",
     text: [
-      line("fiveHour", share.fiveHour),
-      line("weekly", share.weekly),
-    ].join("\n"),
+      block("fiveHour", share.fiveHour),
+      block("weekly", share.weekly),
+    ].join("\n\n"),
   };
 }
