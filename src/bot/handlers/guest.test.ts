@@ -752,3 +752,74 @@ describe("guestAskHandler", () => {
     expect(events).toEqual(["typing-ok"]);
   });
 });
+
+// Guest threads carry the same defect the reply chain had: the turn stored the
+// question and the answer, and whatever a tool fetched was gone by the next
+// message.
+describe("guestAskHandler — tool calls on the stored thread", () => {
+  const RECORDS = [
+    {
+      callId: "call_1",
+      name: "fetch_page",
+      arguments: '{"url":"https://e.x"}',
+      output: '"Alice 113\\nBob 111\\nCarol 107"',
+    },
+  ];
+
+  test("persistThread keeps the turn's tool calls", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({
+      text: "three of them got in",
+      totalTokens: 1,
+      toolCalls: RECORDS,
+    });
+
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistThread();
+
+    expect((await storage.getGuestThread("c1"))!.turns[0]!.toolCalls).toEqual(
+      RECORDS,
+    );
+  });
+
+  test("a turn that called no tools stores no key at all", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "plain", totalTokens: 1, toolCalls: [] });
+
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistThread();
+
+    expect(
+      (await storage.getGuestThread("c1"))!.turns[0]!.toolCalls,
+    ).toBeUndefined();
+  });
+
+  test("a stored turn's tool results reach the next prompt", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread: {
+          chatId: "c1",
+          turns: [
+            { userQuestion: "Q1", botAnswer: "A1", toolCalls: RECORDS },
+          ],
+          ts: 500,
+        },
+        userText: "you missed someone",
+      }),
+    );
+
+    const sent = (ai.calls[0] as { messages: unknown[] }).messages;
+    expect(JSON.stringify(sent)).toContain("Carol 107");
+    // Question, transcript, answer, then the new question.
+    expect(sent).toHaveLength(4);
+  });
+});
