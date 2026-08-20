@@ -38,6 +38,7 @@ import { normalizeManagedBotInput } from "../managed-bots/validate";
 import { getOrInitSettings } from "../settings";
 import { gatherSpendOverview } from "../spending/overview";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
+import { usageShare } from "../ratelimit/share";
 import type { ModelCatalog } from "../ai/model-catalog";
 import { isValidPermaslug, type FetchProviderEndpoints } from "./openrouter-proxy";
 
@@ -569,6 +570,26 @@ export async function handleApi(
   if (req.path === "/api/me/spending" && req.method === "GET") {
     const spending = await deps.storage.getUserSpend(actor.userId, Date.now());
     return { status: 200, body: { spending } };
+  }
+
+  // The viewer's own rate-limit standing, for the Web App header. Percentage
+  // only: unlike the owner-gated `/api/ratelimit/*` routes below, this one is
+  // reachable by every authenticated user, so it must not carry the raw token
+  // counts (`UsageStatus`) — `usageShare` collapses them to a share of budget
+  // before the response body is built. Scoped strictly to `actor.userId`; the
+  // id never comes from the request.
+  if (req.path === "/api/me/usage" && req.method === "GET") {
+    const settings = await getOrInitSettings(deps.storage);
+    const now = Date.now();
+    const stored = await deps.storage.getUserUsage(actor.userId);
+    const status = summarizeUsage(
+      actor.userId,
+      settings.rateLimit,
+      stored,
+      now,
+    );
+    const exempt = actor.isOwner && settings.rateLimit.ownerExempt;
+    return { status: 200, body: { usage: usageShare(status, exempt) } };
   }
 
   // Memory vault: the family roster for the character switcher. A narrow DTO

@@ -21,8 +21,9 @@ import type { ManagedBotInput } from "../../managed-bots/validate";
 import type { SpendSummary } from "../../spending/window";
 import type { SpendOverview } from "../../spending/overview";
 import type { UsageStatus } from "../../ratelimit/window";
+import type { UsageShare } from "../../ratelimit/share";
 
-export type { SpendSummary, UsageStatus, SpendOverview };
+export type { SpendSummary, UsageStatus, UsageShare, SpendOverview };
 
 declare global {
   interface Window {
@@ -150,6 +151,10 @@ export const api = {
     req<{ usage: UsageStatus }>("PUT", `/api/ratelimit/user/${id}`, {
       reset: true,
     }),
+  // Percentage-only view of the caller's own limits (the header bars). Distinct
+  // from `getMyUsage` above, which is the owner-gated admin route carrying raw
+  // token counts.
+  getMyUsageShare: () => req<{ usage: UsageShare }>("GET", "/api/me/usage"),
   getMySpending: () => req<SpendingResponse>("GET", "/api/me/spending"),
   getUserSpending: (id: string) =>
     req<SpendingResponse>("GET", `/api/admin/users/${id}/spending`),

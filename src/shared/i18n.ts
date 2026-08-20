@@ -87,6 +87,19 @@ type Strings = {
   // Reply to `/digest` when the period held nothing worth reporting (the
   // scheduled digest simply stays silent in that case).
   bot_digest_empty: string;
+  // `/usage` (DM only): a header, then two lines per rate-limit window — the
+  // window and the share of its budget already spent, then how long until it
+  // comes back. Deliberately
+  // percentage-only: the raw token counts are operational detail and never
+  // leave the admin surfaces (see `ratelimit/share.ts`).
+  // The header carries the meaning of the bare percentage below it ("of your
+  // limit, spent"), so each window line doesn't have to repeat it.
+  bot_usage_header: string;
+  bot_usage_line: (window: WindowKind, usedPercent: number) => string;
+  bot_usage_reset: (msUntilReset: number) => string;
+  // Shown instead of the bars when the viewer is the (exempt) owner: their
+  // usage is never accrued, so a 0% bar would be meaningless rather than true.
+  bot_usage_exempt: string;
   bot_ai_error: string;
   bot_details_summary: string;
   bot_contact_no_user_id: string;
@@ -269,6 +282,15 @@ type Strings = {
   ui_ratelimit_weekly_window: string;
   ui_ratelimit_resets: string;
   ui_ratelimit_reset: string;
+
+  // Web App header (`components/usage-header.tsx`): the viewer's own budget as
+  // two progress bars. Percentage-only, exactly like the `/usage` command.
+  ui_usage_header_title: string;
+  ui_usage_header_5h: string;
+  ui_usage_header_weekly: string;
+  ui_usage_header_left: (remainingPercent: number) => string;
+  ui_usage_header_resets: (msUntilReset: number) => string;
+  ui_usage_header_exempt: string;
 
   ui_users_all: string;
   ui_users_empty: string;
@@ -578,6 +600,11 @@ const en: Strings = {
   bot_digest_col_today: "Today",
   bot_digest_col_denials: "Denials",
   bot_digest_empty: "Nothing to report — no spend, new users or denials yet.",
+  bot_usage_header: "📊 Limit used",
+  bot_usage_line: (window, used) =>
+    `${window === "weekly" ? "Week" : "5 hours"}: ${used}%`,
+  bot_usage_reset: (ms) => `~${etaEn(ms)} until reset`,
+  bot_usage_exempt: "The limits don't apply to you.",
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
@@ -784,6 +811,12 @@ const en: Strings = {
   ui_ratelimit_weekly_window: "Weekly window",
   ui_ratelimit_resets: "Resets",
   ui_ratelimit_reset: "Reset usage",
+  ui_usage_header_title: "Your limits",
+  ui_usage_header_5h: "5 h",
+  ui_usage_header_weekly: "7 d",
+  ui_usage_header_left: (left) => `${left}% left`,
+  ui_usage_header_resets: (ms) => `~${etaEn(ms)} until reset`,
+  ui_usage_header_exempt: "No limits apply to you.",
 
   ui_users_all: "All Users",
   ui_users_empty: "No users yet — they appear after their first message.",
@@ -1062,6 +1095,11 @@ const ru: Strings = {
   bot_digest_unpriced: (models) =>
     `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
   bot_digest_empty: "Пока не о чем отчитываться — ни трат, ни новых юзеров, ни отказов.",
+  bot_usage_header: "📊 Израсходовано лимита",
+  bot_usage_line: (window, used) =>
+    `${window === "weekly" ? "Неделя" : "5 часов"}: ${used}%`,
+  bot_usage_reset: (ms) => `~${etaRu(ms)} до сброса`,
+  bot_usage_exempt: "На тебя лимиты не распространяются.",
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
   bot_contact_no_user_id:
@@ -1269,6 +1307,12 @@ const ru: Strings = {
   ui_ratelimit_weekly_window: "Недельное окно",
   ui_ratelimit_resets: "Сброс",
   ui_ratelimit_reset: "Сбросить использование",
+  ui_usage_header_title: "Твои лимиты",
+  ui_usage_header_5h: "5 ч",
+  ui_usage_header_weekly: "7 дн",
+  ui_usage_header_left: (left) => `осталось ${left}%`,
+  ui_usage_header_resets: (ms) => `~${etaRu(ms)} до сброса`,
+  ui_usage_header_exempt: "На тебя лимиты не распространяются.",
 
   ui_users_all: "Все пользователи",
   ui_users_empty:
