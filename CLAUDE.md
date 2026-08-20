@@ -4,21 +4,6 @@ Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
 See `README.md` for setup, running, deployment, observability, and the
 user-facing feature/metrics catalog. This file covers how to work in the code.
 
-### Architecture
-
-**`docs/ARCHITECTURE.md` is the source of truth for system structure** — the
-component map, runtime/data flow, data model, and key design decisions. **Read it
-before any work that touches the architecture, adds or removes a module, or
-crosses a component boundary.**
-
-Keep the two in sync: when a change alters the architecture — a new/removed/
-renamed module or service, a changed data or control flow, a new external
-integration, a new cross-cutting pattern, or a moved boundary — **update
-`docs/ARCHITECTURE.md` in the same change** so the doc never drifts from the code.
-
-Keep this file pointing to `docs/ARCHITECTURE.md` rather than duplicating it;
-the doc is the single source of truth for structure.
-
 ### Commands
 
 ```bash
