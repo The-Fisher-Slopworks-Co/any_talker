@@ -94,7 +94,6 @@ type Strings = {
   bot_usage_window_5h: string;
   bot_usage_window_weekly: string;
   bot_usage_line: (usedPercent: number, msUntilReset: number) => string;
-  bot_usage_footer: string;
   // Shown instead of the bars when the viewer is the (exempt) owner: their
   // usage is never accrued, so a 0% bar would be meaningless rather than true.
   bot_usage_exempt: string;
@@ -603,8 +602,6 @@ const en: Strings = {
   bot_usage_window_weekly: "Weekly window",
   bot_usage_line: (used, ms) =>
     `${used}% used · resets in ~${etaEn(ms)}`,
-  bot_usage_footer:
-    "Percentages only — how much of your own budget is gone, and when it comes back.",
   bot_usage_exempt: "📊 You're exempt from the limits — spend away.",
   bot_ai_error: "⚠️ AI error. Try again later.",
   bot_details_summary: "Expand reply",
@@ -1101,8 +1098,6 @@ const ru: Strings = {
   bot_usage_window_weekly: "Недельное окно",
   bot_usage_line: (used, ms) =>
     `израсходовано ${used}% · сброс через ~${etaRu(ms)}`,
-  bot_usage_footer:
-    "Только проценты — сколько своего лимита ты уже потратил и когда он вернётся.",
   bot_usage_exempt: "📊 На тебя лимиты не распространяются — трать сколько нужно.",
   bot_ai_error: "⚠️ Ошибка ИИ. Попробуй позже.",
   bot_details_summary: "Развернуть ответ",
