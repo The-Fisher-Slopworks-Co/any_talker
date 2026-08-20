@@ -58,8 +58,8 @@ describe("UsageHeader markup", () => {
 
   test("says when each window resets", () => {
     const html = render(share());
-    expect(html).toContain("resets in ~2 h");
-    expect(html).toContain("resets in ~3 d");
+    expect(html).toContain("~2 h until reset");
+    expect(html).toContain("~3 d until reset");
   });
 
   test("exposes the share to assistive tech as a progressbar", () => {

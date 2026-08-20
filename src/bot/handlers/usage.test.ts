@@ -72,25 +72,35 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage);
     expect(outcome.kind).toBe("usage");
     if (outcome.kind !== "usage") throw new Error("unreachable");
-    expect(outcome.text).toContain("5 hours\n0% used");
-    expect(outcome.text).toContain("Week\n0% used");
-    expect(outcome.text).toContain("Resets in ~");
+    expect(outcome.text).toContain("5 hours\n0%");
+    expect(outcome.text).toContain("Week\n0%");
+    expect(outcome.text).toContain("until reset");
   });
 
-  test("gives the window, the share and the reset a line each", async () => {
+  test("is a header plus a line each for window, share and reset", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
     const lines = outcome.text.split("\n");
-    expect(lines).toHaveLength(7);
-    expect(lines[0]).toBe("5 hours");
-    expect(lines[1]).toBe("25% used");
-    expect(lines[2]).toMatch(/^Resets in ~\d+ [a-z]+$/);
-    expect(lines[3]).toBe("");
-    expect(lines[4]).toBe("Week");
-    expect(lines[5]).toBe("3% used");
-    expect(lines[6]).toMatch(/^Resets in ~\d+ [a-z]+$/);
+    expect(lines).toHaveLength(9);
+    expect(lines[0]).toBe("📊 Limit used");
+    expect(lines[1]).toBe("");
+    expect(lines[2]).toBe("5 hours");
+    expect(lines[3]).toBe("25%");
+    expect(lines[4]).toMatch(/^~\d+ [a-z]+ until reset$/);
+    expect(lines[5]).toBe("");
+    expect(lines[6]).toBe("Week");
+    expect(lines[7]).toBe("3%");
+    expect(lines[8]).toMatch(/^~\d+ [a-z]+ until reset$/);
+  });
+
+  // The bare "25%" only reads as "spent" because the header says so.
+  test("says what the percentage is a share of, once, in the header", async () => {
+    const storage = await withLimits(1000, 10_000);
+    const outcome = await run(storage);
+    if (outcome.kind !== "usage") throw new Error("expected a report");
+    expect(outcome.text.match(/used/g)).toHaveLength(1);
   });
 
   test("never leaks a token count", async () => {
@@ -105,11 +115,11 @@ describe("usageCommandHandler", () => {
     expect(outcome.text).not.toContain("10,000");
   });
 
-  test("names when each window resets", async () => {
+  test("names how long each window has left", async () => {
     const storage = await withLimits(1000, 10_000);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text.match(/Resets in ~/g)).toHaveLength(2);
+    expect(outcome.text.match(/until reset/g)).toHaveLength(2);
   });
 
   test("answers in Russian for a Russian-speaking user", async () => {
@@ -117,8 +127,10 @@ describe("usageCommandHandler", () => {
     await spend(storage, USER, 250);
     const outcome = await run(storage, { lang: "ru" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("5 часов\nИзрасходовано 25%\nСброс через ~");
-    expect(outcome.text).toContain("Неделя\nИзрасходовано 3%\nСброс через ~");
+    expect(outcome.text).toContain("📊 Израсходовано лимита");
+    expect(outcome.text).toMatch(/5 часов\n25%\n~\d+ \S+ до сброса/);
+    expect(outcome.text).toMatch(/Неделя\n3%\n~\d+ \S+ до сброса/);
+    expect(outcome.text.match(/Израсходовано/g)).toHaveLength(1);
   });
 
   test("tells an exempt owner they have no limits", async () => {
@@ -143,7 +155,7 @@ describe("usageCommandHandler", () => {
     await spend(storage, "owner", 500);
     const outcome = await run(storage, { fromUserId: "owner" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("5 hours\n50% used");
+    expect(outcome.text).toContain("5 hours\n50%");
   });
 
   test("does not accrue usage — asking is free", async () => {
