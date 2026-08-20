@@ -72,23 +72,25 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage);
     expect(outcome.kind).toBe("usage");
     if (outcome.kind !== "usage") throw new Error("unreachable");
-    expect(outcome.text).toContain("5 hours: 0% used");
-    expect(outcome.text).toContain("Week: 0% used");
+    expect(outcome.text).toContain("5 hours\n0% used");
+    expect(outcome.text).toContain("Week\n0% used");
     expect(outcome.text).toContain("Resets in ~");
   });
 
-  test("puts each window's share and reset on their own lines", async () => {
+  test("gives the window, the share and the reset a line each", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
     const lines = outcome.text.split("\n");
-    expect(lines).toHaveLength(5);
-    expect(lines[0]).toBe("5 hours: 25% used");
-    expect(lines[1]).toMatch(/^Resets in ~\d+ [a-z]+$/);
-    expect(lines[2]).toBe("");
-    expect(lines[3]).toBe("Week: 3% used");
-    expect(lines[4]).toMatch(/^Resets in ~\d+ [a-z]+$/);
+    expect(lines).toHaveLength(7);
+    expect(lines[0]).toBe("5 hours");
+    expect(lines[1]).toBe("25% used");
+    expect(lines[2]).toMatch(/^Resets in ~\d+ [a-z]+$/);
+    expect(lines[3]).toBe("");
+    expect(lines[4]).toBe("Week");
+    expect(lines[5]).toBe("3% used");
+    expect(lines[6]).toMatch(/^Resets in ~\d+ [a-z]+$/);
   });
 
   test("never leaks a token count", async () => {
@@ -115,8 +117,8 @@ describe("usageCommandHandler", () => {
     await spend(storage, USER, 250);
     const outcome = await run(storage, { lang: "ru" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("5 часов: израсходовано 25%\nСброс через ~");
-    expect(outcome.text).toContain("Неделя: израсходовано 3%\nСброс через ~");
+    expect(outcome.text).toContain("5 часов\nИзрасходовано 25%\nСброс через ~");
+    expect(outcome.text).toContain("Неделя\nИзрасходовано 3%\nСброс через ~");
   });
 
   test("tells an exempt owner they have no limits", async () => {
@@ -141,7 +143,7 @@ describe("usageCommandHandler", () => {
     await spend(storage, "owner", 500);
     const outcome = await run(storage, { fromUserId: "owner" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("5 hours: 50% used");
+    expect(outcome.text).toContain("5 hours\n50% used");
   });
 
   test("does not accrue usage — asking is free", async () => {

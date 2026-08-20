@@ -65,12 +65,13 @@ export async function usageCommandHandler(
     exempt,
   );
 
-  // Per window: the share spent, then the reset on its own line. Nothing else —
-  // a header restating the question the user just asked only pushes the answer
-  // further down the screen.
+  // One short line each: which window, the share spent, when it resets. Nothing
+  // else — a header restating the question the user just asked only pushes the
+  // answer further down the screen.
   const block = (kind: WindowKind, w: WindowShare) =>
     [
-      s.bot_usage_line(kind, w.usedPercent),
+      s.bot_usage_window(kind),
+      s.bot_usage_used(w.usedPercent),
       s.bot_usage_reset(Math.max(0, w.resetMs - input.nowMs)),
     ].join("\n");
 
