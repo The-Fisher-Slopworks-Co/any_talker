@@ -3,6 +3,7 @@
 
 import type { Storage } from "../../storage/types";
 import { t, type Lang } from "../../shared/i18n";
+import type { WindowKind } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
 import { summarizeUsage } from "../../ratelimit/window";
 import { usageShare, type WindowShare } from "../../ratelimit/share";
@@ -40,34 +41,6 @@ export type UsageCommandOutcome =
   | { kind: "ignored" }
   | { kind: "usage"; text: string };
 
-// Character cells of the text progress bar. Kept short so the line survives a
-// narrow phone screen without wrapping, which would break the bar in half.
-export const BAR_CELLS = 10;
-
-// Renders a percentage as a fixed-width block bar. Pure and language-neutral —
-// the same figure the Web App header draws with CSS, drawn with characters.
-export function progressBar(usedPercent: number): string {
-  const clamped = Math.max(0, Math.min(100, usedPercent));
-  // Any non-zero usage lights at least one cell: an all-empty bar next to
-  // "1% used" would contradict the number beside it.
-  const filled =
-    clamped === 0 ? 0 : Math.max(1, Math.round((clamped / 100) * BAR_CELLS));
-  return "▰".repeat(filled) + "▱".repeat(BAR_CELLS - filled);
-}
-
-function windowBlock(
-  label: string,
-  share: WindowShare,
-  lang: Lang,
-  nowMs: number,
-): string {
-  const line = t(lang).bot_usage_line(
-    share.usedPercent,
-    Math.max(0, share.resetMs - nowMs),
-  );
-  return `${label}\n${progressBar(share.usedPercent)} ${line}`;
-}
-
 // Builds the user's own usage report. Reads only: asking where you stand must
 // never move the windows or cost budget. The report is percentage-only by
 // construction — `usageShare` is the only thing this handler ever sees, so the
@@ -92,18 +65,17 @@ export async function usageCommandHandler(
     exempt,
   );
 
-  const text = [
-    s.bot_usage_header,
-    "",
-    windowBlock(s.bot_usage_window_5h, share.fiveHour, input.lang, input.nowMs),
-    "",
-    windowBlock(
-      s.bot_usage_window_weekly,
-      share.weekly,
-      input.lang,
-      input.nowMs,
-    ),
-  ].join("\n");
+  // One line per window, nothing else: the share spent and when it resets is
+  // the whole answer, and a header restating the question the user just asked
+  // only pushes it further down the screen.
+  const line = (kind: WindowKind, w: WindowShare) =>
+    s.bot_usage_line(kind, w.usedPercent, Math.max(0, w.resetMs - input.nowMs));
 
-  return { kind: "usage", text };
+  return {
+    kind: "usage",
+    text: [
+      line("fiveHour", share.fiveHour),
+      line("weekly", share.weekly),
+    ].join("\n"),
+  };
 }

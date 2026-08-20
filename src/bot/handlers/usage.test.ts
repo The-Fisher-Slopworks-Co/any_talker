@@ -5,12 +5,7 @@ import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../../storage/memory";
 import { DEFAULT_SETTINGS } from "../../shared/types";
 import { currentWindowStarts } from "../../ratelimit/window";
-import {
-  matchUsageCommand,
-  progressBar,
-  usageCommandHandler,
-  BAR_CELLS,
-} from "./usage";
+import { matchUsageCommand, usageCommandHandler } from "./usage";
 
 const NOW = 1_700_000_000_000;
 const USER = "u1";
@@ -64,32 +59,6 @@ describe("matchUsageCommand", () => {
   });
 });
 
-describe("progressBar", () => {
-  test("is always the same width", () => {
-    for (const p of [0, 1, 37, 50, 99, 100]) {
-      expect([...progressBar(p)]).toHaveLength(BAR_CELLS);
-    }
-  });
-
-  test("empty at 0% and full at 100%", () => {
-    expect(progressBar(0)).toBe("▱".repeat(BAR_CELLS));
-    expect(progressBar(100)).toBe("▰".repeat(BAR_CELLS));
-  });
-
-  test("lights at least one cell for any non-zero share", () => {
-    expect(progressBar(1)).toBe("▰" + "▱".repeat(BAR_CELLS - 1));
-  });
-
-  test("fills proportionally", () => {
-    expect(progressBar(50)).toBe("▰▰▰▰▰▱▱▱▱▱");
-  });
-
-  test("clamps out-of-range input", () => {
-    expect(progressBar(-10)).toBe("▱".repeat(BAR_CELLS));
-    expect(progressBar(150)).toBe("▰".repeat(BAR_CELLS));
-  });
-});
-
 describe("usageCommandHandler", () => {
   test("ignores group chats", async () => {
     const storage = new MemoryStorage();
@@ -103,18 +72,19 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage);
     expect(outcome.kind).toBe("usage");
     if (outcome.kind !== "usage") throw new Error("unreachable");
-    expect(outcome.text).toContain("0% used");
-    expect(outcome.text).toContain("5-hour window");
-    expect(outcome.text).toContain("Weekly window");
+    expect(outcome.text).toContain("5 hours: 0% used");
+    expect(outcome.text).toContain("Week: 0% used");
   });
 
-  test("reports each window's own percentage", async () => {
+  test("is one line per window and nothing else", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);
     const outcome = await run(storage);
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("25% used");
-    expect(outcome.text).toContain("3% used");
+    const lines = outcome.text.split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^5 hours: 25% used, resets in ~\d+ [a-z]+$/);
+    expect(lines[1]).toMatch(/^Week: 3% used, resets in ~\d+ [a-z]+$/);
   });
 
   test("never leaks a token count", async () => {
@@ -129,15 +99,6 @@ describe("usageCommandHandler", () => {
     expect(outcome.text).not.toContain("10,000");
   });
 
-  test("draws a bar for each window", async () => {
-    const storage = await withLimits(1000, 10_000);
-    await spend(storage, USER, 500);
-    const outcome = await run(storage);
-    if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain(progressBar(50));
-    expect(outcome.text).toContain(progressBar(5));
-  });
-
   test("names when each window resets", async () => {
     const storage = await withLimits(1000, 10_000);
     const outcome = await run(storage);
@@ -150,15 +111,15 @@ describe("usageCommandHandler", () => {
     await spend(storage, USER, 250);
     const outcome = await run(storage, { lang: "ru" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("Окно 5 часов");
-    expect(outcome.text).toContain("израсходовано 25%");
+    expect(outcome.text).toContain("5 часов: израсходовано 25%, сброс через ~");
+    expect(outcome.text).toContain("Неделя: израсходовано 3%, сброс через ~");
   });
 
   test("tells an exempt owner they have no limits", async () => {
     const storage = await withLimits(1000, 10_000);
     const outcome = await run(storage, { fromUserId: "owner" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("exempt");
+    expect(outcome.text).toContain("don't apply to you");
     expect(outcome.text).not.toContain("%");
   });
 
@@ -176,7 +137,7 @@ describe("usageCommandHandler", () => {
     await spend(storage, "owner", 500);
     const outcome = await run(storage, { fromUserId: "owner" });
     if (outcome.kind !== "usage") throw new Error("expected a report");
-    expect(outcome.text).toContain("50% used");
+    expect(outcome.text).toContain("5 hours: 50% used");
   });
 
   test("does not accrue usage — asking is free", async () => {
