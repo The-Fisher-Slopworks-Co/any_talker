@@ -3,7 +3,7 @@
 
 import type { Storage } from "../storage/types";
 import type { AIMessage, AIUserContentPart } from "../ai/types";
-import type { Gender } from "../shared/types";
+import type { Gender, ToolCallRecord } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 import { localDateTimeString } from "../shared/tz";
 import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
@@ -158,6 +158,14 @@ export function buildReplyFallbackMessage(replyTarget: ReplyTarget): AIMessage {
   return { role: "user", content: header };
 }
 
+// Replays a past turn's tool calls as what they were. Each record becomes one
+// `tool` message, which `ai/responses-input.ts` expands back into the
+// provider's `function_call` / `function_call_output` pair — the model sees its
+// own call and the result it was given, in the same shape as when it made them.
+export function toolCallMessages(records: ToolCallRecord[]): AIMessage[] {
+  return records.map((r) => ({ role: "tool", ...r }));
+}
+
 export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
   const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
   const audios = args.audios ?? [];
@@ -179,6 +187,10 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
         } else {
           messages.push({ role: "user", content: c.userQuestion });
         }
+        // Between the question and the answer, where the calls actually
+        // happened. Appending after the question rather than before it also
+        // keeps the cacheable prefix of every older turn byte-identical.
+        if (c.toolCalls) messages.push(...toolCallMessages(c.toolCalls));
         messages.push({ role: "assistant", content: c.botAnswer });
       }
     } else {
@@ -223,6 +235,7 @@ type ChainEntry = {
   userQuestion: string;
   botAnswer: string;
   userImageFileIds: string[] | undefined;
+  toolCalls: ToolCallRecord[] | undefined;
 };
 
 async function collectChain(
@@ -240,6 +253,7 @@ async function collectChain(
       userQuestion: node.userQuestion,
       botAnswer: node.botAnswer,
       userImageFileIds: node.userImageFileIds,
+      toolCalls: node.toolCalls,
     });
     cursor = node.parentBotMsgId;
   }

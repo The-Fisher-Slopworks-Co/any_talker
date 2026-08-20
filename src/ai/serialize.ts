@@ -16,6 +16,9 @@ export const VIDEO_SNAPSHOT_MARKER =
 export function serializeMessages(msgs: AIMessage[]): SerializedAIMessage[] {
   return msgs.map((m) => {
     if (m.role === "assistant") return { role: "assistant", content: m.content };
+    // A replayed tool call is four plain strings; the stored form is the live
+    // one, so it survives a snapshot untouched.
+    if (m.role === "tool") return m;
     if (typeof m.content === "string") {
       return { role: "user", content: m.content };
     }
@@ -50,6 +53,7 @@ export function deserializeMessages(
 ): AIMessage[] {
   return msgs.map((m) => {
     if (m.role === "assistant") return { role: "assistant", content: m.content };
+    if (m.role === "tool") return m;
     if (typeof m.content === "string") {
       return { role: "user", content: m.content };
     }

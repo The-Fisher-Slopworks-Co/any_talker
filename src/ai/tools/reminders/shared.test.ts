@@ -12,6 +12,15 @@ import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import { DEFAULT_SETTINGS } from "../../../shared/types";
 import type { ToolCallContext, ToolEffect } from "../registry";
 
+// The message union now also covers replayed tool calls, which carry `output`
+// rather than `content`. These fixtures never build one, so a hit here means a
+// broken fixture, not a case to handle.
+function contentOf<T extends { role: string }>(m: T): unknown {
+  if (!("content" in m)) throw new Error(`no content on a ${m.role} message`);
+  return (m as { content: unknown }).content;
+}
+
+
 const baseCtx: ToolCallContext = {
   source: "ask",
   chatId: "c1",
@@ -160,7 +169,7 @@ describe("persistReminder context capture", () => {
     const out = await persistReminder(storage, ctx, fireAtMs, "x");
     if (!out.ok) throw new Error("expected ok");
     const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
-    const parts = stored.contextMessages[0]!.content as Array<{
+    const parts = contentOf(stored.contextMessages[0]!) as Array<{
       type: string;
     }>;
     expect(parts[1]).toMatchObject({

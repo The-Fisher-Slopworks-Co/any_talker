@@ -578,6 +578,7 @@ export class MemoryStorage implements Storage {
     return {
       ...v,
       userImageFileIds: v.userImageFileIds ? [...v.userImageFileIds] : undefined,
+      toolCalls: v.toolCalls?.map((r) => ({ ...r })),
     };
   }
 
@@ -591,6 +592,7 @@ export class MemoryStorage implements Storage {
       userImageFileIds: node.userImageFileIds
         ? [...node.userImageFileIds]
         : undefined,
+      toolCalls: node.toolCalls?.map((r) => ({ ...r })),
     });
   }
 

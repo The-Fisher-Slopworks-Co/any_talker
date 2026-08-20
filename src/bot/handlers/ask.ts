@@ -3,6 +3,7 @@
 
 import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
+import type { ToolCallRecord } from "../../shared/types";
 import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
 import { recordDenial } from "../../spending/record";
@@ -162,6 +163,13 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     }
   }
 
+  // Tools this turn ran, filled once the model call returns and read by
+  // `persistTurn`, which the dispatcher invokes after the reply is sent. Same
+  // mutable-handle shape as the tool `effects` array in `ai/turn.ts`, and for
+  // the same reason: `persistTurn` is built before the ask so the error and
+  // rate-limit paths can persist a turn too.
+  let turnToolCalls: ToolCallRecord[] = [];
+
   // Persist this turn into the conversation graph under BOTH the bot's reply
   // message id and the user's ask message id (unique within a chat, so no
   // collision): a Telegram reply chain can pass through either side's message,
@@ -191,6 +199,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       ts: input.now,
       userImageFileIds:
         allImageFileIds.length > 0 ? allImageFileIds : undefined,
+      toolCalls: turnToolCalls.length > 0 ? turnToolCalls : undefined,
     };
     await Promise.all([
       convStorage.saveConversation(input.chatId, botMsgId, node),
@@ -299,6 +308,12 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       persistConversation: persistTurn,
     };
   }
+  // Set before the empty-answer check below, so a turn whose tools ran but
+  // whose final output came back blank still persists what they returned: the
+  // failure notice becomes `botAnswer`, and the next turn picks up from the
+  // material instead of re-fetching it. A turn that threw inside `runAiTurn`
+  // returned above with nothing to record.
+  turnToolCalls = result.toolCalls;
 
   // A model can legitimately finish with no text (e.g. an output-token cap hit
   // mid-reasoning). Surface it as an error turn — Telegram rejects empty

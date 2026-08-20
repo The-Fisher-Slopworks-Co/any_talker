@@ -1086,3 +1086,115 @@ describe("askHandler", () => {
     expect((await storage.getGlobalSpend(1_000)).day).toBe(0);
   });
 });
+
+// A tool's result used to die with the request that produced it: the node kept
+// the question and the answer, so the next turn had neither the fetched page
+// nor the URL to fetch it again, and filled the gap by inventing. These pin the
+// record onto the node.
+describe("askHandler — tool calls on the persisted turn", () => {
+  const RECORDS = [
+    {
+      callId: "call_1",
+      name: "fetch_page",
+      arguments: '{"url":"https://e.x"}',
+      output: '"# Page"',
+    },
+  ];
+
+  test("answered: the turn's tool calls are stored with it", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({
+      text: "hi back",
+      totalTokens: 10,
+      toolCalls: RECORDS,
+    });
+
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    if (out.kind !== "answered") return;
+    await out.persistConversation(999);
+
+    expect((await storage.getConversation("c1", 999))!.toolCalls).toEqual(
+      RECORDS,
+    );
+    // Both keys of the turn carry them, as with every other node field.
+    expect((await storage.getConversation("c1", 1))!.toolCalls).toEqual(RECORDS);
+  });
+
+  // An empty array would still be a key on the node and would change the
+  // rendered chain; a turn that called nothing must look exactly as before.
+  test("a turn that called no tools stores no key at all", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "hi", totalTokens: 10, toolCalls: [] });
+
+    const out = await askHandler(baseInput({ storage, ai }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(999);
+
+    expect((await storage.getConversation("c1", 999))!.toolCalls).toBeUndefined();
+  });
+
+  // The model can burn its whole turn on tools and come back with nothing to
+  // say. The material it gathered is still worth keeping — otherwise the retry
+  // pays for the same fetches again.
+  test("an empty answer still persists what the tools returned", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({ text: "  ", totalTokens: 10, toolCalls: RECORDS });
+
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("error");
+    if (out.kind !== "error") return;
+    await out.persistConversation(4, "AI error");
+
+    const node = await storage.getConversation("c1", 4);
+    expect(node!.botAnswer).toBe("AI error");
+    expect(node!.toolCalls).toEqual(RECORDS);
+  });
+
+  // End to end: turn 1 fetches, turn 2 replies into it and must see the page.
+  test("the next turn's prompt carries the previous turn's tool results", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    const first = await askHandler(
+      baseInput({
+        storage,
+        ai: new FakeAI({
+          text: "three of them got in",
+          totalTokens: 10,
+          toolCalls: [
+            {
+              callId: "call_1",
+              name: "fetch_page",
+              arguments: '{"url":"https://e.x"}',
+              output: '"Alice 113\\nBob 111\\nCarol 107"',
+            },
+          ],
+        }),
+      }),
+    );
+    if (first.kind !== "answered") throw new Error(`unexpected ${first.kind}`);
+    await first.persistConversation(999);
+
+    const ai = new FakeAI();
+    await askHandler(
+      baseInput({
+        storage,
+        ai,
+        userText: "you missed someone",
+        askMessageId: 2,
+        replyTarget: {
+          messageId: 999,
+          text: "three of them got in",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+
+    const sent = (ai.calls[0] as Parameters<AIClient["ask"]>[0]).messages;
+    expect(JSON.stringify(sent)).toContain("Carol 107");
+  });
+});
