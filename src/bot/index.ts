@@ -77,7 +77,7 @@ type AnswerGuestQuery = (args: {
 // Identifies a managed (non-main) bot. Its presence switches `createBot` into
 // managed mode: `/ask` is matched ONLY when explicitly addressed as `@self`,
 // and the bot's id scopes per-character storage + the tool call context.
-export type BotPersona = {
+type BotPersona = {
   botId: string;
 };
 

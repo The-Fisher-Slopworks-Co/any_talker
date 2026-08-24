@@ -32,7 +32,7 @@ import type { AccessDenyReason } from "../access";
 // Guest mode's silent denials: the access-gate reasons plus "empty" (nothing
 // to answer about — no text, no reply, no media). `reason` feeds the
 // dispatcher's log line; the guest sees no message in any of these cases.
-export type GuestDenyReason = AccessDenyReason | "empty";
+type GuestDenyReason = AccessDenyReason | "empty";
 
 export type GuestAskInput = {
   storage: Storage;
@@ -103,7 +103,7 @@ const normalizeForMatch = (s: string): string =>
 // (`answerGuestQuery` never returns the posted message's id), so the replied-to
 // text is the only link: continue the thread only when it matches, otherwise
 // the caller falls back to quoting the replied-to message verbatim.
-export function threadMatchesReply(
+function threadMatchesReply(
   thread: GuestThreadNode,
   replyText: string | null,
 ): boolean {

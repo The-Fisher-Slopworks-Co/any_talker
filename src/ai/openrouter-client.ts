@@ -55,13 +55,13 @@ export const MAX_SESSION_ID_LENGTH = 256;
 // model calls, so that is the number parity is measured on. Pinned by a test.
 export const MAX_TOOL_ROUNDS = 6;
 
-export const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 
 // The SDK's own defaults are `timeoutMs: -1` (none) and a retry budget of one
 // hour, which would hang an ask far past Telegram's typing window and past the
 // top bucket of `bot_ai_request_duration_seconds`. Both are set explicitly.
-export const DEFAULT_TIMEOUT_MS = 180_000;
-export const DEFAULT_RETRY_CONFIG: NonNullable<SDKOptions["retryConfig"]> = {
+const DEFAULT_TIMEOUT_MS = 180_000;
+const DEFAULT_RETRY_CONFIG: NonNullable<SDKOptions["retryConfig"]> = {
   strategy: "backoff",
   backoff: {
     initialInterval: 500,

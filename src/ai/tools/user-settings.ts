@@ -103,7 +103,7 @@ const UpdateSchema = z
 
 type UpdateInput = z.infer<typeof UpdateSchema>;
 
-export type UpdateUserSettingsOutput =
+type UpdateUserSettingsOutput =
   { ok: true; applied: UserSettingChange[] } | { ok: false; reason: string };
 
 function applyChange(

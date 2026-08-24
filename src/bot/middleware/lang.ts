@@ -5,7 +5,7 @@ import type { Context, MiddlewareFn } from "grammy";
 import type { Storage } from "../../storage/types";
 import { resolveLang, t, type Lang } from "../../shared/i18n";
 
-export type LangFlavor = {
+type LangFlavor = {
   lang: Lang;
   t: ReturnType<typeof t>;
 };

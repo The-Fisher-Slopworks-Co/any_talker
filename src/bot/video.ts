@@ -84,12 +84,12 @@ export type VideoKind = "video" | "video_note" | "animation";
 // transcodes uploads (and GIFs) into.
 export type VideoClip = { bytes: Uint8Array; mediaType: string };
 
-export const DEFAULT_VIDEO_MEDIA_TYPE = "video/mp4";
+const DEFAULT_VIDEO_MEDIA_TYPE = "video/mp4";
 
 // The slice of Telegram's Video / VideoNote / Animation objects this module
 // needs, kept structural (as `PhotoSizeLike` is) so nothing here depends on
 // grammY's types.
-export type VideoLike = {
+type VideoLike = {
   file_id: string;
   duration?: number;
   file_size?: number;

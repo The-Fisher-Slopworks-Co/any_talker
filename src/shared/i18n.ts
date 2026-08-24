@@ -25,7 +25,7 @@ export function resolveLang(
   return storedPref ?? normalizeLang(telegramCode) ?? DEFAULT_LANG;
 }
 
-export type ReminderTimeParts = {
+type ReminderTimeParts = {
   year: number;
   month: number;
   day: number;

@@ -51,7 +51,3 @@ export async function getBuildInfo(
   })();
   return cached;
 }
-
-export function resetBuildInfoCacheForTests(): void {
-  cached = null;
-}

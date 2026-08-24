@@ -11,7 +11,7 @@ import { fetchWithTimeout } from "../ai/tools/http";
 
 const OPENROUTER_TIMEOUT_MS = 10_000;
 
-export type ProxyEndpoint = {
+type ProxyEndpoint = {
   provider_name: string;
   // Routing slug for the provider (e.g. "deepinfra/fp4"). Distinct from the
   // human-readable provider_name and what `provider.order` expects.

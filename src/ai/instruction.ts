@@ -6,8 +6,6 @@ import type { RateLimitConfig, ReasoningEffort } from "../shared/types";
 
 export type DetailLevel = "short" | "wise";
 
-export const DEFAULT_DETAIL_LEVEL: DetailLevel = "short";
-
 export function detailLevelMultiplier(
   level: DetailLevel,
   rl: RateLimitConfig,

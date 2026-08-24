@@ -3,7 +3,7 @@
 
 import { timingSafeEqual } from "node:crypto";
 
-export type TelegramUser = {
+type TelegramUser = {
   id: number;
   first_name?: string;
   username?: string;

@@ -33,7 +33,7 @@ export function Toggle({
   );
 }
 
-export function PrimaryButton({
+function PrimaryButton({
   disabled,
   onClick,
   children,

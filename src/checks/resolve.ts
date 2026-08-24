@@ -8,7 +8,7 @@ import { applyAnswer, currentCount } from "./counter";
 import { escapeHtmlText } from "../bot/html";
 import { migratedChatId } from "../shared/chat-migration";
 
-export type CheckInlineKeyboardButton = {
+type CheckInlineKeyboardButton = {
   text: string;
   callback_data: string;
 };

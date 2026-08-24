@@ -32,15 +32,15 @@ function hasVisibleSpend(s: SpendSummary): boolean {
   return s.month >= VISIBLE_USD;
 }
 
-export type SpendRow = { id: string; label: string; spend: SpendSummary };
-export type ModelRow = {
+type SpendRow = { id: string; label: string; spend: SpendSummary };
+type ModelRow = {
   modelId: string;
   spend: SpendSummary;
   unpriced: boolean;
 };
-export type DeniedRow = { userId: string; label: string; count: number };
-export type NewEntity = { id: string; label: string; firstSeenAt: number };
-export type NewChatEntity = NewEntity & { type: ChatType };
+type DeniedRow = { userId: string; label: string; count: number };
+type NewEntity = { id: string; label: string; firstSeenAt: number };
+type NewChatEntity = NewEntity & { type: ChatType };
 
 // A cross-cutting snapshot of where the money and the denials are going, shared
 // by the periodic owner digest and the admin dashboard endpoint. O(users+chats)

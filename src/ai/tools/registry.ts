@@ -44,7 +44,7 @@ export type ToolCallContext = {
 // *object* schema; every tool here already uses `z.object(...)` (a `.refine()`d
 // object still satisfies the bound), so narrowing costs nothing and keeps
 // `execute`'s input typed.
-export type ToolParameters<TInput> = $ZodObject<$ZodShape> & z.ZodType<TInput>;
+type ToolParameters<TInput> = $ZodObject<$ZodShape> & z.ZodType<TInput>;
 
 export type Tool<TInput = unknown, TOutput = unknown> = {
   name: string;
