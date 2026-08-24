@@ -9,13 +9,15 @@
     "start": "bun ./src/main.ts",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
-    "check": "bun run typecheck && bun test"
+    "lint": "oxlint",
+    "check": "bun run typecheck && bun run lint && bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/turndown": "^5.0.6"
+    "@types/turndown": "^5.0.6",
+    "oxlint": "^1.80.0"
   },
   "peerDependencies": {
     "typescript": "^5"

@@ -15,7 +15,9 @@ export async function fetchWithTimeout(
     return await proxiedFetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     if (err instanceof DOMException && err.name === "TimeoutError") {
-      throw new Error(`${timeoutLabel} timed out after ${timeoutMs / 1000}s`);
+      throw new Error(`${timeoutLabel} timed out after ${timeoutMs / 1000}s`, {
+        cause: err,
+      });
     }
     throw err;
   }

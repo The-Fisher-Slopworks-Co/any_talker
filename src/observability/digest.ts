@@ -22,7 +22,7 @@ export function hasDigestActivity(o: SpendOverview): boolean {
 // `|` ends the cell, and the rest open emphasis / code / highlight / LaTeX /
 // HTML runs. Real labels hit this — a chat titled "да кто этот ваш Гатс _:|"
 // would eat its own row without escaping.
-const CELL_SYNTAX = /[\\`*_~\[\]|=$<]/g;
+const CELL_SYNTAX = /[\\`*_~[\]|=$<]/g;
 
 function cell(text: string): string {
   return text.replace(CELL_SYNTAX, (ch) => `\\${ch}`);

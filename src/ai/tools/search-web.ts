@@ -93,7 +93,9 @@ export function createSearchWebTool(apiKey: string, concurrency: number): Tool<I
           body = await readTextCapped(response, MAX_BODY_BYTES);
         } catch (err) {
           if (err instanceof DOMException && err.name === "TimeoutError") {
-            throw new Error(`Search timed out after ${TIMEOUT_MS / 1000}s`);
+            throw new Error(`Search timed out after ${TIMEOUT_MS / 1000}s`, {
+              cause: err,
+            });
           }
           throw err;
         }

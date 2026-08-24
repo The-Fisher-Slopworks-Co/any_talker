@@ -8,8 +8,9 @@ user-facing feature/metrics catalog. This file covers how to work in the code.
 
 ```bash
 bun run dev        # long-polling + hot reload (src/main.ts)
-bun run check      # typecheck + tests — run before every commit
+bun run check      # typecheck + lint + tests — run before every commit
 bun run typecheck  # bunx tsc --noEmit
+bun run lint       # oxlint (config: .oxlintrc.json)
 bun test           # tests (co-located *.test.ts)
 ```
 
