@@ -19,7 +19,7 @@ export type DisplayNameResult =
   | { ok: true; value: string | null }
   | { ok: false; reason: DisplayNameError };
 
-const ALLOWED_CHARS = /^[\p{L}\p{M}\p{Nd} .'\-]+$/u;
+const ALLOWED_CHARS = /^[\p{L}\p{M}\p{Nd} .'-]+$/u;
 const CONTROL_CHARS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}]/u;
 const HAS_LETTER = /\p{L}/u;
 const MULTILINE_CHARS = /[\n\r\t]/;

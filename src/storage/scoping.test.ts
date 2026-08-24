@@ -14,9 +14,9 @@ import type { Tool, ToolCallContext } from "../ai/tools/registry";
 // (`storage.forBot(ctx.botId)`) and could silently regress.
 
 function byName(tools: Tool[], name: string): Tool {
-  const t = tools.find((t) => t.name === name);
-  if (!t) throw new Error(`tool not found: ${name}`);
-  return t;
+  const tool = tools.find((candidate) => candidate.name === name);
+  if (!tool) throw new Error(`tool not found: ${name}`);
+  return tool;
 }
 
 function ctx(botId: string | null, over: Partial<ToolCallContext> = {}): ToolCallContext {

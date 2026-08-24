@@ -136,12 +136,12 @@ export function normalizeCheckInput(raw: unknown): NormalizedCheckInput {
 
   let counterAnchorDate: string | null = null;
   if (b.counterAnchorDate !== null && b.counterAnchorDate !== undefined) {
-    const raw =
+    const anchor =
       typeof b.counterAnchorDate === "string" ? b.counterAnchorDate.trim() : "";
-    if (raw === "") {
+    if (anchor === "") {
       counterAnchorDate = null;
-    } else if (isValidAnchorDate(raw)) {
-      counterAnchorDate = raw;
+    } else if (isValidAnchorDate(anchor)) {
+      counterAnchorDate = anchor;
     } else {
       return { ok: false, error: "counter_anchor_date_invalid" };
     }

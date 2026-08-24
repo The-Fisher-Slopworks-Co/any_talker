@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    // Every `.sort()` here runs on an array built one expression earlier —
+    // `[...x]`, `.map()`, `.filter()`, `Object.keys()` — so there is nothing
+    // shared left to mutate, and `toSorted()` would only add a copy.
+    "unicorn/no-array-sort": "off",
+    // Fires on every helper closure inside a `test()` body, which is where the
+    // test's own fixtures live. Hoisting them would scatter each test's setup.
+    "unicorn/consistent-function-scoping": "off",
+    // `reader.onload = …` is the canonical one-shot FileReader form, and the
+    // options `addEventListener` buys are the ones a single handler never uses.
+    "unicorn/prefer-add-event-listener": "off",
+    // A leading underscore marks the test-only escape hatches (`_reset…ForTest`)
+    // and the never-read exhaustiveness bindings. Both are deliberate.
+    "no-underscore-dangle": "off"
+  },
+  "ignorePatterns": ["node_modules"]
+}

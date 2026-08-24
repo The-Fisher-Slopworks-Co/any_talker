@@ -816,9 +816,9 @@ export async function handleApi(
       const next: Settings = {
         ...current,
         ...patch,
-        rateLimit: { ...current.rateLimit, ...(patch.rateLimit ?? {}) },
-        budget: { ...current.budget, ...(patch.budget ?? {}) },
-        anomaly: { ...current.anomaly, ...(patch.anomaly ?? {}) },
+        rateLimit: { ...current.rateLimit, ...patch.rateLimit },
+        budget: { ...current.budget, ...patch.budget },
+        anomaly: { ...current.anomaly, ...patch.anomaly },
       };
       await deps.storage.saveSettings(next);
       return { status: 200, body: next };

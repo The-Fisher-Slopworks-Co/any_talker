@@ -373,7 +373,7 @@ export function isValidTimezone(tz: string): boolean {
   if (TZ_VALID.has(tz)) return true;
   if (TZ_INVALID.has(tz)) return false;
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    Intl.DateTimeFormat("en-US", { timeZone: tz });
     TZ_VALID.add(tz);
     return true;
   } catch {

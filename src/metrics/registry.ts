@@ -233,7 +233,7 @@ export class Histogram implements Metric {
     if (!entry) {
       entry = {
         labels: { ...labels },
-        buckets: new Array(this.buckets.length).fill(0),
+        buckets: Array.from({ length: this.buckets.length }, () => 0),
         sum: 0,
         count: 0,
       };
