@@ -16,6 +16,9 @@ bun run knip       # unused files/exports/deps (config: knip.ts)
 bun test           # tests (co-located *.test.ts)
 ```
 
+`bun install` installs a lefthook pre-commit hook that runs the same gate
+(`lefthook.yml`, ~3s). `LEFTHOOK=0 git commit` skips it for one commit.
+
 ### Layout (`src/`)
 
 - `main.ts` — composition root: loads config, wires storage/ai/rateLimiter, registers tools, starts bot + HTTP server + schedulers.
