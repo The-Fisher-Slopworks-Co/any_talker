@@ -70,11 +70,11 @@ export type ApiDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ownerId: string;
-  modelCatalog?: ModelCatalog;
-  managedBots?: ManagedBotController;
+  modelCatalog?: ModelCatalog | undefined;
+  managedBots?: ManagedBotController | undefined;
   // Always wired in `main.ts`; an absent fetcher only happens on a DI mistake,
   // which the route answers with 503.
-  fetchProviderEndpoints?: FetchProviderEndpoints;
+  fetchProviderEndpoints?: FetchProviderEndpoints | undefined;
 };
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
@@ -839,7 +839,10 @@ export async function handleApi(
       if (typeof body.id !== "string" || body.id.length === 0) {
         return { status: 400, body: { error: "id required" } };
       }
-      await deps.storage.addWhitelist(kind, { id: body.id, label: body.label });
+      await deps.storage.addWhitelist(kind, {
+        id: body.id,
+        ...(body.label !== undefined && { label: body.label }),
+      });
       const list = await deps.storage.listWhitelist(kind);
       return { status: 200, body: list };
     }
@@ -867,7 +870,10 @@ export async function handleApi(
     if (body.id === deps.ownerId) {
       return { status: 400, body: { error: "cannot blacklist the owner" } };
     }
-    await deps.storage.addBlacklist({ id: body.id, label: body.label });
+    await deps.storage.addBlacklist({
+      id: body.id,
+      ...(body.label !== undefined && { label: body.label }),
+    });
     const users = await deps.storage.listBlacklist();
     return { status: 200, body: users };
   }

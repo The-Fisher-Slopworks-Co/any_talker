@@ -31,8 +31,8 @@ export function buildRichMarkdown(
   body: string,
   botName: string | null,
   opts: {
-    topBlock?: string;
-    collapseThreshold?: number;
+    topBlock?: string | undefined;
+    collapseThreshold?: number | undefined;
     detailsSummary: string;
   },
 ): RichContent {

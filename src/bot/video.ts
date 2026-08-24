@@ -334,7 +334,7 @@ export async function extractVideoMedia(args: {
   durationSec: number;
   maxFrames: number;
   withAudio: boolean;
-  spawn?: VideoSpawnFn;
+  spawn?: VideoSpawnFn | undefined;
 }): Promise<ExtractedVideo> {
   const spawn = args.spawn ?? defaultSpawn;
   const path = join(tmpdir(), `any-talker-video-${randomUUID()}`);
@@ -379,7 +379,7 @@ export async function fetchVideoParts(args: {
   mode: "native" | "frames";
   maxFrames: number;
   download?: (botToken: string, fileId: string) => Promise<Uint8Array>;
-  spawn?: VideoSpawnFn;
+  spawn?: VideoSpawnFn | undefined;
 }): Promise<VideoFetchOutcome> {
   const { video } = args;
   if (video.durationSec > MAX_VIDEO_SECONDS) {

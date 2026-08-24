@@ -89,16 +89,16 @@ export type BotDeps = {
   // Whether a model takes video input (`ModelCatalog.supportsVideoInput`).
   // Decides whether a clip is sent whole or as sampled frames — see
   // `resolveVideoMode`. Optional so a test bot can omit it (⇒ always frames).
-  supportsVideoInput?: (modelId: string) => Promise<boolean>;
+  supportsVideoInput?: ((modelId: string) => Promise<boolean>) | undefined;
   // Present for managed bots only; absent ⇒ the main bot.
-  persona?: BotPersona;
+  persona?: BotPersona | undefined;
   // The user ids of the OTHER family bots this bot should consider for routing.
   // For a managed bot: the main bot + every other managed bot — used both for
   // the alone-check and to recognize a bare `/ask` replying to a sibling. For
   // the main bot: the managed (character) bots (`BotManager.managedBotIds()`) —
   // it never needs the alone-check, but uses these to recognize a bare `/ask`
   // replying to a *present* character's message and defer to that character.
-  siblingBotIds?: () => string[];
+  siblingBotIds?: (() => string[]) | undefined;
   logFormat: LogFormat;
   logIncomingUpdates: boolean;
   logDebug: boolean;
@@ -783,9 +783,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     imageFileIds: string[];
     audios: Uint8Array[];
     // Whole clips, when the answering model takes video natively.
-    videos?: VideoClip[];
+    videos?: VideoClip[] | undefined;
     // Set when the media needs explaining — video frames aren't loose photos.
-    attachments?: string;
+    attachments?: string | undefined;
     replyToMessage: Message | undefined;
     quote: string | null;
     forwardOrigin: boolean;

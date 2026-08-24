@@ -105,7 +105,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   const res = await fetch(path, {
     method,
     headers: { ...authHeader(), "Content-Type": "application/json" },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    ...(body !== undefined && { body: JSON.stringify(body) }),
   });
   if (!res.ok) {
     let errorCode: string | null = null;

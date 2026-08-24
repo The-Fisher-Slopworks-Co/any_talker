@@ -50,13 +50,13 @@ export type GuestAskInput = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
-  audios?: Uint8Array[];
+  audios?: Uint8Array[] | undefined;
   // Whole clips, sent when the answering model advertises video input. Empty in
   // frames mode, where the clip already arrived as `images` + `audios`.
-  videos?: VideoClip[];
+  videos?: VideoClip[] | undefined;
   // Describes media the parts alone don't explain — video frames (see
   // `bot/video.ts`). Goes into the user envelope, so it is persisted too.
-  attachments?: string;
+  attachments?: string | undefined;
   imageFileIds: string[];
   replyImageFileIds: string[];
   // The message the guest query replied to. Guest threads only capture this
@@ -68,8 +68,8 @@ export type GuestAskInput = {
   replyTarget: ReplyTarget | null;
   priorThread: GuestThreadNode | null;
   lang: Lang;
-  onAIStart?: () => void;
-  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
+  onAIStart?: (() => void) | undefined;
+  fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
 };
 
 export type GuestAskOutcome =
@@ -318,9 +318,12 @@ export async function guestAskHandler(
         {
           userQuestion: envelope,
           botAnswer: body,
-          userImageFileIds:
-            allImageFileIds.length > 0 ? allImageFileIds : undefined,
-          toolCalls: result.toolCalls.length > 0 ? result.toolCalls : undefined,
+          // As in ask.ts: absent, never explicitly undefined — the stored turn
+          // uses key presence to tell "none" from "predates the field".
+          ...(allImageFileIds.length > 0 && {
+            userImageFileIds: allImageFileIds,
+          }),
+          ...(result.toolCalls.length > 0 && { toolCalls: result.toolCalls }),
         },
       ].slice(-MAX_REPLY_CHAIN_DEPTH);
       await storage.saveGuestThread(input.chatId, {

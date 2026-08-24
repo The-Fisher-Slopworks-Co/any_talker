@@ -81,11 +81,11 @@ export interface AIClient {
     system: string;
     messages: AIMessage[];
     tools: Tool[];
-    routing?: RoutingOptions;
-    reasoningEffort?: ReasoningEffort | null;
+    routing?: RoutingOptions | undefined;
+    reasoningEffort?: ReasoningEffort | null | undefined;
     // Stable id of the conversation this turn belongs to, so OpenRouter routes
     // the session stickily and keeps its prompt cache warm (`ai/session.ts`).
-    sessionId?: string | null;
+    sessionId?: string | null | undefined;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult>;
 }

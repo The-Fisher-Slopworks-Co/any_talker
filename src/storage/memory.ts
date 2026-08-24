@@ -577,8 +577,8 @@ export class MemoryStorage implements Storage {
     if (!v) return null;
     return {
       ...v,
-      userImageFileIds: v.userImageFileIds ? [...v.userImageFileIds] : undefined,
-      toolCalls: v.toolCalls?.map((r) => ({ ...r })),
+      ...(v.userImageFileIds && { userImageFileIds: [...v.userImageFileIds] }),
+      ...(v.toolCalls && { toolCalls: v.toolCalls.map((r) => ({ ...r })) }),
     };
   }
 
@@ -589,10 +589,12 @@ export class MemoryStorage implements Storage {
   ): Promise<void> {
     this.b.conversations.set(this.convKey(chatId, botMsgId), {
       ...node,
-      userImageFileIds: node.userImageFileIds
-        ? [...node.userImageFileIds]
-        : undefined,
-      toolCalls: node.toolCalls?.map((r) => ({ ...r })),
+      ...(node.userImageFileIds && {
+        userImageFileIds: [...node.userImageFileIds],
+      }),
+      ...(node.toolCalls && {
+        toolCalls: node.toolCalls.map((r) => ({ ...r })),
+      }),
     });
   }
 
