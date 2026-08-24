@@ -101,7 +101,11 @@ function authHeader(): Record<string, string> {
   return { Authorization: `tma ${initData}` };
 }
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function req<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(path, {
     method,
     headers: { ...authHeader(), "Content-Type": "application/json" },
@@ -129,15 +133,18 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export const api = {
   getSettings: () => req<Settings>("GET", "/api/settings"),
-  putSettings: (patch: Partial<Settings>) => req<Settings>("PUT", "/api/settings", patch),
+  putSettings: (patch: Partial<Settings>) =>
+    req<Settings>("PUT", "/api/settings", patch),
   getWhitelist: () =>
-    req<{ users: WhitelistEntry[]; chats: WhitelistEntry[] }>("GET", "/api/whitelist"),
+    req<{ users: WhitelistEntry[]; chats: WhitelistEntry[] }>(
+      "GET",
+      "/api/whitelist",
+    ),
   addWhitelist: (kind: WhitelistKind, entry: WhitelistEntry) =>
     req<WhitelistEntry[]>("POST", `/api/whitelist/${kind}`, entry),
   removeWhitelist: (kind: WhitelistKind, id: string) =>
     req<WhitelistEntry[]>("DELETE", `/api/whitelist/${kind}/${id}`),
-  getBlacklist: () =>
-    req<{ users: WhitelistEntry[] }>("GET", "/api/blacklist"),
+  getBlacklist: () => req<{ users: WhitelistEntry[] }>("GET", "/api/blacklist"),
   addBlacklist: (entry: WhitelistEntry) =>
     req<WhitelistEntry[]>("POST", "/api/blacklist", entry),
   removeBlacklist: (id: string) =>
@@ -201,15 +208,17 @@ export const api = {
       `/api/admin/chats/${id}`,
       settings,
     ),
-  listMyReminders: () =>
-    req<RemindersResponse>("GET", "/api/me/reminders"),
+  listMyReminders: () => req<RemindersResponse>("GET", "/api/me/reminders"),
   listMyBots: () => req<{ bots: FactBot[] }>("GET", "/api/me/bots"),
   listMyFacts: (scope: string) =>
     req<FactsResponse>("GET", `/api/me/facts/${scope}`),
   addMyFact: (scope: string, fact: UserFact) =>
     req<FactsResponse>("POST", `/api/me/facts/${scope}`, fact),
-  updateMyFact: (scope: string, key: string, patch: { value: string; newKey?: string }) =>
-    req<FactsResponse>("PUT", `/api/me/facts/${scope}/${key}`, patch),
+  updateMyFact: (
+    scope: string,
+    key: string,
+    patch: { value: string; newKey?: string },
+  ) => req<FactsResponse>("PUT", `/api/me/facts/${scope}/${key}`, patch),
   deleteMyFact: (scope: string, key: string) =>
     req<FactsResponse>("DELETE", `/api/me/facts/${scope}/${key}`),
   listUserFacts: (id: string, scope: string) =>

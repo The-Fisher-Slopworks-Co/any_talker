@@ -7,10 +7,7 @@ import {
   type LogFormat,
   type LogLevel,
 } from "../../log";
-import {
-  toolCallDurationSeconds,
-  toolCallsTotal,
-} from "../../metrics";
+import { toolCallDurationSeconds, toolCallsTotal } from "../../metrics";
 import type { Tool } from "./registry";
 
 export function withLogging<TIn, TOut>(

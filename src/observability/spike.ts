@@ -22,7 +22,10 @@ export function detectSpike(
   summary: SpendSummary,
   cfg: SpikeConfig,
 ): { isSpike: boolean; baseline: number } {
-  const baseline = Math.max((summary.week - summary.day) / 6, cfg.minBaselineUsd);
+  const baseline = Math.max(
+    (summary.week - summary.day) / 6,
+    cfg.minBaselineUsd,
+  );
   const isSpike =
     summary.day >= cfg.absoluteUsd ||
     summary.day >= baseline * cfg.velocityMultiplier;

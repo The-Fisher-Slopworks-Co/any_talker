@@ -220,7 +220,10 @@ export async function guestAskHandler(
   const priorTurns = priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
   const messages: AIMessage[] = [];
   for (const turn of priorTurns) {
-    const chainImages = await loadChainImages(turn.userImageFileIds, input.fetchPhoto);
+    const chainImages = await loadChainImages(
+      turn.userImageFileIds,
+      input.fetchPhoto,
+    );
     if (chainImages.length > 0) {
       messages.push({
         role: "user",

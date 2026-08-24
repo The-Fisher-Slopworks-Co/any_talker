@@ -10,7 +10,9 @@ export type BuildInfo = {
 
 const SHORT_LEN = 7;
 
-export function shortenCommit(commit: string | null | undefined): string | null {
+export function shortenCommit(
+  commit: string | null | undefined,
+): string | null {
   if (!commit) return null;
   const trimmed = commit.trim();
   if (trimmed.length === 0) return null;

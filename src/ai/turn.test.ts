@@ -97,7 +97,9 @@ describe("runAiTurn — request assembly", () => {
     const main = new FakeAI();
     const managed = new FakeAI();
     await runAiTurn(baseInput({ ai: main, botId: null, chatId: "-100123" }));
-    await runAiTurn(baseInput({ ai: managed, botId: "777", chatId: "-100123" }));
+    await runAiTurn(
+      baseInput({ ai: managed, botId: "777", chatId: "-100123" }),
+    );
     expect(main.calls[0]?.sessionId).not.toBe(managed.calls[0]?.sessionId);
   });
 

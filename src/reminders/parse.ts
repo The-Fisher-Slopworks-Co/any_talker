@@ -26,10 +26,7 @@ const SerializedAIUserContentPartSchema = z.discriminatedUnion("type", [
 const SerializedAIMessageSchema = z.discriminatedUnion("role", [
   z.object({
     role: z.literal("user"),
-    content: z.union([
-      z.string(),
-      z.array(SerializedAIUserContentPartSchema),
-    ]),
+    content: z.union([z.string(), z.array(SerializedAIUserContentPartSchema)]),
   }),
   z.object({
     role: z.literal("assistant"),

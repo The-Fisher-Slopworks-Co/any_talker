@@ -86,10 +86,7 @@ export async function deliverReminder(
     // (parseStoredReminder quarantines bad records before they reach this
     // path), so remaining throws here are AI/storage/network failures —
     // transient retry on the next tick is correct.
-    console.error(
-      `[reminders] AI composition failed id=${reminder.id}:`,
-      err,
-    );
+    console.error(`[reminders] AI composition failed id=${reminder.id}:`, err);
     return "transient";
   }
 
@@ -187,10 +184,7 @@ async function composeReminderMessage(
   });
 
   const prior = deserializeMessages(reminder.contextMessages);
-  const messages: AIMessage[] = [
-    ...prior,
-    { role: "user", content: envelope },
-  ];
+  const messages: AIMessage[] = [...prior, { role: "user", content: envelope }];
 
   const toolSource: "ask" | "guest" =
     reminder.target.kind === "ask_reply" ? "ask" : "guest";

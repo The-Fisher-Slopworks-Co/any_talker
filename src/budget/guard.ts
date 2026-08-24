@@ -35,7 +35,8 @@ export class SpendBudgetGuard implements BudgetGuard {
       checkNewUser ? this.storage.getUser(userId) : Promise.resolve(null),
     ]);
 
-    if (global.month >= config.globalMonthlyCapUsd) return this.deny("globalMonthly");
+    if (global.month >= config.globalMonthlyCapUsd)
+      return this.deny("globalMonthly");
     if (global.day >= config.globalDailyCapUsd) return this.deny("globalDaily");
     if (chat.day >= config.perChatDailyCapUsd) return this.deny("chatDaily");
 
@@ -48,7 +49,8 @@ export class SpendBudgetGuard implements BudgetGuard {
       now - user.firstSeenAt < config.newUserWindowDays * MS_PER_DAY
     ) {
       const userSpend = await this.storage.getUserSpend(userId, now);
-      if (userSpend.day >= config.newUserDailyCapUsd) return this.deny("newUser");
+      if (userSpend.day >= config.newUserDailyCapUsd)
+        return this.deny("newUser");
     }
 
     return { allowed: true };

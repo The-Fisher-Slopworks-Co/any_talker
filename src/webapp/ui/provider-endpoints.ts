@@ -103,7 +103,9 @@ export function pickEndpointBySort(
 ): ProviderEndpoint | null {
   if (endpoints.length === 0) return null;
   if (sort === "price") {
-    const best = endpoints.reduce((a, e) => (priceSum(e) < priceSum(a) ? e : a));
+    const best = endpoints.reduce((a, e) =>
+      priceSum(e) < priceSum(a) ? e : a,
+    );
     return priceSum(best) === Infinity ? null : best;
   }
   if (sort === "throughput") {

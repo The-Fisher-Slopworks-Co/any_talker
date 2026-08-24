@@ -13,7 +13,6 @@ function contentOf<T extends { role: string }>(m: T): unknown {
   return (m as { content: unknown }).content;
 }
 
-
 const SENDER = {
   firstName: "John",
   lastName: "Doe",
@@ -40,7 +39,9 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(msgs).toEqual([{ role: "user", content: envelope({ text: "hello" }) }]);
+    expect(msgs).toEqual([
+      { role: "user", content: envelope({ text: "hello" }) },
+    ]);
   });
 
   test("envelope contains author, quote, text in that exact order", async () => {
@@ -56,7 +57,11 @@ describe("buildContext", () => {
       images: [],
     });
     expect(contentOf(msgs[0]!)).toBe(
-      JSON.stringify({ author: "John Doe", quote: "to be or not to be", text: "what does this mean" }),
+      JSON.stringify({
+        author: "John Doe",
+        quote: "to be or not to be",
+        text: "what does this mean",
+      }),
     );
     // Field order check (the keys must come out as author, quote, text):
     expect(Object.keys(JSON.parse(contentOf(msgs[0]!) as string))).toEqual([
@@ -107,7 +112,12 @@ describe("buildContext", () => {
       sentAt: null,
       storage,
       chatId: "c1",
-      sender: { firstName: "Alice", lastName: null, nameOverride: null, gender: null },
+      sender: {
+        firstName: "Alice",
+        lastName: null,
+        nameOverride: null,
+        gender: null,
+      },
       userText: "hi",
       quote: null,
       replyTarget: null,
@@ -122,7 +132,12 @@ describe("buildContext", () => {
       sentAt: null,
       storage,
       chatId: "c1",
-      sender: { firstName: "John", lastName: "Doe", nameOverride: "Pseudonym", gender: null },
+      sender: {
+        firstName: "John",
+        lastName: "Doe",
+        nameOverride: "Pseudonym",
+        gender: null,
+      },
       userText: "hi",
       quote: null,
       replyTarget: null,
@@ -137,7 +152,12 @@ describe("buildContext", () => {
       sentAt: null,
       storage,
       chatId: "c1",
-      sender: { firstName: "John", lastName: "Doe", nameOverride: "   ", gender: null },
+      sender: {
+        firstName: "John",
+        lastName: "Doe",
+        nameOverride: "   ",
+        gender: null,
+      },
       userText: "hi",
       quote: null,
       replyTarget: null,
@@ -152,7 +172,12 @@ describe("buildContext", () => {
       sentAt: null,
       storage,
       chatId: "c1",
-      sender: { firstName: "Саша", lastName: null, nameOverride: null, gender: "female" },
+      sender: {
+        firstName: "Саша",
+        lastName: null,
+        nameOverride: null,
+        gender: "female",
+      },
       userText: "привет",
       quote: null,
       replyTarget: null,
@@ -209,7 +234,12 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "what does that mean",
       quote: null,
-      replyTarget: { messageId: 999, text: "to be or not to be", authorFirstName: "Alice", images: [] },
+      replyTarget: {
+        messageId: 999,
+        text: "to be or not to be",
+        authorFirstName: "Alice",
+        images: [],
+      },
       images: [],
     });
     expect(msgs).toEqual([
@@ -236,7 +266,12 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "follow-up",
       quote: null,
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 100,
+        text: "A1",
+        authorFirstName: "Bot",
+        images: [],
+      },
       images: [],
     });
     expect(msgs).toEqual([
@@ -267,7 +302,12 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "Q3",
       quote: null,
-      replyTarget: { messageId: 200, text: "A2", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 200,
+        text: "A2",
+        authorFirstName: "Bot",
+        images: [],
+      },
       images: [],
     });
     expect(msgs).toEqual([
@@ -288,11 +328,19 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "hi",
       quote: null,
-      replyTarget: { messageId: 500, text: "old bot reply", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 500,
+        text: "old bot reply",
+        authorFirstName: "Bot",
+        images: [],
+      },
       images: [],
     });
     expect(msgs).toEqual([
-      { role: "user", content: "Context (replied message from Bot): old bot reply" },
+      {
+        role: "user",
+        content: "Context (replied message from Bot): old bot reply",
+      },
       { role: "user", content: envelope({ text: "hi" }) },
     ]);
   });
@@ -317,7 +365,12 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "next",
       quote: null,
-      replyTarget: { messageId: depth, text: `A${depth}`, authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: depth,
+        text: `A${depth}`,
+        authorFirstName: "Bot",
+        images: [],
+      },
       images: [],
       maxDepth: 5,
     });
@@ -380,7 +433,12 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "what is this",
       quote: null,
-      replyTarget: { messageId: 12, text: null, authorFirstName: "Alice", images: [] },
+      replyTarget: {
+        messageId: 12,
+        text: null,
+        authorFirstName: "Alice",
+        images: [],
+      },
       images: [],
     });
     expect(msgs[0]).toEqual({
@@ -398,11 +456,19 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "",
       quote: null,
-      replyTarget: { messageId: 999, text: "what is 2+2?", authorFirstName: "Alice", images: [] },
+      replyTarget: {
+        messageId: 999,
+        text: "what is 2+2?",
+        authorFirstName: "Alice",
+        images: [],
+      },
       images: [],
     });
     expect(msgs).toEqual([
-      { role: "user", content: "Context (replied message from Alice): what is 2+2?" },
+      {
+        role: "user",
+        content: "Context (replied message from Alice): what is 2+2?",
+      },
     ]);
   });
 
@@ -421,7 +487,12 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "",
       quote: null,
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 100,
+        text: "A1",
+        authorFirstName: "Bot",
+        images: [],
+      },
       images: [],
     });
     // Without the trailing envelope the prompt would end on an assistant
@@ -456,7 +527,10 @@ describe("buildContext", () => {
       {
         role: "user",
         content: [
-          { type: "text", text: "Context (replied message from Alice): <media>" },
+          {
+            type: "text",
+            text: "Context (replied message from Alice): <media>",
+          },
           { type: "image", image: replyBytes, mediaType: "image/jpeg" },
         ],
       },
@@ -481,7 +555,10 @@ describe("buildContext", () => {
       {
         role: "user",
         content: [
-          { type: "text", text: envelope({ text: "what is on this picture?" }) },
+          {
+            type: "text",
+            text: envelope({ text: "what is on this picture?" }),
+          },
           { type: "image", image: bytes, mediaType: "image/jpeg" },
         ],
       },
@@ -594,13 +671,21 @@ describe("buildContext", () => {
       sender: SENDER,
       userText: "",
       quote: "explain this part",
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 100,
+        text: "A1",
+        authorFirstName: "Bot",
+        images: [],
+      },
       images: [],
     });
     expect(msgs).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
-      { role: "user", content: envelope({ quote: "explain this part", text: "" }) },
+      {
+        role: "user",
+        content: envelope({ quote: "explain this part", text: "" }),
+      },
     ]);
   });
 
@@ -687,7 +772,12 @@ describe("buildContext", () => {
       userText: "follow-up",
       quote: null,
       images: [],
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 100,
+        text: "A1",
+        authorFirstName: "Bot",
+        images: [],
+      },
       fetchPhoto,
     });
     expect(fetched).toEqual(["f1", "f2"]);
@@ -722,7 +812,12 @@ describe("buildContext", () => {
       userText: "x",
       quote: null,
       images: [],
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 100,
+        text: "A1",
+        authorFirstName: "Bot",
+        images: [],
+      },
       fetchPhoto: async () => null,
     });
     expect(msgs[0]).toEqual({ role: "user", content: "Q" });
@@ -745,7 +840,12 @@ describe("buildContext", () => {
       userText: "x",
       quote: null,
       images: [],
-      replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+      replyTarget: {
+        messageId: 100,
+        text: "A1",
+        authorFirstName: "Bot",
+        images: [],
+      },
     });
     expect(msgs[0]).toEqual({ role: "user", content: "Q" });
   });

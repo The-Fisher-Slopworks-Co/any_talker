@@ -186,7 +186,10 @@ export interface Storage {
   getChatSettings(chatId: string): Promise<ChatSettings | null>;
   saveChatSettings(chatId: string, settings: ChatSettings): Promise<void>;
 
-  getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null>;
+  getConversation(
+    chatId: string,
+    botMsgId: number,
+  ): Promise<ConversationNode | null>;
   saveConversation(
     chatId: string,
     botMsgId: number,

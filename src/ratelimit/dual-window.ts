@@ -5,10 +5,7 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter, CheckResult } from "./types";
 import type { RateLimitConfig } from "../shared/types";
 import { summarizeUsage, currentWindowStarts } from "./window";
-import {
-  rateLimitChecksTotal,
-  rateLimitTokensDeductedTotal,
-} from "../metrics";
+import { rateLimitChecksTotal, rateLimitTokensDeductedTotal } from "../metrics";
 
 // Per-user dual fixed-window limiter (5-hour + weekly). `check` is read-only —
 // the window math is deterministic, so the only persisted state is the spent

@@ -10,7 +10,9 @@ const originalDnsLookup = Bun.dns.lookup;
 const originalFetch = globalThis.fetch;
 
 function mockDns(answers: DnsAnswer[] | ((host: string) => DnsAnswer[])) {
-  (Bun.dns as { lookup: typeof Bun.dns.lookup }).lookup = (async (host: string) => {
+  (Bun.dns as { lookup: typeof Bun.dns.lookup }).lookup = (async (
+    host: string,
+  ) => {
     const out = typeof answers === "function" ? answers(host) : answers;
     return out;
   }) as typeof Bun.dns.lookup;
@@ -24,7 +26,9 @@ const fetchSpy = mock(
 beforeEach(() => {
   globalThis.fetch = fetchSpy as unknown as typeof fetch;
   fetchSpy.mockReset();
-  fetchSpy.mockImplementation(() => Promise.resolve(new Response("ok", { status: 200 })));
+  fetchSpy.mockImplementation(() =>
+    Promise.resolve(new Response("ok", { status: 200 })),
+  );
 });
 
 afterEach(() => {
@@ -118,8 +122,14 @@ describe("safeFetch DNS pinning", () => {
     expect(typeof bunInit.tls?.checkServerIdentity).toBe("function");
     // The override must validate against the original hostname — not the IP —
     // otherwise rebinding to a private IP at TLS time would still slip past.
-    const wrongCert = { subject: { CN: "attacker.invalid" }, subjectaltname: "DNS:attacker.invalid" };
-    const err = bunInit.tls!.checkServerIdentity!("203.0.113.10", wrongCert as never);
+    const wrongCert = {
+      subject: { CN: "attacker.invalid" },
+      subjectaltname: "DNS:attacker.invalid",
+    };
+    const err = bunInit.tls!.checkServerIdentity!(
+      "203.0.113.10",
+      wrongCert as never,
+    );
     expect(err).toBeInstanceOf(Error);
     expect(err!.message).toContain("example.test");
   });

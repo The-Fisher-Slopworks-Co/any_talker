@@ -59,10 +59,14 @@ describe("usageShare", () => {
   });
 
   test("rounds to whole percents", () => {
-    expect(usageShare(status(win(126, 1000), win(0, 10)), false).fiveHour
-      .usedPercent).toBe(13);
-    expect(usageShare(status(win(124, 1000), win(0, 10)), false).fiveHour
-      .usedPercent).toBe(12);
+    expect(
+      usageShare(status(win(126, 1000), win(0, 10)), false).fiveHour
+        .usedPercent,
+    ).toBe(13);
+    expect(
+      usageShare(status(win(124, 1000), win(0, 10)), false).fiveHour
+        .usedPercent,
+    ).toBe(12);
   });
 
   test("any spend shows as at least 1%, never a 0% bar", () => {
@@ -90,16 +94,13 @@ describe("usageShare", () => {
   });
 
   test("passes the exempt flag through", () => {
-    expect(
-      usageShare(status(win(0, 1000), win(0, 10_000)), true).exempt,
-    ).toBe(true);
+    expect(usageShare(status(win(0, 1000), win(0, 10_000)), true).exempt).toBe(
+      true,
+    );
   });
 
   test("composes with summarizeUsage on a fresh user", () => {
-    const share = usageShare(
-      summarizeUsage("u1", CONFIG, null, NOW),
-      false,
-    );
+    const share = usageShare(summarizeUsage("u1", CONFIG, null, NOW), false);
     expect(share.fiveHour.usedPercent).toBe(0);
     expect(share.weekly.remainingPercent).toBe(100);
     expect(share.fiveHour.resetMs).toBeGreaterThan(NOW);

@@ -9,7 +9,12 @@ import {
   type FactsResponse,
   type UserFact,
 } from "../api-client";
-import { Card, SectionFooter, SectionHeader, Stack } from "../components/layout";
+import {
+  Card,
+  SectionFooter,
+  SectionHeader,
+  Stack,
+} from "../components/layout";
 import { EmptyState, LoadingState } from "../components/states";
 import { RowButton } from "../components/controls";
 import { NavRow, SelectRow } from "../components/select-row";

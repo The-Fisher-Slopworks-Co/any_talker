@@ -59,7 +59,10 @@ function spendRow(label: string, spend: SpendSummary): string[] {
 // spend rankings as tables — the previous "$X ($Y/d)" text lines put the two
 // windows the owner compares into one cramped column. Returns null when there's
 // nothing to report (see `hasDigestActivity`).
-export function buildDigestMarkdown(o: SpendOverview, lang: Lang): string | null {
+export function buildDigestMarkdown(
+  o: SpendOverview,
+  lang: Lang,
+): string | null {
   if (!hasDigestActivity(o)) return null;
   const s = t(lang);
   const lines: string[] = [

@@ -43,7 +43,9 @@ class FakeAI implements AIClient {
 
 class FakeApi implements ReminderApi {
   calls: { chat_id: string | number }[] = [];
-  constructor(private readonly impl: () => Promise<unknown> = async () => ({})) {}
+  constructor(
+    private readonly impl: () => Promise<unknown> = async () => ({}),
+  ) {}
   async sendRichMessage(params: { chat_id: string | number }) {
     this.calls.push({ chat_id: params.chat_id });
     return this.impl();
@@ -91,7 +93,13 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
 
     expect(api.calls).toHaveLength(1);
     expect(ai.calls).toBe(1);
@@ -107,7 +115,13 @@ describe("runReminderTick", () => {
     });
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
     expect((await storage.fetchDueReminders(1_000)).map((r) => r.id)).toEqual([
       "due",
     ]);
@@ -121,7 +135,13 @@ describe("runReminderTick", () => {
       throw new Error("ai down");
     });
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
     expect(api.calls).toEqual([]);
     expect((await storage.fetchDueReminders(1_000)).map((r) => r.id)).toEqual([
       "due",
@@ -136,7 +156,13 @@ describe("runReminderTick", () => {
     });
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
     expect(await storage.fetchDueReminders(1_000)).toEqual([]);
   });
 
@@ -146,7 +172,13 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
     expect(api.calls).toEqual([]);
     expect(ai.calls).toBe(0);
   });
@@ -158,7 +190,13 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
 
     expect(api.calls).toEqual([]);
     expect(ai.calls).toBe(0);
@@ -173,7 +211,13 @@ describe("runReminderTick", () => {
     const api = new FakeApi();
     const ai = new FakeAI();
 
-    await runReminderTick({ runtimes: runtimes(storage, api), ai, rateLimiter: testRateLimiter, ownerId: "owner", nowMs: 1_000 });
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
 
     expect(api.calls).toHaveLength(3);
     expect(ai.calls).toBe(3);

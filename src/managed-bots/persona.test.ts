@@ -48,7 +48,10 @@ test("managed resolver: global settings + character prompt, no name prefix, igno
 
 test("managed resolver: falls back to global settings if the record vanished", async () => {
   const storage = new MemoryStorage();
-  await storage.saveSettings({ ...DEFAULT_SETTINGS, systemPrompt: "global prompt" });
+  await storage.saveSettings({
+    ...DEFAULT_SETTINGS,
+    systemPrompt: "global prompt",
+  });
 
   const { settings, botName } = await createManagedPersonaResolver(
     storage,
@@ -71,9 +74,8 @@ test("main resolver: effective settings (global + chat override) + chat botName"
     botName: "ChatName",
   });
 
-  const { settings, botName } = await createMainPersonaResolver(storage)(
-    "chat-1",
-  );
+  const { settings, botName } =
+    await createMainPersonaResolver(storage)("chat-1");
 
   expect(settings.systemPrompt).toBe("chat override");
   expect(botName).toBe("ChatName");

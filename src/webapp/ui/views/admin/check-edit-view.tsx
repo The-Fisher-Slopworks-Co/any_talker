@@ -312,7 +312,10 @@ export function CheckEditView({
           selected={draft.counterAnchorDate !== null}
           onSelect={() => {
             if (draft.counterAnchorDate === null) {
-              set("counterAnchorDate", localDateString(Date.now(), draft.timezone));
+              set(
+                "counterAnchorDate",
+                localDateString(Date.now(), draft.timezone),
+              );
             }
           }}
         />
@@ -378,10 +381,7 @@ export function CheckEditView({
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_check_enabled_label}</span>
           <span className="flex-1" />
-          <Toggle
-            value={draft.enabled}
-            onChange={(v) => set("enabled", v)}
-          />
+          <Toggle value={draft.enabled} onChange={(v) => set("enabled", v)} />
         </div>
       </Card>
       <SectionFooter>{s.ui_check_enabled_footer}</SectionFooter>
@@ -410,9 +410,7 @@ export function CheckEditView({
       )}
 
       {error && (
-        <SectionFooter>
-          {s.ui_check_save_validation_error(error)}
-        </SectionFooter>
+        <SectionFooter>{s.ui_check_save_validation_error(error)}</SectionFooter>
       )}
 
       <SaveButton

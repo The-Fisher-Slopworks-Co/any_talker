@@ -27,7 +27,9 @@ async function exhaustUsage(
 }
 
 class FakeAI implements AIClient {
-  constructor(public reply: AskResult = { text: "guest reply", totalTokens: 50 }) {}
+  constructor(
+    public reply: AskResult = { text: "guest reply", totalTokens: 50 },
+  ) {}
   calls: unknown[] = [];
   async ask(opts: Parameters<AIClient["ask"]>[0]): Promise<AskResult> {
     this.calls.push(opts);
@@ -52,7 +54,12 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
     now: 1_000,
     chatId: "c1",
     userId: "42",
-    sender: { firstName: "Jane", lastName: null, nameOverride: null, gender: null },
+    sender: {
+      firstName: "Jane",
+      lastName: null,
+      nameOverride: null,
+      gender: null,
+    },
     userText: "hello",
     quote: null,
     images: [],
@@ -146,12 +153,9 @@ describe("guestAskHandler", () => {
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "42", 1000);
     const rl = new DualWindowLimiter(rlStorage);
-    const out = await guestAskHandler(
-      baseInput({ storage, rateLimiter: rl }),
-    );
+    const out = await guestAskHandler(baseInput({ storage, rateLimiter: rl }));
     expect(out.kind).toBe("rateLimited");
-    if (out.kind === "rateLimited")
-      expect(out.msUntilReset).toBeGreaterThan(0);
+    if (out.kind === "rateLimited") expect(out.msUntilReset).toBeGreaterThan(0);
   });
 
   test("answered: records reported costUsd to the user's spend", async () => {
@@ -193,7 +197,11 @@ describe("guestAskHandler", () => {
       chatId: "c1",
       turns: [
         {
-          userQuestion: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+          userQuestion: JSON.stringify({
+            author: "Jane",
+            time: SENT_AT,
+            text: "hello",
+          }),
           botAnswer: "the answer",
         },
       ],
@@ -217,12 +225,21 @@ describe("guestAskHandler", () => {
         },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
-      { role: "user", content: "Context (replied message from Bob): how are you?" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        content: "Context (replied message from Bob): how are you?",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
       },
     ]);
   });
@@ -235,10 +252,17 @@ describe("guestAskHandler", () => {
       baseInput({
         storage,
         ai,
-        replyTarget: { messageId: 7, text: null, authorFirstName: null, images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: null,
+          authorFirstName: null,
+          images: [],
+        },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages[0]).toEqual({
       role: "user",
       content: "Context (replied message from unknown): <media>",
@@ -259,16 +283,27 @@ describe("guestAskHandler", () => {
         storage,
         ai,
         priorThread,
-        replyTarget: { messageId: 7, text: "A1", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: "A1",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        content: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
       },
     ]);
   });
@@ -289,15 +324,26 @@ describe("guestAskHandler", () => {
         storage,
         ai,
         priorThread,
-        replyTarget: { messageId: 7, text: "Привет", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: "Привет",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       { role: "user", content: "Context (replied message from Bot): Привет" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        content: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
       },
     ]);
   });
@@ -317,7 +363,12 @@ describe("guestAskHandler", () => {
         ai,
         priorThread,
         now: 2000,
-        replyTarget: { messageId: 7, text: "Привет", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: "Привет",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
     if (out.kind !== "answered") throw new Error("expected answered");
@@ -325,7 +376,11 @@ describe("guestAskHandler", () => {
     const stored = await storage.getGuestThread("c1");
     expect(stored?.turns).toEqual([
       {
-        userQuestion: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        userQuestion: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
         botAnswer: "fresh answer",
       },
     ]);
@@ -354,13 +409,19 @@ describe("guestAskHandler", () => {
         },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "**Привет,** _Jane_!" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        content: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
       },
     ]);
   });
@@ -379,10 +440,17 @@ describe("guestAskHandler", () => {
         storage,
         ai,
         priorThread,
-        replyTarget: { messageId: 7, text: null, authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: null,
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages[0]).toEqual({
       role: "user",
       content: "Context (replied message from Bot): <media>",
@@ -403,16 +471,27 @@ describe("guestAskHandler", () => {
         storage,
         ai,
         priorThread,
-        replyTarget: { messageId: 7, text: "👍", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: "👍",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "👍" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        content: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
       },
     ]);
   });
@@ -426,7 +505,12 @@ describe("guestAskHandler", () => {
         storage,
         ai,
         userText: "",
-        replyTarget: { messageId: 7, text: "hi", authorFirstName: "Bob", images: [] },
+        replyTarget: {
+          messageId: 7,
+          text: "hi",
+          authorFirstName: "Bob",
+          images: [],
+        },
       }),
     );
     expect(out.kind).toBe("answered");
@@ -453,14 +537,29 @@ describe("guestAskHandler", () => {
     const img = new Uint8Array([1, 2]);
     const voice = new Uint8Array([3, 4]);
     await guestAskHandler(
-      baseInput({ storage, ai, images: [img], audios: [voice], imageFileIds: ["f1"] }),
+      baseInput({
+        storage,
+        ai,
+        images: [img],
+        audios: [voice],
+        imageFileIds: ["f1"],
+      }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       {
         role: "user",
         content: [
-          { type: "text", text: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }) },
+          {
+            type: "text",
+            text: JSON.stringify({
+              author: "Jane",
+              time: SENT_AT,
+              text: "hello",
+            }),
+          },
           { type: "image", image: img, mediaType: "image/jpeg" },
           { type: "audio", audio: voice, mediaType: "audio/mp3" },
         ],
@@ -487,7 +586,9 @@ describe("guestAskHandler", () => {
         },
       }),
     );
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages[0]).toEqual({
       role: "user",
       content: [
@@ -514,7 +615,11 @@ describe("guestAskHandler", () => {
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistThread();
     const stored = await storage.getGuestThread("c1");
-    expect(stored?.turns[0]?.userImageFileIds).toEqual(["own1", "reply1", "reply2"]);
+    expect(stored?.turns[0]?.userImageFileIds).toEqual([
+      "own1",
+      "reply1",
+      "reply2",
+    ]);
   });
 
   test("prior-turn image file ids are re-fetched and attached to the chain", async () => {
@@ -525,7 +630,9 @@ describe("guestAskHandler", () => {
     const fetched: string[] = [];
     const priorThread = {
       chatId: "c1",
-      turns: [{ userQuestion: "Q1", botAnswer: "A1", userImageFileIds: ["old1"] }],
+      turns: [
+        { userQuestion: "Q1", botAnswer: "A1", userImageFileIds: ["old1"] },
+      ],
       ts: 500,
     };
     await guestAskHandler(
@@ -540,7 +647,9 @@ describe("guestAskHandler", () => {
       }),
     );
     expect(fetched).toEqual(["old1"]);
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages[0]).toEqual({
       role: "user",
       content: [
@@ -556,7 +665,9 @@ describe("guestAskHandler", () => {
     await storage.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await guestAskHandler(baseInput({ storage, ai, quote: "как дела" }));
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       {
         role: "user",
@@ -580,13 +691,19 @@ describe("guestAskHandler", () => {
       ts: 500,
     };
     await guestAskHandler(baseInput({ storage, ai, priorThread }));
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       {
         role: "user",
-        content: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        content: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
       },
     ]);
   });
@@ -609,7 +726,11 @@ describe("guestAskHandler", () => {
     expect(stored?.turns).toEqual([
       { userQuestion: "Q1", botAnswer: "A1" },
       {
-        userQuestion: JSON.stringify({ author: "Jane", time: SENT_AT, text: "hello" }),
+        userQuestion: JSON.stringify({
+          author: "Jane",
+          time: SENT_AT,
+          text: "hello",
+        }),
         botAnswer: "second answer",
       },
     ]);
@@ -620,17 +741,22 @@ describe("guestAskHandler", () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "newest", totalTokens: 1 });
-    const overflowTurns = Array.from({ length: MAX_REPLY_CHAIN_DEPTH + 5 }, (_, i) => ({
-      userQuestion: `Q${i}`,
-      botAnswer: `A${i}`,
-    }));
+    const overflowTurns = Array.from(
+      { length: MAX_REPLY_CHAIN_DEPTH + 5 },
+      (_, i) => ({
+        userQuestion: `Q${i}`,
+        botAnswer: `A${i}`,
+      }),
+    );
     const priorThread = { chatId: "c1", turns: overflowTurns, ts: 500 };
     const out = await guestAskHandler(
       baseInput({ storage, ai, priorThread, now: 2000 }),
     );
     if (out.kind !== "answered") throw new Error("expected answered");
 
-    const call = ai.calls[0] as { messages: { role: string; content: unknown }[] };
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
     expect(call.messages.length).toBe(MAX_REPLY_CHAIN_DEPTH * 2 + 1);
     expect(call.messages[0]).toEqual({
       role: "user",
@@ -671,7 +797,10 @@ describe("guestAskHandler", () => {
   test("answered.text is the raw AI Rich Markdown (no HTML sanitization)", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI({ text: "<b>bold</b> & raw <script>x</script>", totalTokens: 1 });
+    const ai = new FakeAI({
+      text: "<b>bold</b> & raw <script>x</script>",
+      totalTokens: 1,
+    });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.text).toBe("<b>bold</b> & raw <script>x</script>");
@@ -808,9 +937,7 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
         ai,
         priorThread: {
           chatId: "c1",
-          turns: [
-            { userQuestion: "Q1", botAnswer: "A1", toolCalls: RECORDS },
-          ],
+          turns: [{ userQuestion: "Q1", botAnswer: "A1", toolCalls: RECORDS }],
           ts: 500,
         },
         userText: "you missed someone",

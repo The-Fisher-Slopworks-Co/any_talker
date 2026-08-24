@@ -34,7 +34,9 @@ describe("capToolOutput", () => {
   // The model is handed this string; cutting the encoded form would leave it
   // reading a broken value.
   test("an oversized string result stays valid JSON", () => {
-    const capped = capToolOutput(JSON.stringify("y".repeat(TOOL_OUTPUT_MAX * 2)));
+    const capped = capToolOutput(
+      JSON.stringify("y".repeat(TOOL_OUTPUT_MAX * 2)),
+    );
     const decoded: unknown = JSON.parse(capped);
     expect(typeof decoded).toBe("string");
     expect(decoded as string).toContain(`${TOOL_OUTPUT_MAX * 2} chars total`);
@@ -42,7 +44,9 @@ describe("capToolOutput", () => {
 
   test("an oversized object result degrades to a truncated JSON string", () => {
     const capped = capToolOutput(
-      JSON.stringify({ rows: Array.from({ length: 2000 }, (_, i) => `row ${i}`) }),
+      JSON.stringify({
+        rows: Array.from({ length: 2000 }, (_, i) => `row ${i}`),
+      }),
     );
     const decoded: unknown = JSON.parse(capped);
     expect(typeof decoded).toBe("string");
@@ -90,15 +94,19 @@ describe("extractToolCalls", () => {
   // Replaying a call the request has no result for is a malformed request, so
   // a half-formed pair must never reach storage in the first place.
   test("a call with no output is dropped", () => {
-    expect(extractToolCalls([call("call_a"), call("call_b"), output("call_b")], none))
-      .toEqual([
-        {
-          callId: "call_b",
-          name: "echo",
-          arguments: '{"value":"call_b"}',
-          output: '"ok"',
-        },
-      ]);
+    expect(
+      extractToolCalls(
+        [call("call_a"), call("call_b"), output("call_b")],
+        none,
+      ),
+    ).toEqual([
+      {
+        callId: "call_b",
+        name: "echo",
+        arguments: '{"value":"call_b"}',
+        output: '"ok"',
+      },
+    ]);
   });
 
   test("an output with no call is ignored", () => {
@@ -109,7 +117,12 @@ describe("extractToolCalls", () => {
   // every follow-up would re-harvest its ancestors' calls onto its own node.
   test("calls already known from earlier turns are skipped", () => {
     const records = extractToolCalls(
-      [call("call_old"), output("call_old"), call("call_new"), output("call_new")],
+      [
+        call("call_old"),
+        output("call_old"),
+        call("call_new"),
+        output("call_new"),
+      ],
       new Set(["call_old"]),
     );
     expect(records.map((r) => r.callId)).toEqual(["call_new"]);
@@ -133,7 +146,10 @@ describe("extractToolCalls", () => {
 
   test("results are capped on the way in", () => {
     const records = extractToolCalls(
-      [call("c1"), output("c1", JSON.stringify("z".repeat(TOOL_OUTPUT_MAX * 2)))],
+      [
+        call("c1"),
+        output("c1", JSON.stringify("z".repeat(TOOL_OUTPUT_MAX * 2))),
+      ],
       none,
     );
     expect(records[0]!.output.length).toBeLessThan(TOOL_OUTPUT_MAX + 200);

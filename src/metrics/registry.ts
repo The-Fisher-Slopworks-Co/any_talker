@@ -266,9 +266,7 @@ export class Histogram implements Metric {
       lines.push(
         `${this.name}_bucket${renderLabels(entry.labels, { le: "+Inf" })} ${entry.count}`,
       );
-      lines.push(
-        `${this.name}_sum${renderLabels(entry.labels)} ${entry.sum}`,
-      );
+      lines.push(`${this.name}_sum${renderLabels(entry.labels)} ${entry.sum}`);
       lines.push(
         `${this.name}_count${renderLabels(entry.labels)} ${entry.count}`,
       );

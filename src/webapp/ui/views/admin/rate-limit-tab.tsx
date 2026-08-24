@@ -32,8 +32,7 @@ export function RateLimitTab({
     api.getMyUsage().then((r) => setUsage(r.usage));
   }, []);
 
-  const dirty =
-    JSON.stringify(config) !== JSON.stringify(settings.rateLimit);
+  const dirty = JSON.stringify(config) !== JSON.stringify(settings.rateLimit);
 
   const save = async () => {
     setSaving(true);

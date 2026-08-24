@@ -4,8 +4,7 @@
 import type { BudgetConfig, BudgetDenyReason } from "../shared/types";
 
 export type BudgetCheckResult =
-  | { allowed: true }
-  | { allowed: false; reason: BudgetDenyReason };
+  { allowed: true } | { allowed: false; reason: BudgetDenyReason };
 
 // Hard USD-budget gate. Decides whether one more request may spend money, given
 // the current global/chat/new-user spend. Checked independently of — and before

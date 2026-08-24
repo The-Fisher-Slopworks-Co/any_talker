@@ -19,10 +19,7 @@ export type WindowKind = "fiveHour" | "weekly";
 // of) the token rate limit — money vs. fairness. Checked most-severe-first, so
 // when several caps are breached at once the guard reports the top one.
 export type BudgetDenyReason =
-  | "globalMonthly"
-  | "globalDaily"
-  | "chatDaily"
-  | "newUser";
+  "globalMonthly" | "globalDaily" | "chatDaily" | "newUser";
 
 // USD spend caps. The primary protector of a fixed monthly budget is
 // `globalMonthlyCapUsd`; the daily/chat/new-user caps bound how fast that budget
@@ -89,7 +86,10 @@ export type UserSettingField = "name" | "timezone" | "gender" | "language";
 // into the reply's blockquote. `value` is the new canonical value (a display
 // name, an IANA timezone, `"male"`/`"female"`, or `"en"`/`"ru"`), or `null` when
 // the field was cleared back to its default.
-export type UserSettingChange = { field: UserSettingField; value: string | null };
+export type UserSettingChange = {
+  field: UserSettingField;
+  value: string | null;
+};
 
 export type Settings = {
   systemPrompt: string;

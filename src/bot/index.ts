@@ -24,7 +24,11 @@ import { guestAskHandler } from "./handlers/guest";
 import { handleCheckCallback } from "./handlers/check-callback";
 import { CHECK_CALLBACK_RE } from "../checks/callback-data";
 import type { ReplyTarget } from "./context-builder";
-import { pickPhotoSize, fetchTelegramPhoto, downloadTelegramFile } from "./photo";
+import {
+  pickPhotoSize,
+  fetchTelegramPhoto,
+  downloadTelegramFile,
+} from "./photo";
 import { transcodeOggToMp3 } from "./transcode";
 import {
   pickVideo,
@@ -298,7 +302,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   // Deliberately not debug-gated: it must be answerable from prod logs.
   const logAccessDenied = (fields: LogFields) => {
     console.log(
-      formatLog({ level: "info", msg: "ask_access_denied", fields }, deps.logFormat),
+      formatLog(
+        { level: "info", msg: "ask_access_denied", fields },
+        deps.logFormat,
+      ),
     );
   };
 
@@ -397,8 +404,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const chatRecord = {
         id: String(chat.id),
         type: chat.type,
-        title: "title" in chat ? chat.title ?? null : null,
-        username: "username" in chat ? chat.username ?? null : null,
+        title: "title" in chat ? (chat.title ?? null) : null,
+        username: "username" in chat ? (chat.username ?? null) : null,
         firstSeenAt: now,
         lastSeenAt: now,
       };
@@ -444,7 +451,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     reason: BudgetDenyReason,
   ): Promise<void> => {
     if (reason !== "globalMonthly" && reason !== "globalDaily") return;
-    const period: "day" | "month" = reason === "globalMonthly" ? "month" : "day";
+    const period: "day" | "month" =
+      reason === "globalMonthly" ? "month" : "day";
     try {
       const now = Date.now();
       const claimed = await deps.storage.claimAlert(
@@ -483,7 +491,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       const ownerLang = await deps.storage.getUserLang(deps.ownerId);
       await api.sendMessage(
         deps.ownerId,
-        t(ownerLang ?? "en").bot_owner_new_group(chat.title ?? chat.id, chat.id),
+        t(ownerLang ?? "en").bot_owner_new_group(
+          chat.title ?? chat.id,
+          chat.id,
+        ),
       );
     } catch (err) {
       console.error("new group alert failed:", err);
@@ -526,8 +537,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           type: "article",
           id: "1",
           title: "Reply",
-          input_message_content:
-            richContent as unknown as InputMessageContent,
+          input_message_content: richContent as unknown as InputMessageContent,
         },
       });
     };
@@ -556,7 +566,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     let audios: Uint8Array[] = [];
     if (msg.voice) {
       try {
-        const raw = await downloadTelegramFile(deps.botToken, msg.voice.file_id);
+        const raw = await downloadTelegramFile(
+          deps.botToken,
+          msg.voice.file_id,
+        );
         // ogg → mp3, as in the voice ask flow; unusable audio is surfaced
         // like a fetch failure rather than sending raw ogg.
         const mp3 = await transcodeOggToMp3(raw);
@@ -624,7 +637,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const replyVoice = replyMsg?.voice;
     if (replyTarget && replyVoice) {
       try {
-        const raw = await downloadTelegramFile(deps.botToken, replyVoice.file_id);
+        const raw = await downloadTelegramFile(
+          deps.botToken,
+          replyVoice.file_id,
+        );
         // Transcode ogg → mp3; on failure drop the reply audio (it's only
         // supplementary context, and raw ogg would crash the request).
         const mp3 = await transcodeOggToMp3(raw);
@@ -654,7 +670,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         }
         replyTarget.mediaNote = media.attachments;
         if (replyVideo.thumbnailFileId) {
-          replyImageFileIds = [...replyImageFileIds, replyVideo.thumbnailFileId];
+          replyImageFileIds = [
+            ...replyImageFileIds,
+            replyVideo.thumbnailFileId,
+          ];
         }
       }
     }
@@ -906,7 +925,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const replyVoice = args.replyToMessage?.voice;
     if (replyTarget && replyVoice) {
       try {
-        const raw = await downloadTelegramFile(deps.botToken, replyVoice.file_id);
+        const raw = await downloadTelegramFile(
+          deps.botToken,
+          replyVoice.file_id,
+        );
         // Transcode ogg → mp3; on failure drop the reply audio (it's only
         // supplementary context, and raw ogg would crash the request).
         const mp3 = await transcodeOggToMp3(raw);
@@ -949,7 +971,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         // Neither a clip nor a frame carries a Telegram file id; the clip's
         // thumbnail is a real one, so a follow-up turn keeps a still of it.
         if (replyVideo.thumbnailFileId) {
-          replyImageFileIds = [...replyImageFileIds, replyVideo.thumbnailFileId];
+          replyImageFileIds = [
+            ...replyImageFileIds,
+            replyVideo.thumbnailFileId,
+          ];
         }
         debugLog("reply_video_resolved", {
           chat_id: chatId,
@@ -1056,7 +1081,10 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         case "error": {
           console.error("ask error:", outcome.message);
           const sent = await ctx.reply(ctx.t.bot_ai_error);
-          await outcome.persistConversation(sent.message_id, ctx.t.bot_ai_error);
+          await outcome.persistConversation(
+            sent.message_id,
+            ctx.t.bot_ai_error,
+          );
           return;
         }
         case "answered": {
@@ -1327,9 +1355,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
             messageId: msg.message_id,
             fileId: picked.file_id,
           })
-          .catch((err) =>
-            console.error("appendAlbumPhoto failed:", err),
-          );
+          .catch((err) => console.error("appendAlbumPhoto failed:", err));
       }
       const key = `${chatId}:${msg.media_group_id}`;
       mediaGroupBuffer.push({
@@ -1530,7 +1556,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const chatId = String(upd.chat.id);
     const selfId = String(ctx.me.id);
     try {
-      if (present) await deps.storage.recordBotPresence(chatId, selfId, Date.now());
+      if (present)
+        await deps.storage.recordBotPresence(chatId, selfId, Date.now());
       else await deps.storage.removeBotPresence(chatId, selfId);
     } catch (err) {
       console.error("my_chat_member presence update failed:", err);
@@ -1678,12 +1705,7 @@ function extractReplyTarget(reply: Message): ReplyTarget {
 }
 
 type AskOutcomeKind =
-  | "answered"
-  | "denied"
-  | "usage"
-  | "budgetLimited"
-  | "rateLimited"
-  | "error";
+  "answered" | "denied" | "usage" | "budgetLimited" | "rateLimited" | "error";
 
 const ASK_OUTCOME_LABEL: Record<AskOutcomeKind, AskOutcomeLabel> = {
   answered: "answered",

@@ -54,7 +54,10 @@ type Backing = {
   unpricedModels: Set<string>;
   // kind -> (UTC date -> set of entity ids that spent that day). Bounds the
   // spike scan to today's real spenders.
-  spendActive: { user: Map<string, Set<string>>; chat: Map<string, Set<string>> };
+  spendActive: {
+    user: Map<string, Set<string>>;
+    chat: Map<string, Set<string>>;
+  };
   // UTC date -> (userId -> denial count) for the "who hits limits most" ranking.
   denialRank: Map<string, Map<string, number>>;
   // Wrapped so the scalar is shared by reference across `forBot` views.
@@ -230,7 +233,9 @@ export class MemoryStorage implements Storage {
   }
 
   async getSettings(): Promise<Settings | null> {
-    return this.b.settings.value ? structuredClone(this.b.settings.value) : null;
+    return this.b.settings.value
+      ? structuredClone(this.b.settings.value)
+      : null;
   }
 
   async saveSettings(settings: Settings): Promise<void> {
@@ -241,7 +246,10 @@ export class MemoryStorage implements Storage {
     return [...this.b.whitelist[kind].values()];
   }
 
-  async addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void> {
+  async addWhitelist(
+    kind: WhitelistKind,
+    entry: WhitelistEntry,
+  ): Promise<void> {
     this.b.whitelist[kind].set(entry.id, { ...entry });
   }
 
@@ -271,9 +279,7 @@ export class MemoryStorage implements Storage {
 
   async getUserUsage(userId: string): Promise<UserUsage | null> {
     const v = this.b.usage.get(userId);
-    return v
-      ? { fiveHour: { ...v.fiveHour }, weekly: { ...v.weekly } }
-      : null;
+    return v ? { fiveHour: { ...v.fiveHour }, weekly: { ...v.weekly } } : null;
   }
 
   // Atomic by JS event-loop construction: there is no `await` between the read
@@ -322,7 +328,10 @@ export class MemoryStorage implements Storage {
     return this.b.userTimezones.get(userId) ?? null;
   }
 
-  async setUserTimezone(userId: string, timezone: string | null): Promise<void> {
+  async setUserTimezone(
+    userId: string,
+    timezone: string | null,
+  ): Promise<void> {
     if (timezone === null) this.b.userTimezones.delete(userId);
     else this.b.userTimezones.set(userId, timezone);
   }
@@ -388,7 +397,11 @@ export class MemoryStorage implements Storage {
     nowMs: number,
   ): Promise<void> {
     if (!(costUsd > 0)) return;
-    accrueDailyBucket(this.nestedBucket(this.b.userSpend, userId), costUsd, nowMs);
+    accrueDailyBucket(
+      this.nestedBucket(this.b.userSpend, userId),
+      costUsd,
+      nowMs,
+    );
     this.markActive("user", userId, nowMs);
   }
 
@@ -402,7 +415,11 @@ export class MemoryStorage implements Storage {
     nowMs: number,
   ): Promise<void> {
     if (!(costUsd > 0)) return;
-    accrueDailyBucket(this.nestedBucket(this.b.chatSpend, chatId), costUsd, nowMs);
+    accrueDailyBucket(
+      this.nestedBucket(this.b.chatSpend, chatId),
+      costUsd,
+      nowMs,
+    );
     this.markActive("chat", chatId, nowMs);
   }
 
@@ -425,7 +442,11 @@ export class MemoryStorage implements Storage {
     nowMs: number,
   ): Promise<void> {
     if (!(costUsd > 0)) return;
-    accrueDailyBucket(this.nestedBucket(this.b.modelSpend, modelId), costUsd, nowMs);
+    accrueDailyBucket(
+      this.nestedBucket(this.b.modelSpend, modelId),
+      costUsd,
+      nowMs,
+    );
     this.b.spendModels.add(modelId);
   }
 
@@ -503,7 +524,9 @@ export class MemoryStorage implements Storage {
     const isNew = existing === undefined;
     // Preserve the original first-seen instant; a legacy record without one is
     // treated as long-known (epoch 0), never "new".
-    const firstSeenAt = existing ? existing.firstSeenAt ?? 0 : user.firstSeenAt;
+    const firstSeenAt = existing
+      ? (existing.firstSeenAt ?? 0)
+      : user.firstSeenAt;
     this.b.users.set(user.id, { ...user, firstSeenAt });
     return { isNew };
   }
@@ -564,7 +587,10 @@ export class MemoryStorage implements Storage {
     return s ? structuredClone(s) : null;
   }
 
-  async saveChatSettings(chatId: string, settings: ChatSettings): Promise<void> {
+  async saveChatSettings(
+    chatId: string,
+    settings: ChatSettings,
+  ): Promise<void> {
     if (isEmptyChatSettings(settings)) {
       this.b.chatSettings.delete(chatId);
       return;
@@ -572,7 +598,10 @@ export class MemoryStorage implements Storage {
     this.b.chatSettings.set(chatId, structuredClone(settings));
   }
 
-  async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {
+  async getConversation(
+    chatId: string,
+    botMsgId: number,
+  ): Promise<ConversationNode | null> {
     const v = this.b.conversations.get(this.convKey(chatId, botMsgId));
     if (!v) return null;
     return {
@@ -642,7 +671,10 @@ export class MemoryStorage implements Storage {
     return v ? structuredClone(v) : null;
   }
 
-  async saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void> {
+  async saveGuestThread(
+    chatId: string,
+    thread: GuestThreadNode,
+  ): Promise<void> {
     this.b.guestThreads.set(this.sk(chatId), structuredClone(thread));
   }
 
@@ -653,7 +685,8 @@ export class MemoryStorage implements Storage {
   async fetchDueReminders(nowMs: number): Promise<Reminder[]> {
     const out: Reminder[] = [];
     for (const [key, r] of this.b.reminders.entries()) {
-      if (this.inScope(key) && r.fireAtMs <= nowMs) out.push(structuredClone(r));
+      if (this.inScope(key) && r.fireAtMs <= nowMs)
+        out.push(structuredClone(r));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
@@ -661,7 +694,8 @@ export class MemoryStorage implements Storage {
   async listRemindersForUser(userId: string): Promise<Reminder[]> {
     const out: Reminder[] = [];
     for (const [key, r] of this.b.reminders.entries()) {
-      if (this.inScope(key) && r.userId === userId) out.push(structuredClone(r));
+      if (this.inScope(key) && r.userId === userId)
+        out.push(structuredClone(r));
     }
     return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }

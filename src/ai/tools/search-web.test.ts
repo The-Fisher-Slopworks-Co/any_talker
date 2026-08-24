@@ -15,7 +15,9 @@ const ctx: ToolCallContext = {
   now: 0,
 };
 
-const mockFetch = mock(() => Promise.resolve(new Response("", { status: 200 })));
+const mockFetch = mock(() =>
+  Promise.resolve(new Response("", { status: 200 })),
+);
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
@@ -36,8 +38,16 @@ describe("search_web tool", () => {
             success: true,
             data: {
               web: [
-                { title: "First", url: "https://a.example/1", description: "desc 1" },
-                { title: "Second", url: "https://b.example/2", description: "desc 2" },
+                {
+                  title: "First",
+                  url: "https://a.example/1",
+                  description: "desc 1",
+                },
+                {
+                  title: "Second",
+                  url: "https://b.example/2",
+                  description: "desc 2",
+                },
               ],
             },
           }),
@@ -55,10 +65,10 @@ describe("search_web tool", () => {
   test("returns 'No results found.' when web is empty", async () => {
     mockFetch.mockImplementation(() =>
       Promise.resolve(
-        new Response(
-          JSON.stringify({ success: true, data: { web: [] } }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
+        new Response(JSON.stringify({ success: true, data: { web: [] } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
       ),
     );
     const tool = createSearchWebTool("key", 2);
@@ -83,7 +93,9 @@ describe("search_web tool", () => {
       ),
     );
     const tool = createSearchWebTool("key", 2);
-    await expect(tool.execute({ query: "x", limit: 5 }, ctx)).rejects.toThrow("Response too large");
+    await expect(tool.execute({ query: "x", limit: 5 }, ctx)).rejects.toThrow(
+      "Response too large",
+    );
   });
 
   test("throws on non-JSON body", async () => {
@@ -96,14 +108,23 @@ describe("search_web tool", () => {
       ),
     );
     const tool = createSearchWebTool("key", 2);
-    await expect(tool.execute({ query: "x", limit: 5 }, ctx)).rejects.toThrow("non-JSON");
+    await expect(tool.execute({ query: "x", limit: 5 }, ctx)).rejects.toThrow(
+      "non-JSON",
+    );
   });
 
   test("propagates Firecrawl HTTP errors", async () => {
     mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response("rate limited", { status: 429, statusText: "Too Many Requests" })),
+      Promise.resolve(
+        new Response("rate limited", {
+          status: 429,
+          statusText: "Too Many Requests",
+        }),
+      ),
     );
     const tool = createSearchWebTool("key", 2);
-    await expect(tool.execute({ query: "x", limit: 5 }, ctx)).rejects.toThrow("Firecrawl error 429");
+    await expect(tool.execute({ query: "x", limit: 5 }, ctx)).rejects.toThrow(
+      "Firecrawl error 429",
+    );
   });
 });

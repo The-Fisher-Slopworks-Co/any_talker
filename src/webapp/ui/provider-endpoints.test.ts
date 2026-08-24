@@ -35,7 +35,10 @@ describe("toProviderOptions", () => {
     const opts = toProviderOptions([
       ep({ provider_name: "DeepInfra", provider_slug: "deepinfra/fp4" }),
       ep({ provider_name: "DeepInfra", provider_slug: "deepinfra/fp8" }),
-      ep({ provider_name: "Bedrock", provider_slug: "amazon-bedrock/eu-west-1" }),
+      ep({
+        provider_name: "Bedrock",
+        provider_slug: "amazon-bedrock/eu-west-1",
+      }),
     ]);
     expect(opts).toEqual([
       { slug: "deepinfra", name: "DeepInfra" },
