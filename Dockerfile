@@ -5,9 +5,12 @@ WORKDIR /usr/src/app
 
 # Install production dependencies in a separate stage so the layer
 # is cached as long as package.json / bun.lock are unchanged.
+# --ignore-scripts because --production skips devDependencies but still runs
+# the root `prepare`, and `lefthook install` needs both the binary and a `.git`,
+# neither of which exists here. No dependency of ours relies on an install script.
 FROM base AS deps
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Final runtime image: production deps + source. Bun runs TypeScript
 # directly, so there is no separate build step.
