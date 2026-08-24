@@ -10,7 +10,9 @@ export type BuildInfo = {
 
 const SHORT_LEN = 7;
 
-export function shortenCommit(commit: string | null | undefined): string | null {
+export function shortenCommit(
+  commit: string | null | undefined,
+): string | null {
   if (!commit) return null;
   const trimmed = commit.trim();
   if (trimmed.length === 0) return null;
@@ -48,8 +50,4 @@ export async function getBuildInfo(
     return { commit, shortCommit: shortenCommit(commit) };
   })();
   return cached;
-}
-
-export function resetBuildInfoCacheForTests(): void {
-  cached = null;
 }

@@ -215,8 +215,11 @@ export function ModelsCard({
   // fallbacks would stay hidden below the fold and still be saved — and still be
   // rejected by the catalogue check the admin can't see.
   const updateAt = (idx: number, value: string) =>
-    onChange(fallback ? models.map((m, i) => (i === idx ? value : m)) : [value]);
-  const removeAt = (idx: number) => onChange(models.filter((_, i) => i !== idx));
+    onChange(
+      fallback ? models.map((m, i) => (i === idx ? value : m)) : [value],
+    );
+  const removeAt = (idx: number) =>
+    onChange(models.filter((_, i) => i !== idx));
 
   return (
     <Card>

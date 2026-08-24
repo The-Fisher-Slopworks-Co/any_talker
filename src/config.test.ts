@@ -33,7 +33,7 @@ test("loadConfig reads optional app attribution", () => {
     ...baseEnv,
     OPENROUTER_APP_URL: "https://example.com",
     OPENROUTER_APP_TITLE: "any_talker",
-    });
+  });
   expect(cfg.openrouterAppUrl).toBe("https://example.com");
   expect(cfg.openrouterAppTitle).toBe("any_talker");
 });

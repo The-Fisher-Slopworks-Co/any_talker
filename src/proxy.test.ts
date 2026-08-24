@@ -61,7 +61,9 @@ describe("getEffectiveProxyForUrl", () => {
       HTTPS_PROXY: "http://hsp:443",
       NO_PROXY: "example.com:8443",
     };
-    expect(getEffectiveProxyForUrl("https://example.com:8443/", env)).toBeNull();
+    expect(
+      getEffectiveProxyForUrl("https://example.com:8443/", env),
+    ).toBeNull();
     expect(getEffectiveProxyForUrl("https://example.com/", env)).toBe(
       "http://hsp:443",
     );
@@ -109,7 +111,9 @@ describe("getEffectiveProxyForUrl", () => {
 
 describe("proxiedFetch", () => {
   const originalFetch = globalThis.fetch;
-  const mockFetch = mock(() => Promise.resolve(new Response("", { status: 200 })));
+  const mockFetch = mock(() =>
+    Promise.resolve(new Response("", { status: 200 })),
+  );
 
   beforeEach(() => {
     globalThis.fetch = mockFetch as unknown as typeof fetch;

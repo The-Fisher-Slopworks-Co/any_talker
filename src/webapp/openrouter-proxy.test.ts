@@ -55,7 +55,11 @@ describe("fetchOpenRouterEndpoints", () => {
       {
         provider_name: "DeepInfra",
         provider_slug: "deepinfra/fp4",
-        pricing: { prompt: "0.000001", completion: "0.000002", image: undefined },
+        pricing: {
+          prompt: "0.000001",
+          completion: "0.000002",
+          image: undefined,
+        },
         throughput: 120,
         latency: 300,
       },
@@ -85,7 +89,9 @@ describe("fetchOpenRouterEndpoints", () => {
       fetch: stub({
         endpoints: () =>
           json({
-            data: { endpoints: [{ provider_name: "Together", tag: "together" }] },
+            data: {
+              endpoints: [{ provider_name: "Together", tag: "together" }],
+            },
           }),
         stats: () => json({ error: "nope" }, 500),
       }),

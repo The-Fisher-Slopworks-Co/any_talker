@@ -29,7 +29,9 @@ describe("MemoryStorage whitelist", () => {
     const s = new MemoryStorage();
     await s.addWhitelist("users", { id: "42", label: "alice" });
     await s.addWhitelist("chats", { id: "-100", label: "team" });
-    expect(await s.listWhitelist("users")).toEqual([{ id: "42", label: "alice" }]);
+    expect(await s.listWhitelist("users")).toEqual([
+      { id: "42", label: "alice" },
+    ]);
     expect(await s.isWhitelisted("users", "42")).toBe(true);
     expect(await s.isWhitelisted("chats", "-100")).toBe(true);
     expect(await s.isWhitelisted("users", "-100")).toBe(false);

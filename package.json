@@ -9,13 +9,23 @@
     "start": "bun ./src/main.ts",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
-    "check": "bun run typecheck && bun test"
+    "lint": "oxlint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "knip": "knip",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run knip && bun test",
+    "prepare": "lefthook install"
   },
   "devDependencies": {
+    "@grammyjs/types": "3.27.3",
     "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/turndown": "^5.0.6"
+    "@types/turndown": "^5.0.6",
+    "knip": "^6.32.2",
+    "lefthook": "^2.1.10",
+    "oxlint": "^1.80.0",
+    "prettier": "^3.9.6"
   },
   "peerDependencies": {
     "typescript": "^5"

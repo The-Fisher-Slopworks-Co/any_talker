@@ -92,7 +92,9 @@ function firecrawlEnvelope(data: {
   });
 }
 
-function bodyOf(call: [RequestInfo | URL, RequestInit?] | undefined): {
+function bodyOf(
+  call: [RequestInfo | URL, (RequestInit | undefined)?] | undefined,
+): {
   location?: { languages?: string[] };
   formats?: string[];
 } {
@@ -104,7 +106,10 @@ const tool = createYoutubeTranscriptTool("test-api-key");
 describe("extractVideoId", () => {
   test.each([
     ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"],
-    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=share&t=42", "dQw4w9WgXcQ"],
+    [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ&feature=share&t=42",
+      "dQw4w9WgXcQ",
+    ],
     ["https://m.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"],
     ["https://youtu.be/dQw4w9WgXcQ", "dQw4w9WgXcQ"],
     ["https://youtu.be/dQw4w9WgXcQ?t=10", "dQw4w9WgXcQ"],
@@ -114,7 +119,10 @@ describe("extractVideoId", () => {
     ["  dQw4w9WgXcQ  ", "dQw4w9WgXcQ"],
     ["https://www.youtube.com/watch?app=desktop&v=dQw4w9WgXcQ", "dQw4w9WgXcQ"],
     // Duplicate v= params: take the FIRST, as YouTube does (not the last).
-    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ&v=ZZZZZZZZZZZ", "dQw4w9WgXcQ"],
+    [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ&v=ZZZZZZZZZZZ",
+      "dQw4w9WgXcQ",
+    ],
   ])("extracts id from %s", (input, expected) => {
     expect(extractVideoId(input)).toBe(expected);
   });
@@ -153,9 +161,9 @@ describe("extractPlayerResponseJson", () => {
   });
 
   test("throws when the marker is absent", () => {
-    expect(() => extractPlayerResponseJson("<html>nothing here</html>")).toThrow(
-      "Could not find ytInitialPlayerResponse",
-    );
+    expect(() =>
+      extractPlayerResponseJson("<html>nothing here</html>"),
+    ).toThrow("Could not find ytInitialPlayerResponse");
   });
 
   test("anchors on the assignment when the marker appears earlier in a string", () => {
@@ -218,7 +226,9 @@ describe("youtube_transcript tool", () => {
 
   test("happy path: one scrape when the chat language is the original", async () => {
     // ctx.lang is "en" and the only track is en, so no re-scrape is needed.
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
     mockFetch.mockResolvedValue(
       firecrawlEnvelope({
         rawHtml,
@@ -232,7 +242,9 @@ describe("youtube_transcript tool", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
     const sent = bodyOf(mockFetch.mock.calls[0]);
-    expect(String(mockFetch.mock.calls[0]![0])).toBe("https://api.firecrawl.dev/v2/scrape");
+    expect(String(mockFetch.mock.calls[0]![0])).toBe(
+      "https://api.firecrawl.dev/v2/scrape",
+    );
     expect(sent.formats).toEqual(["rawHtml", "markdown"]);
     expect(sent.location?.languages).toEqual(["en"]);
   });
@@ -244,10 +256,13 @@ describe("youtube_transcript tool", () => {
       buildPlayerResponse({ tracks: [{ languageCode: "ru", kind: "asr" }] }),
     );
     mockFetch.mockImplementation((_input, init) => {
-      const langs = JSON.parse(String((init as RequestInit)?.body)).location?.languages;
+      const langs = JSON.parse(String((init as RequestInit)?.body)).location
+        ?.languages;
       if (Array.isArray(langs) && langs[0] === "ru") {
         return Promise.resolve(
-          firecrawlEnvelope({ markdown: markdownDoc({ transcript: "оригинальный русский текст" }) }),
+          firecrawlEnvelope({
+            markdown: markdownDoc({ transcript: "оригинальный русский текст" }),
+          }),
         );
       }
       return Promise.resolve(
@@ -286,7 +301,9 @@ describe("youtube_transcript tool", () => {
   });
 
   test("falls back to the video title minus the ' - YouTube' suffix", async () => {
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
     mockFetch.mockResolvedValue(
       firecrawlEnvelope({
         rawHtml,
@@ -299,9 +316,14 @@ describe("youtube_transcript tool", () => {
   });
 
   test("omits the heading when no title is present", async () => {
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
     mockFetch.mockResolvedValue(
-      firecrawlEnvelope({ rawHtml, markdown: markdownDoc({ transcript: "just the cue" }) }),
+      firecrawlEnvelope({
+        rawHtml,
+        markdown: markdownDoc({ transcript: "just the cue" }),
+      }),
     );
     const result = await tool.execute({ url: VIDEO_ID }, ctx);
     expect(result).toBe("just the cue");
@@ -309,24 +331,37 @@ describe("youtube_transcript tool", () => {
 
   test("throws when the video has no caption tracks", async () => {
     const rawHtml = watchPageHtml(buildPlayerResponse({ captionsBlock: null }));
-    mockFetch.mockResolvedValue(firecrawlEnvelope({ rawHtml, markdown: markdownDoc({}) }));
-    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow("no captions");
+    mockFetch.mockResolvedValue(
+      firecrawlEnvelope({ rawHtml, markdown: markdownDoc({}) }),
+    );
+    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
+      "no captions",
+    );
   });
 
   test("throws on unavailable / private videos via playabilityStatus", async () => {
     const rawHtml = watchPageHtml(
       buildPlayerResponse({
-        playabilityStatus: { status: "LOGIN_REQUIRED", reason: "Sign in to confirm your age" },
+        playabilityStatus: {
+          status: "LOGIN_REQUIRED",
+          reason: "Sign in to confirm your age",
+        },
         tracks: [],
       }),
     );
     mockFetch.mockResolvedValue(firecrawlEnvelope({ rawHtml, markdown: "" }));
-    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow("Video unavailable");
+    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
+      "Video unavailable",
+    );
   });
 
   test("throws when tracks exist but the markdown has no transcript section", async () => {
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
-    mockFetch.mockResolvedValue(firecrawlEnvelope({ rawHtml, markdown: markdownDoc({}) }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
+    mockFetch.mockResolvedValue(
+      firecrawlEnvelope({ rawHtml, markdown: markdownDoc({}) }),
+    );
     await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
       "No transcript could be extracted",
     );
@@ -334,7 +369,10 @@ describe("youtube_transcript tool", () => {
 
   test("throws when the page lacks ytInitialPlayerResponse", async () => {
     mockFetch.mockResolvedValue(
-      firecrawlEnvelope({ rawHtml: "<html><body>Cookie wall</body></html>", markdown: "" }),
+      firecrawlEnvelope({
+        rawHtml: "<html><body>Cookie wall</body></html>",
+        markdown: "",
+      }),
     );
     await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
       "Could not find ytInitialPlayerResponse",
@@ -342,7 +380,9 @@ describe("youtube_transcript tool", () => {
   });
 
   test("caps output at MAX_LENGTH (50 000)", async () => {
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
     mockFetch.mockResolvedValue(
       firecrawlEnvelope({
         rawHtml,
@@ -355,7 +395,9 @@ describe("youtube_transcript tool", () => {
   });
 
   test("a huge title does not evict the transcript from the MAX_LENGTH budget", async () => {
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
     mockFetch.mockResolvedValue(
       firecrawlEnvelope({
         rawHtml,
@@ -370,7 +412,9 @@ describe("youtube_transcript tool", () => {
   });
 
   test("returns a well-formed string when MAX_LENGTH cuts mid-surrogate", async () => {
-    const rawHtml = watchPageHtml(buildPlayerResponse({ tracks: [{ languageCode: "en" }] }));
+    const rawHtml = watchPageHtml(
+      buildPlayerResponse({ tracks: [{ languageCode: "en" }] }),
+    );
     // Fill to just under the boundary so an emoji surrogate pair straddles it.
     const body = "x".repeat(49_999) + "😀".repeat(100);
     mockFetch.mockResolvedValue(
@@ -396,13 +440,20 @@ describe("youtube_transcript tool", () => {
 
   test("surfaces a non-2xx Firecrawl response as an error", async () => {
     mockFetch.mockResolvedValue(
-      new Response("rate limited", { status: 429, statusText: "Too Many Requests" }),
+      new Response("rate limited", {
+        status: 429,
+        statusText: "Too Many Requests",
+      }),
     );
-    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow("Firecrawl error 429");
+    await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
+      "Firecrawl error 429",
+    );
   });
 
   test("throws when Firecrawl returns an empty page", async () => {
-    mockFetch.mockResolvedValue(firecrawlEnvelope({ rawHtml: "", markdown: "" }));
+    mockFetch.mockResolvedValue(
+      firecrawlEnvelope({ rawHtml: "", markdown: "" }),
+    );
     await expect(tool.execute({ url: VIDEO_ID }, ctx)).rejects.toThrow(
       "Firecrawl returned an empty page",
     );

@@ -4,7 +4,11 @@
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
 import { SpendBudgetGuard } from "./guard";
-import { DEFAULT_SETTINGS, type BudgetConfig, type User } from "../shared/types";
+import {
+  DEFAULT_SETTINGS,
+  type BudgetConfig,
+  type User,
+} from "../shared/types";
 
 const NOW = 1_700_000_000_000;
 const MS_PER_DAY = 86_400_000;
@@ -23,7 +27,9 @@ const seenUser = (id: string, firstSeenAt: number): User => ({
   lastSeenAt: firstSeenAt,
 });
 
-const args = (over: Partial<Parameters<SpendBudgetGuard["check"]>[0]> = {}) => ({
+const args = (
+  over: Partial<Parameters<SpendBudgetGuard["check"]>[0]> = {},
+) => ({
   userId: "u1",
   chatId: "c1",
   isOwner: false,

@@ -26,10 +26,7 @@ const SerializedAIUserContentPartSchema = z.discriminatedUnion("type", [
 const SerializedAIMessageSchema = z.discriminatedUnion("role", [
   z.object({
     role: z.literal("user"),
-    content: z.union([
-      z.string(),
-      z.array(SerializedAIUserContentPartSchema),
-    ]),
+    content: z.union([z.string(), z.array(SerializedAIUserContentPartSchema)]),
   }),
   z.object({
     role: z.literal("assistant"),
@@ -51,7 +48,7 @@ const DeliveryTargetSchema = z.discriminatedUnion("kind", [
 // Anything else — id, userId, fireAtMs, target, text, createdAtMs — is
 // strict: a missing/wrong shape means the record is corrupt and gets
 // quarantined.
-export const StoredReminderSchema = z.object({
+const StoredReminderSchema = z.object({
   id: z.string(),
   userId: z.string(),
   chatId: z.string().optional(),

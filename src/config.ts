@@ -26,7 +26,9 @@ export type Config = {
   logDebug: boolean;
 };
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
+export function loadConfig(
+  env: Record<string, string | undefined> = process.env,
+): Config {
   const required = (name: string): string => {
     const v = env[name];
     if (!v) throw new Error(`Missing required env var: ${name}`);
@@ -34,7 +36,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   };
 
   const port = env.PORT ? Number(env.PORT) : 8080;
-  if (Number.isNaN(port)) throw new Error(`PORT must be a number, got: ${env.PORT}`);
+  if (Number.isNaN(port))
+    throw new Error(`PORT must be a number, got: ${env.PORT}`);
 
   // One release of grace for deployments still on the pre-OpenRouter names.
   // Those names would actively lie about what this build talks to, but a hard
@@ -63,7 +66,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     withLegacyFallback("OPENROUTER_BASE_URL", "OPENAI_BASE_URL") ??
     DEFAULT_OPENROUTER_BASE_URL;
   if (legacy.length > 0) {
-    console.warn(`Deprecated env var names in use, rename: ${legacy.join(", ")}`);
+    console.warn(
+      `Deprecated env var names in use, rename: ${legacy.join(", ")}`,
+    );
   }
 
   return {
@@ -73,12 +78,20 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     openrouterAppUrl: nonEmptyOrUndefined(env.OPENROUTER_APP_URL),
     openrouterAppTitle: nonEmptyOrUndefined(env.OPENROUTER_APP_TITLE),
     firecrawlApiKey: nonEmptyOrUndefined(env.FIRECRAWL_API_KEY),
-    firecrawlConcurrency: parsePositiveInt("FIRECRAWL_CONCURRENCY", env.FIRECRAWL_CONCURRENCY, 2),
+    firecrawlConcurrency: parsePositiveInt(
+      "FIRECRAWL_CONCURRENCY",
+      env.FIRECRAWL_CONCURRENCY,
+      2,
+    ),
     botOwnerId: required("BOT_OWNER_ID"),
     keydbUrl: env.KEYDB_URL ?? "redis://localhost:6379",
     port,
     logFormat: resolveLogFormat(env),
-    logIncomingUpdates: parseBool("LOG_INCOMING_UPDATES", env.LOG_INCOMING_UPDATES, true),
+    logIncomingUpdates: parseBool(
+      "LOG_INCOMING_UPDATES",
+      env.LOG_INCOMING_UPDATES,
+      true,
+    ),
     logDebug: parseBool("LOG_DEBUG", env.LOG_DEBUG, false),
   };
 }
@@ -90,17 +103,28 @@ function nonEmptyOrUndefined(v: string | undefined): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
-function parsePositiveInt(name: string, raw: string | undefined, defaultValue: number): number {
+function parsePositiveInt(
+  name: string,
+  raw: string | undefined,
+  defaultValue: number,
+): number {
   if (raw === undefined || raw === "") return defaultValue;
   const v = Number(raw);
-  if (!Number.isInteger(v) || v < 1) throw new Error(`${name} must be a positive integer, got: ${raw}`);
+  if (!Number.isInteger(v) || v < 1)
+    throw new Error(`${name} must be a positive integer, got: ${raw}`);
   return v;
 }
 
-function parseBool(name: string, raw: string | undefined, defaultValue: boolean): boolean {
+function parseBool(
+  name: string,
+  raw: string | undefined,
+  defaultValue: boolean,
+): boolean {
   if (raw === undefined || raw === "") return defaultValue;
   const v = raw.toLowerCase();
   if (v === "1" || v === "true" || v === "yes" || v === "on") return true;
   if (v === "0" || v === "false" || v === "no" || v === "off") return false;
-  throw new Error(`${name} must be one of true/false/1/0/yes/no/on/off, got: ${raw}`);
+  throw new Error(
+    `${name} must be one of true/false/1/0/yes/no/on/off, got: ${raw}`,
+  );
 }

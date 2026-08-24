@@ -2,11 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import {
-  DATE_FORMATS,
-  formatDateTime,
-  isValidDateFormat,
-} from "./date-format";
+import { DATE_FORMATS, formatDateTime, isValidDateFormat } from "./date-format";
 
 const SAMPLE = Date.UTC(2026, 11, 31, 15, 45, 0);
 

@@ -6,8 +6,6 @@ import type { RateLimitConfig, ReasoningEffort } from "../shared/types";
 
 export type DetailLevel = "short" | "wise";
 
-export const DEFAULT_DETAIL_LEVEL: DetailLevel = "short";
-
 export function detailLevelMultiplier(
   level: DetailLevel,
   rl: RateLimitConfig,
@@ -20,7 +18,9 @@ export function detailLevelMultiplier(
   }
 }
 
-export function detailLevelReasoningEffort(level: DetailLevel): ReasoningEffort {
+export function detailLevelReasoningEffort(
+  level: DetailLevel,
+): ReasoningEffort {
   switch (level) {
     case "short":
       return "low";
@@ -155,8 +155,8 @@ export function buildInstruction(
   opts: {
     timezone?: string;
     lang?: Lang;
-    detailLevel?: DetailLevel;
-    facts?: Array<{ key: string; value: string }>;
+    detailLevel?: DetailLevel | undefined;
+    facts?: Array<{ key: string; value: string }> | undefined;
   } = {},
 ): string {
   const sections: string[] = [

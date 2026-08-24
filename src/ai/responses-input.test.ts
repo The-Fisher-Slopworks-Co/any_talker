@@ -146,7 +146,9 @@ describe("dataUrl", () => {
     expect(dataUrl("image/jpeg", new Uint8Array([1, 2]))).toBe(
       "data:image/jpeg;base64,AQI=",
     );
-    expect(dataUrl("image/png", new Uint8Array())).toBe("data:image/png;base64,");
+    expect(dataUrl("image/png", new Uint8Array())).toBe(
+      "data:image/png;base64,",
+    );
   });
 });
 
@@ -181,8 +183,19 @@ describe("toResponsesInput — replayed tool calls", () => {
       { role: "assistant", content: "A1" },
       { role: "user", content: "Q2" },
     ]);
-    expect(items.map((i) => (i as { type?: string; role?: string }).type ?? (i as { role: string }).role))
-      .toEqual(["user", "function_call", "function_call_output", "assistant", "user"]);
+    expect(
+      items.map(
+        (i) =>
+          (i as { type?: string; role?: string }).type ??
+          (i as { role: string }).role,
+      ),
+    ).toEqual([
+      "user",
+      "function_call",
+      "function_call_output",
+      "assistant",
+      "user",
+    ]);
   });
 
   // The id and the argument string are the provider's own words; re-encoding
@@ -233,7 +246,8 @@ describe("toResponsesInput — call id collisions", () => {
     ]);
     // Every id appears exactly twice: once as the call, once as its result.
     const counts = new Map<string, number>();
-    for (const i of items) counts.set(i.callId, (counts.get(i.callId) ?? 0) + 1);
+    for (const i of items)
+      counts.set(i.callId, (counts.get(i.callId) ?? 0) + 1);
     expect([...counts.values()]).toEqual([2, 2, 2]);
   });
 

@@ -8,7 +8,7 @@ import { applyAnswer, currentCount } from "./counter";
 import { escapeHtmlText } from "../bot/html";
 import { migratedChatId } from "../shared/chat-migration";
 
-export type CheckInlineKeyboardButton = {
+type CheckInlineKeyboardButton = {
   text: string;
   callback_data: string;
 };
@@ -66,8 +66,7 @@ export async function resolveCheck(args: {
   }
 
   const { replyCount, patch } = applyAnswer(check, answer, nowMs);
-  const replyTemplate =
-    answer === "yes" ? check.yesReply : check.noReply;
+  const replyTemplate = answer === "yes" ? check.yesReply : check.noReply;
   const reply = formatReply(replyTemplate, {
     name: check.targetName,
     count: replyCount,

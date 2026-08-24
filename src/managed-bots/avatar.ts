@@ -12,7 +12,10 @@ export async function setManagedBotAvatar(
   bytes: Uint8Array,
 ): Promise<boolean> {
   try {
-    await api.setMyProfilePhoto({ type: "static", photo: new InputFile(bytes) });
+    await api.setMyProfilePhoto({
+      type: "static",
+      photo: new InputFile(bytes),
+    });
     return true;
   } catch (err) {
     console.error("[managed-bots] setMyProfilePhoto failed:", err);

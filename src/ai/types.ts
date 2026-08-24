@@ -33,7 +33,7 @@ export type AIMessage =
   // items (`responses-input.ts` expands it into `function_call` +
   // `function_call_output`). Call and result travel together so a replay can
   // never emit a call the request has no result for.
-  | ToolCallRecord & { role: "tool" };
+  | (ToolCallRecord & { role: "tool" });
 
 // The stored form (reminder context snapshots). Deliberately has no video
 // variant: a whole clip is up to 20 MB, and base64'ing that into a reminder
@@ -81,11 +81,11 @@ export interface AIClient {
     system: string;
     messages: AIMessage[];
     tools: Tool[];
-    routing?: RoutingOptions;
-    reasoningEffort?: ReasoningEffort | null;
+    routing?: RoutingOptions | undefined;
+    reasoningEffort?: ReasoningEffort | null | undefined;
     // Stable id of the conversation this turn belongs to, so OpenRouter routes
     // the session stickily and keeps its prompt cache warm (`ai/session.ts`).
-    sessionId?: string | null;
+    sessionId?: string | null | undefined;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult>;
 }

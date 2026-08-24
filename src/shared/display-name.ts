@@ -5,7 +5,7 @@
 // code points (Array.from(...).length, not .length). Set well under
 // Telegram's own 64-char limit on first_name so the name still fits inside
 // any LLM envelope or message header we render around it.
-export const DISPLAY_NAME_MAX_LEN = 32;
+const DISPLAY_NAME_MAX_LEN = 32;
 
 export type DisplayNameError =
   | "too_long"
@@ -16,10 +16,9 @@ export type DisplayNameError =
   | "no_letter";
 
 export type DisplayNameResult =
-  | { ok: true; value: string | null }
-  | { ok: false; reason: DisplayNameError };
+  { ok: true; value: string | null } | { ok: false; reason: DisplayNameError };
 
-const ALLOWED_CHARS = /^[\p{L}\p{M}\p{Nd} .'\-]+$/u;
+const ALLOWED_CHARS = /^[\p{L}\p{M}\p{Nd} .'-]+$/u;
 const CONTROL_CHARS = /[\p{Cc}\p{Cf}\p{Co}\p{Cn}\p{Cs}]/u;
 const HAS_LETTER = /\p{L}/u;
 const MULTILINE_CHARS = /[\n\r\t]/;

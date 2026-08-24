@@ -62,8 +62,18 @@ async function scanSpikes(
     minBaselineUsd: anomaly.spikeMinBaselineUsd,
   };
   await Promise.all([
-    scanKind(deps, "user", { ...base, absoluteUsd: anomaly.spikeUserAbsoluteUsd }, lang),
-    scanKind(deps, "chat", { ...base, absoluteUsd: anomaly.spikeChatAbsoluteUsd }, lang),
+    scanKind(
+      deps,
+      "user",
+      { ...base, absoluteUsd: anomaly.spikeUserAbsoluteUsd },
+      lang,
+    ),
+    scanKind(
+      deps,
+      "chat",
+      { ...base, absoluteUsd: anomaly.spikeChatAbsoluteUsd },
+      lang,
+    ),
   ]);
 }
 

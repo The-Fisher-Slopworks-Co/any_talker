@@ -165,7 +165,10 @@ describe("update_user_settings execute", () => {
     });
     expect(await storage.getUserName("u1")).toBe("Vasya");
     expect(c.effects).toEqual([
-      { type: "settings_updated", changes: [{ field: "name", value: "Vasya" }] },
+      {
+        type: "settings_updated",
+        changes: [{ field: "name", value: "Vasya" }],
+      },
     ] as ToolEffect[]);
   });
 

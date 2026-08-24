@@ -5,7 +5,8 @@ import { z } from "zod";
 import { readTextCapped, safeFetch } from "./http";
 import type { Tool } from "./registry";
 
-const PRIMARY_CDN = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
+const PRIMARY_CDN =
+  "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
 const FALLBACK_CDN = "https://latest.currency-api.pages.dev/v1/currencies";
 const TIMEOUT_MS = 10_000;
 const MAX_BODY_BYTES = 1_000_000;
@@ -36,7 +37,10 @@ type CurrencyResponse = {
 };
 
 async function fetchRates(base: string): Promise<CurrencyResponse> {
-  const urls = [`${PRIMARY_CDN}/${base}.min.json`, `${FALLBACK_CDN}/${base}.min.json`];
+  const urls = [
+    `${PRIMARY_CDN}/${base}.min.json`,
+    `${FALLBACK_CDN}/${base}.min.json`,
+  ];
   let lastErr: unknown;
   for (const url of urls) {
     try {
@@ -73,7 +77,10 @@ async function fetchRates(base: string): Promise<CurrencyResponse> {
       lastErr = err;
     }
   }
-  const message = lastErr instanceof Error ? lastErr.message : String(lastErr ?? "unknown error");
+  const message =
+    lastErr instanceof Error
+      ? lastErr.message
+      : String(lastErr ?? "unknown error");
   throw new Error(`Currency API request failed: ${message}`);
 }
 
@@ -121,7 +128,9 @@ export const currencyConvertTool: Tool<Input, string> = {
     }
     const rateValue = (rates as Record<string, unknown>)[target];
     if (typeof rateValue !== "number" || !Number.isFinite(rateValue)) {
-      throw new Error(`No exchange rate available from '${base}' to '${target}'`);
+      throw new Error(
+        `No exchange rate available from '${base}' to '${target}'`,
+      );
     }
 
     const converted = amount * rateValue;

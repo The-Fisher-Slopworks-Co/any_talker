@@ -41,7 +41,9 @@ describe("ModelsCard markup", () => {
   });
 
   test("renders one row without fallback controls by default", () => {
-    const html = render(<ModelsCard models={["a", "b", "c"]} onChange={() => {}} />);
+    const html = render(
+      <ModelsCard models={["a", "b", "c"]} onChange={() => {}} />,
+    );
     expect((html.match(/<input/g) ?? []).length).toBe(1);
     expect(html).not.toContain("Add fallback");
   });
@@ -83,7 +85,9 @@ describe("ModelsCard markup", () => {
   test("shows the invalid-model warning only once a catalogue can judge", () => {
     // No catalogue has loaded in a static render, so an unknown id must not be
     // accused of anything yet.
-    const html = render(<ModelsCard models={["not-a-real-id"]} onChange={() => {}} />);
+    const html = render(
+      <ModelsCard models={["not-a-real-id"]} onChange={() => {}} />,
+    );
     expect(html).not.toContain("isn’t in /v1/models");
   });
 });

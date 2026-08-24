@@ -37,7 +37,11 @@ describe("cancel_reminder", () => {
       { ...ctx, timezone: "Europe/Moscow", effects },
     );
     expect(effects).toEqual([
-      { type: "reminder_cancelled", fireAtMs: 2_000_000, timezone: "Europe/Moscow" },
+      {
+        type: "reminder_cancelled",
+        fireAtMs: 2_000_000,
+        timezone: "Europe/Moscow",
+      },
     ]);
   });
 
@@ -67,7 +71,10 @@ describe("cancel_reminder", () => {
     // Created under the main bot namespace.
     await storage.saveReminder(reminder({ id: "r1" }));
     const tool = createCancelReminderTool({ storage });
-    const out = await tool.execute({ reminderId: "r1" }, { ...ctx, botId: "bot9" });
+    const out = await tool.execute(
+      { reminderId: "r1" },
+      { ...ctx, botId: "bot9" },
+    );
     expect(out).toEqual({ cancelled: false });
     // Still present in the main namespace.
     expect(await storage.getReminder("r1")).not.toBeNull();

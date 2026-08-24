@@ -64,7 +64,9 @@ describe("UsageHeader markup", () => {
 
   test("exposes the share to assistive tech as a progressbar", () => {
     const html = render(share());
-    const values = [...html.matchAll(/aria-valuenow="(\d+)"/g)].map((m) => m[1]);
+    const values = [...html.matchAll(/aria-valuenow="(\d+)"/g)].map(
+      (m) => m[1],
+    );
     expect(values).toEqual(["25", "60"]);
   });
 

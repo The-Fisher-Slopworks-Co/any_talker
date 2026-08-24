@@ -8,7 +8,7 @@ import { t, type Lang } from "../shared/i18n";
 // True when the interval had anything worth a DM — new users/chats, denials, an
 // unpriced model, or any spend this week. A genuinely quiet bot returns false so
 // the owner isn't pinged with a "nothing happened" digest.
-export function hasDigestActivity(o: SpendOverview): boolean {
+function hasDigestActivity(o: SpendOverview): boolean {
   return (
     o.global.week > 0 ||
     o.newUsers.length > 0 ||
@@ -22,7 +22,7 @@ export function hasDigestActivity(o: SpendOverview): boolean {
 // `|` ends the cell, and the rest open emphasis / code / highlight / LaTeX /
 // HTML runs. Real labels hit this — a chat titled "да кто этот ваш Гатс _:|"
 // would eat its own row without escaping.
-const CELL_SYNTAX = /[\\`*_~\[\]|=$<]/g;
+const CELL_SYNTAX = /[\\`*_~[\]|=$<]/g;
 
 function cell(text: string): string {
   return text.replace(CELL_SYNTAX, (ch) => `\\${ch}`);
@@ -59,7 +59,10 @@ function spendRow(label: string, spend: SpendSummary): string[] {
 // spend rankings as tables — the previous "$X ($Y/d)" text lines put the two
 // windows the owner compares into one cramped column. Returns null when there's
 // nothing to report (see `hasDigestActivity`).
-export function buildDigestMarkdown(o: SpendOverview, lang: Lang): string | null {
+export function buildDigestMarkdown(
+  o: SpendOverview,
+  lang: Lang,
+): string | null {
   if (!hasDigestActivity(o)) return null;
   const s = t(lang);
   const lines: string[] = [

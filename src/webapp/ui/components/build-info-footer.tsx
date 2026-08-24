@@ -8,7 +8,10 @@ export function BuildInfoFooter() {
   const [info, setInfo] = useState<BuildInfoResponse | null>(null);
 
   useEffect(() => {
-    api.getBuildInfo().then(setInfo).catch(() => setInfo(null));
+    api
+      .getBuildInfo()
+      .then(setInfo)
+      .catch(() => setInfo(null));
   }, []);
 
   if (!info?.shortCommit) return null;

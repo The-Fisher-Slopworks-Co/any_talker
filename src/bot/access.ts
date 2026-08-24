@@ -9,8 +9,7 @@ import type { Storage } from "../storage/types";
 export type AccessDenyReason = "blacklisted" | "not_whitelisted";
 
 export type AccessVerdict =
-  | { allowed: true }
-  | { allowed: false; reason: AccessDenyReason };
+  { allowed: true } | { allowed: false; reason: AccessDenyReason };
 
 export async function checkAccess(args: {
   storage: Storage;

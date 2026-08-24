@@ -21,7 +21,10 @@ export function matchDigestCommand(
   const m = COMMAND_RE.exec(text.trim());
   if (!m) return false;
   const addressed = m[1];
-  return addressed === undefined || addressed.toLowerCase() === selfUsername?.toLowerCase();
+  return (
+    addressed === undefined ||
+    addressed.toLowerCase() === selfUsername?.toLowerCase()
+  );
 }
 
 export type DigestCommandInput = {

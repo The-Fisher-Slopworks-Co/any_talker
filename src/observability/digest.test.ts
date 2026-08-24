@@ -29,7 +29,11 @@ describe("buildDigestMarkdown", () => {
       overview({
         global: { day: 0.02, week: 0.44, month: 3.75 },
         topUsers: [
-          { id: "u1", label: "@spender", spend: { day: 0.004321, week: 0.12, month: 0.91 } },
+          {
+            id: "u1",
+            label: "@spender",
+            spend: { day: 0.004321, week: 0.12, month: 0.91 },
+          },
         ],
       }),
       "en",
@@ -55,7 +59,11 @@ describe("buildDigestMarkdown", () => {
       overview({
         global: { ...zero, week: 2.62, month: 2.62 },
         topChats: [
-          { id: "c1", label: "да кто этот ваш Гатс _:|", spend: { ...zero, month: 2.62 } },
+          {
+            id: "c1",
+            label: "да кто этот ваш Гатс _:|",
+            spend: { ...zero, month: 2.62 },
+          },
         ],
       }),
       "ru",
@@ -70,8 +78,16 @@ describe("buildDigestMarkdown", () => {
     const md = buildDigestMarkdown(
       overview({
         models: [
-          { modelId: "vendor/model-x", spend: { ...zero, month: 1.95 }, unpriced: false },
-          { modelId: "vendor/model-y", spend: { ...zero, month: 0.1 }, unpriced: true },
+          {
+            modelId: "vendor/model-x",
+            spend: { ...zero, month: 1.95 },
+            unpriced: false,
+          },
+          {
+            modelId: "vendor/model-y",
+            spend: { ...zero, month: 0.1 },
+            unpriced: true,
+          },
         ],
         unpricedModels: ["vendor/model-y"],
       }),
@@ -92,7 +108,8 @@ describe("buildDigestMarkdown", () => {
     )!;
     const lines = md.split("\n");
     for (const [i, line] of lines.entries()) {
-      if (!line.startsWith("| ") || !lines[i + 1]?.startsWith("| ---")) continue;
+      if (!line.startsWith("| ") || !lines[i + 1]?.startsWith("| ---"))
+        continue;
       expect(lines[i - 1]).toBe("");
     }
   });

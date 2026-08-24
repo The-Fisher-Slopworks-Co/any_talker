@@ -84,12 +84,12 @@ export type VideoKind = "video" | "video_note" | "animation";
 // transcodes uploads (and GIFs) into.
 export type VideoClip = { bytes: Uint8Array; mediaType: string };
 
-export const DEFAULT_VIDEO_MEDIA_TYPE = "video/mp4";
+const DEFAULT_VIDEO_MEDIA_TYPE = "video/mp4";
 
 // The slice of Telegram's Video / VideoNote / Animation objects this module
 // needs, kept structural (as `PhotoSizeLike` is) so nothing here depends on
 // grammY's types.
-export type VideoLike = {
+type VideoLike = {
   file_id: string;
   duration?: number;
   file_size?: number;
@@ -268,7 +268,9 @@ export function splitJpegFrames(buf: Uint8Array): Uint8Array[] {
   }
   // Copy rather than subarray: a view would pin the whole mjpeg buffer for as
   // long as any single frame is alive.
-  return starts.map((start, i) => buf.slice(start, starts[i + 1] ?? buf.length));
+  return starts.map((start, i) =>
+    buf.slice(start, starts[i + 1] ?? buf.length),
+  );
 }
 
 // The slice of `Bun.spawn` this module uses, narrowed so tests can inject a
@@ -334,7 +336,7 @@ export async function extractVideoMedia(args: {
   durationSec: number;
   maxFrames: number;
   withAudio: boolean;
-  spawn?: VideoSpawnFn;
+  spawn?: VideoSpawnFn | undefined;
 }): Promise<ExtractedVideo> {
   const spawn = args.spawn ?? defaultSpawn;
   const path = join(tmpdir(), `any-talker-video-${randomUUID()}`);
@@ -345,7 +347,9 @@ export async function extractVideoMedia(args: {
       spawn,
     );
     const frames = raw ? splitJpegFrames(raw).slice(0, args.maxFrames) : [];
-    const audio = args.withAudio ? await runFfmpeg(audioArgs(path), spawn) : null;
+    const audio = args.withAudio
+      ? await runFfmpeg(audioArgs(path), spawn)
+      : null;
     return { frames, audio };
   } catch (err) {
     console.error("video extraction failed:", err);
@@ -379,7 +383,7 @@ export async function fetchVideoParts(args: {
   mode: "native" | "frames";
   maxFrames: number;
   download?: (botToken: string, fileId: string) => Promise<Uint8Array>;
-  spawn?: VideoSpawnFn;
+  spawn?: VideoSpawnFn | undefined;
 }): Promise<VideoFetchOutcome> {
   const { video } = args;
   if (video.durationSec > MAX_VIDEO_SECONDS) {

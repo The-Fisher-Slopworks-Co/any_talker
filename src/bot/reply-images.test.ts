@@ -13,7 +13,9 @@ const photoSize = (id: string, w = 800, h = 600) => ({
   height: h,
 });
 
-const makeMessage = (overrides: Partial<Message> & { message_id: number }): Message =>
+const makeMessage = (
+  overrides: Partial<Message> & { message_id: number },
+): Message =>
   ({
     date: 1,
     chat: { id: 1, type: "private" },

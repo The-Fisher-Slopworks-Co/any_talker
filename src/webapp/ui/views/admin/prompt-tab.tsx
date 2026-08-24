@@ -48,9 +48,7 @@ export function PromptTab({
   const [saving, setSaving] = useState(false);
 
   // Save exactly what the card shows.
-  const trimmed = models
-    .map((m) => m.trim())
-    .filter((m) => m.length > 0);
+  const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
   const modelsDirty =
     trimmed.length !== settings.models.length ||
     trimmed.some((m, i) => m !== settings.models[i]);

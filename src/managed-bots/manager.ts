@@ -22,7 +22,7 @@ import type { ManagedBot } from "./types";
 // `managed_bot_created` service message.
 export type ManagedBotUser = {
   id: number;
-  username?: string;
+  username?: string | undefined;
   first_name: string;
 };
 
@@ -106,7 +106,8 @@ export class BotManager {
   }
 
   async startBot(record: ManagedBot, token: string): Promise<void> {
-    if (this.running.has(record.botId) || this.starting.has(record.botId)) return;
+    if (this.running.has(record.botId) || this.starting.has(record.botId))
+      return;
     this.starting.add(record.botId);
     try {
       await this.startBotInner(record, token);
@@ -115,7 +116,10 @@ export class BotManager {
     }
   }
 
-  private async startBotInner(record: ManagedBot, token: string): Promise<void> {
+  private async startBotInner(
+    record: ManagedBot,
+    token: string,
+  ): Promise<void> {
     // Refresh the username from Telegram so the stored record (and the admin UI)
     // reflects the bot's current @username even if it was renamed in @BotFather.
     // A throwaway client is used purely for the getMe call (it is never started,
@@ -156,7 +160,9 @@ export class BotManager {
     const bot = createBot(deps);
     await bot.api
       .deleteWebhook()
-      .catch((err) => console.error(`[managed-bots] deleteWebhook failed:`, err));
+      .catch((err) =>
+        console.error(`[managed-bots] deleteWebhook failed:`, err),
+      );
     // Sync the Telegram display name to the character's name (best-effort).
     await bot.api
       .setMyName(record.displayName)
@@ -170,22 +176,24 @@ export class BotManager {
     // conflict) out of the polling loop. Left uncaught it would be an unhandled
     // rejection and take down the whole process — main bot included — so a dead
     // character bot is unregistered here and recovery is attempted instead.
-    bot.start({
-      drop_pending_updates: true,
-      allowed_updates: [...ALLOWED_UPDATES],
-    }).catch((err) => {
-      const entry = this.running.get(record.botId);
-      // Already stopped via stopBot/deleteBot, or replaced by a newer
-      // instance — this death is stale and not ours to handle.
-      if (!entry || entry.bot !== bot) return;
-      this.running.delete(record.botId);
-      this.handlePollingCrash(record, token, err).catch((recoverErr) =>
-        console.error(
-          `[managed-bots] crash recovery failed for ${record.botId}:`,
-          recoverErr,
-        ),
-      );
-    });
+    bot
+      .start({
+        drop_pending_updates: true,
+        allowed_updates: [...ALLOWED_UPDATES],
+      })
+      .catch((err) => {
+        const entry = this.running.get(record.botId);
+        // Already stopped via stopBot/deleteBot, or replaced by a newer
+        // instance — this death is stale and not ours to handle.
+        if (!entry || entry.bot !== bot) return;
+        this.running.delete(record.botId);
+        this.handlePollingCrash(record, token, err).catch((recoverErr) =>
+          console.error(
+            `[managed-bots] crash recovery failed for ${record.botId}:`,
+            recoverErr,
+          ),
+        );
+      });
     this.running.set(record.botId, { record, bot });
     console.log(`[managed-bots] started ${record.botId} (@${username})`);
   }
@@ -248,7 +256,9 @@ export class BotManager {
     this.running.delete(botId);
     await entry.bot
       .stop()
-      .catch((err) => console.error(`[managed-bots] stop failed ${botId}:`, err));
+      .catch((err) =>
+        console.error(`[managed-bots] stop failed ${botId}:`, err),
+      );
   }
 
   async stopAll(): Promise<void> {

@@ -39,7 +39,8 @@ export function buildChatSettingsPayload(
 ): ChatSettings {
   const next: ChatSettings = {};
   if (draft.promptOverride) next.systemPrompt = draft.promptValue;
-  if (draft.modelsOverride && draft.models.length > 0) next.models = draft.models;
+  if (draft.modelsOverride && draft.models.length > 0)
+    next.models = draft.models;
   if (draft.botName.length > 0) next.botName = draft.botName;
   if (draft.tzOverride) next.timezone = draft.tzValue;
 

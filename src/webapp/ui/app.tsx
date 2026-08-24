@@ -160,9 +160,7 @@ function AppShell({
         return (
           <ManagedBotEditView
             botId={route.botId}
-            onClose={() =>
-              setRoute({ kind: "admin-section", section: "bots" })
-            }
+            onClose={() => setRoute({ kind: "admin-section", section: "bots" })}
           />
         );
       case "my-reminders":

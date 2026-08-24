@@ -42,7 +42,10 @@ export function summarizeSpend(
   nowMs: number,
 ): SpendSummary {
   const read = (k: string): number => {
-    const v = byDate instanceof Map ? byDate.get(k) : (byDate as Record<string, number>)[k];
+    const v =
+      byDate instanceof Map
+        ? byDate.get(k)
+        : (byDate as Record<string, number>)[k];
     return typeof v === "number" && Number.isFinite(v) ? v : 0;
   };
   const dates = recentUtcDateKeys(nowMs, SPEND_WINDOW_DAYS.month);

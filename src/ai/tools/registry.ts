@@ -37,14 +37,14 @@ export type ToolCallContext = {
   // Snapshot of the messages passed to ai.ask() for the turn this tool
   // call is running inside. Tools that need to durably capture the
   // conversation context (e.g. reminders) read this.
-  contextMessages?: AIMessage[];
+  contextMessages?: AIMessage[] | undefined;
 };
 
 // A tool's input schema. `@openrouter/agent`'s `tool()` requires a zod v4
 // *object* schema; every tool here already uses `z.object(...)` (a `.refine()`d
 // object still satisfies the bound), so narrowing costs nothing and keeps
 // `execute`'s input typed.
-export type ToolParameters<TInput> = $ZodObject<$ZodShape> & z.ZodType<TInput>;
+type ToolParameters<TInput> = $ZodObject<$ZodShape> & z.ZodType<TInput>;
 
 export type Tool<TInput = unknown, TOutput = unknown> = {
   name: string;

@@ -38,7 +38,12 @@ export function getEffectiveProxyForUrl(
     return null;
   }
   if (parsed.protocol === "https:") {
-    return pickEnv(env.HTTPS_PROXY, env.https_proxy, env.HTTP_PROXY, env.http_proxy);
+    return pickEnv(
+      env.HTTPS_PROXY,
+      env.https_proxy,
+      env.HTTP_PROXY,
+      env.http_proxy,
+    );
   }
   return pickEnv(env.HTTP_PROXY, env.http_proxy);
 }

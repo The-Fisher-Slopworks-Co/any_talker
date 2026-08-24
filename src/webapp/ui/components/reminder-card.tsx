@@ -20,10 +20,10 @@ export function ReminderCard({
 }: {
   reminders: Reminder[];
   chats: Record<string, Chat>;
-  users?: Record<string, User>;
-  displayNames?: Record<string, string | null>;
+  users?: Record<string, User> | undefined;
+  displayNames?: Record<string, string | null> | undefined;
   showUserId: boolean;
-  onUserClick?: (userId: string) => void;
+  onUserClick?: ((userId: string) => void) | undefined;
   emptyText: string;
 }) {
   const { t: s } = useI18n();

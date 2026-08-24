@@ -5,9 +5,10 @@ let cached: { areas: string[]; byArea: Map<string, string[]> } | null = null;
 
 function load(): { areas: string[]; byArea: Map<string, string[]> } {
   if (cached) return cached;
-  const supported = (
-    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
-  ).supportedValuesOf?.("timeZone") ?? [];
+  const supported =
+    (
+      Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+    ).supportedValuesOf?.("timeZone") ?? [];
   const byArea = new Map<string, string[]>();
   for (const tz of supported) {
     const slash = tz.indexOf("/");
