@@ -42,7 +42,8 @@ describe("schedule_reminder_in", () => {
     const storage = new MemoryStorage();
     const tool = createScheduleReminderInTool({ storage });
     expect(
-      tool.parameters.safeParse({ amount: 0, unit: "minutes", text: "x" }).success,
+      tool.parameters.safeParse({ amount: 0, unit: "minutes", text: "x" })
+        .success,
     ).toBe(false);
   });
 
@@ -72,7 +73,9 @@ describe("schedule_reminder_in", () => {
       guestCtx,
     );
     expect(out).toEqual({ ok: false, reason: expect.stringContaining("DM") });
-    expect(await storage.fetchDueReminders(askCtx.now + 60 * 60_000)).toEqual([]);
+    expect(await storage.fetchDueReminders(askCtx.now + 60 * 60_000)).toEqual(
+      [],
+    );
   });
 
   test("guest: persists with guest_dm target after recordPrivateChat", async () => {

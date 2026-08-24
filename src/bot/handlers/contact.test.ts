@@ -22,7 +22,9 @@ const baseInput = (overrides: Partial<ContactInput> = {}): ContactInput => ({
 describe("contactHandler", () => {
   test("ignored when chat is not private", async () => {
     const storage = new MemoryStorage();
-    const out = await contactHandler(baseInput({ storage, isPrivateChat: false }));
+    const out = await contactHandler(
+      baseInput({ storage, isPrivateChat: false }),
+    );
     expect(out.kind).toBe("ignored");
     expect(await storage.listWhitelist("users")).toEqual([]);
   });
@@ -132,7 +134,8 @@ describe("contactHandler", () => {
     });
     const out = await contactHandler(baseInput({ storage }));
     expect(out.kind).toBe("alreadyWhitelisted");
-    if (out.kind === "alreadyWhitelisted") expect(out.label).toBe("Alice Smith");
+    if (out.kind === "alreadyWhitelisted")
+      expect(out.label).toBe("Alice Smith");
 
     expect(await storage.listWhitelist("users")).toEqual([
       { id: "42", label: "Old Label" },

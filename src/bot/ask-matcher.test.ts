@@ -59,7 +59,11 @@ test("isPresenceFresh: undefined is never fresh; TTL boundary is inclusive", () 
 });
 
 const bare: AskMatch = { detailLevel: "short", userText: "", explicit: false };
-const explicit: AskMatch = { detailLevel: "short", userText: "", explicit: true };
+const explicit: AskMatch = {
+  detailLevel: "short",
+  userText: "",
+  explicit: true,
+};
 
 test("askGate: an explicit @self mention is always answered", () => {
   expect(askGate(explicit, true, "group", "other")).toBe("answer");
@@ -105,21 +109,21 @@ test("computeAlone: alone when no sibling has a fresh presence record", () => {
   // No siblings present at all → alone.
   expect(computeAlone(["100", "200"], {}, now, BOT_PRESENCE_TTL_MS)).toBe(true);
   // A sibling seen just now → not alone.
-  expect(
-    computeAlone(["100"], { "100": now }, now, BOT_PRESENCE_TTL_MS),
-  ).toBe(false);
+  expect(computeAlone(["100"], { "100": now }, now, BOT_PRESENCE_TTL_MS)).toBe(
+    false,
+  );
   // A different bot present, but not one of our siblings → still alone.
-  expect(
-    computeAlone(["100"], { "999": now }, now, BOT_PRESENCE_TTL_MS),
-  ).toBe(true);
+  expect(computeAlone(["100"], { "999": now }, now, BOT_PRESENCE_TTL_MS)).toBe(
+    true,
+  );
 });
 
 test("computeAlone: a stale presence entry is ignored (treated as absent)", () => {
   const now = 10 * BOT_PRESENCE_TTL_MS;
   const stale = now - BOT_PRESENCE_TTL_MS - 1;
-  expect(computeAlone(["100"], { "100": stale }, now, BOT_PRESENCE_TTL_MS)).toBe(
-    true,
-  );
+  expect(
+    computeAlone(["100"], { "100": stale }, now, BOT_PRESENCE_TTL_MS),
+  ).toBe(true);
   // Exactly at the TTL boundary still counts as present.
   const edge = now - BOT_PRESENCE_TTL_MS;
   expect(computeAlone(["100"], { "100": edge }, now, BOT_PRESENCE_TTL_MS)).toBe(
@@ -141,8 +145,12 @@ test("classifyReplyTarget: own message ⇒ self, present family sibling ⇒ sibl
   const SELF_ID = 42;
   const SIBLINGS = ["100", "200"];
   expect(classifyReplyTarget(42, SELF_ID, SIBLINGS, allPresent)).toBe("self");
-  expect(classifyReplyTarget(100, SELF_ID, SIBLINGS, allPresent)).toBe("sibling");
-  expect(classifyReplyTarget(200, SELF_ID, SIBLINGS, allPresent)).toBe("sibling");
+  expect(classifyReplyTarget(100, SELF_ID, SIBLINGS, allPresent)).toBe(
+    "sibling",
+  );
+  expect(classifyReplyTarget(200, SELF_ID, SIBLINGS, allPresent)).toBe(
+    "sibling",
+  );
   // A human or an unrelated third-party bot is "other".
   expect(classifyReplyTarget(999, SELF_ID, SIBLINGS, allPresent)).toBe("other");
   // No reply at all.
@@ -178,12 +186,22 @@ test("regression: a bare /ask replying to a PRESENT character routes to that cha
   const repliedFrom = CHAR_ID; // the replied-to message was sent by the character
 
   // Main bot's view: the character is a present family sibling → defer.
-  const mainReply = classifyReplyTarget(repliedFrom, MAIN_ID, [String(CHAR_ID)], allPresent);
+  const mainReply = classifyReplyTarget(
+    repliedFrom,
+    MAIN_ID,
+    [String(CHAR_ID)],
+    allPresent,
+  );
   expect(mainReply).toBe("sibling");
   expect(askGate(bare, false, "supergroup", mainReply)).toBe("skip");
 
   // Character bot's view: the reply is to its own message → it answers.
-  const charReply = classifyReplyTarget(repliedFrom, CHAR_ID, [String(MAIN_ID)], allPresent);
+  const charReply = classifyReplyTarget(
+    repliedFrom,
+    CHAR_ID,
+    [String(MAIN_ID)],
+    allPresent,
+  );
   expect(charReply).toBe("self");
   expect(askGate(bare, true, "supergroup", charReply)).toBe("answer");
 });
@@ -195,7 +213,12 @@ test("regression: a bare /ask replying to an ABSENT character falls back to the 
 
   // The character left the chat (or is down) — it is not present. The main bot
   // must answer rather than defer into silence.
-  const mainReply = classifyReplyTarget(repliedFrom, MAIN_ID, [String(CHAR_ID)], nonePresent);
+  const mainReply = classifyReplyTarget(
+    repliedFrom,
+    MAIN_ID,
+    [String(CHAR_ID)],
+    nonePresent,
+  );
   expect(mainReply).toBe("other");
   expect(askGate(bare, false, "supergroup", mainReply)).toBe("answer");
 });

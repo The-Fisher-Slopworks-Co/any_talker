@@ -12,7 +12,10 @@ export async function fetchWithTimeout(
   timeoutLabel: string,
 ): Promise<Response> {
   try {
-    return await proxiedFetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    return await proxiedFetch(input, {
+      ...init,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch (err) {
     if (err instanceof DOMException && err.name === "TimeoutError") {
       throw new Error(`${timeoutLabel} timed out after ${timeoutMs / 1000}s`, {
@@ -23,11 +26,15 @@ export async function fetchWithTimeout(
   }
 }
 
-const PRIVATE_BLOCK_MESSAGE = "Blocked: private and local addresses are not allowed";
+const PRIVATE_BLOCK_MESSAGE =
+  "Blocked: private and local addresses are not allowed";
 
 function isBlockedIPv4(ip: string): boolean {
   const parts = ip.split(".").map((p) => Number(p));
-  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+  if (
+    parts.length !== 4 ||
+    parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)
+  ) {
     return true;
   }
   const [a, b] = parts as [number, number, number, number];
@@ -119,7 +126,10 @@ export type SafeFetchOptions = {
   maxRedirects?: number;
 };
 
-export async function safeFetch(url: string, opts: SafeFetchOptions): Promise<Response> {
+export async function safeFetch(
+  url: string,
+  opts: SafeFetchOptions,
+): Promise<Response> {
   const maxRedirects = opts.maxRedirects ?? 5;
   let currentUrl = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -166,7 +176,11 @@ export async function safeFetch(url: string, opts: SafeFetchOptions): Promise<Re
       opts.timeoutLabel,
     );
 
-    if (response.status >= 300 && response.status < 400 && response.status !== 304) {
+    if (
+      response.status >= 300 &&
+      response.status < 400 &&
+      response.status !== 304
+    ) {
       const location = response.headers.get("location");
       if (!location) return response;
       currentUrl = new URL(location, currentUrl).toString();
@@ -177,7 +191,10 @@ export async function safeFetch(url: string, opts: SafeFetchOptions): Promise<Re
   throw new Error(`Too many redirects (>${maxRedirects})`);
 }
 
-export async function readTextCapped(response: Response, maxBytes: number): Promise<string> {
+export async function readTextCapped(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
   const declared = Number(response.headers.get("content-length") ?? "");
   if (Number.isFinite(declared) && declared > maxBytes) {
     throw new Error(`Response too large (${declared} bytes)`);

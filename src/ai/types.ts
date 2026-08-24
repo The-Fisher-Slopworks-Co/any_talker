@@ -33,7 +33,7 @@ export type AIMessage =
   // items (`responses-input.ts` expands it into `function_call` +
   // `function_call_output`). Call and result travel together so a replay can
   // never emit a call the request has no result for.
-  | ToolCallRecord & { role: "tool" };
+  | (ToolCallRecord & { role: "tool" });
 
 // The stored form (reminder context snapshots). Deliberately has no video
 // variant: a whole clip is up to 20 MB, and base64'ing that into a reminder

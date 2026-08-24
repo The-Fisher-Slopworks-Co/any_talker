@@ -8,10 +8,7 @@
 // there is no longer an HTML sanitizer here.
 
 export function escapeHtmlText(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function escapeAttrValue(value: string): string {

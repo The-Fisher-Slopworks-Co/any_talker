@@ -81,7 +81,9 @@ describe("pickVideo", () => {
     expect(pickVideo({ video_note: { file_id: "vn" } })?.kind).toBe(
       "video_note",
     );
-    expect(pickVideo({ animation: { file_id: "gif" } })?.kind).toBe("animation");
+    expect(pickVideo({ animation: { file_id: "gif" } })?.kind).toBe(
+      "animation",
+    );
   });
 
   test("optional metadata degrades to zero duration / no size / no thumbnail", () => {

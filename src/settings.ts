@@ -44,9 +44,7 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
 // token-bucket `capacity` (the old burst budget) maps to the 5-hour budget;
 // everything else falls back to defaults. Tolerant of missing/invalid fields so
 // old `at:settings` rows load without a migration (schema-on-read).
-function normalizeRateLimit(
-  rl: RateLimitConfig | undefined,
-): RateLimitConfig {
+function normalizeRateLimit(rl: RateLimitConfig | undefined): RateLimitConfig {
   const def = DEFAULT_SETTINGS.rateLimit;
   const legacy = (rl ?? {}) as Partial<RateLimitConfig> & { capacity?: number };
   const fiveHourTokens =
@@ -60,7 +58,9 @@ function normalizeRateLimit(
       ? legacy.weeklyTokens
       : def.weeklyTokens;
   const ownerExempt =
-    typeof legacy.ownerExempt === "boolean" ? legacy.ownerExempt : def.ownerExempt;
+    typeof legacy.ownerExempt === "boolean"
+      ? legacy.ownerExempt
+      : def.ownerExempt;
   // /askwise must never cost less than /ask, so the multiplier is floored at 1.
   const wiseMultiplier =
     typeof legacy.wiseMultiplier === "number" && legacy.wiseMultiplier >= 1
@@ -78,7 +78,10 @@ function normalizeBudget(b: BudgetConfig | undefined): BudgetConfig {
   return {
     enabled: bool(legacy.enabled, def.enabled),
     ownerExempt: bool(legacy.ownerExempt, def.ownerExempt),
-    globalMonthlyCapUsd: num(legacy.globalMonthlyCapUsd, def.globalMonthlyCapUsd),
+    globalMonthlyCapUsd: num(
+      legacy.globalMonthlyCapUsd,
+      def.globalMonthlyCapUsd,
+    ),
     globalDailyCapUsd: num(legacy.globalDailyCapUsd, def.globalDailyCapUsd),
     perChatDailyCapUsd: num(legacy.perChatDailyCapUsd, def.perChatDailyCapUsd),
     newUserDailyCapUsd: num(legacy.newUserDailyCapUsd, def.newUserDailyCapUsd),
@@ -91,16 +94,28 @@ function normalizeAnomaly(a: AnomalyConfig | undefined): AnomalyConfig {
   const def = DEFAULT_SETTINGS.anomaly;
   const legacy = (a ?? {}) as Partial<AnomalyConfig>;
   return {
-    digestIntervalHours: posInt(legacy.digestIntervalHours, def.digestIntervalHours),
-    spikeUserAbsoluteUsd: num(legacy.spikeUserAbsoluteUsd, def.spikeUserAbsoluteUsd),
-    spikeChatAbsoluteUsd: num(legacy.spikeChatAbsoluteUsd, def.spikeChatAbsoluteUsd),
+    digestIntervalHours: posInt(
+      legacy.digestIntervalHours,
+      def.digestIntervalHours,
+    ),
+    spikeUserAbsoluteUsd: num(
+      legacy.spikeUserAbsoluteUsd,
+      def.spikeUserAbsoluteUsd,
+    ),
+    spikeChatAbsoluteUsd: num(
+      legacy.spikeChatAbsoluteUsd,
+      def.spikeChatAbsoluteUsd,
+    ),
     // A multiplier below 1 would flag every spender; floor it at 1.
     spikeVelocityMultiplier:
       typeof legacy.spikeVelocityMultiplier === "number" &&
       legacy.spikeVelocityMultiplier >= 1
         ? legacy.spikeVelocityMultiplier
         : def.spikeVelocityMultiplier,
-    spikeMinBaselineUsd: num(legacy.spikeMinBaselineUsd, def.spikeMinBaselineUsd),
+    spikeMinBaselineUsd: num(
+      legacy.spikeMinBaselineUsd,
+      def.spikeMinBaselineUsd,
+    ),
   };
 }
 
@@ -141,7 +156,9 @@ function normalize(s: Settings): Settings {
   // Routing is validated on read, not just on write: a hand-edited or corrupted
   // row would otherwise reach the request body, where a bad value fails every
   // ask rather than one save. Invalid ⇒ null ⇒ the field is simply not sent.
-  const providerSort = isValidProviderSort(s.providerSort) ? s.providerSort : null;
+  const providerSort = isValidProviderSort(s.providerSort)
+    ? s.providerSort
+    : null;
   const provider = isValidProviderSlug(s.provider) ? s.provider : null;
   const serviceTier = isValidServiceTier(s.serviceTier) ? s.serviceTier : null;
   // Field-by-field return (no `...s` spread) so keys no longer in the schema are

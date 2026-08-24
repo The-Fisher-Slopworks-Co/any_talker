@@ -161,7 +161,9 @@ describe("calculator tool — whitespace", () => {
   test("empty / whitespace-only input fails", () => {
     // Empty string is rejected by zod (min(1)); whitespace-only goes to the
     // parser, which fails on EOF.
-    expect(calculatorTool.parameters.safeParse({ expression: "" }).success).toBe(false);
+    expect(
+      calculatorTool.parameters.safeParse({ expression: "" }).success,
+    ).toBe(false);
     expect(() => evaluate("   ")).toThrow(/parse error/i);
   });
 });
@@ -206,12 +208,16 @@ describe("calculator tool — errors", () => {
     // NaN/Infinity slip through bare evaluate() but are caught when the tool
     // formats the result for the model — that's what the model actually sees.
     expect(() => formatNumber(evaluate("sqrt(-1)"))).toThrow(/NaN/);
-    expect(() => calculatorTool.execute({ expression: "sqrt(-1)" }, ctx)).toThrow(/NaN/);
+    expect(() =>
+      calculatorTool.execute({ expression: "sqrt(-1)" }, ctx),
+    ).toThrow(/NaN/);
   });
 
   test("infinite result throws (e.g. 1e308 * 1e308)", () => {
     expect(() => formatNumber(evaluate("1e308 * 1e308"))).toThrow(/infinite/);
-    expect(() => calculatorTool.execute({ expression: "1e308 * 1e308" }, ctx)).toThrow(/infinite/);
+    expect(() =>
+      calculatorTool.execute({ expression: "1e308 * 1e308" }, ctx),
+    ).toThrow(/infinite/);
   });
 });
 

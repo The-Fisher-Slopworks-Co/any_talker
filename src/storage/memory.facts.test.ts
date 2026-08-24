@@ -146,9 +146,7 @@ describe("MemoryStorage user facts", () => {
     }
     await s.rememberUserFact("u1", "foo", "lower");
     // Now at the cap (50 items total). Updating "FOO" should still succeed.
-    expect((await s.listUserFacts("u1")).length).toBe(
-      USER_FACTS_MAX_PER_USER,
-    );
+    expect((await s.listUserFacts("u1")).length).toBe(USER_FACTS_MAX_PER_USER);
     expect(await s.rememberUserFact("u1", "FOO", "upper")).toEqual({
       ok: true,
     });

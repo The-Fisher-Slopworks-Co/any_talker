@@ -92,12 +92,18 @@ describe("validateDisplayName", () => {
 
   test("rejects strings over 32 code points", () => {
     const name = "A".repeat(33);
-    expect(validateDisplayName(name)).toEqual({ ok: false, reason: "too_long" });
+    expect(validateDisplayName(name)).toEqual({
+      ok: false,
+      reason: "too_long",
+    });
   });
 
   test("rejects exactly-33 mixed-width chars by code points", () => {
     const name = "李".repeat(33);
-    expect(validateDisplayName(name)).toEqual({ ok: false, reason: "too_long" });
+    expect(validateDisplayName(name)).toEqual({
+      ok: false,
+      reason: "too_long",
+    });
   });
 
   test("accepts exactly 32 code points", () => {

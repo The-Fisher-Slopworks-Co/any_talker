@@ -40,7 +40,10 @@ import { gatherSpendOverview } from "../spending/overview";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
 import { usageShare } from "../ratelimit/share";
 import type { ModelCatalog } from "../ai/model-catalog";
-import { isValidPermaslug, type FetchProviderEndpoints } from "./openrouter-proxy";
+import {
+  isValidPermaslug,
+  type FetchProviderEndpoints,
+} from "./openrouter-proxy";
 
 export type ApiRequest = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -283,8 +286,7 @@ const BAD_ANOMALY: ApiResponse = {
 const nonNegNum = (v: unknown): boolean =>
   v === undefined || (typeof v === "number" && Number.isFinite(v) && v >= 0);
 const posIntOrUndef = (v: unknown): boolean =>
-  v === undefined ||
-  (typeof v === "number" && Number.isInteger(v) && v >= 1);
+  v === undefined || (typeof v === "number" && Number.isInteger(v) && v >= 1);
 const boolOrUndef = (v: unknown): boolean =>
   v === undefined || typeof v === "boolean";
 
@@ -1161,7 +1163,10 @@ export async function handleApi(
         deps.storage.isWhitelisted("chats", id),
       ]);
       if (!chat) return { status: 404, body: { error: "chat not found" } };
-      return { status: 200, body: { chat, settings: settings ?? {}, whitelisted } };
+      return {
+        status: 200,
+        body: { chat, settings: settings ?? {}, whitelisted },
+      };
     }
     if (req.method === "PUT") {
       const chat = await deps.storage.getChat(id);
@@ -1216,7 +1221,8 @@ export async function handleApi(
     const id = mbMatch[1]!;
     if (req.method === "GET") {
       const bot = await deps.storage.getManagedBot(id);
-      if (!bot) return { status: 404, body: { error: "managed bot not found" } };
+      if (!bot)
+        return { status: 404, body: { error: "managed bot not found" } };
       return {
         status: 200,
         body: { bot, running: deps.managedBots?.isRunning(id) ?? false },

@@ -57,7 +57,10 @@ function makeReminder(over: Partial<Reminder> = {}): Reminder {
 describe("migrateChatData", () => {
   test("moves chat settings to the new id, deleting the old key", async () => {
     const storage = new MemoryStorage();
-    await storage.saveChatSettings(OLD, { botName: "Capybara", timezone: "UTC" });
+    await storage.saveChatSettings(OLD, {
+      botName: "Capybara",
+      timezone: "UTC",
+    });
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
@@ -166,9 +169,7 @@ describe("migrateChatData", () => {
       createdAtMs: 0,
     });
     await storage.saveReminder(makeReminder({ id: "r-main" }));
-    await storage
-      .forBot("777")
-      .saveReminder(makeReminder({ id: "r-managed" }));
+    await storage.forBot("777").saveReminder(makeReminder({ id: "r-managed" }));
     await storage.saveReminder(
       makeReminder({
         id: "r-other",
@@ -200,7 +201,10 @@ describe("migrateChatData", () => {
   test("repoints a guest-dm reminder's origin chat but not its target", async () => {
     const storage = new MemoryStorage();
     await storage.saveReminder(
-      makeReminder({ id: "r-guest", target: { kind: "guest_dm", userId: "u1" } }),
+      makeReminder({
+        id: "r-guest",
+        target: { kind: "guest_dm", userId: "u1" },
+      }),
     );
 
     await migrateChatData(storage, OLD, NEW, NOW);
@@ -217,7 +221,10 @@ describe("migrateChatData", () => {
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getBotPresence(NEW)).toEqual({ "111": 5000, "222": 6000 });
+    expect(await storage.getBotPresence(NEW)).toEqual({
+      "111": 5000,
+      "222": 6000,
+    });
     expect(await storage.getBotPresence(OLD)).toEqual({});
   });
 

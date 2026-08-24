@@ -574,7 +574,8 @@ const en: Strings = {
     limitedBy === "weekly"
       ? `Weekly token limit reached. Resets in ~${etaEn(ms)}.`
       : `5-hour token limit reached. Resets in ~${etaEn(ms)}.`,
-  bot_budget_limited: "⚠️ The bot is at capacity right now. Please try again later.",
+  bot_budget_limited:
+    "⚠️ The bot is at capacity right now. Please try again later.",
   bot_owner_budget_cap: (period, spent) =>
     `🛑 Global ${period === "month" ? "monthly" : "daily"} budget cap reached ($${spent} spent). Non-owner requests are blocked until it resets.`,
   bot_owner_new_group: (title, chatId) =>
@@ -609,8 +610,7 @@ const en: Strings = {
   bot_details_summary: "Expand reply",
   bot_contact_no_user_id:
     "This contact isn't on Telegram — nothing to whitelist.",
-  bot_contact_is_owner:
-    "You're already the owner — no whitelist entry needed.",
+  bot_contact_is_owner: "You're already the owner — no whitelist entry needed.",
   bot_contact_already_whitelisted: (label) =>
     `${label} is already whitelisted.`,
   bot_contact_added: (label) => `Added ${label} to the whitelist.`,
@@ -718,8 +718,7 @@ const en: Strings = {
   ui_time_note_local: "Times are shown in your device's local timezone.",
   ui_time_note_tz: (tz) => `Times are shown in the ${tz} timezone.`,
   ui_main_language: "Language",
-  ui_main_language_footer:
-    "Language for the bot UI and AI replies.",
+  ui_main_language_footer: "Language for the bot UI and AI replies.",
   ui_main_lang_english: "English",
   ui_main_lang_russian: "Russian",
   ui_main_reminders: "Reminders",
@@ -736,15 +735,15 @@ const en: Strings = {
   ui_whitelist_allowed_chats: "Allowed Chats",
   ui_whitelist_no_entries: "No entries",
   ui_whitelist_footer_users:
-    "Add entries from a user's page via \"Add to whitelist\".",
+    'Add entries from a user\'s page via "Add to whitelist".',
   ui_whitelist_footer_chats:
-    "Add entries from a chat's page via \"Add to whitelist\".",
+    'Add entries from a chat\'s page via "Add to whitelist".',
 
   ui_blacklist_add: "Add to blacklist",
   ui_blacklist_remove: "Remove from blacklist",
   ui_blacklist_blocked_users: "Blocked Users",
   ui_blacklist_footer:
-    "Blocked users are always denied — even when the whitelist is off, and even in whitelisted chats. Their pending reminders are dropped. Add entries from a user's page via \"Add to blacklist\".",
+    'Blocked users are always denied — even when the whitelist is off, and even in whitelisted chats. Their pending reminders are dropped. Add entries from a user\'s page via "Add to blacklist".',
 
   ui_prompt_models: "Models",
   ui_prompt_system_prompt: "System Prompt",
@@ -885,8 +884,7 @@ const en: Strings = {
   ui_chat_tz: "Timezone",
   ui_chat_tz_on_footer: "Used unless a user has set their own timezone.",
   ui_chat_tz_off_footer: (tz) => `Using global timezone (${tz}).`,
-  ui_chat_prompt_placeholder:
-    "Describe how the bot should behave in this chat",
+  ui_chat_prompt_placeholder: "Describe how the bot should behave in this chat",
   ui_chat_keyword_filter: "Keyword Filter",
   ui_chat_keyword_filter_enabled: "Enabled",
   ui_chat_keyword_filter_placeholder: "word1, word2, word3",
@@ -938,7 +936,7 @@ const en: Strings = {
   ui_route_check_edit: "Edit Check",
   ui_route_check_create: "New Check",
   ui_checks_all: "Recurring Checks",
-  ui_checks_empty: "No checks yet. Tap \"New check\" to create one.",
+  ui_checks_empty: 'No checks yet. Tap "New check" to create one.',
   ui_checks_footer:
     "Each check sends a question at a daily time. The target user taps Yes/No; non-answers time out as No.",
   ui_checks_create: "New check",
@@ -964,18 +962,16 @@ const en: Strings = {
   ui_check_schedule_footer:
     "Daily wall-clock time in the timezone below. The bot fires at most once per day.",
   ui_check_timezone: "Timezone",
-  ui_check_timezone_footer:
-    "Timezone used to interpret the daily time above.",
+  ui_check_timezone_footer: "Timezone used to interpret the daily time above.",
   ui_check_timeout: "Timeout (minutes)",
   ui_check_timeout_footer:
     "If the user hasn't clicked within this many minutes, the check resolves as if they tapped No.",
   ui_check_question: "Question",
-  ui_check_question_placeholder:
-    "{name}, did you do sport today?",
+  ui_check_question_placeholder: "{name}, did you do sport today?",
   ui_check_question_footer:
     "Sent at the scheduled time. {name} becomes a clickable mention that pings the user; {count} is the current counter.",
-  ui_check_yes_button: "\"Yes\" button label",
-  ui_check_no_button: "\"No\" button label",
+  ui_check_yes_button: '"Yes" button label',
+  ui_check_no_button: '"No" button label',
   ui_check_yes_reply: "Reply when Yes",
   ui_check_yes_reply_placeholder:
     "{name}, at least don't lie to yourself. Day without sport {count}",
@@ -993,7 +989,7 @@ const en: Strings = {
     "Manual: counter is stored and adjusted on each answer. Days since a date: {count} is computed live as the number of days from the anchor date to today in the check's timezone.",
   ui_check_counter_anchor_date: "Anchor date",
   ui_check_counter_anchor_date_footer:
-    "{count} = days from this date to today. With \"Reset to 0 on Yes\", a Yes answer moves the anchor to today.",
+    '{count} = days from this date to today. With "Reset to 0 on Yes", a Yes answer moves the anchor to today.',
   ui_check_counter_mode: "Counter on Yes",
   ui_check_counter_mode_always: "Always increment (trolling mode)",
   ui_check_counter_mode_reset: "Reset to 0 (real streak)",
@@ -1094,7 +1090,8 @@ const ru: Strings = {
   bot_digest_col_denials: "Отказов",
   bot_digest_unpriced: (models) =>
     `⚠️ Модели без данных о стоимости (траты занижены): ${models}`,
-  bot_digest_empty: "Пока не о чем отчитываться — ни трат, ни новых юзеров, ни отказов.",
+  bot_digest_empty:
+    "Пока не о чем отчитываться — ни трат, ни новых юзеров, ни отказов.",
   bot_usage_header: "📊 Израсходовано лимита",
   bot_usage_line: (window, used) =>
     `${window === "weekly" ? "Неделя" : "5 часов"}: ${used}%`,
@@ -1106,8 +1103,7 @@ const ru: Strings = {
     "Этот контакт не зарегистрирован в Telegram — добавлять в белый список нечего.",
   bot_contact_is_owner:
     "Ты уже владелец бота — запись в белом списке не нужна.",
-  bot_contact_already_whitelisted: (label) =>
-    `${label} уже в белом списке.`,
+  bot_contact_already_whitelisted: (label) => `${label} уже в белом списке.`,
   bot_contact_added: (label) => `${label} добавлен(а) в белый список.`,
   bot_check_wrong_user: "Этот вопрос адресован не тебе.",
   bot_reminder_scheduled: (p) => {
@@ -1192,8 +1188,7 @@ const ru: Strings = {
   ui_main_name_err_too_long: "Слишком длинное (макс. 32 символа).",
   ui_main_name_err_multiline: "Переносы строк недопустимы.",
   ui_main_name_err_control_char: "Содержит скрытые или невидимые символы.",
-  ui_main_name_err_charset:
-    "Допустимы только буквы, цифры, пробел и . ' -",
+  ui_main_name_err_charset: "Допустимы только буквы, цифры, пробел и . ' -",
   ui_main_name_err_blocked_token: "Содержит зарезервированное ключевое слово.",
   ui_main_name_err_no_letter: "Должно содержать хотя бы одну букву.",
   ui_main_gender: "Пол",
@@ -1214,8 +1209,7 @@ const ru: Strings = {
     "Время указано в локальном часовом поясе вашего устройства.",
   ui_time_note_tz: (tz) => `Время указано в часовом поясе ${tz}.`,
   ui_main_language: "Язык",
-  ui_main_language_footer:
-    "Язык интерфейса бота и ответов ИИ.",
+  ui_main_language_footer: "Язык интерфейса бота и ответов ИИ.",
   ui_main_lang_english: "Английский",
   ui_main_lang_russian: "Русский",
   ui_main_reminders: "Напоминания",
@@ -1377,13 +1371,11 @@ const ru: Strings = {
   ui_chat_provider_off_footer: (provider) =>
     `Используется глобальный провайдер (${provider}).`,
   ui_chat_service_tier: "Тариф обслуживания",
-  ui_chat_service_tier_on_footer:
-    "Тариф обработки запросов в этом чате.",
+  ui_chat_service_tier_on_footer: "Тариф обработки запросов в этом чате.",
   ui_chat_service_tier_off_footer: (tier) =>
     `Используется глобальный тариф (${tier}).`,
   ui_chat_tz: "Часовой пояс",
-  ui_chat_tz_on_footer:
-    "Используется, если у пользователя нет своего пояса.",
+  ui_chat_tz_on_footer: "Используется, если у пользователя нет своего пояса.",
   ui_chat_tz_off_footer: (tz) => `Используется глобальный пояс (${tz}).`,
   ui_chat_prompt_placeholder: "Опиши, как должен вести себя бот в этом чате",
   ui_chat_keyword_filter: "Фильтр по ключевым словам",
@@ -1397,11 +1389,9 @@ const ru: Strings = {
 
   ui_reminders_upcoming: "Предстоящие",
   ui_reminders_empty_my: "Напоминаний не запланировано.",
-  ui_reminders_footer_my:
-    "Попроси бота в чате запланировать напоминание.",
+  ui_reminders_footer_my: "Попроси бота в чате запланировать напоминание.",
   ui_reminders_admin_header: "Все напоминания",
-  ui_reminders_admin_empty:
-    "Никто пока не запланировал напоминаний.",
+  ui_reminders_admin_empty: "Никто пока не запланировал напоминаний.",
   ui_reminders_admin_footer:
     "Ожидающие напоминания всех пользователей. Доставки с временными ошибками остаются до успешной или окончательной ошибки.",
   ui_reminders_dm: "ЛС",
@@ -1471,8 +1461,7 @@ const ru: Strings = {
   ui_check_timeout_footer:
     "Если за это время пользователь не нажал кнопку, чек резолвится как «Нет».",
   ui_check_question: "Вопрос",
-  ui_check_question_placeholder:
-    "{name}, занялся ли ты сегодня спортом?",
+  ui_check_question_placeholder: "{name}, занялся ли ты сегодня спортом?",
   ui_check_question_footer:
     "Отправляется в назначенное время. {name} — кликабельное упоминание, пингующее пользователя; {count} — текущий счётчик.",
   ui_check_yes_button: "Подпись кнопки «Да»",
@@ -1496,8 +1485,7 @@ const ru: Strings = {
   ui_check_counter_anchor_date_footer:
     "{count} — количество дней от этой даты до сегодня. При режиме «Сбрасывать в 0 при Да» ответ «Да» переносит опорную дату на сегодня.",
   ui_check_counter_mode: "Счётчик при «Да»",
-  ui_check_counter_mode_always:
-    "Всегда увеличивать (режим подколки)",
+  ui_check_counter_mode_always: "Всегда увеличивать (режим подколки)",
   ui_check_counter_mode_reset: "Сбрасывать в 0 (настоящий стрик)",
   ui_check_counter_mode_footer:
     "«Всегда увеличивать» — счётчик растёт независимо от ответа. «Сбрасывать» — обнуляется при «Да».",
@@ -1515,7 +1503,8 @@ const ru: Strings = {
   ui_check_save_validation_error: (code) => `Ошибка валидации: ${code}`,
 
   ui_admin_bots: "Боты-персонажи",
-  ui_admin_bots_desc: "Управляемые боты — дополнительные персонажи со своей персоной",
+  ui_admin_bots_desc:
+    "Управляемые боты — дополнительные персонажи со своей персоной",
   ui_route_bot_edit: "Редактирование бота",
   ui_route_bot_create: "Новый бот",
   ui_mbots_all: "Ваши боты-персонажи",

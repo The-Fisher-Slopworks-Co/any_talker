@@ -37,7 +37,9 @@ export function evaluate(input: string): number {
   const ALLOWED = /^[\s0-9a-zA-Z_.+\-*/%^(),]*$/;
   if (!ALLOWED.test(input)) {
     const bad = [...input].find((c) => !/[\s0-9a-zA-Z_.+\-*/%^(),]/.test(c));
-    throw new Error(`Calculator parse error: illegal character ${JSON.stringify(bad)}`);
+    throw new Error(
+      `Calculator parse error: illegal character ${JSON.stringify(bad)}`,
+    );
   }
   const tokens = tokenize(input);
   const parser = new Parser(tokens);
@@ -66,14 +68,7 @@ export function formatNumber(n: number): string {
 // Tokenizer
 // ---------------------------------------------------------------------------
 
-type TokenType =
-  | "num"
-  | "ident"
-  | "op"
-  | "lparen"
-  | "rparen"
-  | "comma"
-  | "eof";
+type TokenType = "num" | "ident" | "op" | "lparen" | "rparen" | "comma" | "eof";
 
 type Token = {
   type: TokenType;
@@ -140,7 +135,9 @@ function tokenize(src: string): Token[] {
       // Reject something like "1.2.3" which the loop above already wouldn't
       // produce, but be defensive.
       if (!/^(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/.test(raw)) {
-        throw new Error(`Calculator parse error: malformed number ${JSON.stringify(raw)}`);
+        throw new Error(
+          `Calculator parse error: malformed number ${JSON.stringify(raw)}`,
+        );
       }
       tokens.push({ type: "num", value: raw, pos: start });
       continue;
@@ -150,12 +147,18 @@ function tokenize(src: string): Token[] {
       while (i < src.length && isIdentCont(src[i]!)) i++;
       // Lowercase here so the parser/evaluator can treat identifiers as
       // case-insensitive without worrying about it everywhere.
-      tokens.push({ type: "ident", value: src.slice(start, i).toLowerCase(), pos: start });
+      tokens.push({
+        type: "ident",
+        value: src.slice(start, i).toLowerCase(),
+        pos: start,
+      });
       continue;
     }
     // Should be unreachable thanks to the ALLOWED regex, but keep the safety
     // net so any future tokenizer gap surfaces clearly.
-    throw new Error(`Calculator parse error: unexpected character ${JSON.stringify(c)} at position ${i}`);
+    throw new Error(
+      `Calculator parse error: unexpected character ${JSON.stringify(c)} at position ${i}`,
+    );
   }
   tokens.push({ type: "eof", value: "", pos: src.length });
   return tokens;
@@ -234,7 +237,10 @@ class Parser {
 
   parseExpression(): Node {
     let lhs = this.parseTerm();
-    while (this.peek().type === "op" && (this.peek().value === "+" || this.peek().value === "-")) {
+    while (
+      this.peek().type === "op" &&
+      (this.peek().value === "+" || this.peek().value === "-")
+    ) {
       const op = this.advance().value as "+" | "-";
       const rhs = this.parseTerm();
       lhs = { kind: "bin", op, lhs, rhs };
@@ -246,7 +252,9 @@ class Parser {
     let lhs = this.parseUnary();
     while (
       this.peek().type === "op" &&
-      (this.peek().value === "*" || this.peek().value === "/" || this.peek().value === "%")
+      (this.peek().value === "*" ||
+        this.peek().value === "/" ||
+        this.peek().value === "%")
     ) {
       const op = this.advance().value as "*" | "/" | "%";
       const rhs = this.parseUnary();
@@ -358,7 +366,9 @@ function evalNode(node: Node): number {
     case "const": {
       const v = CONSTANTS[node.name];
       if (v === undefined) {
-        throw new Error(`Calculator error: unknown identifier ${JSON.stringify(node.name)}`);
+        throw new Error(
+          `Calculator error: unknown identifier ${JSON.stringify(node.name)}`,
+        );
       }
       return v;
     }
@@ -389,12 +399,16 @@ function evalNode(node: Node): number {
     case "call": {
       const fn = FUNCTIONS[node.name];
       if (!fn) {
-        throw new Error(`Calculator error: unknown function ${JSON.stringify(node.name)}`);
+        throw new Error(
+          `Calculator error: unknown function ${JSON.stringify(node.name)}`,
+        );
       }
       const args = node.args.map(evalNode);
       if (fn.arity === "variadic") {
         if (args.length === 0) {
-          throw new Error(`Calculator error: ${node.name}() requires at least one argument`);
+          throw new Error(
+            `Calculator error: ${node.name}() requires at least one argument`,
+          );
         }
         return fn.fn(args);
       }

@@ -8,7 +8,11 @@ import type { RateLimitConfig, ToolCallRecord } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import { recordSpend } from "../spending/record";
 import { conversationSessionId } from "./session";
-import { getAllTools, type ToolCallSource, type ToolEffect } from "./tools/registry";
+import {
+  getAllTools,
+  type ToolCallSource,
+  type ToolEffect,
+} from "./tools/registry";
 import {
   buildInstruction,
   detailLevelMultiplier,
@@ -144,7 +148,11 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
       ? detailLevelMultiplier(input.detailLevel, input.rateLimit)
       : 1;
     const deduction = Math.round(result.totalTokens * multiplier);
-    const deducting = input.rateLimiter.deduct(input.userId, deduction, input.now);
+    const deducting = input.rateLimiter.deduct(
+      input.userId,
+      deduction,
+      input.now,
+    );
     if (input.bestEffortDeduct) {
       await deducting.catch((err) =>
         console.error("token deduction failed:", err),

@@ -55,7 +55,12 @@ export async function transcodeOggToMp3(
         "4",
         "pipe:1",
       ],
-      { stdin: input, stdout: "pipe", stderr: "ignore", signal: controller.signal },
+      {
+        stdin: input,
+        stdout: "pipe",
+        stderr: "ignore",
+        signal: controller.signal,
+      },
     );
     const [bytes, code] = await Promise.all([
       new Response(proc.stdout).arrayBuffer(),

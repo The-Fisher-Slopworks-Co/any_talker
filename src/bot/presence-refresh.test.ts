@@ -34,7 +34,13 @@ test("refreshes on edited content and callback queries", () => {
   expect(
     shouldRefreshPresence({
       update_id: 2,
-      edited_message: { message_id: 1, date: 0, chat: CHAT, from: USER, text: "x" },
+      edited_message: {
+        message_id: 1,
+        date: 0,
+        chat: CHAT,
+        from: USER,
+        text: "x",
+      },
     } as unknown as Update),
   ).toBe(true);
   expect(

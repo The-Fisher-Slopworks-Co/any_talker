@@ -20,7 +20,9 @@ export function detailLevelMultiplier(
   }
 }
 
-export function detailLevelReasoningEffort(level: DetailLevel): ReasoningEffort {
+export function detailLevelReasoningEffort(
+  level: DetailLevel,
+): ReasoningEffort {
   switch (level) {
     case "short":
       return "low";

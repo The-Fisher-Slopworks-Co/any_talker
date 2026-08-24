@@ -129,7 +129,9 @@ describe("Registry", () => {
   test("rejects duplicate metric names", () => {
     const r = new Registry();
     r.register(new Counter("x", "x"));
-    expect(() => r.register(new Counter("x", "x"))).toThrow(/already registered/);
+    expect(() => r.register(new Counter("x", "x"))).toThrow(
+      /already registered/,
+    );
   });
 
   test("collector exceptions don't break rendering", () => {

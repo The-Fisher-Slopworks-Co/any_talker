@@ -66,8 +66,7 @@ export async function resolveCheck(args: {
   }
 
   const { replyCount, patch } = applyAnswer(check, answer, nowMs);
-  const replyTemplate =
-    answer === "yes" ? check.yesReply : check.noReply;
+  const replyTemplate = answer === "yes" ? check.yesReply : check.noReply;
   const reply = formatReply(replyTemplate, {
     name: check.targetName,
     count: replyCount,

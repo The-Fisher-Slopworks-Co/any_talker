@@ -84,7 +84,9 @@ describe("MESSAGES parity", () => {
         minute: 0,
         timezone: "Asia/Yekaterinburg",
       }),
-    ).toBe("Было создано напоминание на 07.05.2026 в 10:00 (Asia/Yekaterinburg)");
+    ).toBe(
+      "Было создано напоминание на 07.05.2026 в 10:00 (Asia/Yekaterinburg)",
+    );
   });
 
   test("bot_reminder_scheduled renders EN with YYYY-MM-DD", () => {

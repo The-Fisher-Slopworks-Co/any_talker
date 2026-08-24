@@ -100,7 +100,9 @@ describe("list_reminders", () => {
     // No lone surrogate survives the cut.
     const loneSurrogate = [...note].some(
       (c) =>
-        c.length === 1 && c.charCodeAt(0) >= 0xd800 && c.charCodeAt(0) <= 0xdfff,
+        c.length === 1 &&
+        c.charCodeAt(0) >= 0xd800 &&
+        c.charCodeAt(0) <= 0xdfff,
     );
     expect(loneSurrogate).toBe(false);
   });

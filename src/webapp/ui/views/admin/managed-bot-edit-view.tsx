@@ -56,7 +56,10 @@ function CreateBotForm() {
   const [username, setUsername] = useState("");
 
   useEffect(() => {
-    api.getManagedBotNewInfo().then(setInfo).catch(() => setInfo(null));
+    api
+      .getManagedBotNewInfo()
+      .then(setInfo)
+      .catch(() => setInfo(null));
   }, []);
 
   if (info === null) return <LoadingState />;
@@ -78,7 +81,9 @@ function CreateBotForm() {
       {!info.canManageBots && (
         <Card>
           <div className={ROW_CLS}>
-            <span className={ROW_LABEL_CLS}>{s.ui_mbot_create_need_manage}</span>
+            <span className={ROW_LABEL_CLS}>
+              {s.ui_mbot_create_need_manage}
+            </span>
           </div>
         </Card>
       )}
@@ -244,9 +249,7 @@ function EditBotForm({
       </Card>
       <SectionFooter>{avatarMsg ?? s.ui_mbot_avatar_footer}</SectionFooter>
 
-      {error && (
-        <SectionFooter>{s.ui_mbot_save_error(error)}</SectionFooter>
-      )}
+      {error && <SectionFooter>{s.ui_mbot_save_error(error)}</SectionFooter>}
 
       <SaveButton
         saving={saving}

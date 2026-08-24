@@ -21,7 +21,11 @@ async function makeInitData(params: Record<string, string>): Promise<string> {
     false,
     ["sign"],
   );
-  const secret = await crypto.subtle.sign("HMAC", secretKey, enc.encode(BOT_TOKEN));
+  const secret = await crypto.subtle.sign(
+    "HMAC",
+    secretKey,
+    enc.encode(BOT_TOKEN),
+  );
 
   const signKey = await crypto.subtle.importKey(
     "raw",
@@ -30,8 +34,14 @@ async function makeInitData(params: Record<string, string>): Promise<string> {
     false,
     ["sign"],
   );
-  const sig = await crypto.subtle.sign("HMAC", signKey, enc.encode(dataCheckString));
-  const hash = [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    signKey,
+    enc.encode(dataCheckString),
+  );
+  const hash = [...new Uint8Array(sig)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
   const all = { ...params, hash };
   return new URLSearchParams(all).toString();

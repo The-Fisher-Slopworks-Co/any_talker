@@ -278,7 +278,10 @@ export class KeyDBStorage implements Storage {
     return raw ? (JSON.parse(raw) as WhitelistEntry[]) : [];
   }
 
-  async addWhitelist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void> {
+  async addWhitelist(
+    kind: WhitelistKind,
+    entry: WhitelistEntry,
+  ): Promise<void> {
     const list = await this.listWhitelist(kind);
     const next = [...list.filter((e) => e.id !== entry.id), { ...entry }];
     await this.client.set(`${PREFIX}whitelist:${kind}`, JSON.stringify(next));
@@ -360,7 +363,10 @@ export class KeyDBStorage implements Storage {
     return await this.client.get(`${PREFIX}user_tz:${userId}`);
   }
 
-  async setUserTimezone(userId: string, timezone: string | null): Promise<void> {
+  async setUserTimezone(
+    userId: string,
+    timezone: string | null,
+  ): Promise<void> {
     const key = `${PREFIX}user_tz:${userId}`;
     if (timezone === null) await this.client.del(key);
     else await this.client.set(key, timezone);
@@ -420,7 +426,9 @@ export class KeyDBStorage implements Storage {
     nowMs: number,
   ): Promise<SpendSummary> {
     const dates = recentUtcDateKeys(nowMs, SPEND_WINDOW_DAYS.month);
-    const raws = await this.client.mget(...dates.map((d) => `${keyPrefix}:${d}`));
+    const raws = await this.client.mget(
+      ...dates.map((d) => `${keyPrefix}:${d}`),
+    );
     const byDate: Record<string, number> = {};
     for (let i = 0; i < dates.length; i++) {
       const raw = raws[i];
@@ -663,7 +671,10 @@ export class KeyDBStorage implements Storage {
     return raw ? (JSON.parse(raw) as ChatSettings) : null;
   }
 
-  async saveChatSettings(chatId: string, settings: ChatSettings): Promise<void> {
+  async saveChatSettings(
+    chatId: string,
+    settings: ChatSettings,
+  ): Promise<void> {
     const key = `${PREFIX}chat_settings:${chatId}`;
     if (isEmptyChatSettings(settings)) {
       await this.client.del(key);
@@ -672,7 +683,10 @@ export class KeyDBStorage implements Storage {
     await this.client.set(key, JSON.stringify(settings));
   }
 
-  async getConversation(chatId: string, botMsgId: number): Promise<ConversationNode | null> {
+  async getConversation(
+    chatId: string,
+    botMsgId: number,
+  ): Promise<ConversationNode | null> {
     const raw = await this.client.get(this.sk(`msg:${chatId}:${botMsgId}`));
     return raw ? (JSON.parse(raw) as ConversationNode) : null;
   }
@@ -738,7 +752,10 @@ export class KeyDBStorage implements Storage {
     return raw ? (JSON.parse(raw) as GuestThreadNode) : null;
   }
 
-  async saveGuestThread(chatId: string, thread: GuestThreadNode): Promise<void> {
+  async saveGuestThread(
+    chatId: string,
+    thread: GuestThreadNode,
+  ): Promise<void> {
     const key = this.sk(`guest_thread:${chatId}`);
     await this.client.set(key, JSON.stringify(thread));
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
@@ -778,7 +795,8 @@ export class KeyDBStorage implements Storage {
     const raws = await this.client.mget(...keys);
     const out: Reminder[] = [];
     const orphans: string[] = [];
-    const corrupted: Array<{ id: string; reason: ReminderParseFailureReason }> = [];
+    const corrupted: Array<{ id: string; reason: ReminderParseFailureReason }> =
+      [];
     for (let i = 0; i < ids.length; i++) {
       const raw = raws[i];
       if (raw === null || raw === undefined) {
@@ -807,17 +825,13 @@ export class KeyDBStorage implements Storage {
       remindersParseFailuresTotal.inc({ reason });
       await this.client
         .del(this.sk(`reminder:${id}`))
-        .catch((err) =>
-          console.error("quarantine del payload failed:", err),
-        );
+        .catch((err) => console.error("quarantine del payload failed:", err));
       orphans.push(id);
     }
     if (orphans.length > 0) {
       await this.client
         .zrem(this.sk("reminders:due"), orphans[0]!, ...orphans.slice(1))
-        .catch((err) =>
-          console.error("zrem orphan reminders failed:", err),
-        );
+        .catch((err) => console.error("zrem orphan reminders failed:", err));
     }
     return out;
   }
@@ -849,11 +863,7 @@ export class KeyDBStorage implements Storage {
   }
 
   async listAllReminders(): Promise<Reminder[]> {
-    const ids = await this.client.zrange(
-      this.sk("reminders:due"),
-      0,
-      -1,
-    );
+    const ids = await this.client.zrange(this.sk("reminders:due"), 0, -1);
     if (ids.length === 0) return [];
     const keys = ids.map((id) => this.sk(`reminder:${id}`));
     const raws = await this.client.mget(...keys);
@@ -922,11 +932,7 @@ export class KeyDBStorage implements Storage {
   }
 
   async saveCheck(check: RecurringCheck): Promise<void> {
-    await this.client.hset(
-      `${PREFIX}checks`,
-      check.id,
-      JSON.stringify(check),
-    );
+    await this.client.hset(`${PREFIX}checks`, check.id, JSON.stringify(check));
   }
 
   async getCheck(id: string): Promise<RecurringCheck | null> {

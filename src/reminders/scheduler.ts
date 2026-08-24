@@ -49,7 +49,13 @@ export async function runReminderTick(deps: {
 }): Promise<void> {
   await Promise.allSettled(
     deps.runtimes.map((runtime) =>
-      runRuntimeTick(runtime, deps.ai, deps.rateLimiter, deps.ownerId, deps.nowMs),
+      runRuntimeTick(
+        runtime,
+        deps.ai,
+        deps.rateLimiter,
+        deps.ownerId,
+        deps.nowMs,
+      ),
     ),
   );
 }

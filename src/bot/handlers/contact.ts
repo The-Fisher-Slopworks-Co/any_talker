@@ -24,7 +24,9 @@ export type ContactOutcome =
   | { kind: "alreadyWhitelisted"; label: string }
   | { kind: "added"; label: string };
 
-export async function contactHandler(input: ContactInput): Promise<ContactOutcome> {
+export async function contactHandler(
+  input: ContactInput,
+): Promise<ContactOutcome> {
   if (!input.isPrivateChat) return { kind: "ignored" };
   if (input.fromUserId !== input.ownerId) return { kind: "ignored" };
 
@@ -40,7 +42,10 @@ export async function contactHandler(input: ContactInput): Promise<ContactOutcom
   const targetId = String(targetUserId);
   if (targetId === input.ownerId) return { kind: "isOwner" };
 
-  const label = composeFullName(input.contact.first_name, input.contact.last_name);
+  const label = composeFullName(
+    input.contact.first_name,
+    input.contact.last_name,
+  );
 
   const [isWl, existing] = await Promise.all([
     input.storage.isWhitelisted("users", targetId),

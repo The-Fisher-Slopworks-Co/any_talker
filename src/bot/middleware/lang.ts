@@ -19,12 +19,10 @@ export function makeLangMiddleware(storage: Storage): MiddlewareFn<BotContext> {
     const userId = from && !from.is_bot ? String(from.id) : null;
 
     const stored = userId
-      ? await storage
-          .getUserLang(userId)
-          .catch((err) => {
-            console.error("getUserLang failed:", err);
-            return null;
-          })
+      ? await storage.getUserLang(userId).catch((err) => {
+          console.error("getUserLang failed:", err);
+          return null;
+        })
       : null;
 
     const lang = resolveLang(stored, from?.language_code);

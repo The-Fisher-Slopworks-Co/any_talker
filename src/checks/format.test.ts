@@ -32,9 +32,7 @@ describe("formatQuestion", () => {
         name: "Nikita",
         count: 0,
       }),
-    ).toBe(
-      `&lt;b&gt;<a href="tg://user?id=42">Nikita</a>&lt;/b&gt; &amp; co`,
-    );
+    ).toBe(`&lt;b&gt;<a href="tg://user?id=42">Nikita</a>&lt;/b&gt; &amp; co`);
   });
 
   test("HTML-escapes special characters inside the name", () => {
@@ -44,9 +42,7 @@ describe("formatQuestion", () => {
         name: `Bob <hax> & "y"`,
         count: 0,
       }),
-    ).toBe(
-      `<a href="tg://user?id=42">Bob &lt;hax&gt; &amp; "y"</a>`,
-    );
+    ).toBe(`<a href="tg://user?id=42">Bob &lt;hax&gt; &amp; "y"</a>`);
   });
 
   test("HTML-escapes special characters in the userId attribute", () => {

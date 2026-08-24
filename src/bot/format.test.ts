@@ -15,7 +15,9 @@ const md = (
   body: string,
   botName: string | null,
   opts: { topBlock?: string; collapseThreshold?: number } = {},
-) => buildRichMarkdown(body, botName, { ...opts, detailsSummary: SUMMARY }).markdown;
+) =>
+  buildRichMarkdown(body, botName, { ...opts, detailsSummary: SUMMARY })
+    .markdown;
 
 describe("buildRichMarkdown", () => {
   test("returns the markdown body unchanged when bot name is null", () => {
@@ -74,9 +76,9 @@ describe("buildRichMarkdown", () => {
   });
 
   test("places the top block before the name and body", () => {
-    expect(md("body", "Helper", { topBlock: "<blockquote>note</blockquote>\n" })).toBe(
-      "<blockquote>note</blockquote>\n\n<b>Helper</b>\n\nbody",
-    );
+    expect(
+      md("body", "Helper", { topBlock: "<blockquote>note</blockquote>\n" }),
+    ).toBe("<blockquote>note</blockquote>\n\n<b>Helper</b>\n\nbody");
   });
 
   test("top block with no bot name", () => {
@@ -88,13 +90,17 @@ describe("buildRichMarkdown", () => {
   test("uses the default collapse threshold when none is given", () => {
     const atThreshold = "a".repeat(DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD);
     expect(md(atThreshold, null)).toBe(atThreshold);
-    const overThreshold = "a".repeat(DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1);
+    const overThreshold = "a".repeat(
+      DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD + 1,
+    );
     expect(md(overThreshold, null)).toContain("<details>");
   });
 
   test("truncates a body exceeding the 32768-char rich-message limit", () => {
     const body = "a".repeat(RICH_MESSAGE_TEXT_MAX + 100);
-    const out = md(body, null, { collapseThreshold: RICH_MESSAGE_TEXT_MAX * 2 });
+    const out = md(body, null, {
+      collapseThreshold: RICH_MESSAGE_TEXT_MAX * 2,
+    });
     expect(out.length).toBeLessThanOrEqual(RICH_MESSAGE_TEXT_MAX);
     expect(out.endsWith("…")).toBe(true);
   });
@@ -111,7 +117,9 @@ describe("buildRichMarkdown", () => {
   test("truncation backs off to a whitespace boundary", () => {
     const head = "x".repeat(RICH_MESSAGE_TEXT_MAX - 2 - 50);
     const body = `${head} ${"y".repeat(100)}`;
-    const out = md(body, null, { collapseThreshold: RICH_MESSAGE_TEXT_MAX * 2 });
+    const out = md(body, null, {
+      collapseThreshold: RICH_MESSAGE_TEXT_MAX * 2,
+    });
     expect(out.length).toBeLessThanOrEqual(RICH_MESSAGE_TEXT_MAX);
     expect(out).not.toContain("y");
     expect(out.endsWith("…")).toBe(true);

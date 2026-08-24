@@ -141,7 +141,10 @@ describe("parseStoredReminder — schema violations", () => {
 
   test("rejects unknown target.kind", () => {
     expectSchemaViolation(
-      stringify({ ...validRecord, target: { kind: "carrier_pigeon", id: "x" } }),
+      stringify({
+        ...validRecord,
+        target: { kind: "carrier_pigeon", id: "x" },
+      }),
     );
   });
 

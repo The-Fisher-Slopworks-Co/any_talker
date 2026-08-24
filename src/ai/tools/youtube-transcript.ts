@@ -26,9 +26,12 @@ const URL_VIDEO_ID_RE =
   /(?:youtube\.com\/(?:watch\?(?:.*?&)??v=|shorts\/|embed\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/;
 
 const Schema = z.object({
-  url: z.string().min(1).describe(
-    "YouTube video URL (watch, youtu.be, m., shorts) or a bare 11-character video ID.",
-  ),
+  url: z
+    .string()
+    .min(1)
+    .describe(
+      "YouTube video URL (watch, youtu.be, m., shorts) or a bare 11-character video ID.",
+    ),
   language: z
     .string()
     .min(2)
@@ -212,7 +215,9 @@ async function firecrawlScrape(
     throw new Error("Firecrawl returned a non-JSON response");
   }
   if (!parsed.success) {
-    throw new Error(`Firecrawl scrape failed: ${parsed.error ?? "success=false"}`);
+    throw new Error(
+      `Firecrawl scrape failed: ${parsed.error ?? "success=false"}`,
+    );
   }
   if (!parsed.data) {
     throw new Error("Firecrawl returned no data");
@@ -220,7 +225,9 @@ async function firecrawlScrape(
   return parsed.data;
 }
 
-export function createYoutubeTranscriptTool(apiKey: string): Tool<Input, string> {
+export function createYoutubeTranscriptTool(
+  apiKey: string,
+): Tool<Input, string> {
   return {
     name: "youtube_transcript",
     description:
@@ -233,10 +240,12 @@ export function createYoutubeTranscriptTool(apiKey: string): Tool<Input, string>
       // JSON (to learn the original language) and the rendered transcript.
       const requested = language ?? ctx.lang;
 
-      const first = await firecrawlScrape(apiKey, watchUrl, [requested], [
-        "rawHtml",
-        "markdown",
-      ]);
+      const first = await firecrawlScrape(
+        apiKey,
+        watchUrl,
+        [requested],
+        ["rawHtml", "markdown"],
+      );
 
       const html = first.rawHtml || first.html || "";
       if (html.length === 0) {
@@ -276,9 +285,12 @@ export function createYoutubeTranscriptTool(apiKey: string): Tool<Input, string>
         originalLang &&
         baseLang(originalLang) !== baseLang(requested)
       ) {
-        const second = await firecrawlScrape(apiKey, watchUrl, [originalLang], [
-          "markdown",
-        ]);
+        const second = await firecrawlScrape(
+          apiKey,
+          watchUrl,
+          [originalLang],
+          ["markdown"],
+        );
         markdown = second.markdown ?? markdown;
       }
 

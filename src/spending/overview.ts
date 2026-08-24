@@ -33,7 +33,11 @@ function hasVisibleSpend(s: SpendSummary): boolean {
 }
 
 export type SpendRow = { id: string; label: string; spend: SpendSummary };
-export type ModelRow = { modelId: string; spend: SpendSummary; unpriced: boolean };
+export type ModelRow = {
+  modelId: string;
+  spend: SpendSummary;
+  unpriced: boolean;
+};
 export type DeniedRow = { userId: string; label: string; count: number };
 export type NewEntity = { id: string; label: string; firstSeenAt: number };
 export type NewChatEntity = NewEntity & { type: ChatType };
@@ -96,7 +100,11 @@ export async function gatherSpendOverview(
   ]);
 
   const topUsers = users
-    .map((u, i): SpendRow => ({ id: u.id, label: userLabel(u), spend: userSpends[i]! }))
+    .map((u, i): SpendRow => ({
+      id: u.id,
+      label: userLabel(u),
+      spend: userSpends[i]!,
+    }))
     .filter((r) => hasVisibleSpend(r.spend))
     .sort(byMonthThenDay)
     .slice(0, opts.limit);
@@ -110,19 +118,21 @@ export async function gatherSpendOverview(
         hasVisibleSpend(spend) &&
         !(opts.excludePrivateChats && chat.type === "private"),
     )
-    .map(({ chat, spend }): SpendRow => ({ id: chat.id, label: chatLabel(chat), spend }))
+    .map(({ chat, spend }): SpendRow => ({
+      id: chat.id,
+      label: chatLabel(chat),
+      spend,
+    }))
     .sort(byMonthThenDay)
     .slice(0, opts.limit);
 
   const unpricedSet = new Set(unpricedModels);
   const models = modelIds
-    .map(
-      (m, i): ModelRow => ({
-        modelId: m,
-        spend: modelSpends[i]!,
-        unpriced: unpricedSet.has(m),
-      }),
-    )
+    .map((m, i): ModelRow => ({
+      modelId: m,
+      spend: modelSpends[i]!,
+      unpriced: unpricedSet.has(m),
+    }))
     // An unpriced model survives an all-zero row: its $0 is "OpenRouter
     // reported no cost", not "no traffic", and the row's ⚠️ marker is the only
     // place the dashboard says so.
@@ -133,7 +143,11 @@ export async function gatherSpendOverview(
   const userById = new Map(users.map((u) => [u.id, u]));
   const topDenied = denied.map((d): DeniedRow => {
     const u = userById.get(d.userId);
-    return { userId: d.userId, label: u ? userLabel(u) : d.userId, count: d.count };
+    return {
+      userId: d.userId,
+      label: u ? userLabel(u) : d.userId,
+      count: d.count,
+    };
   });
 
   // Legacy rows carry firstSeenAt 0 (never "new"); the filter excludes them.
@@ -141,17 +155,19 @@ export async function gatherSpendOverview(
     firstSeenAt > 0 && firstSeenAt >= opts.newSinceMs;
   const newUsers = users
     .filter((u) => isNew(u.firstSeenAt))
-    .map((u): NewEntity => ({ id: u.id, label: userLabel(u), firstSeenAt: u.firstSeenAt }));
+    .map((u): NewEntity => ({
+      id: u.id,
+      label: userLabel(u),
+      firstSeenAt: u.firstSeenAt,
+    }));
   const newChats = chats
     .filter((c) => isNew(c.firstSeenAt))
-    .map(
-      (c): NewChatEntity => ({
-        id: c.id,
-        label: chatLabel(c),
-        type: c.type,
-        firstSeenAt: c.firstSeenAt,
-      }),
-    );
+    .map((c): NewChatEntity => ({
+      id: c.id,
+      label: chatLabel(c),
+      type: c.type,
+      firstSeenAt: c.firstSeenAt,
+    }));
 
   return {
     global,

@@ -136,7 +136,8 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     });
 
   const payload = buildPayload();
-  const wasOverridden = (key: keyof ChatSettings) => original[key] !== undefined;
+  const wasOverridden = (key: keyof ChatSettings) =>
+    original[key] !== undefined;
   const dirty =
     promptOverride !== wasOverridden("systemPrompt") ||
     modelsOverride !== wasOverridden("models") ||
@@ -156,8 +157,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       JSON.stringify(original.keywordFilter ?? null);
 
   const canSave =
-    dirty &&
-    (!modelsOverride || (trimmedModels.length > 0 && modelsValid));
+    dirty && (!modelsOverride || (trimmedModels.length > 0 && modelsValid));
 
   const save = async () => {
     setSaving(true);
@@ -352,7 +352,9 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       <SectionHeader>{s.ui_chat_keyword_filter}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_chat_keyword_filter_enabled}</span>
+          <span className={ROW_LABEL_CLS}>
+            {s.ui_chat_keyword_filter_enabled}
+          </span>
           <span className="flex-1" />
           <Toggle value={kfEnabled} onChange={setKfEnabled} />
         </div>

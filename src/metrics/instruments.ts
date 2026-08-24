@@ -41,12 +41,7 @@ export const commandsTotal = registry.register(
 
 export type AskSource = "ask" | "guest";
 export type AskOutcomeLabel =
-  | "answered"
-  | "denied"
-  | "usage"
-  | "budget_limited"
-  | "rate_limited"
-  | "error";
+  "answered" | "denied" | "usage" | "budget_limited" | "rate_limited" | "error";
 
 export const askTotal = registry.register(
   new Counter(
@@ -239,10 +234,7 @@ const processResidentMemoryBytes = registry.register(
 );
 
 const processHeapUsedBytes = registry.register(
-  new Gauge(
-    "process_heap_used_bytes",
-    "JS heap currently in use, in bytes.",
-  ),
+  new Gauge("process_heap_used_bytes", "JS heap currently in use, in bytes."),
 );
 
 const buildInfo = registry.register(

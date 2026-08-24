@@ -19,7 +19,10 @@ function byName(tools: Tool[], name: string): Tool {
   return tool;
 }
 
-function ctx(botId: string | null, over: Partial<ToolCallContext> = {}): ToolCallContext {
+function ctx(
+  botId: string | null,
+  over: Partial<ToolCallContext> = {},
+): ToolCallContext {
   return {
     source: "ask",
     chatId: "chat-1",
@@ -111,8 +114,12 @@ test("reminders created via a managed bot's tool scope only fire on that bot's s
 
   // The main bot's scheduler does not — neither the base nor the null scope.
   expect(await storage.fetchDueReminders(afterFire)).toHaveLength(0);
-  expect(await storage.forBot(null).fetchDueReminders(afterFire)).toHaveLength(0);
-  expect(await storage.forBot("other-bot").fetchDueReminders(afterFire)).toHaveLength(0);
+  expect(await storage.forBot(null).fetchDueReminders(afterFire)).toHaveLength(
+    0,
+  );
+  expect(
+    await storage.forBot("other-bot").fetchDueReminders(afterFire),
+  ).toHaveLength(0);
 });
 
 test("list_reminders and cancel_reminder are scoped to the calling bot", async () => {
@@ -172,5 +179,7 @@ test("forBot(null) is byte-identical scope to the base main storage", async () =
   const viaNull = await storage.forBot(null).getConversation("chat-9", 100);
   expect(viaNull?.botAnswer).toBe("hello");
   // A managed scope must not see it.
-  expect(await storage.forBot("cat-bot").getConversation("chat-9", 100)).toBeNull();
+  expect(
+    await storage.forBot("cat-bot").getConversation("chat-9", 100),
+  ).toBeNull();
 });

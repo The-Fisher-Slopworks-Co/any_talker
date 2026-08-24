@@ -41,7 +41,10 @@ describe("edit_reminder", () => {
     );
     const tool = createEditReminderTool({ storage });
     const out = await tool.execute({ reminderId: "r1", text: "new note" }, ctx);
-    expect(out).toEqual({ ok: true, fireAt: new Date(2_000_000).toISOString() });
+    expect(out).toEqual({
+      ok: true,
+      fireAt: new Date(2_000_000).toISOString(),
+    });
 
     const saved = await storage.getReminder("r1");
     expect(saved?.text).toBe("new note");
@@ -59,7 +62,10 @@ describe("edit_reminder", () => {
       { reminderId: "r1", newTime: { mode: "in", amount: 2, unit: "minutes" } },
       ctx,
     );
-    expect(out).toEqual({ ok: true, fireAt: new Date(1_120_000).toISOString() });
+    expect(out).toEqual({
+      ok: true,
+      fireAt: new Date(1_120_000).toISOString(),
+    });
     expect((await storage.getReminder("r1"))?.fireAtMs).toBe(1_120_000);
   });
 
@@ -75,7 +81,10 @@ describe("edit_reminder", () => {
       { ...ctx, timezone: "UTC" },
     );
     const expectedMs = Date.UTC(2030, 0, 1, 9, 0);
-    expect(out).toEqual({ ok: true, fireAt: new Date(expectedMs).toISOString() });
+    expect(out).toEqual({
+      ok: true,
+      fireAt: new Date(expectedMs).toISOString(),
+    });
     expect((await storage.getReminder("r1"))?.fireAtMs).toBe(expectedMs);
   });
 
@@ -94,7 +103,10 @@ describe("edit_reminder", () => {
       ctx,
     );
     const expectedMs = 1_000_000 + 60 * 60_000;
-    expect(out).toEqual({ ok: true, fireAt: new Date(expectedMs).toISOString() });
+    expect(out).toEqual({
+      ok: true,
+      fireAt: new Date(expectedMs).toISOString(),
+    });
     const saved = await storage.getReminder("r1");
     expect(saved?.text).toBe("new");
     expect(saved?.fireAtMs).toBe(expectedMs);
@@ -110,7 +122,11 @@ describe("edit_reminder", () => {
       { ...ctx, timezone: "Europe/Moscow", effects },
     );
     expect(effects).toEqual([
-      { type: "reminder_updated", fireAtMs: 1_120_000, timezone: "Europe/Moscow" },
+      {
+        type: "reminder_updated",
+        fireAtMs: 1_120_000,
+        timezone: "Europe/Moscow",
+      },
     ]);
   });
 
@@ -122,7 +138,10 @@ describe("edit_reminder", () => {
     // ctx.now is 1_000_000 ms (1970-01-01T00:16 UTC); the epoch start is in the
     // past relative to it, so it's well under MIN_LEAD.
     const out = await tool.execute(
-      { reminderId: "r1", newTime: { mode: "at", datetime: "1970-01-01T00:00" } },
+      {
+        reminderId: "r1",
+        newTime: { mode: "at", datetime: "1970-01-01T00:00" },
+      },
       { ...ctx, timezone: "UTC", effects },
     );
     expect(out.ok).toBe(false);
@@ -136,7 +155,10 @@ describe("edit_reminder", () => {
     await storage.saveReminder(reminder({ id: "r1", fireAtMs: 1_010_000 }));
     const tool = createEditReminderTool({ storage });
     const out = await tool.execute({ reminderId: "r1", text: "tweak" }, ctx);
-    expect(out).toEqual({ ok: true, fireAt: new Date(1_010_000).toISOString() });
+    expect(out).toEqual({
+      ok: true,
+      fireAt: new Date(1_010_000).toISOString(),
+    });
     expect((await storage.getReminder("r1"))?.text).toBe("tweak");
   });
 

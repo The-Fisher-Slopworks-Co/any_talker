@@ -10,7 +10,9 @@ const msg = (overrides: Partial<Message>): Message => overrides as Message;
 describe("resolveReplyAuthor", () => {
   test("plain message: takes from.first_name", () => {
     expect(
-      resolveReplyAuthor(msg({ from: { id: 1, is_bot: false, first_name: "Alice" } })),
+      resolveReplyAuthor(
+        msg({ from: { id: 1, is_bot: false, first_name: "Alice" } }),
+      ),
     ).toBe("Alice");
   });
 
@@ -32,7 +34,11 @@ describe("resolveReplyAuthor", () => {
 
   test("forwarded from a hidden user: uses sender_user_name", () => {
     const r = msg({
-      forward_origin: { type: "hidden_user", date: 0, sender_user_name: "Anon" },
+      forward_origin: {
+        type: "hidden_user",
+        date: 0,
+        sender_user_name: "Anon",
+      },
     });
     expect(resolveReplyAuthor(r)).toBe("Anon");
   });

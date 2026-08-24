@@ -37,7 +37,10 @@ describe("schedule_reminder_at", () => {
       { datetime: "2020-01-01T00:00", text: "ping" },
       askCtx,
     );
-    expect(out).toEqual({ ok: false, reason: expect.stringContaining("1 minute") });
+    expect(out).toEqual({
+      ok: false,
+      reason: expect.stringContaining("1 minute"),
+    });
   });
 
   test("rejects datetime less than 1 minute from now", async () => {
@@ -48,7 +51,10 @@ describe("schedule_reminder_at", () => {
       { datetime: "2026-05-20T12:00", text: "ping" },
       askCtx,
     );
-    expect(out).toEqual({ ok: false, reason: expect.stringContaining("1 minute") });
+    expect(out).toEqual({
+      ok: false,
+      reason: expect.stringContaining("1 minute"),
+    });
   });
 
   test("rejects unparseable datetime", async () => {
@@ -68,7 +74,10 @@ describe("schedule_reminder_at", () => {
       { datetime: "2026-06-01T10:00", text: "ping" },
       { ...askCtx, timezone: "Not/Real" },
     );
-    expect(out).toEqual({ ok: false, reason: expect.stringContaining("timezone") });
+    expect(out).toEqual({
+      ok: false,
+      reason: expect.stringContaining("timezone"),
+    });
   });
 
   test("guest path requires private chat", async () => {

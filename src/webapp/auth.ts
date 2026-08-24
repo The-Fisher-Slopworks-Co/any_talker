@@ -11,8 +11,7 @@ export type TelegramUser = {
 };
 
 export type VerifyResult =
-  | { ok: true; user: TelegramUser }
-  | { ok: false; reason: string };
+  { ok: true; user: TelegramUser } | { ok: false; reason: string };
 
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -39,7 +38,11 @@ export async function verifyInitData(
     false,
     ["sign"],
   );
-  const secret = await crypto.subtle.sign("HMAC", secretKey, enc.encode(botToken));
+  const secret = await crypto.subtle.sign(
+    "HMAC",
+    secretKey,
+    enc.encode(botToken),
+  );
   const signKey = await crypto.subtle.importKey(
     "raw",
     secret,
@@ -47,12 +50,17 @@ export async function verifyInitData(
     false,
     ["sign"],
   );
-  const sig = await crypto.subtle.sign("HMAC", signKey, enc.encode(dataCheckString));
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    signKey,
+    enc.encode(dataCheckString),
+  );
   const computed = [...new Uint8Array(sig)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  if (!hexDigestsEqual(computed, hash)) return { ok: false, reason: "bad hash" };
+  if (!hexDigestsEqual(computed, hash))
+    return { ok: false, reason: "bad hash" };
 
   const authDate = Number(params.get("auth_date") ?? "0");
   if (!authDate || nowMs - authDate * 1000 > MAX_AGE_MS) {

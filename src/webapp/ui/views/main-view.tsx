@@ -15,7 +15,12 @@ import {
 } from "../../../shared/date-format";
 import { validateDisplayName } from "../../../shared/display-name";
 import { DISPLAY_NAME_ERR_KEY } from "../lib/labels";
-import { Card, SectionFooter, SectionHeader, Stack } from "../components/layout";
+import {
+  Card,
+  SectionFooter,
+  SectionHeader,
+  Stack,
+} from "../components/layout";
 import { RowButton, SaveButton, Toggle } from "../components/controls";
 import { SelectRow } from "../components/select-row";
 import { TimezoneSelect } from "../components/timezone-select";
@@ -209,9 +214,7 @@ export function MainView({
         <>
           <SectionHeader>{s.ui_main_bot_config}</SectionHeader>
           <Card>
-            <RowButton onClick={onOpenAdmin}>
-              {s.ui_main_admin_panel}
-            </RowButton>
+            <RowButton onClick={onOpenAdmin}>{s.ui_main_admin_panel}</RowButton>
           </Card>
         </>
       )}

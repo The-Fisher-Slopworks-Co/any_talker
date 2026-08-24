@@ -18,7 +18,10 @@ const Schema = z.object({
 
 type Input = z.infer<typeof Schema>;
 
-const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+const td = new TurndownService({
+  headingStyle: "atx",
+  codeBlockStyle: "fenced",
+});
 
 export const fetchPageTool: Tool<Input, string> = {
   name: "fetch_page",
@@ -44,7 +47,10 @@ export const fetchPageTool: Tool<Input, string> = {
     const contentType = response.headers.get("content-type") ?? "";
     const body = await readTextCapped(response, MAX_BODY_BYTES);
 
-    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
+    if (
+      !contentType.includes("text/html") &&
+      !contentType.includes("application/xhtml")
+    ) {
       return body.slice(0, MAX_LENGTH);
     }
 

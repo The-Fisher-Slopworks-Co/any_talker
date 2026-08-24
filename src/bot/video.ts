@@ -268,7 +268,9 @@ export function splitJpegFrames(buf: Uint8Array): Uint8Array[] {
   }
   // Copy rather than subarray: a view would pin the whole mjpeg buffer for as
   // long as any single frame is alive.
-  return starts.map((start, i) => buf.slice(start, starts[i + 1] ?? buf.length));
+  return starts.map((start, i) =>
+    buf.slice(start, starts[i + 1] ?? buf.length),
+  );
 }
 
 // The slice of `Bun.spawn` this module uses, narrowed so tests can inject a
@@ -345,7 +347,9 @@ export async function extractVideoMedia(args: {
       spawn,
     );
     const frames = raw ? splitJpegFrames(raw).slice(0, args.maxFrames) : [];
-    const audio = args.withAudio ? await runFfmpeg(audioArgs(path), spawn) : null;
+    const audio = args.withAudio
+      ? await runFfmpeg(audioArgs(path), spawn)
+      : null;
     return { frames, audio };
   } catch (err) {
     console.error("video extraction failed:", err);

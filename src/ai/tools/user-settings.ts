@@ -7,7 +7,10 @@ import type { Storage } from "../../storage/types";
 import type { Gender, UserSettingChange } from "../../shared/types";
 import { canonicalizeTimezone, composeFullName } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
-import { readValidDisplayName, validateDisplayName } from "../../shared/display-name";
+import {
+  readValidDisplayName,
+  validateDisplayName,
+} from "../../shared/display-name";
 import { getEffectiveSettings } from "../../settings";
 
 // Shared doc fragment so both tools describe the same scope/semantics to the
@@ -56,7 +59,10 @@ function createGetUserSettingsTool(deps: {
       // this turn (user → chat → global, and user → Telegram → default); the
       // overrides only decide the isDefault flag.
       return {
-        name: { value: nameOverride ?? telegramName, isDefault: nameOverride === null },
+        name: {
+          value: nameOverride ?? telegramName,
+          isDefault: nameOverride === null,
+        },
         timezone: { value: ctx.timezone, isDefault: tzOverride === null },
         gender: { value: gender },
         language: { value: ctx.lang, isDefault: langOverride === null },
@@ -84,7 +90,9 @@ const UpdateSchema = z
       v.gender !== undefined ||
       v.language !== undefined ||
       (v.clear?.length ?? 0) > 0,
-    { message: "provide at least one field to set, or a non-empty `clear` list" },
+    {
+      message: "provide at least one field to set, or a non-empty `clear` list",
+    },
   )
   .refine(
     // A field is "being set" iff its property is present; deriving the check
@@ -96,8 +104,7 @@ const UpdateSchema = z
 type UpdateInput = z.infer<typeof UpdateSchema>;
 
 export type UpdateUserSettingsOutput =
-  | { ok: true; applied: UserSettingChange[] }
-  | { ok: false; reason: string };
+  { ok: true; applied: UserSettingChange[] } | { ok: false; reason: string };
 
 function applyChange(
   storage: Storage,

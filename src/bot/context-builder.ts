@@ -166,8 +166,11 @@ export function toolCallMessages(records: ToolCallRecord[]): AIMessage[] {
   return records.map((r) => ({ role: "tool", ...r }));
 }
 
-export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
+export async function buildContext(
+  args: BuildContextArgs,
+): Promise<AIMessage[]> {
+  const { storage, chatId, sender, userText, quote, images, replyTarget } =
+    args;
   const audios = args.audios ?? [];
   const videos = args.videos ?? [];
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
@@ -176,9 +179,17 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   if (replyTarget !== null) {
     const node = await storage.getConversation(chatId, replyTarget.messageId);
     if (node) {
-      const chain = await collectChain(storage, chatId, replyTarget.messageId, maxDepth);
+      const chain = await collectChain(
+        storage,
+        chatId,
+        replyTarget.messageId,
+        maxDepth,
+      );
       for (const c of chain) {
-        const chainImages = await loadChainImages(c.userImageFileIds, args.fetchPhoto);
+        const chainImages = await loadChainImages(
+          c.userImageFileIds,
+          args.fetchPhoto,
+        );
         if (chainImages.length > 0) {
           messages.push({
             role: "user",
