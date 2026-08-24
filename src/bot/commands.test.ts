@@ -85,12 +85,14 @@ describe("BOT_COMMAND_SCOPES", () => {
   });
 });
 
+type SetMyCommandsCall = {
+  commands: readonly BotCommand[];
+  other?: { language_code?: string; scope?: BotCommandScope } | undefined;
+};
+
 describe("syncBotCommands", () => {
   test("uploads default + en + ru, and repeats each combo under every scope", async () => {
-    const calls: Array<{
-      commands: readonly BotCommand[];
-      other?: { language_code?: string; scope?: BotCommandScope };
-    }> = [];
+    const calls: SetMyCommandsCall[] = [];
     const api: SyncCommandsApi = {
       async setMyCommands(commands, other) {
         calls.push({ commands, other });
@@ -127,10 +129,7 @@ describe("syncBotCommands", () => {
   });
 
   test("registers commands under BotCommandScopeAllPrivateChats", async () => {
-    const calls: Array<{
-      commands: readonly BotCommand[];
-      other?: { language_code?: string; scope?: BotCommandScope };
-    }> = [];
+    const calls: SetMyCommandsCall[] = [];
     const api: SyncCommandsApi = {
       async setMyCommands(commands, other) {
         calls.push({ commands, other });
@@ -151,10 +150,7 @@ describe("syncBotCommands", () => {
   });
 
   test("registers commands under BotCommandScopeAllGroupChats", async () => {
-    const calls: Array<{
-      commands: readonly BotCommand[];
-      other?: { language_code?: string; scope?: BotCommandScope };
-    }> = [];
+    const calls: SetMyCommandsCall[] = [];
     const api: SyncCommandsApi = {
       async setMyCommands(commands, other) {
         calls.push({ commands, other });
@@ -179,10 +175,7 @@ describe("syncBotCommands", () => {
   });
 
   test("registers commands under BotCommandScopeAllChatAdministrators", async () => {
-    const calls: Array<{
-      commands: readonly BotCommand[];
-      other?: { language_code?: string; scope?: BotCommandScope };
-    }> = [];
+    const calls: SetMyCommandsCall[] = [];
     const api: SyncCommandsApi = {
       async setMyCommands(commands, other) {
         calls.push({ commands, other });
@@ -212,10 +205,7 @@ describe("syncBotCommands", () => {
   });
 
   test("adds /digest under a chat scope for the owner only", async () => {
-    const calls: Array<{
-      commands: readonly BotCommand[];
-      other?: { language_code?: string; scope?: BotCommandScope };
-    }> = [];
+    const calls: SetMyCommandsCall[] = [];
     const api: SyncCommandsApi = {
       async setMyCommands(commands, other) {
         calls.push({ commands, other });

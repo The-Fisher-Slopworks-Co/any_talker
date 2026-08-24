@@ -8,7 +8,10 @@ import { digestCommandHandler, matchDigestCommand } from "./digest";
 const NOW = 1_700_000_000_000;
 const HOUR = 60 * 60 * 1000;
 
-const run = (storage: MemoryStorage, over: Partial<Parameters<typeof digestCommandHandler>[0]> = {}) =>
+const run = (
+  storage: MemoryStorage,
+  over: Partial<Parameters<typeof digestCommandHandler>[0]> = {},
+) =>
   digestCommandHandler({
     storage,
     ownerId: "owner",
@@ -40,8 +43,12 @@ describe("digestCommandHandler", () => {
     const storage = new MemoryStorage();
     await storage.addGlobalSpend(1, NOW);
 
-    expect(await run(storage, { fromUserId: "someone" })).toEqual({ kind: "ignored" });
-    expect(await run(storage, { isPrivateChat: false })).toEqual({ kind: "ignored" });
+    expect(await run(storage, { fromUserId: "someone" })).toEqual({
+      kind: "ignored",
+    });
+    expect(await run(storage, { isPrivateChat: false })).toEqual({
+      kind: "ignored",
+    });
   });
 
   test("returns the digest markdown for the owner", async () => {
@@ -76,7 +83,9 @@ describe("digestCommandHandler", () => {
 
     await run(storage);
 
-    expect(await storage.getDigestState()).toEqual({ lastSentAtMs: NOW - 5 * HOUR });
+    expect(await storage.getDigestState()).toEqual({
+      lastSentAtMs: NOW - 5 * HOUR,
+    });
   });
 
   test("counts 'new' from the last scheduled digest", async () => {

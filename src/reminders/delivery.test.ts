@@ -19,7 +19,6 @@ function contentOf<T extends { role: string }>(m: T): unknown {
   return (m as { content: unknown }).content;
 }
 
-
 type AskArgs = {
   models: string[];
   system: string;
@@ -49,8 +48,9 @@ class FakeTgApi implements ReminderApi {
     // rich send AND the plain fallback (the permanent/transient classification
     // is driven off the fallback). `richImpl` overrides just the rich send, to
     // exercise the rich-fails-but-plain-succeeds fallback.
-    private readonly impl: (...args: unknown[]) => Promise<unknown> = async () =>
-      ({}),
+    private readonly impl: (
+      ...args: unknown[]
+    ) => Promise<unknown> = async () => ({}),
     private readonly richImpl?: (...args: unknown[]) => Promise<unknown>,
   ) {}
   async sendRichMessage(params: {
@@ -114,16 +114,19 @@ const testRateLimiter = {
   reset: async () => {},
 };
 
-const deps = (ai: AIClient, api: ReminderApi, storage = new MemoryStorage()) =>
-  ({
-    storage,
-    api,
-    ai,
-    rateLimiter: testRateLimiter,
-    ownerId: "owner",
-    resolver: createMainPersonaResolver(storage),
-    botId: null,
-  });
+const deps = (
+  ai: AIClient,
+  api: ReminderApi,
+  storage = new MemoryStorage(),
+) => ({
+  storage,
+  api,
+  ai,
+  rateLimiter: testRateLimiter,
+  ownerId: "owner",
+  resolver: createMainPersonaResolver(storage),
+  botId: null,
+});
 
 describe("deliverReminder (AI-driven)", () => {
   test("ask_reply: builds reminder_fired envelope and sends AI output with reply_parameters", async () => {
@@ -477,7 +480,9 @@ describe("deliverReminder accounting (the untracked-cost fix)", () => {
     expect((await storage.getUserSpend("u1", r.fireAtMs)).day).toBeCloseTo(0.3);
     expect((await storage.getChatSpend("c1", r.fireAtMs)).day).toBeCloseTo(0.3);
     expect((await storage.getGlobalSpend(r.fireAtMs)).day).toBeCloseTo(0.3);
-    expect((await storage.getModelSpend("m1", r.fireAtMs)).day).toBeCloseTo(0.3);
+    expect((await storage.getModelSpend("m1", r.fireAtMs)).day).toBeCloseTo(
+      0.3,
+    );
   });
 
   test("owner-exempt reminder records spend but skips the deduction", async () => {

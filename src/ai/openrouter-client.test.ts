@@ -281,7 +281,9 @@ function capturingClient(opts?: {
   return { client, calls };
 }
 
-const askOpts = (over: Partial<Parameters<OpenRouterClient["ask"]>[0]> = {}) => ({
+const askOpts = (
+  over: Partial<Parameters<OpenRouterClient["ask"]>[0]> = {},
+) => ({
   models: ["a/primary"],
   system: "sys",
   messages: [{ role: "user", content: "hi" }] as AIMessage[],
@@ -495,7 +497,10 @@ describe("OpenRouterClient — the result that comes back", () => {
           JSON.stringify(
             responsePayload(
               turn === 1
-                ? { cost: 0.0025, toolCall: { name: "echo", args: { value: "x" } } }
+                ? {
+                    cost: 0.0025,
+                    toolCall: { name: "echo", args: { value: "x" } },
+                  }
                 : { cost: 0.0025 },
             ),
           ),
@@ -759,7 +764,7 @@ describe("OpenRouterClient — the loop bound and the final turn", () => {
   // `strictFinalResponse` is left unset on purpose: a throw here would drop a
   // real, billed ask out of the ledger. `ask.ts` turns the empty text into a
   // user-visible error instead. If someone sets it, this test goes red.
-  test("an empty final output resolves to \"\" and is still charged", async () => {
+  test('an empty final output resolves to "" and is still charged', async () => {
     const before = counterValue("success");
     const { client, calls } = capturingClient({
       reply: (turn) =>

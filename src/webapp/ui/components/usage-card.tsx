@@ -20,9 +20,7 @@ function WindowRows({ label, w }: { label: string; w: WindowStatus }) {
       </div>
       <div className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_resets}</span>
-        <span className={ROW_VALUE_CLS}>
-          {format(w.resetMs)}
-        </span>
+        <span className={ROW_VALUE_CLS}>{format(w.resetMs)}</span>
       </div>
     </>
   );

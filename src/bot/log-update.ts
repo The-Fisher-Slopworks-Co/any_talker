@@ -5,11 +5,7 @@ import type { Update } from "@grammyjs/types/update";
 import type { Message } from "@grammyjs/types/message";
 import type { MiddlewareFn } from "grammy";
 import { formatLog, type LogFormat, type LogFields } from "../log";
-import {
-  commandsTotal,
-  normalizeCommandLabel,
-  updatesTotal,
-} from "../metrics";
+import { commandsTotal, normalizeCommandLabel, updatesTotal } from "../metrics";
 
 const MESSAGE_LIKE_KEYS = [
   "message",
@@ -74,7 +70,10 @@ export function extractUpdateMeta(update: Update): UpdateMeta {
   if (chat) meta.chat = { id: chat.id, type: chat.type };
 
   if ((MESSAGE_LIKE_KEYS as readonly string[]).includes(type)) {
-    Object.assign(meta.flags, messageFlags(unsafeReinterpret<Message>(payload)));
+    Object.assign(
+      meta.flags,
+      messageFlags(unsafeReinterpret<Message>(payload)),
+    );
     if (type === "guest_message") meta.flags.is_guest = true;
   }
 
@@ -115,7 +114,8 @@ function messageFlags(msg: Message): UpdateMeta["flags"] {
 function firstBotCommand(msg: Message): string | null {
   const source = msg.text ?? msg.caption ?? "";
   const entities =
-    msg.entities ?? (msg as { caption_entities?: Message["entities"] }).caption_entities;
+    msg.entities ??
+    (msg as { caption_entities?: Message["entities"] }).caption_entities;
   if (!entities) return null;
   const cmd = entities.find((e) => e.type === "bot_command" && e.offset === 0);
   if (!cmd) return null;

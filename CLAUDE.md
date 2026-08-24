@@ -8,10 +8,16 @@ user-facing feature/metrics catalog. This file covers how to work in the code.
 
 ```bash
 bun run dev        # long-polling + hot reload (src/main.ts)
-bun run check      # typecheck + tests — run before every commit
+bun run check      # typecheck + lint + format + knip + tests — before every commit
 bun run typecheck  # bunx tsc --noEmit
+bun run lint       # oxlint (config: .oxlintrc.json)
+bun run format     # prettier --write over src/ (config: .prettierrc.json)
+bun run knip       # unused files/exports/deps (config: knip.ts)
 bun test           # tests (co-located *.test.ts)
 ```
+
+`bun install` installs a lefthook pre-commit hook that runs the same gate
+(`lefthook.yml`, ~3s). `LEFTHOOK=0 git commit` skips it for one commit.
 
 ### Layout (`src/`)
 

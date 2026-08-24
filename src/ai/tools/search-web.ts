@@ -13,7 +13,13 @@ const QUEUE_MULTIPLIER = 4;
 
 const Schema = z.object({
   query: z.string().max(500).describe("The search query"),
-  limit: z.number().int().min(1).max(MAX_RESULTS).default(5).describe("Number of results to return (1–10)"),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_RESULTS)
+    .default(5)
+    .describe("Number of results to return (1–10)"),
 });
 
 type Input = z.infer<typeof Schema>;
@@ -38,7 +44,9 @@ export function createSemaphore(limit: number, maxQueueDepth: number) {
   return async function acquire<T>(fn: () => Promise<T>): Promise<T> {
     if (active >= limit) {
       if (queue.length >= maxQueueDepth) {
-        throw new Error(`Search queue full (${queue.length} waiting, max ${maxQueueDepth})`);
+        throw new Error(
+          `Search queue full (${queue.length} waiting, max ${maxQueueDepth})`,
+        );
       }
       await new Promise<void>((resolve) => queue.push(resolve));
       // Permit transferred from the releaser; do not bump `active` here —
@@ -60,7 +68,10 @@ export function createSemaphore(limit: number, maxQueueDepth: number) {
   };
 }
 
-export function createSearchWebTool(apiKey: string, concurrency: number): Tool<Input, string> {
+export function createSearchWebTool(
+  apiKey: string,
+  concurrency: number,
+): Tool<Input, string> {
   const sem = createSemaphore(concurrency, concurrency * QUEUE_MULTIPLIER);
   return {
     name: "search_web",
@@ -84,8 +95,12 @@ export function createSearchWebTool(apiKey: string, concurrency: number): Tool<I
         );
 
         if (!response.ok) {
-          const body = await readTextCapped(response, MAX_BODY_BYTES).catch(() => "");
-          throw new Error(`Firecrawl error ${response.status}: ${response.statusText}${body ? ` — ${body}` : ""}`);
+          const body = await readTextCapped(response, MAX_BODY_BYTES).catch(
+            () => "",
+          );
+          throw new Error(
+            `Firecrawl error ${response.status}: ${response.statusText}${body ? ` — ${body}` : ""}`,
+          );
         }
 
         let body: string;
@@ -93,7 +108,9 @@ export function createSearchWebTool(apiKey: string, concurrency: number): Tool<I
           body = await readTextCapped(response, MAX_BODY_BYTES);
         } catch (err) {
           if (err instanceof DOMException && err.name === "TimeoutError") {
-            throw new Error(`Search timed out after ${TIMEOUT_MS / 1000}s`);
+            throw new Error(`Search timed out after ${TIMEOUT_MS / 1000}s`, {
+              cause: err,
+            });
           }
           throw err;
         }

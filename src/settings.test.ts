@@ -176,7 +176,10 @@ describe("applyChatOverrides", () => {
 
   test("normalize preserves a stored whitelistEnabled=false", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({ ...DEFAULT_SETTINGS, whitelistEnabled: false });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      whitelistEnabled: false,
+    });
     const s = await getOrInitSettings(storage);
     expect(s.whitelistEnabled).toBe(false);
   });

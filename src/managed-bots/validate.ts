@@ -8,9 +8,7 @@ import type { ManagedBot } from "./types";
 export type ManagedBotInput = Pick<ManagedBot, "displayName" | "systemPrompt">;
 
 export type ManagedBotValidationError =
-  | "display_name_required"
-  | "display_name_too_long"
-  | "system_prompt_too_long";
+  "display_name_required" | "display_name_too_long" | "system_prompt_too_long";
 
 const MAX_DISPLAY_NAME = 64;
 const MAX_SYSTEM_PROMPT = 8000;
@@ -33,8 +31,7 @@ export function normalizeManagedBotInput(
     return { ok: false, error: "display_name_too_long" };
   }
 
-  const systemPrompt =
-    typeof o.systemPrompt === "string" ? o.systemPrompt : "";
+  const systemPrompt = typeof o.systemPrompt === "string" ? o.systemPrompt : "";
   if (systemPrompt.length > MAX_SYSTEM_PROMPT) {
     return { ok: false, error: "system_prompt_too_long" };
   }

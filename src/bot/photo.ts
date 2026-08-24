@@ -15,7 +15,9 @@ export type PhotoSizeLike = {
 
 const MAX_AREA = 1280 * 1280;
 
-export function pickPhotoSize<T extends PhotoSizeLike>(sizes: readonly T[]): T | null {
+export function pickPhotoSize<T extends PhotoSizeLike>(
+  sizes: readonly T[],
+): T | null {
   if (sizes.length === 0) return null;
 
   const sorted = [...sizes].sort(

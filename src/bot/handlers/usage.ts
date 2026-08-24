@@ -38,8 +38,7 @@ export type UsageCommandInput = {
 };
 
 export type UsageCommandOutcome =
-  | { kind: "ignored" }
-  | { kind: "usage"; text: string };
+  { kind: "ignored" } | { kind: "usage"; text: string };
 
 // Builds the user's own usage report. Reads only: asking where you stand must
 // never move the windows or cost budget. The report is percentage-only by

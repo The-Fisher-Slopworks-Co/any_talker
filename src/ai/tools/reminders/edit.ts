@@ -41,8 +41,7 @@ const Schema = z
 type Input = z.infer<typeof Schema>;
 
 export type EditReminderOutput =
-  | { ok: true; fireAt: string }
-  | { ok: false; reason: string };
+  { ok: true; fireAt: string } | { ok: false; reason: string };
 
 export function createEditReminderTool(deps: {
   storage: Storage;
@@ -79,7 +78,10 @@ export function createEditReminderTool(deps: {
         if (newTime.mode === "in") {
           fireAtMs = ctx.now + durationToMs(newTime.amount, newTime.unit);
         } else {
-          const parsed = parseAbsoluteDateTimeMs(newTime.datetime, ctx.timezone);
+          const parsed = parseAbsoluteDateTimeMs(
+            newTime.datetime,
+            ctx.timezone,
+          );
           if (!parsed.ok) return { ok: false, reason: parsed.reason };
           fireAtMs = parsed.ms;
         }

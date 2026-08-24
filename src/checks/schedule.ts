@@ -15,7 +15,12 @@ export function lastScheduledFireMs(
   scheduleMinute: number,
   timezone: string,
 ): number {
-  const todayMs = computeFireForLocalDate(nowMs, scheduleHour, scheduleMinute, timezone);
+  const todayMs = computeFireForLocalDate(
+    nowMs,
+    scheduleHour,
+    scheduleMinute,
+    timezone,
+  );
   if (todayMs !== null && todayMs <= nowMs) return todayMs;
 
   const yesterdayNowMs = nowMs - ONE_DAY_MS;

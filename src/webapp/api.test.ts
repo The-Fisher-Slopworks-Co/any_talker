@@ -137,7 +137,11 @@ describe("model validation against the catalogue", () => {
       lastSeenAt: 1,
     });
     const r = await handleApi(
-      { method: "PUT", path: "/api/admin/chats/-100", body: { models: ["nope"] } },
+      {
+        method: "PUT",
+        path: "/api/admin/chats/-100",
+        body: { models: ["nope"] },
+      },
       d,
       owner,
     );
@@ -194,7 +198,11 @@ describe("GET /api/openrouter/endpoints/:modelId", () => {
 
   test("rejects a malformed permaslug with 400", async () => {
     const res = await handleApi(
-      { method: "GET", path: "/api/openrouter/endpoints/../secrets", body: null },
+      {
+        method: "GET",
+        path: "/api/openrouter/endpoints/../secrets",
+        body: null,
+      },
       { ...deps(), fetchProviderEndpoints: async () => stats as never },
       owner,
     );
@@ -239,7 +247,11 @@ describe("GET /api/openrouter/endpoints/:modelId", () => {
 
 describe("GET /api/settings", () => {
   test("returns defaults when storage empty", async () => {
-    const res = await handleApi({ method: "GET", path: "/api/settings", body: null }, deps(), owner);
+    const res = await handleApi(
+      { method: "GET", path: "/api/settings", body: null },
+      deps(),
+      owner,
+    );
     expect(res.status).toBe(200);
     expect(res.body).toEqual(DEFAULT_SETTINGS);
   });
@@ -440,9 +452,9 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    expect(
-      (await d.storage.getSettings())?.expandableBlockquoteThreshold,
-    ).toBe(800);
+    expect((await d.storage.getSettings())?.expandableBlockquoteThreshold).toBe(
+      800,
+    );
   });
 
   test("accepts expandableBlockquoteThreshold of 0", async () => {
@@ -457,9 +469,9 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    expect(
-      (await d.storage.getSettings())?.expandableBlockquoteThreshold,
-    ).toBe(0);
+    expect((await d.storage.getSettings())?.expandableBlockquoteThreshold).toBe(
+      0,
+    );
   });
 
   test("rejects a negative expandableBlockquoteThreshold", async () => {
@@ -593,7 +605,11 @@ describe("PUT /api/settings", () => {
 
 describe("whitelist endpoints", () => {
   test("list returns empty initially", async () => {
-    const r = await handleApi({ method: "GET", path: "/api/whitelist", body: null }, deps(), owner);
+    const r = await handleApi(
+      { method: "GET", path: "/api/whitelist", body: null },
+      deps(),
+      owner,
+    );
     expect(r.status).toBe(200);
     expect(r.body).toEqual({ users: [], chats: [] });
   });
@@ -601,12 +617,23 @@ describe("whitelist endpoints", () => {
   test("add and list", async () => {
     const d = deps();
     await handleApi(
-      { method: "POST", path: "/api/whitelist/users", body: { id: "42", label: "alice" } },
+      {
+        method: "POST",
+        path: "/api/whitelist/users",
+        body: { id: "42", label: "alice" },
+      },
       d,
       owner,
     );
-    const r = await handleApi({ method: "GET", path: "/api/whitelist", body: null }, d, owner);
-    expect(r.body).toEqual({ users: [{ id: "42", label: "alice" }], chats: [] });
+    const r = await handleApi(
+      { method: "GET", path: "/api/whitelist", body: null },
+      d,
+      owner,
+    );
+    expect(r.body).toEqual({
+      users: [{ id: "42", label: "alice" }],
+      chats: [],
+    });
   });
 
   test("remove", async () => {
@@ -621,7 +648,11 @@ describe("whitelist endpoints", () => {
       d,
       owner,
     );
-    const r = await handleApi({ method: "GET", path: "/api/whitelist", body: null }, d, owner);
+    const r = await handleApi(
+      { method: "GET", path: "/api/whitelist", body: null },
+      d,
+      owner,
+    );
     expect(r.body).toEqual({ users: [], chats: [] });
   });
 });
@@ -640,7 +671,11 @@ describe("blacklist endpoints", () => {
   test("add and list", async () => {
     const d = deps();
     const added = await handleApi(
-      { method: "POST", path: "/api/blacklist", body: { id: "42", label: "mallory" } },
+      {
+        method: "POST",
+        path: "/api/blacklist",
+        body: { id: "42", label: "mallory" },
+      },
       d,
       owner,
     );
@@ -731,7 +766,9 @@ describe("ratelimit endpoints", () => {
     expect(r.status).toBe(200);
     const { usage } = r.body as { usage: UsageStatus };
     expect(usage.fiveHour.used).toBe(0);
-    expect(usage.fiveHour.limit).toBe(DEFAULT_SETTINGS.rateLimit.fiveHourTokens);
+    expect(usage.fiveHour.limit).toBe(
+      DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
+    );
     expect(usage.weekly.used).toBe(0);
     expect(usage.weekly.limit).toBe(DEFAULT_SETTINGS.rateLimit.weeklyTokens);
   });
@@ -808,7 +845,10 @@ describe("GET /api/me/usage", () => {
       },
     });
   };
-  const get = (d: ReturnType<typeof deps>, actor: { userId: string; isOwner: boolean }) =>
+  const get = (
+    d: ReturnType<typeof deps>,
+    actor: { userId: string; isOwner: boolean },
+  ) =>
     handleApi({ method: "GET", path: "/api/me/usage", body: null }, d, actor);
 
   test("a non-owner gets their own percentages", async () => {
@@ -840,7 +880,7 @@ describe("GET /api/me/usage", () => {
 
     const r = await get(d, guest("42"));
     const json = JSON.stringify(r.body);
-    for (const key of ["used\"", "limit", "remaining\"", "windowStart"]) {
+    for (const key of ['used"', "limit", 'remaining"', "windowStart"]) {
       expect(json).not.toContain(key);
     }
     expect(json).not.toContain("250");
@@ -854,7 +894,9 @@ describe("GET /api/me/usage", () => {
     await d.storage.addUserUsage("99", 1000, starts.fiveHour, starts.weekly);
 
     const r = await get(d, guest("42"));
-    const { usage } = r.body as { usage: { fiveHour: { usedPercent: number } } };
+    const { usage } = r.body as {
+      usage: { fiveHour: { usedPercent: number } };
+    };
     expect(usage.fiveHour.usedPercent).toBe(0);
   });
 
@@ -2497,7 +2539,11 @@ describe("/api/admin/checks", () => {
 
 describe("unknown route", () => {
   test("returns 404", async () => {
-    const r = await handleApi({ method: "GET", path: "/api/nope", body: null }, deps(), owner);
+    const r = await handleApi(
+      { method: "GET", path: "/api/nope", body: null },
+      deps(),
+      owner,
+    );
     expect(r.status).toBe(404);
   });
 });
@@ -2571,8 +2617,16 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
     const d = deps();
     for (const req of [
       { method: "GET" as const, path: "/api/me/facts/12345", body: null },
-      { method: "POST" as const, path: "/api/me/facts/12345", body: { key: "a", value: "b" } },
-      { method: "PUT" as const, path: "/api/me/facts/12345/a", body: { value: "b" } },
+      {
+        method: "POST" as const,
+        path: "/api/me/facts/12345",
+        body: { key: "a", value: "b" },
+      },
+      {
+        method: "PUT" as const,
+        path: "/api/me/facts/12345/a",
+        body: { value: "b" },
+      },
       { method: "DELETE" as const, path: "/api/me/facts/12345/a", body: null },
     ]) {
       const r = await handleApi(req, d, guest("42"));
@@ -2662,7 +2716,8 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
       guest("42"),
     );
     expect(r.status).toBe(200);
-    const facts = (r.body as { facts: Array<{ key: string; value: string }> }).facts;
+    const facts = (r.body as { facts: Array<{ key: string; value: string }> })
+      .facts;
     expect(facts.length).toBe(50);
     expect(facts.find((f) => f.key === "fact_7")?.value).toBe("updated");
   });
@@ -2958,8 +3013,9 @@ describe("PUT /api/settings — budget & anomaly", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    const budget = (r.body as { budget: { globalMonthlyCapUsd: number; enabled: boolean } })
-      .budget;
+    const budget = (
+      r.body as { budget: { globalMonthlyCapUsd: number; enabled: boolean } }
+    ).budget;
     expect(budget.globalMonthlyCapUsd).toBe(10);
     expect(budget.enabled).toBe(true);
   });

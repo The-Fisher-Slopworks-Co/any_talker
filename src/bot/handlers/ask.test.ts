@@ -29,7 +29,9 @@ async function exhaustUsage(
 }
 
 class FakeAI implements AIClient {
-  constructor(public reply: AskResult = { text: "mock reply", totalTokens: 100 }) {}
+  constructor(
+    public reply: AskResult = { text: "mock reply", totalTokens: 100 },
+  ) {}
   calls: unknown[] = [];
   async ask(opts: Parameters<AIClient["ask"]>[0]): Promise<AskResult> {
     this.calls.push(opts);
@@ -55,7 +57,12 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
     chatId: "c1",
     userId: "42",
     askMessageId: 1,
-    sender: { firstName: "John", lastName: "Doe", nameOverride: null, gender: null },
+    sender: {
+      firstName: "John",
+      lastName: "Doe",
+      nameOverride: null,
+      gender: null,
+    },
     userText: "hello",
     quote: null,
     images: [],
@@ -104,7 +111,10 @@ describe("askHandler", () => {
     expect(out.kind).toBe("answered");
     const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
     expect(sent[0]!.content).toEqual([
-      { type: "text", text: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "" }) },
+      {
+        type: "text",
+        text: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "" }),
+      },
       {
         type: "audio",
         audio: new Uint8Array([0x4f, 0x67, 0x67, 0x53]),
@@ -126,7 +136,12 @@ describe("askHandler", () => {
       baseInput({
         storage,
         userText: "",
-        replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 100,
+          text: "A1",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
     expect(out.kind).toBe("usage");
@@ -239,7 +254,9 @@ describe("askHandler", () => {
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "1", 1000);
     const rl = new DualWindowLimiter(rlStorage);
-    const out = await askHandler(baseInput({ storage, userId: "1", rateLimiter: rl }));
+    const out = await askHandler(
+      baseInput({ storage, userId: "1", rateLimiter: rl }),
+    );
     expect(out.kind).toBe("answered");
   });
 
@@ -252,7 +269,9 @@ describe("askHandler", () => {
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "1", 1000);
     const rl = new DualWindowLimiter(rlStorage);
-    const out = await askHandler(baseInput({ storage, userId: "1", rateLimiter: rl }));
+    const out = await askHandler(
+      baseInput({ storage, userId: "1", rateLimiter: rl }),
+    );
     expect(out.kind).toBe("rateLimited");
   });
 
@@ -270,9 +289,7 @@ describe("askHandler", () => {
     });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
-    expect(
-      (ai.calls[0] as Parameters<AIClient["ask"]>[0]).routing,
-    ).toEqual({
+    expect((ai.calls[0] as Parameters<AIClient["ask"]>[0]).routing).toEqual({
       providerSort: "throughput",
       provider: "deepinfra",
       serviceTier: "flex",
@@ -289,12 +306,13 @@ describe("askHandler", () => {
       serviceTier: "priority",
     });
     // An explicit null is an override too — "ignore the global pin in this chat".
-    await storage.saveChatSettings("c1", { providerSort: "latency", provider: null });
+    await storage.saveChatSettings("c1", {
+      providerSort: "latency",
+      provider: null,
+    });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
-    expect(
-      (ai.calls[0] as Parameters<AIClient["ask"]>[0]).routing,
-    ).toEqual({
+    expect((ai.calls[0] as Parameters<AIClient["ask"]>[0]).routing).toEqual({
       providerSort: "latency",
       provider: null,
       serviceTier: "priority",
@@ -325,7 +343,11 @@ describe("askHandler", () => {
       await out.persistConversation(999);
       const node = await storage.getConversation("c1", 999);
       expect(node).toEqual({
-        userQuestion: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
+        userQuestion: JSON.stringify({
+          author: "John Doe",
+          time: SENT_AT,
+          text: "hello",
+        }),
         botAnswer: "hi back",
         parentBotMsgId: null,
         ts: 1000,
@@ -343,7 +365,10 @@ describe("askHandler", () => {
   test("the persisted envelope is byte-identical to the one sent to the model", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({ ...DEFAULT_SETTINGS, timezone: "Europe/Moscow" });
+    await storage.saveSettings({
+      ...DEFAULT_SETTINGS,
+      timezone: "Europe/Moscow",
+    });
     const ai = new FakeAI();
     const out = await askHandler(
       baseInput({ storage, ai, now: Date.UTC(2026, 4, 8, 15, 42, 31) }),
@@ -369,7 +394,12 @@ describe("askHandler", () => {
     const out = await askHandler(
       baseInput({
         storage,
-        replyTarget: { messageId: 100, text: "A1", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 100,
+          text: "A1",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
     if (out.kind === "answered") {
@@ -399,13 +429,22 @@ describe("askHandler", () => {
         rateLimiter: new DualWindowLimiter(rlStorage),
         askMessageId: 3,
         userText: "How was your day?",
-        replyTarget: { messageId: 2, text: "A1", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 2,
+          text: "A1",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
     if (out.kind !== "rateLimited") throw new Error("expected rateLimited");
     await out.persistConversation(4, "You are rate-limited");
     const expected = {
-      userQuestion: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "How was your day?" }),
+      userQuestion: JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        text: "How was your day?",
+      }),
       botAnswer: "You are rate-limited",
       parentBotMsgId: 2,
       ts: 1000,
@@ -428,7 +467,11 @@ describe("askHandler", () => {
     if (out.kind !== "error") throw new Error("expected error");
     await out.persistConversation(4, "AI error");
     const expected = {
-      userQuestion: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
+      userQuestion: JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        text: "hello",
+      }),
       botAnswer: "AI error",
       parentBotMsgId: null,
       ts: 1000,
@@ -471,7 +514,12 @@ describe("askHandler", () => {
         rateLimiter: new DualWindowLimiter(rlStorage),
         askMessageId: 3,
         userText: "How was your day?",
-        replyTarget: { messageId: 2, text: "Hi!", authorFirstName: "Bot", images: [] },
+        replyTarget: {
+          messageId: 2,
+          text: "Hi!",
+          authorFirstName: "Bot",
+          images: [],
+        },
       }),
     );
     if (second.kind !== "rateLimited") throw new Error("expected rateLimited");
@@ -499,9 +547,17 @@ describe("askHandler", () => {
     expect(sent.map((m) => m.content)).toEqual([
       JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
       "Hi!",
-      JSON.stringify({ author: "John Doe", time: SENT_AT, text: "How was your day?" }),
+      JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        text: "How was your day?",
+      }),
       "You are rate-limited",
-      JSON.stringify({ author: "John Doe", time: SENT_AT, text: "What is my first ever message?" }),
+      JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        text: "What is my first ever message?",
+      }),
     ]);
   });
 
@@ -749,7 +805,11 @@ describe("askHandler", () => {
     const out = await askHandler(baseInput({ storage, ai: new EffectfulAI() }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.effects).toEqual([
-      { type: "reminder_scheduled", fireAtMs: 123_456_789, timezone: "Europe/Moscow" },
+      {
+        type: "reminder_scheduled",
+        fireAtMs: 123_456_789,
+        timezone: "Europe/Moscow",
+      },
     ]);
   });
 
@@ -931,12 +991,20 @@ describe("askHandler", () => {
     const sent = (managedAi.calls[0] as { messages: unknown[] }).messages;
     expect(sent[0]).toEqual({
       role: "user",
-      content: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "Q to main" }),
+      content: JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        text: "Q to main",
+      }),
     });
     expect(sent[1]).toEqual({ role: "assistant", content: "Main answer" });
     expect(sent[2]).toEqual({
       role: "user",
-      content: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "follow-up" }),
+      content: JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        text: "follow-up",
+      }),
     });
 
     // The managed answer is stored in the shared (group) namespace and links its
@@ -965,7 +1033,10 @@ describe("askHandler", () => {
     if (first.kind !== "answered") throw new Error("expected answered");
     await first.persistConversation(100);
 
-    const managedAi = new FakeAI({ text: "Managed DM answer", totalTokens: 10 });
+    const managedAi = new FakeAI({
+      text: "Managed DM answer",
+      totalTokens: 10,
+    });
     const out = await askHandler(
       baseInput({
         storage,
@@ -986,7 +1057,8 @@ describe("askHandler", () => {
 
     // No cross-bot chain replay in a DM: the main bot's turn is not surfaced as a
     // prior assistant message (separate physical chats).
-    const sent = (managedAi.calls[0] as { messages: { role: string }[] }).messages;
+    const sent = (managedAi.calls[0] as { messages: { role: string }[] })
+      .messages;
     expect(sent.some((m) => m.role === "assistant")).toBe(false);
 
     // The managed answer is scoped to the managed bot, not the shared namespace,
@@ -1119,7 +1191,9 @@ describe("askHandler — tool calls on the persisted turn", () => {
       RECORDS,
     );
     // Both keys of the turn carry them, as with every other node field.
-    expect((await storage.getConversation("c1", 1))!.toolCalls).toEqual(RECORDS);
+    expect((await storage.getConversation("c1", 1))!.toolCalls).toEqual(
+      RECORDS,
+    );
   });
 
   // An empty array would still be a key on the node and would change the
@@ -1133,7 +1207,9 @@ describe("askHandler — tool calls on the persisted turn", () => {
     if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
     await out.persistConversation(999);
 
-    expect((await storage.getConversation("c1", 999))!.toolCalls).toBeUndefined();
+    expect(
+      (await storage.getConversation("c1", 999))!.toolCalls,
+    ).toBeUndefined();
   });
 
   // The model can burn its whole turn on tools and come back with nothing to

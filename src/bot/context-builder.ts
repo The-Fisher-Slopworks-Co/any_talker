@@ -14,12 +14,12 @@ export type ReplyTarget = {
   text: string | null;
   authorFirstName: string | null;
   images: Uint8Array[];
-  audios?: Uint8Array[];
+  audios?: Uint8Array[] | undefined;
   // Whole clips, when the answering model takes video natively.
-  videos?: VideoClip[];
+  videos?: VideoClip[] | undefined;
   // What the attached media actually is, when that isn't self-evident — in
   // frames mode a video arrives as stills, which would read as loose photos.
-  mediaNote?: string;
+  mediaNote?: string | undefined;
 };
 
 // Picks the storage view that holds a chat's conversation graph.
@@ -75,16 +75,16 @@ export type BuildContextArgs = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
-  audios?: Uint8Array[];
-  videos?: VideoClip[];
-  attachments?: string;
+  audios?: Uint8Array[] | undefined;
+  videos?: VideoClip[] | undefined;
+  attachments?: string | undefined;
   replyTarget: ReplyTarget | null;
   // Stamped onto the new user turn. Callers that persist the same turn must
   // reuse the very same value (see `ask.ts`), or the stored envelope would
   // differ from the one the model saw and break the cache on the next turn.
   sentAt: SentAt | null;
-  maxDepth?: number;
-  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
+  maxDepth?: number | undefined;
+  fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
 };
 
 export function buildUserEnvelope(args: {
@@ -94,7 +94,7 @@ export function buildUserEnvelope(args: {
   sentAt: SentAt | null;
   // Describes media that isn't self-evident from the parts themselves (video
   // frames). Persisted with the turn, so a follow-up reads the same envelope.
-  attachments?: string;
+  attachments?: string | undefined;
 }): string {
   const override = args.sender.nameOverride?.trim() ?? "";
   const author =
@@ -166,8 +166,11 @@ export function toolCallMessages(records: ToolCallRecord[]): AIMessage[] {
   return records.map((r) => ({ role: "tool", ...r }));
 }
 
-export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]> {
-  const { storage, chatId, sender, userText, quote, images, replyTarget } = args;
+export async function buildContext(
+  args: BuildContextArgs,
+): Promise<AIMessage[]> {
+  const { storage, chatId, sender, userText, quote, images, replyTarget } =
+    args;
   const audios = args.audios ?? [];
   const videos = args.videos ?? [];
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
@@ -176,9 +179,17 @@ export async function buildContext(args: BuildContextArgs): Promise<AIMessage[]>
   if (replyTarget !== null) {
     const node = await storage.getConversation(chatId, replyTarget.messageId);
     if (node) {
-      const chain = await collectChain(storage, chatId, replyTarget.messageId, maxDepth);
+      const chain = await collectChain(
+        storage,
+        chatId,
+        replyTarget.messageId,
+        maxDepth,
+      );
       for (const c of chain) {
-        const chainImages = await loadChainImages(c.userImageFileIds, args.fetchPhoto);
+        const chainImages = await loadChainImages(
+          c.userImageFileIds,
+          args.fetchPhoto,
+        );
         if (chainImages.length > 0) {
           messages.push({
             role: "user",

@@ -89,7 +89,8 @@ export function BudgetTab({
     setSaving(false);
   };
 
-  const b = (patch: Partial<BudgetConfig>) => setBudget({ ...budget, ...patch });
+  const b = (patch: Partial<BudgetConfig>) =>
+    setBudget({ ...budget, ...patch });
   const a = (patch: Partial<AnomalyConfig>) =>
     setAnomaly({ ...anomaly, ...patch });
 

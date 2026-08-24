@@ -6,7 +6,7 @@
 
 export type LabelValues = Record<string, string>;
 
-export type MetricType = "counter" | "gauge" | "histogram";
+type MetricType = "counter" | "gauge" | "histogram";
 
 export interface Metric {
   readonly name: string;
@@ -233,7 +233,7 @@ export class Histogram implements Metric {
     if (!entry) {
       entry = {
         labels: { ...labels },
-        buckets: new Array(this.buckets.length).fill(0),
+        buckets: Array.from({ length: this.buckets.length }, () => 0),
         sum: 0,
         count: 0,
       };
@@ -266,9 +266,7 @@ export class Histogram implements Metric {
       lines.push(
         `${this.name}_bucket${renderLabels(entry.labels, { le: "+Inf" })} ${entry.count}`,
       );
-      lines.push(
-        `${this.name}_sum${renderLabels(entry.labels)} ${entry.sum}`,
-      );
+      lines.push(`${this.name}_sum${renderLabels(entry.labels)} ${entry.sum}`);
       lines.push(
         `${this.name}_count${renderLabels(entry.labels)} ${entry.count}`,
       );
@@ -280,7 +278,7 @@ export class Histogram implements Metric {
 export class Registry {
   private readonly metrics: Metric[] = [];
   private readonly collectors: Array<() => void> = [];
-  private onCollectorError?: (err: unknown) => void;
+  private onCollectorError?: ((err: unknown) => void) | undefined;
 
   register<T extends Metric>(metric: T): T {
     if (this.metrics.some((m) => m.name === metric.name)) {

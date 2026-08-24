@@ -83,10 +83,19 @@ async function main() {
   registerTool(logged(calculatorTool));
   registerTool(logged(fetchPageTool));
   if (config.firecrawlApiKey) {
-    registerTool(logged(createSearchWebTool(config.firecrawlApiKey, config.firecrawlConcurrency)));
+    registerTool(
+      logged(
+        createSearchWebTool(
+          config.firecrawlApiKey,
+          config.firecrawlConcurrency,
+        ),
+      ),
+    );
     registerTool(logged(createYoutubeTranscriptTool(config.firecrawlApiKey)));
   } else {
-    console.warn("FIRECRAWL_API_KEY not set, search_web and youtube_transcript tools disabled");
+    console.warn(
+      "FIRECRAWL_API_KEY not set, search_web and youtube_transcript tools disabled",
+    );
   }
   for (const t of createReminderTools({ storage })) registerTool(logged(t));
   for (const t of createUserFactsTools({ storage })) registerTool(logged(t));
@@ -151,7 +160,10 @@ async function main() {
     );
     if (created) {
       await ctx.api
-        .sendMessage(upd.user.id, ctx.t.bot_managed_bot_created(created.username))
+        .sendMessage(
+          upd.user.id,
+          ctx.t.bot_managed_bot_created(created.username),
+        )
         .catch((err) =>
           console.error("[managed-bots] owner notify failed:", err),
         );

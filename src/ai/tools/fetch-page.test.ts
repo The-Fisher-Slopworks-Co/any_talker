@@ -15,7 +15,9 @@ const ctx: ToolCallContext = {
   now: 0,
 };
 
-const mockFetch = mock(() => Promise.resolve(new Response("", { status: 200 })));
+const mockFetch = mock(() =>
+  Promise.resolve(new Response("", { status: 200 })),
+);
 const originalFetch = globalThis.fetch;
 const originalDnsLookup = Bun.dns.lookup;
 
@@ -24,8 +26,9 @@ beforeEach(() => {
   mockFetch.mockReset();
   // Stub Bun.dns.lookup so safeFetch's IP-pinning resolves to a deterministic
   // public address without hitting real DNS in tests.
-  (Bun.dns as { lookup: typeof Bun.dns.lookup }).lookup = (async () =>
-    [{ address: "203.0.113.10", family: 4, ttl: 60 }]) as typeof Bun.dns.lookup;
+  (Bun.dns as { lookup: typeof Bun.dns.lookup }).lookup = (async () => [
+    { address: "203.0.113.10", family: 4, ttl: 60 },
+  ]) as typeof Bun.dns.lookup;
 });
 
 afterEach(() => {
@@ -43,11 +46,16 @@ function htmlResponse(html: string, contentType = "text/html; charset=utf-8") {
 describe("fetch_page tool", () => {
   describe("schema validation", () => {
     test("accepts a valid URL", () => {
-      expect(fetchPageTool.parameters.safeParse({ url: "https://example.com" }).success).toBe(true);
+      expect(
+        fetchPageTool.parameters.safeParse({ url: "https://example.com" })
+          .success,
+      ).toBe(true);
     });
 
     test("rejects a non-URL string", () => {
-      expect(fetchPageTool.parameters.safeParse({ url: "not-a-url" }).success).toBe(false);
+      expect(
+        fetchPageTool.parameters.safeParse({ url: "not-a-url" }).success,
+      ).toBe(false);
     });
 
     test("rejects missing url", () => {
@@ -65,7 +73,9 @@ describe("fetch_page tool", () => {
       "http://0.0.0.0/",
       "http://169.254.169.254/latest/meta-data/",
     ])("blocks IPv4 private/local URL: %s", async (url) => {
-      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow("Blocked");
+      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow(
+        "Blocked",
+      );
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -76,7 +86,9 @@ describe("fetch_page tool", () => {
       "http://[fe80::1]/",
       "http://[::ffff:127.0.0.1]/",
     ])("blocks IPv6 private/local URL: %s", async (url) => {
-      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow("Blocked");
+      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow(
+        "Blocked",
+      );
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -92,9 +104,7 @@ describe("fetch_page tool", () => {
       "https://example.com:8443/",
       "http://example.com:6379/",
     ])("blocks non-standard destination port: %s", async (url) => {
-      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow(
-        "port",
-      );
+      await expect(fetchPageTool.execute({ url }, ctx)).rejects.toThrow("port");
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -113,7 +123,9 @@ describe("fetch_page tool", () => {
     });
 
     test("allows explicit standard ports (:80 on http, :443 on https)", async () => {
-      mockFetch.mockImplementation(() => Promise.resolve(htmlResponse("<p>ok</p>")));
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(htmlResponse("<p>ok</p>")),
+      );
       await expect(
         fetchPageTool.execute({ url: "http://example.com:80/" }, ctx),
       ).resolves.toBeDefined();
@@ -162,9 +174,14 @@ describe("fetch_page tool", () => {
             }),
           );
         }
-        return Promise.resolve(htmlResponse("<html><body><p>landed</p></body></html>"));
+        return Promise.resolve(
+          htmlResponse("<html><body><p>landed</p></body></html>"),
+        );
       });
-      const result = await fetchPageTool.execute({ url: "https://example.com/start" }, ctx);
+      const result = await fetchPageTool.execute(
+        { url: "https://example.com/start" },
+        ctx,
+      );
       expect(result.length).toBeGreaterThan(0);
       expect(call).toBe(2);
     });
@@ -187,11 +204,13 @@ describe("fetch_page tool", () => {
   describe("HTTP errors", () => {
     test("throws on non-OK response", async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("Not Found", { status: 404, statusText: "Not Found" }))
+        Promise.resolve(
+          new Response("Not Found", { status: 404, statusText: "Not Found" }),
+        ),
       );
-      await expect(fetchPageTool.execute({ url: "https://example.com/404" }, ctx)).rejects.toThrow(
-        "HTTP 404"
-      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/404" }, ctx),
+      ).rejects.toThrow("HTTP 404");
     });
 
     test("throws when declared content-length exceeds limit", async () => {
@@ -199,13 +218,16 @@ describe("fetch_page tool", () => {
         Promise.resolve(
           new Response("body", {
             status: 200,
-            headers: { "content-type": "text/plain", "content-length": "10000001" },
-          })
-        )
+            headers: {
+              "content-type": "text/plain",
+              "content-length": "10000001",
+            },
+          }),
+        ),
       );
-      await expect(fetchPageTool.execute({ url: "https://example.com/huge" }, ctx)).rejects.toThrow(
-        "Response too large"
-      );
+      await expect(
+        fetchPageTool.execute({ url: "https://example.com/huge" }, ctx),
+      ).rejects.toThrow("Response too large");
     });
 
     test("throws when streamed body exceeds limit (no content-length)", async () => {
@@ -237,10 +259,13 @@ describe("fetch_page tool", () => {
           new Response("plain text content", {
             status: 200,
             headers: { "content-type": "text/plain" },
-          })
-        )
+          }),
+        ),
       );
-      const result = await fetchPageTool.execute({ url: "https://example.com/file.txt" }, ctx);
+      const result = await fetchPageTool.execute(
+        { url: "https://example.com/file.txt" },
+        ctx,
+      );
       expect(result).toBe("plain text content");
     });
   });
@@ -255,7 +280,10 @@ describe("fetch_page tool", () => {
         </article>
       </body></html>`;
       mockFetch.mockImplementation(() => Promise.resolve(htmlResponse(html)));
-      const result = await fetchPageTool.execute({ url: "https://example.com/article" }, ctx);
+      const result = await fetchPageTool.execute(
+        { url: "https://example.com/article" },
+        ctx,
+      );
       expect(result).toContain("My Article");
       expect(result).toContain("paragraph");
     });
@@ -267,7 +295,10 @@ describe("fetch_page tool", () => {
         <div class="widget">Widget B</div>
       </body></html>`;
       mockFetch.mockImplementation(() => Promise.resolve(htmlResponse(html)));
-      const result = await fetchPageTool.execute({ url: "https://example.com/dashboard" }, ctx);
+      const result = await fetchPageTool.execute(
+        { url: "https://example.com/dashboard" },
+        ctx,
+      );
       expect(result.length).toBeGreaterThan(0);
     });
 
@@ -275,7 +306,10 @@ describe("fetch_page tool", () => {
       const longContent = "word ".repeat(20_000);
       const html = `<!DOCTYPE html><html><body><p>${longContent}</p></body></html>`;
       mockFetch.mockImplementation(() => Promise.resolve(htmlResponse(html)));
-      const result = await fetchPageTool.execute({ url: "https://example.com/long" }, ctx);
+      const result = await fetchPageTool.execute(
+        { url: "https://example.com/long" },
+        ctx,
+      );
       expect(result.length).toBeLessThanOrEqual(50_000);
     });
   });

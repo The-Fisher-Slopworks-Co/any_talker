@@ -40,7 +40,10 @@ import { gatherSpendOverview } from "../spending/overview";
 import { summarizeUsage, type UsageStatus } from "../ratelimit/window";
 import { usageShare } from "../ratelimit/share";
 import type { ModelCatalog } from "../ai/model-catalog";
-import { isValidPermaslug, type FetchProviderEndpoints } from "./openrouter-proxy";
+import {
+  isValidPermaslug,
+  type FetchProviderEndpoints,
+} from "./openrouter-proxy";
 
 export type ApiRequest = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -70,11 +73,11 @@ export type ApiDeps = {
   storage: Storage;
   rateLimiter: RateLimiter;
   ownerId: string;
-  modelCatalog?: ModelCatalog;
-  managedBots?: ManagedBotController;
+  modelCatalog?: ModelCatalog | undefined;
+  managedBots?: ManagedBotController | undefined;
   // Always wired in `main.ts`; an absent fetcher only happens on a DI mistake,
   // which the route answers with 503.
-  fetchProviderEndpoints?: FetchProviderEndpoints;
+  fetchProviderEndpoints?: FetchProviderEndpoints | undefined;
 };
 
 const FORBIDDEN: ApiResponse = { status: 403, body: { error: "forbidden" } };
@@ -283,8 +286,7 @@ const BAD_ANOMALY: ApiResponse = {
 const nonNegNum = (v: unknown): boolean =>
   v === undefined || (typeof v === "number" && Number.isFinite(v) && v >= 0);
 const posIntOrUndef = (v: unknown): boolean =>
-  v === undefined ||
-  (typeof v === "number" && Number.isInteger(v) && v >= 1);
+  v === undefined || (typeof v === "number" && Number.isInteger(v) && v >= 1);
 const boolOrUndef = (v: unknown): boolean =>
   v === undefined || typeof v === "boolean";
 
@@ -816,9 +818,9 @@ export async function handleApi(
       const next: Settings = {
         ...current,
         ...patch,
-        rateLimit: { ...current.rateLimit, ...(patch.rateLimit ?? {}) },
-        budget: { ...current.budget, ...(patch.budget ?? {}) },
-        anomaly: { ...current.anomaly, ...(patch.anomaly ?? {}) },
+        rateLimit: { ...current.rateLimit, ...patch.rateLimit },
+        budget: { ...current.budget, ...patch.budget },
+        anomaly: { ...current.anomaly, ...patch.anomaly },
       };
       await deps.storage.saveSettings(next);
       return { status: 200, body: next };
@@ -839,7 +841,10 @@ export async function handleApi(
       if (typeof body.id !== "string" || body.id.length === 0) {
         return { status: 400, body: { error: "id required" } };
       }
-      await deps.storage.addWhitelist(kind, { id: body.id, label: body.label });
+      await deps.storage.addWhitelist(kind, {
+        id: body.id,
+        ...(body.label !== undefined && { label: body.label }),
+      });
       const list = await deps.storage.listWhitelist(kind);
       return { status: 200, body: list };
     }
@@ -867,7 +872,10 @@ export async function handleApi(
     if (body.id === deps.ownerId) {
       return { status: 400, body: { error: "cannot blacklist the owner" } };
     }
-    await deps.storage.addBlacklist({ id: body.id, label: body.label });
+    await deps.storage.addBlacklist({
+      id: body.id,
+      ...(body.label !== undefined && { label: body.label }),
+    });
     const users = await deps.storage.listBlacklist();
     return { status: 200, body: users };
   }
@@ -1155,7 +1163,10 @@ export async function handleApi(
         deps.storage.isWhitelisted("chats", id),
       ]);
       if (!chat) return { status: 404, body: { error: "chat not found" } };
-      return { status: 200, body: { chat, settings: settings ?? {}, whitelisted } };
+      return {
+        status: 200,
+        body: { chat, settings: settings ?? {}, whitelisted },
+      };
     }
     if (req.method === "PUT") {
       const chat = await deps.storage.getChat(id);
@@ -1210,7 +1221,8 @@ export async function handleApi(
     const id = mbMatch[1]!;
     if (req.method === "GET") {
       const bot = await deps.storage.getManagedBot(id);
-      if (!bot) return { status: 404, body: { error: "managed bot not found" } };
+      if (!bot)
+        return { status: 404, body: { error: "managed bot not found" } };
       return {
         status: 200,
         body: { bot, running: deps.managedBots?.isRunning(id) ?? false },

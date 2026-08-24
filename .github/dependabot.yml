@@ -2,9 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Keep the GitHub Actions used by our CI / release / REUSE workflows current.
 version: 2
 updates:
+  # The actions our CI / release / REUSE workflows pin.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -16,3 +16,19 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # The runtime and dev dependencies. Bun's ecosystem reads package.json +
+  # bun.lock; grouping the non-major bumps keeps this to one PR a week, while
+  # majors stay separate because they are the ones that need reading.
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "deps"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

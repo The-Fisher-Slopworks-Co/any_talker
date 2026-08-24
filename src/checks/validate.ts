@@ -32,15 +32,12 @@ export type CheckInputFields = {
 };
 
 export type NormalizedCheckInput =
-  | { ok: true; value: CheckInputFields }
-  | { ok: false; error: ValidationError };
+  { ok: true; value: CheckInputFields } | { ok: false; error: ValidationError };
 
 function requireNonEmptyString(
   v: unknown,
   error: ValidationError,
-):
-  | { ok: true; value: string }
-  | { ok: false; error: ValidationError } {
+): { ok: true; value: string } | { ok: false; error: ValidationError } {
   const s = typeof v === "string" ? v.trim() : "";
   if (s.length === 0) return { ok: false, error };
   return { ok: true, value: s };
@@ -51,15 +48,8 @@ function requireIntInRange(
   min: number,
   max: number,
   error: ValidationError,
-):
-  | { ok: true; value: number }
-  | { ok: false; error: ValidationError } {
-  if (
-    typeof v !== "number" ||
-    !Number.isInteger(v) ||
-    v < min ||
-    v > max
-  ) {
+): { ok: true; value: number } | { ok: false; error: ValidationError } {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < min || v > max) {
     return { ok: false, error };
   }
   return { ok: true, value: v };
@@ -136,12 +126,12 @@ export function normalizeCheckInput(raw: unknown): NormalizedCheckInput {
 
   let counterAnchorDate: string | null = null;
   if (b.counterAnchorDate !== null && b.counterAnchorDate !== undefined) {
-    const raw =
+    const anchor =
       typeof b.counterAnchorDate === "string" ? b.counterAnchorDate.trim() : "";
-    if (raw === "") {
+    if (anchor === "") {
       counterAnchorDate = null;
-    } else if (isValidAnchorDate(raw)) {
-      counterAnchorDate = raw;
+    } else if (isValidAnchorDate(anchor)) {
+      counterAnchorDate = anchor;
     } else {
       return { ok: false, error: "counter_anchor_date_invalid" };
     }

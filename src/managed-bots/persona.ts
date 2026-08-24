@@ -7,7 +7,7 @@ import { getEffectiveSettings, getOrInitSettings } from "../settings";
 
 // The character a bot answers as for a given chat: the effective AI settings to
 // run with, plus the display name shown as the bold prefix before its replies.
-export type ResolvedPersona = {
+type ResolvedPersona = {
   settings: Settings;
   botName: string | null;
 };

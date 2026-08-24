@@ -85,7 +85,9 @@ export function SpendTab() {
             <>
               {m.modelId}
               {m.unpriced ? (
-                <span className="ml-1 text-tg-hint">({s.ui_spend_unpriced})</span>
+                <span className="ml-1 text-tg-hint">
+                  ({s.ui_spend_unpriced})
+                </span>
               ) : null}
             </>
           ),

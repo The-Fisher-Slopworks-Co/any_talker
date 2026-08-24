@@ -17,7 +17,6 @@ function contentOf<T extends { role: string }>(m: T): unknown {
   return (m as { content: unknown }).content;
 }
 
-
 describe("serializeMessages / deserializeMessages", () => {
   test("round-trips text-only user and assistant messages", () => {
     const msgs: AIMessage[] = [
@@ -53,7 +52,8 @@ describe("serializeMessages / deserializeMessages", () => {
 
     const back = deserializeMessages(serialized);
     const recoveredParts = contentOf(back[0]!) as Array<
-      { type: "text"; text: string } | { type: "image"; image: Uint8Array; mediaType: string }
+      | { type: "text"; text: string }
+      | { type: "image"; image: Uint8Array; mediaType: string }
     >;
     const img = recoveredParts[1]!;
     if (img.type !== "image") throw new Error();

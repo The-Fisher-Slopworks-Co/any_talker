@@ -10,11 +10,7 @@ import {
   FACT_VALUE_MAX_LEN,
 } from "../../shared/user-facts";
 
-const KeySchema = z
-  .string()
-  .min(1)
-  .max(FACT_KEY_MAX_LEN)
-  .regex(FACT_KEY_REGEX);
+const KeySchema = z.string().min(1).max(FACT_KEY_MAX_LEN).regex(FACT_KEY_REGEX);
 const ValueSchema = z.string().min(1).max(FACT_VALUE_MAX_LEN);
 
 const RememberSchema = z.object({
@@ -22,9 +18,7 @@ const RememberSchema = z.object({
   value: ValueSchema,
 });
 type RememberInput = z.infer<typeof RememberSchema>;
-type RememberOutput =
-  | { ok: true }
-  | { ok: false; reason: "limit_reached" };
+type RememberOutput = { ok: true } | { ok: false; reason: "limit_reached" };
 
 const ListSchema = z.object({});
 type ListInput = z.infer<typeof ListSchema>;
@@ -56,7 +50,9 @@ function createRememberFactTool(deps: {
       `value, and adding a new key past the ${USER_FACTS_MAX_PER_USER}-fact cap evicts the oldest fact to make room.`,
     parameters: RememberSchema,
     execute: async ({ key, value }, ctx) => {
-      return deps.storage.forBot(ctx.botId ?? null).rememberUserFact(ctx.userId, key, value);
+      return deps.storage
+        .forBot(ctx.botId ?? null)
+        .rememberUserFact(ctx.userId, key, value);
     },
   };
 }
@@ -88,7 +84,9 @@ function createForgetFactTool(deps: {
       "{existed:false} if no fact existed under that key (not an error).",
     parameters: ForgetSchema,
     execute: async ({ key }, ctx) => {
-      return deps.storage.forBot(ctx.botId ?? null).forgetUserFact(ctx.userId, key);
+      return deps.storage
+        .forBot(ctx.botId ?? null)
+        .forgetUserFact(ctx.userId, key);
     },
   };
 }
