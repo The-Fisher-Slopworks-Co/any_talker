@@ -10,14 +10,17 @@
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
     "lint": "oxlint",
-    "check": "bun run typecheck && bun run lint && bun test"
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/turndown": "^5.0.6",
-    "oxlint": "^1.80.0"
+    "oxlint": "^1.80.0",
+    "prettier": "^3.9.6"
   },
   "peerDependencies": {
     "typescript": "^5"
