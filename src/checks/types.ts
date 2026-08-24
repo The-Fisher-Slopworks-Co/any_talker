@@ -3,11 +3,6 @@
 
 export type CheckCounterMode = "always_increment" | "reset_on_yes";
 
-export const COUNTER_MODES: readonly CheckCounterMode[] = [
-  "always_increment",
-  "reset_on_yes",
-];
-
 export function isValidCounterMode(v: unknown): v is CheckCounterMode {
   return v === "always_increment" || v === "reset_on_yes";
 }

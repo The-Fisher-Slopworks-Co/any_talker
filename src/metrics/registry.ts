@@ -6,7 +6,7 @@
 
 export type LabelValues = Record<string, string>;
 
-export type MetricType = "counter" | "gauge" | "histogram";
+type MetricType = "counter" | "gauge" | "histogram";
 
 export interface Metric {
   readonly name: string;

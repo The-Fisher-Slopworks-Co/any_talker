@@ -8,7 +8,7 @@ import { t, type Lang } from "../shared/i18n";
 // True when the interval had anything worth a DM — new users/chats, denials, an
 // unpriced model, or any spend this week. A genuinely quiet bot returns false so
 // the owner isn't pinged with a "nothing happened" digest.
-export function hasDigestActivity(o: SpendOverview): boolean {
+function hasDigestActivity(o: SpendOverview): boolean {
   return (
     o.global.week > 0 ||
     o.newUsers.length > 0 ||

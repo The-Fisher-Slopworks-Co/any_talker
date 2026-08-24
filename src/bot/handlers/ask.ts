@@ -90,10 +90,7 @@ export type AskOutcome =
 // Persists a turn the AI never answered (rate limit, provider error). The
 // dispatcher passes the notice it actually sent so the stored transcript stays
 // truthful — and so a later reply to either message still carries the chain.
-export type PersistFailedTurn = (
-  botMsgId: number,
-  botAnswer: string,
-) => Promise<void>;
+type PersistFailedTurn = (botMsgId: number, botAnswer: string) => Promise<void>;
 
 export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // Per-character storage view: scoped methods (user facts, this bot's own

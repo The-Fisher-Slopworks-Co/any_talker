@@ -48,7 +48,7 @@ const DeliveryTargetSchema = z.discriminatedUnion("kind", [
 // Anything else — id, userId, fireAtMs, target, text, createdAtMs — is
 // strict: a missing/wrong shape means the record is corrupt and gets
 // quarantined.
-export const StoredReminderSchema = z.object({
+const StoredReminderSchema = z.object({
   id: z.string(),
   userId: z.string(),
   chatId: z.string().optional(),

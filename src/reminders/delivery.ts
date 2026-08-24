@@ -19,7 +19,7 @@ import { t } from "../shared/i18n";
 
 export type DeliveryOutcome = "delivered" | "permanent" | "transient";
 
-export type ReminderReplyParameters = {
+type ReminderReplyParameters = {
   message_id: number;
   allow_sending_without_reply?: boolean;
 };

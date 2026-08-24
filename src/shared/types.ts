@@ -61,18 +61,10 @@ export type ReasoningEffort = "low" | "high";
 // How OpenRouter should pick among the upstreams serving one model.
 export type ProviderSort = "price" | "throughput" | "latency";
 
-export const PROVIDER_SORT_VALUES: readonly ProviderSort[] = [
-  "price",
-  "throughput",
-  "latency",
-];
-
 // Service tiers trade cost against latency/availability. Omitting the field
 // (null) uses the standard tier; "flex" is cheaper but slower, and "priority" is
 // faster at a higher price.
 export type ServiceTier = "flex" | "priority";
-
-export const SERVICE_TIER_VALUES: readonly ServiceTier[] = ["flex", "priority"];
 
 export type Gender = "male" | "female";
 
@@ -127,7 +119,7 @@ export const DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
 // Default per-user reminder cap (see `Settings.maxRemindersPerUser`). Mirrors
 // the `USER_FACTS_MAX_PER_USER` precedent, but enforced as rejection rather than
 // oldest-eviction.
-export const DEFAULT_MAX_REMINDERS_PER_USER = 50;
+const DEFAULT_MAX_REMINDERS_PER_USER = 50;
 
 export type WhitelistKind = "users" | "chats";
 
@@ -136,15 +128,10 @@ export type WhitelistEntry = {
   label?: string;
 };
 
-export type Whitelist = {
-  users: WhitelistEntry[];
-  chats: WhitelistEntry[];
-};
-
 // One fixed window's accounting: the start (epoch ms) it was accrued against
 // and the tokens used within it. A stored window whose start no longer matches
 // the current (deterministically phase-shifted) window is treated as empty.
-export type UsageWindow = {
+type UsageWindow = {
   windowStart: number;
   used: number;
 };
@@ -182,7 +169,7 @@ export type Chat = {
   lastSeenAt: number;
 };
 
-export type KeywordFilter = {
+type KeywordFilter = {
   enabled: boolean;
   keywords: string[];
 };
@@ -234,7 +221,7 @@ export type ConversationNode = {
   toolCalls?: ToolCallRecord[];
 };
 
-export type GuestThreadTurn = {
+type GuestThreadTurn = {
   userQuestion: string;
   botAnswer: string;
   // Telegram file_ids of the images that accompanied the question (own photo +

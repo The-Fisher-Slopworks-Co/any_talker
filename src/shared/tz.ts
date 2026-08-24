@@ -73,7 +73,7 @@ export function localDateTimeString(utcMs: number, tz: string): string {
   return `${localDateString(utcMs, tz)} ${pad(hour)}:${pad(minute)}`;
 }
 
-export function tzOffsetMinutesAt(utcMs: number, tz: string): number {
+function tzOffsetMinutesAt(utcMs: number, tz: string): number {
   const parts = offsetFormatter(tz).formatToParts(new Date(utcMs));
   const off =
     parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";

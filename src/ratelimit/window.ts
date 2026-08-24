@@ -25,7 +25,7 @@ export const WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 604_800_000
 // plus two days of slack: once both windows are stale a record is meaningless,
 // so letting idle users' keys expire keeps the keyspace bounded (the old
 // per-(chat,user) buckets had no TTL and accumulated forever).
-export const USAGE_RETENTION_MS = WEEK_MS + 2 * 24 * 60 * 60 * 1000;
+const USAGE_RETENTION_MS = WEEK_MS + 2 * 24 * 60 * 60 * 1000;
 export const USAGE_RETENTION_SECONDS = Math.floor(USAGE_RETENTION_MS / 1000);
 
 // FNV-1a 32-bit hash of the user id, returned unsigned. Deterministic and

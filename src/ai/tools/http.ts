@@ -71,7 +71,7 @@ function isBlockedIPv6(ip: string): boolean {
   return false;
 }
 
-export function isBlockedAddress(ip: string): boolean {
+function isBlockedAddress(ip: string): boolean {
   const v = isIP(ip);
   if (v === 4) return isBlockedIPv4(ip);
   if (v === 6) return isBlockedIPv6(ip);
@@ -113,10 +113,6 @@ export async function resolvePublicHost(hostname: string): Promise<string> {
     }
   }
   return addresses[0]!.address;
-}
-
-export async function assertPublicHost(hostname: string): Promise<void> {
-  await resolvePublicHost(hostname);
 }
 
 export type SafeFetchOptions = {

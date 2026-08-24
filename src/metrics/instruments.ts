@@ -39,7 +39,6 @@ export const commandsTotal = registry.register(
   ),
 );
 
-export type AskSource = "ask" | "guest";
 export type AskOutcomeLabel =
   "answered" | "denied" | "usage" | "budget_limited" | "rate_limited" | "error";
 
@@ -160,7 +159,7 @@ export const videoExtractionsTotal = registry.register(
 
 // --- Self-instrumentation --------------------------------------------------
 
-export const metricsCollectorErrorsTotal = registry.register(
+const metricsCollectorErrorsTotal = registry.register(
   new Counter(
     "bot_metrics_collector_errors_total",
     "Times a registry.onCollect() callback threw during scrape (process gauges, etc.).",
