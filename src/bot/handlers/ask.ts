@@ -42,20 +42,20 @@ export type AskInput = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
-  audios?: Uint8Array[];
+  audios?: Uint8Array[] | undefined;
   // Whole clips, sent when the answering model advertises video input. Empty in
   // frames mode, where the clip already arrived as `images` + `audios`.
-  videos?: VideoClip[];
+  videos?: VideoClip[] | undefined;
   // Describes media the parts alone don't explain — video frames (see
   // `bot/video.ts`). Goes into the user envelope, so it is persisted too.
-  attachments?: string;
+  attachments?: string | undefined;
   imageFileIds: string[];
   replyImageFileIds: string[];
   replyTarget: ReplyTarget | null;
   lang: Lang;
   detailLevel: DetailLevel;
-  onAIStart?: () => void;
-  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
+  onAIStart?: (() => void) | undefined;
+  fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
 };
 
 export type AskOutcome =
@@ -197,9 +197,11 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       botAnswer,
       parentBotMsgId,
       ts: input.now,
-      userImageFileIds:
-        allImageFileIds.length > 0 ? allImageFileIds : undefined,
-      toolCalls: turnToolCalls.length > 0 ? turnToolCalls : undefined,
+      // Spread rather than assigned: a stored node distinguishes "no images"
+      // from "written before the field existed" by the key being absent, so
+      // neither may be persisted as an explicit undefined.
+      ...(allImageFileIds.length > 0 && { userImageFileIds: allImageFileIds }),
+      ...(turnToolCalls.length > 0 && { toolCalls: turnToolCalls }),
     };
     await Promise.all([
       convStorage.saveConversation(input.chatId, botMsgId, node),

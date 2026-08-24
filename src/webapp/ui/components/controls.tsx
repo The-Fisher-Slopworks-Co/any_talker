@@ -85,11 +85,11 @@ export function NumberInput({
 }: {
   value: number;
   onChange: (n: number) => void;
-  min?: number;
-  max?: number;
-  step?: number | string;
-  integer?: boolean;
-  className?: string;
+  min?: number | undefined;
+  max?: number | undefined;
+  step?: number | string | undefined;
+  integer?: boolean | undefined;
+  className?: string | undefined;
 }) {
   const [text, setText] = useState(() => String(value));
   const lastEmittedRef = useRef(value);

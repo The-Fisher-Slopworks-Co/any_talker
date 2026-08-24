@@ -165,7 +165,7 @@ describe("runAiTurn — request assembly", () => {
 
   test("no detailLevel: no detail section and no reasoning effort (guest/delivery path)", async () => {
     const ai = new FakeAI();
-    await runAiTurn(baseInput({ ai, source: "guest", detailLevel: undefined }));
+    await runAiTurn(baseInput({ ai, source: "guest" }));
     const opts = ai.calls[0]!;
     expect(opts.system).not.toContain("# Уровень подробности");
     expect(opts.reasoningEffort).toBeUndefined();
@@ -183,7 +183,7 @@ describe("runAiTurn — request assembly", () => {
 
   test("contextMessages is omitted from the tool context when not passed", async () => {
     const ai = new FakeAI();
-    await runAiTurn(baseInput({ ai, contextMessages: undefined }));
+    await runAiTurn(baseInput({ ai }));
     expect(ai.calls[0]!.toolCallContext.contextMessages).toBeUndefined();
   });
 });

@@ -101,9 +101,9 @@ export function buildRequestFields(opts: {
   // The full chain; [0] is the primary.
   models: string[];
   routing: RoutingOptions;
-  reasoningEffort?: ReasoningEffort | null;
+  reasoningEffort?: ReasoningEffort | null | undefined;
   // Stable id of the conversation this request belongs to (`ai/session.ts`).
-  sessionId?: string | null;
+  sessionId?: string | null | undefined;
 }): {
   model: string;
   models?: string[];
@@ -201,9 +201,9 @@ export class OpenRouterClient implements AIClient {
     system: string;
     messages: AIMessage[];
     tools: Tool[];
-    routing?: RoutingOptions;
-    reasoningEffort?: ReasoningEffort | null;
-    sessionId?: string | null;
+    routing?: RoutingOptions | undefined;
+    reasoningEffort?: ReasoningEffort | null | undefined;
+    sessionId?: string | null | undefined;
     toolCallContext: ToolCallContext;
   }): Promise<AskResult> {
     const primary = opts.models[0];

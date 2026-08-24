@@ -92,7 +92,7 @@ function firecrawlEnvelope(data: {
   });
 }
 
-function bodyOf(call: [RequestInfo | URL, RequestInit?] | undefined): {
+function bodyOf(call: [RequestInfo | URL, (RequestInit | undefined)?] | undefined): {
   location?: { languages?: string[] };
   formats?: string[];
 } {

@@ -22,7 +22,7 @@ import type { ManagedBot } from "./types";
 // `managed_bot_created` service message.
 export type ManagedBotUser = {
   id: number;
-  username?: string;
+  username?: string | undefined;
   first_name: string;
 };
 

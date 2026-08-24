@@ -17,9 +17,9 @@ export type ProxyEndpoint = {
   // human-readable provider_name and what `provider.order` expects.
   provider_slug: string | null;
   pricing: {
-    prompt?: string;
-    completion?: string;
-    image?: string;
+    prompt?: string | undefined;
+    completion?: string | undefined;
+    image?: string | undefined;
   };
   throughput: number | null;
   latency: number | null;

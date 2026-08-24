@@ -280,7 +280,7 @@ export class Histogram implements Metric {
 export class Registry {
   private readonly metrics: Metric[] = [];
   private readonly collectors: Array<() => void> = [];
-  private onCollectorError?: (err: unknown) => void;
+  private onCollectorError?: ((err: unknown) => void) | undefined;
 
   register<T extends Metric>(metric: T): T {
     if (this.metrics.some((m) => m.name === metric.name)) {

@@ -11,9 +11,9 @@ export type ContactInput = {
   isPrivateChat: boolean;
   fromUserId: string;
   contact: {
-    user_id?: number;
+    user_id?: number | undefined;
     first_name: string;
-    last_name?: string;
+    last_name?: string | undefined;
   };
 };
 

@@ -37,7 +37,7 @@ export type ToolCallContext = {
   // Snapshot of the messages passed to ai.ask() for the turn this tool
   // call is running inside. Tools that need to durably capture the
   // conversation context (e.g. reminders) read this.
-  contextMessages?: AIMessage[];
+  contextMessages?: AIMessage[] | undefined;
 };
 
 // A tool's input schema. `@openrouter/agent`'s `tool()` requires a zod v4

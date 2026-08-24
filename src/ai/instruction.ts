@@ -155,8 +155,8 @@ export function buildInstruction(
   opts: {
     timezone?: string;
     lang?: Lang;
-    detailLevel?: DetailLevel;
-    facts?: Array<{ key: string; value: string }>;
+    detailLevel?: DetailLevel | undefined;
+    facts?: Array<{ key: string; value: string }> | undefined;
   } = {},
 ): string {
   const sections: string[] = [

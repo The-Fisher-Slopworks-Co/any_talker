@@ -14,12 +14,12 @@ export type ReplyTarget = {
   text: string | null;
   authorFirstName: string | null;
   images: Uint8Array[];
-  audios?: Uint8Array[];
+  audios?: Uint8Array[] | undefined;
   // Whole clips, when the answering model takes video natively.
-  videos?: VideoClip[];
+  videos?: VideoClip[] | undefined;
   // What the attached media actually is, when that isn't self-evident — in
   // frames mode a video arrives as stills, which would read as loose photos.
-  mediaNote?: string;
+  mediaNote?: string | undefined;
 };
 
 // Picks the storage view that holds a chat's conversation graph.
@@ -75,16 +75,16 @@ export type BuildContextArgs = {
   userText: string;
   quote: string | null;
   images: Uint8Array[];
-  audios?: Uint8Array[];
-  videos?: VideoClip[];
-  attachments?: string;
+  audios?: Uint8Array[] | undefined;
+  videos?: VideoClip[] | undefined;
+  attachments?: string | undefined;
   replyTarget: ReplyTarget | null;
   // Stamped onto the new user turn. Callers that persist the same turn must
   // reuse the very same value (see `ask.ts`), or the stored envelope would
   // differ from the one the model saw and break the cache on the next turn.
   sentAt: SentAt | null;
-  maxDepth?: number;
-  fetchPhoto?: (fileId: string) => Promise<Uint8Array | null>;
+  maxDepth?: number | undefined;
+  fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
 };
 
 export function buildUserEnvelope(args: {
@@ -94,7 +94,7 @@ export function buildUserEnvelope(args: {
   sentAt: SentAt | null;
   // Describes media that isn't self-evident from the parts themselves (video
   // frames). Persisted with the turn, so a follow-up reads the same envelope.
-  attachments?: string;
+  attachments?: string | undefined;
 }): string {
   const override = args.sender.nameOverride?.trim() ?? "";
   const author =
