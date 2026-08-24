@@ -12,13 +12,16 @@
     "lint": "oxlint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
-    "check": "bun run typecheck && bun run lint && bun run format:check && bun test"
+    "knip": "knip",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run knip && bun test"
   },
   "devDependencies": {
+    "@grammyjs/types": "3.27.3",
     "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/turndown": "^5.0.6",
+    "knip": "^6.32.2",
     "oxlint": "^1.80.0",
     "prettier": "^3.9.6"
   },
