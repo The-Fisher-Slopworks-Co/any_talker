@@ -33,7 +33,7 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@openrouter/agent": "0.8.0",
-    "@openrouter/sdk": "0.13.67",
+    "@openrouter/sdk": "1.2.54",
     "bun-plugin-tailwind": "^0.1.2",
     "grammy": "^1.43.0",
     "linkedom": "^0.18.12",
