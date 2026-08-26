@@ -10,7 +10,6 @@ import { runAiTurn } from "../ai/turn";
 import { deserializeMessages } from "../ai/serialize";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
-import { richApi } from "../bot/rich";
 import { localDateTimeString } from "../shared/tz";
 import { migratedChatId } from "../shared/chat-migration";
 import { composeFullName } from "../shared/types";
@@ -40,12 +39,15 @@ export type ReminderApi = {
   ): Promise<unknown>;
 };
 
-// Adapt a grammY Api into the narrow ReminderApi. sendRichMessage is reached
-// through the raw proxy because it is newer (Bot API 10.1) than the installed
-// grammY typings.
+// Adapt a grammY Api into the narrow ReminderApi.
 export function reminderApiFromGrammy(api: Api): ReminderApi {
   return {
-    sendRichMessage: (params) => richApi(api).sendRichMessage(params),
+    sendRichMessage: ({ chat_id, rich_message, reply_parameters }) =>
+      api.sendRichMessage(
+        chat_id,
+        rich_message,
+        reply_parameters ? { reply_parameters } : {},
+      ),
     sendMessage: (chat_id, text, other) =>
       api.sendMessage(chat_id, text, other),
   };
