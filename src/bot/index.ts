@@ -2,12 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { Bot, type Context, type Api } from "grammy";
-import type {
-  InlineQueryResult,
-  InputMessageContent,
-  Message,
-  Update,
-} from "grammy/types";
+import type { Message, Update } from "grammy/types";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { BudgetGuard } from "../budget/types";
@@ -48,15 +43,12 @@ import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
 import { resolveReplyImages } from "./reply-images";
 import { buildRichMarkdown, buildEffectsTopBlock } from "./format";
-import { richApi } from "./rich";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { readValidDisplayName } from "../shared/display-name";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../shared/types";
 import { t } from "../shared/i18n";
 import { utcDateKey } from "../spending/window";
 import { ALERT_TTL_SECONDS } from "../observability/scheduler";
-import type { SentGuestMessage } from "../types/telegram-guest";
-import type { InputRichMessageContent } from "../types/telegram-rich";
 import { makeIncomingUpdateLogger } from "./log-update";
 import { migrateChatData } from "../storage/migrate-chat";
 import { makeLangMiddleware, type BotContext } from "./middleware/lang";
@@ -68,11 +60,6 @@ import {
   checksProcessedTotal,
   type AskOutcomeLabel,
 } from "../metrics";
-
-type AnswerGuestQuery = (args: {
-  guest_query_id: string;
-  result: InlineQueryResult;
-}) => Promise<SentGuestMessage>;
 
 // Identifies a managed (non-main) bot. Its presence switches `createBot` into
 // managed mode: `/ask` is matched ONLY when explicitly addressed as `@self`,
@@ -513,9 +500,6 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
     const userText = (msg.text ?? msg.caption ?? "").trim();
 
-    const answerGuestQuery = (
-      ctx.api.raw as unknown as { answerGuestQuery: AnswerGuestQuery }
-    ).answerGuestQuery;
     const answer = (
       text: string,
       botName: string | null,
@@ -528,17 +512,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
         detailsSummary: ctx.t.bot_details_summary,
       });
-      const richContent: InputRichMessageContent = {
-        rich_message: { markdown: content.markdown },
-      };
-      return answerGuestQuery({
-        guest_query_id: guestQueryId,
-        result: {
-          type: "article",
-          id: "1",
-          title: "Reply",
-          input_message_content: richContent as unknown as InputMessageContent,
-        },
+      return ctx.api.answerGuestQuery(guestQueryId, {
+        type: "article",
+        id: "1",
+        title: "Reply",
+        input_message_content: { rich_message: { markdown: content.markdown } },
       });
     };
 
@@ -1097,11 +1075,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           const replyParameters = { message_id: args.askMessageId };
           let sent: Message;
           try {
-            sent = await richApi(ctx.api).sendRichMessage({
-              chat_id: chatId,
-              rich_message: { markdown: content.markdown },
-              reply_parameters: replyParameters,
-            });
+            // `skip_entity_detection` is deliberately left unset: Telegram
+            // auto-links plain URLs and mentions in the AI reply, matching the
+            // behavior of the `parse_mode: "HTML"` send path this replaced.
+            sent = await ctx.api.sendRichMessage(
+              chatId,
+              { markdown: content.markdown },
+              { reply_parameters: replyParameters },
+            );
           } catch (err) {
             // Rich send failed (markdown Telegram rejected, or the method is
             // unavailable on this server) — fall back to a plain message so the
@@ -1286,9 +1267,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       case "digest":
         // Rich send with the same plain fallback the scheduled digest uses.
         try {
-          await richApi(ctx.api).sendRichMessage({
-            chat_id: from.id,
-            rich_message: { markdown: outcome.markdown },
+          await ctx.api.sendRichMessage(from.id, {
+            markdown: outcome.markdown,
           });
         } catch (err) {
           console.error("digest sendRichMessage failed, sending plain:", err);
