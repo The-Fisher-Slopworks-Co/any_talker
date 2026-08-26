@@ -218,13 +218,6 @@ export class OpenRouterClient implements AIClient {
     // `effects`/`contextMessages` and leak them into another.
     const tools = toAgentTools(opts.tools, opts.toolCallContext);
 
-    // Filled by the SessionEnd hook, which the agent runs in the `finally` of
-    // its tool loop — so it has already fired by the time `getText()` resolves,
-    // including on the error path. This is the only loop-aggregated usage
-    // figure the agent exposes; `getResponse().usage` covers the final call
-    // only and would under-count every tool-using ask.
-    let totals: SessionUsageTotals | undefined;
-
     // The input is built once and kept: the call ids it carries are what the
     // agent's state will echo back, and they are not always the stored ones —
     // `toResponsesInput` renames a call id that would repeat within a request.
@@ -277,15 +270,6 @@ export class OpenRouterClient implements AIClient {
           // fresh, and the SDK strips `state` from the outgoing request, so
           // this changes nothing on the wire.
           state: { load: async () => null, save: async () => {} },
-          hooks: {
-            SessionEnd: [
-              {
-                handler: (payload) => {
-                  totals = payload.totalUsage;
-                },
-              },
-            ],
-          },
         },
         this.titleHeader,
       );
@@ -296,6 +280,11 @@ export class OpenRouterClient implements AIClient {
       // set `strictFinalResponse`, because a throw here would drop a real,
       // billed ask out of the ledger.
       const text = await result.getText();
+      // Loop-aggregated usage: every model call the run made, not just the
+      // final one (`getResponse().usage` would under-count every tool-using
+      // ask). Resolved after `getText()` so the run is complete and the totals
+      // are final.
+      const totals = await result.getUsage();
       // The tool calls this run made, read off the conversation the agent
       // actually assembled — real call ids and the exact serialization the
       // model was handed, neither of which a wrapper around `execute` can see.

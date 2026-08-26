@@ -2,7 +2,6 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Api } from "grammy";
-import { richApi } from "../bot/rich";
 
 // Narrow owner-DM sender — the only capability the observability scheduler needs
 // from Telegram. Kept small (not grammY's full Api) so the test double stays
@@ -17,12 +16,11 @@ export type NotifyApi = {
   }): Promise<unknown>;
 };
 
-// Adapt a grammY Api into NotifyApi. `sendRichMessage` goes through the raw
-// proxy because it postdates the installed grammY typings — same as
-// `reminderApiFromGrammy`.
+// Adapt a grammY Api into NotifyApi.
 export function notifyApiFromGrammy(api: Api): NotifyApi {
   return {
     sendMessage: (chatId, text) => api.sendMessage(chatId, text),
-    sendRichMessage: (params) => richApi(api).sendRichMessage(params),
+    sendRichMessage: ({ chat_id, rich_message }) =>
+      api.sendRichMessage(chat_id, rich_message),
   };
 }
