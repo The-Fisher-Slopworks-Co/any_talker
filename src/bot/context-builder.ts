@@ -185,11 +185,27 @@ export async function buildContext(
         replyTarget.messageId,
         maxDepth,
       );
-      for (const c of chain) {
-        const chainImages = await loadChainImages(
+      // `collectChain` walks parents from the replied-to node and unshifts, so
+      // the replied-to node is always the LAST entry.
+      for (const [i, c] of chain.entries()) {
+        let chainImages = await loadChainImages(
           c.userImageFileIds,
           args.fetchPhoto,
         );
+        // A stored file id was issued to whichever family bot persisted the
+        // node, and Telegram file ids are bot-scoped — so when a DIFFERENT
+        // family bot continues a shared-graph chain, the reload above comes
+        // back short. For the replied-to node the dispatcher already fetched
+        // the media through this bot's own update (`replyTarget.images`), so
+        // prefer those bytes over silently dropping the images. When the
+        // reload succeeded (same bot), it already covers the reply's images —
+        // the count check keeps them from being attached twice.
+        if (
+          i === chain.length - 1 &&
+          chainImages.length < replyTarget.images.length
+        ) {
+          chainImages = replyTarget.images;
+        }
         if (chainImages.length > 0) {
           messages.push({
             role: "user",
