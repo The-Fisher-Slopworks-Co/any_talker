@@ -18,8 +18,8 @@ updates:
           - "*"
 
   # The runtime and dev dependencies. Bun's ecosystem reads package.json +
-  # bun.lock; grouping the non-major bumps keeps this to one PR a week, while
-  # majors stay separate because they are the ones that need reading.
+  # bun.lock; everything lands in one PR a week, majors included, so the whole
+  # week's drift gets read and merged in a single pass.
   - package-ecosystem: "bun"
     directory: "/"
     schedule:
@@ -28,7 +28,6 @@ updates:
     commit-message:
       prefix: "deps"
     groups:
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+      dependencies:
+        patterns:
+          - "*"
