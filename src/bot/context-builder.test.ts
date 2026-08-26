@@ -823,6 +823,137 @@ describe("buildContext", () => {
     expect(msgs[0]).toEqual({ role: "user", content: "Q" });
   });
 
+  // The group conversation graph is shared across the bot family, but Telegram
+  // file ids are bot-scoped: a node persisted by the main bot carries file ids
+  // a managed bot cannot download. The replied-to message's media, however, is
+  // already in `replyTarget.images` (downloaded via this bot's own update), so
+  // the chain walk must fall back to those bytes instead of dropping the photo.
+  test("replied-to node falls back to replyTarget images when stored file ids fail (cross-bot chain)", async () => {
+    const storage = new MemoryStorage();
+    const replyBytes = new Uint8Array([0xbb, 0x01]);
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q-photo",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["other-bots-file-id"],
+    });
+    const msgs = await buildContext({
+      sentAt: null,
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "",
+      quote: null,
+      images: [],
+      replyTarget: {
+        messageId: 100,
+        text: "Q-photo",
+        authorFirstName: "Alice",
+        images: [replyBytes],
+      },
+      // A foreign file id: getFile with this bot's token fails ⇒ null.
+      fetchPhoto: async () => null,
+    });
+    expect(msgs).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Q-photo" },
+          { type: "image", image: replyBytes, mediaType: "image/jpeg" },
+        ],
+      },
+      { role: "assistant", content: "A1" },
+      { role: "user", content: envelope() },
+    ]);
+  });
+
+  test("replied-to node keeps reloaded chain images when the reload succeeds (no duplication)", async () => {
+    const storage = new MemoryStorage();
+    const chainBytes = new Uint8Array([0xcc, 0x01]);
+    const replyBytes = new Uint8Array([0xcc, 0x02]);
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q-photo",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["f1"],
+    });
+    const msgs = await buildContext({
+      sentAt: null,
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "follow-up",
+      quote: null,
+      images: [],
+      replyTarget: {
+        messageId: 100,
+        text: "Q-photo",
+        authorFirstName: "Bot",
+        images: [replyBytes],
+      },
+      fetchPhoto: async (id) => (id === "f1" ? chainBytes : null),
+    });
+    expect(msgs[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Q-photo" },
+        { type: "image", image: chainBytes, mediaType: "image/jpeg" },
+      ],
+    });
+  });
+
+  test("fallback covers only the replied-to node — a failing ancestor stays text-only", async () => {
+    const storage = new MemoryStorage();
+    const replyBytes = new Uint8Array([0xdd, 0x01]);
+    await storage.saveConversation("c1", 100, {
+      userQuestion: "Q1-photo",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      userImageFileIds: ["other-bots-file-id"],
+    });
+    await storage.saveConversation("c1", 200, {
+      userQuestion: "Q2-photo",
+      botAnswer: "A2",
+      parentBotMsgId: 100,
+      ts: 2,
+      userImageFileIds: ["another-foreign-id"],
+    });
+    const msgs = await buildContext({
+      sentAt: null,
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "next",
+      quote: null,
+      images: [],
+      replyTarget: {
+        messageId: 200,
+        text: "Q2-photo",
+        authorFirstName: "Alice",
+        images: [replyBytes],
+      },
+      fetchPhoto: async () => null,
+    });
+    expect(msgs).toEqual([
+      // The ancestor's photo is genuinely unrecoverable — its bytes are not in
+      // the reply — so its turn stays text-only.
+      { role: "user", content: "Q1-photo" },
+      { role: "assistant", content: "A1" },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Q2-photo" },
+          { type: "image", image: replyBytes, mediaType: "image/jpeg" },
+        ],
+      },
+      { role: "assistant", content: "A2" },
+      { role: "user", content: envelope({ text: "next" }) },
+    ]);
+  });
+
   test("chain walk leaves entries text-only when fetchPhoto is not provided", async () => {
     const storage = new MemoryStorage();
     await storage.saveConversation("c1", 100, {
