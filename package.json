@@ -17,7 +17,7 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@grammyjs/types": "3.27.3",
+    "@grammyjs/types": "5.0.0",
     "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
@@ -32,14 +32,14 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
-    "@openrouter/agent": "0.8.0",
+    "@openrouter/agent": "0.11.0",
     "@openrouter/sdk": "0.13.67",
     "bun-plugin-tailwind": "^0.1.2",
-    "grammy": "^1.43.0",
-    "linkedom": "^0.18.12",
+    "grammy": "^1.46.0",
+    "linkedom": "^0.18.13",
     "react": "latest",
     "react-dom": "latest",
-    "tailwindcss": "^4.2.4",
+    "tailwindcss": "^4.3.3",
     "turndown": "^7.2.4",
     "zod": "^4.4.3"
   }
