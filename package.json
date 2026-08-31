@@ -22,8 +22,8 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/turndown": "^5.0.6",
-    "knip": "^6.32.2",
-    "lefthook": "^2.1.10",
+    "knip": "^6.32.3",
+    "lefthook": "^2.1.12",
     "oxlint": "^1.80.0",
     "prettier": "^3.9.6"
   },
@@ -33,7 +33,7 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@openrouter/agent": "0.11.0",
-    "@openrouter/sdk": "0.13.67",
+    "@openrouter/sdk": "1.2.80",
     "bun-plugin-tailwind": "^0.1.2",
     "grammy": "^1.46.0",
     "linkedom": "^0.18.13",
