@@ -61,16 +61,29 @@ export async function persistReminder(
     }
   }
 
-  // Per-user reminder cap (global policy; settings are not bot-scoped). The cap
-  // is enforced per character via the scoped count. This is a check-then-save
-  // guardrail, not an atomic invariant: concurrent creations within one tool
-  // step could overshoot by a few, which is harmless for a quota bound.
+  // Per-user reminder cap, shared across the whole bot family: reminders are
+  // stored per character scope, so the cap sums the scoped counts of the main
+  // bot and every managed bot (plus the current turn's scope, normally already
+  // among them). This is a check-then-save guardrail, not an atomic invariant:
+  // concurrent creations within one tool step could overshoot by a few, which
+  // is harmless for a quota bound.
   const { maxRemindersPerUser } = await getOrInitSettings(storage);
-  const count = await scoped.countRemindersForUser(ctx.userId);
+  const managedBots = await storage.listManagedBots();
+  const scopeIds = new Set<string | null>([
+    null,
+    ctx.botId ?? null,
+    ...managedBots.map((bot) => bot.botId),
+  ]);
+  const counts = await Promise.all(
+    [...scopeIds].map((id) =>
+      storage.forBot(id).countRemindersForUser(ctx.userId),
+    ),
+  );
+  const count = counts.reduce((sum, n) => sum + n, 0);
   if (count >= maxRemindersPerUser) {
     return {
       ok: false,
-      reason: `limit_reached: the user already has the maximum of ${maxRemindersPerUser} active reminders; ask them to cancel some before adding more`,
+      reason: `limit_reached: the user already has the maximum of ${maxRemindersPerUser} active reminders across all characters; ask them to cancel some before adding more`,
     };
   }
 

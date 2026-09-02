@@ -107,10 +107,11 @@ export type Settings = {
   anomaly: AnomalyConfig;
   timezone: string;
   expandableBlockquoteThreshold: number;
-  // Cap on how many reminders one user may hold at once (per character bot).
-  // Creation past this is rejected (not evicted — a reminder is a user-visible
-  // commitment). Bounds list/cancel cost and the KeyDB keyspace, since reminders
-  // carry no TTL. Configurable via PUT /api/settings; defaults to 50.
+  // Cap on how many reminders one user may hold at once, shared across the
+  // whole bot family (main bot + every managed character). Creation past this
+  // is rejected (not evicted — a reminder is a user-visible commitment). Bounds
+  // list/cancel cost and the KeyDB keyspace, since reminders carry no TTL.
+  // Configurable via PUT /api/settings; defaults to 5.
   maxRemindersPerUser: number;
 };
 
@@ -119,7 +120,7 @@ export const DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD = 500;
 // Default per-user reminder cap (see `Settings.maxRemindersPerUser`). Mirrors
 // the `USER_FACTS_MAX_PER_USER` precedent, but enforced as rejection rather than
 // oldest-eviction.
-const DEFAULT_MAX_REMINDERS_PER_USER = 50;
+const DEFAULT_MAX_REMINDERS_PER_USER = 5;
 
 export type WhitelistKind = "users" | "chats";
 
