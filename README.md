@@ -148,7 +148,7 @@ are supported as `host:port`).
 - Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, edit a
   reminder's note or time, or cancel them by description; the AI drives this via the
   `schedule_reminder_*` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
-  is capped at `maxRemindersPerUser` reminders (default 50; configurable via `PUT /api/settings`).
+  is capped at `maxRemindersPerUser` reminders (default 5; configurable via `PUT /api/settings`).
 - Personal settings via chat — ask the bot to read or change your own name, timezone, gender, or
   language in plain language ("call me Vasya", "I'm in Moscow time", "switch to Russian"); the AI
   drives this via the `get_user_settings` / `update_user_settings` tools (the same four fields the
