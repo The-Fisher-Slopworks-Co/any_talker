@@ -287,20 +287,39 @@ describe("persistReminder per-user cap", () => {
     expect((await persistReminder(storage, u2, future(1), "b")).ok).toBe(true);
   });
 
-  test("the cap is scoped per character bot", async () => {
+  test("the cap is shared across character bots", async () => {
     const storage = new MemoryStorage();
     await withCap(storage, 1);
-    // Fill the main bot's allowance for u1.
+    // Fill the family-wide allowance for u1 via the main bot.
     expect((await persistReminder(storage, baseCtx, future(0), "a")).ok).toBe(
+      true,
+    );
+    // The same user is over the cap under a managed bot too.
+    const managed = { ...baseCtx, botId: "bot9" };
+    const out = await persistReminder(storage, managed, future(1), "b");
+    expect(out).toEqual({
+      ok: false,
+      reason: expect.stringContaining("limit_reached"),
+    });
+  });
+
+  test("reminders held by a managed bot count against the main bot's cap", async () => {
+    const storage = new MemoryStorage();
+    await withCap(storage, 1);
+    await storage.saveManagedBot({
+      botId: "bot9",
+      ownerUserId: "owner",
+      username: "bot9_bot",
+      displayName: "Bot 9",
+      systemPrompt: "be a bot",
+      createdAtMs: 0,
+    });
+    const managed = { ...baseCtx, botId: "bot9" };
+    expect((await persistReminder(storage, managed, future(0), "a")).ok).toBe(
       true,
     );
     expect((await persistReminder(storage, baseCtx, future(1), "b")).ok).toBe(
       false,
-    );
-    // The same user under a managed bot has a separate allowance.
-    const managed = { ...baseCtx, botId: "bot9" };
-    expect((await persistReminder(storage, managed, future(2), "c")).ok).toBe(
-      true,
     );
   });
 });

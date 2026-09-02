@@ -107,10 +107,11 @@ export type Settings = {
   anomaly: AnomalyConfig;
   timezone: string;
   expandableBlockquoteThreshold: number;
-  // Cap on how many reminders one user may hold at once (per character bot).
-  // Creation past this is rejected (not evicted — a reminder is a user-visible
-  // commitment). Bounds list/cancel cost and the KeyDB keyspace, since reminders
-  // carry no TTL. Configurable via PUT /api/settings; defaults to 5.
+  // Cap on how many reminders one user may hold at once, shared across the
+  // whole bot family (main bot + every managed character). Creation past this
+  // is rejected (not evicted — a reminder is a user-visible commitment). Bounds
+  // list/cancel cost and the KeyDB keyspace, since reminders carry no TTL.
+  // Configurable via PUT /api/settings; defaults to 5.
   maxRemindersPerUser: number;
 };
 
