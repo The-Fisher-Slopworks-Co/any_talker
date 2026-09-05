@@ -55,31 +55,41 @@ describe("MemoryStorage whitelist", () => {
 describe("MemoryStorage blacklist", () => {
   test("starts empty", async () => {
     const s = new MemoryStorage();
-    expect(await s.listBlacklist()).toEqual([]);
-    expect(await s.isBlacklisted("1")).toBe(false);
+    expect(await s.listBlacklist("users")).toEqual([]);
+    expect(await s.listBlacklist("chats")).toEqual([]);
+    expect(await s.isBlacklisted("users", "1")).toBe(false);
+    expect(await s.isBlacklisted("chats", "1")).toBe(false);
   });
 
   test("add then list and check; add is idempotent on id, last label wins", async () => {
     const s = new MemoryStorage();
-    await s.addBlacklist({ id: "42", label: "a" });
-    await s.addBlacklist({ id: "42", label: "b" });
-    expect(await s.listBlacklist()).toEqual([{ id: "42", label: "b" }]);
-    expect(await s.isBlacklisted("42")).toBe(true);
-    expect(await s.isBlacklisted("43")).toBe(false);
+    await s.addBlacklist("users", { id: "42", label: "a" });
+    await s.addBlacklist("users", { id: "42", label: "b" });
+    expect(await s.listBlacklist("users")).toEqual([{ id: "42", label: "b" }]);
+    expect(await s.isBlacklisted("users", "42")).toBe(true);
+    expect(await s.isBlacklisted("users", "43")).toBe(false);
   });
 
   test("remove removes the entry", async () => {
     const s = new MemoryStorage();
-    await s.addBlacklist({ id: "42" });
-    await s.removeBlacklist("42");
-    expect(await s.isBlacklisted("42")).toBe(false);
+    await s.addBlacklist("users", { id: "42" });
+    await s.removeBlacklist("users", "42");
+    expect(await s.isBlacklisted("users", "42")).toBe(false);
+  });
+
+  test("users and chats are separate lists", async () => {
+    const s = new MemoryStorage();
+    await s.addBlacklist("chats", { id: "-100" });
+    expect(await s.isBlacklisted("chats", "-100")).toBe(true);
+    expect(await s.isBlacklisted("users", "-100")).toBe(false);
+    expect(await s.listBlacklist("users")).toEqual([]);
   });
 
   test("is shared across forBot scopes (global, like the whitelist)", async () => {
     const s = new MemoryStorage();
-    await s.forBot("777").addBlacklist({ id: "42" });
-    expect(await s.isBlacklisted("42")).toBe(true);
-    expect(await s.forBot(null).isBlacklisted("42")).toBe(true);
+    await s.forBot("777").addBlacklist("users", { id: "42" });
+    expect(await s.isBlacklisted("users", "42")).toBe(true);
+    expect(await s.forBot(null).isBlacklisted("users", "42")).toBe(true);
   });
 });
 

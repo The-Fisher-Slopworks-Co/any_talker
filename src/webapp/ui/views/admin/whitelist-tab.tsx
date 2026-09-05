@@ -78,10 +78,12 @@ function WhitelistList({
 }
 
 function BlacklistList({
+  kind,
   entries,
   onOpen,
   onRemove,
 }: {
+  kind: WhitelistKind;
   entries: WhitelistEntry[];
   onOpen: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
@@ -89,7 +91,11 @@ function BlacklistList({
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_blacklist_blocked_users}</SectionHeader>
+      <SectionHeader>
+        {kind === "users"
+          ? s.ui_blacklist_blocked_users
+          : s.ui_blacklist_blocked_chats}
+      </SectionHeader>
       <Card>
         {entries.length === 0 ? (
           <EmptyState>{s.ui_whitelist_no_entries}</EmptyState>
@@ -119,7 +125,11 @@ function BlacklistList({
           ))
         )}
       </Card>
-      <SectionFooter>{s.ui_blacklist_footer}</SectionFooter>
+      <SectionFooter>
+        {kind === "users"
+          ? s.ui_blacklist_footer_users
+          : s.ui_blacklist_footer_chats}
+      </SectionFooter>
     </>
   );
 }
@@ -201,14 +211,26 @@ export function WhitelistTab({
       {blacklist === null ? (
         <LoadingState />
       ) : (
-        <BlacklistList
-          entries={blacklist.users}
-          onOpen={onOpenUser}
-          onRemove={async (id) => {
-            const users = await api.removeBlacklist(id);
-            setBlacklist({ users });
-          }}
-        />
+        <>
+          <BlacklistList
+            kind="users"
+            entries={blacklist.users}
+            onOpen={onOpenUser}
+            onRemove={async (id) => {
+              const users = await api.removeBlacklist("users", id);
+              setBlacklist((prev) => (prev ? { ...prev, users } : prev));
+            }}
+          />
+          <BlacklistList
+            kind="chats"
+            entries={blacklist.chats}
+            onOpen={onOpenChat}
+            onRemove={async (id) => {
+              const chats = await api.removeBlacklist("chats", id);
+              setBlacklist((prev) => (prev ? { ...prev, chats } : prev));
+            }}
+          />
+        </>
       )}
     </Stack>
   );

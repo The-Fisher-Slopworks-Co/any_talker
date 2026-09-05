@@ -39,6 +39,7 @@ export async function migrateChatData(
   const steps: Array<[name: string, run: () => Promise<void>]> = [
     ["chat_settings", () => migrateSettings(storage, oldChatId, newChatId)],
     ["whitelist", () => migrateWhitelist(storage, oldChatId, newChatId)],
+    ["blacklist", () => migrateBlacklist(storage, oldChatId, newChatId)],
     ["directory", () => migrateDirectory(storage, oldChatId, newChatId)],
     ["checks", () => migrateChecks(storage, oldChatId, newChatId)],
     ["reminders", () => migrateReminders(storage, oldChatId, newChatId)],
@@ -81,6 +82,20 @@ async function migrateWhitelist(
   if (!old) return;
   await storage.addWhitelist("chats", { ...old, id: newChatId });
   await storage.removeWhitelist("chats", oldChatId);
+}
+
+// Carried over for the same reason as the whitelist, but the failure mode is
+// worse: a blocked group that silently unblocks itself by upgrading.
+async function migrateBlacklist(
+  storage: Storage,
+  oldChatId: string,
+  newChatId: string,
+): Promise<void> {
+  const entries = await storage.listBlacklist("chats");
+  const old = entries.find((e) => e.id === oldChatId);
+  if (!old) return;
+  await storage.addBlacklist("chats", { ...old, id: newChatId });
+  await storage.removeBlacklist("chats", oldChatId);
 }
 
 async function migrateDirectory(

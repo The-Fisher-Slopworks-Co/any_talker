@@ -164,6 +164,7 @@ export function UserEditView({ userId }: { userId: string }) {
           initial={data.whitelisted}
         />
         <BlacklistToggleButton
+          kind="users"
           id={user.id}
           label={effectiveName}
           initial={data.blacklisted}

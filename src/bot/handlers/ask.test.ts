@@ -84,7 +84,15 @@ describe("askHandler", () => {
   test("blacklisted user denied with the reason for the log", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist({ id: "42" });
+    await storage.addBlacklist("users", { id: "42" });
+    const out: AskOutcome = await askHandler(baseInput({ storage }));
+    expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
+  });
+
+  test("blacklisted chat denied with the reason for the log", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.addBlacklist("chats", { id: "c1" });
     const out: AskOutcome = await askHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
