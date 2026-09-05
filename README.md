@@ -186,6 +186,12 @@ are supported as `host:port`).
   pending reminders are dropped instead of delivered. Only the owner is immune. Managed from the same
   admin tab (blocked-users / blocked-chats lists) and via "Add to blacklist" on a user's or chat's
   page. A blocked group that upgrades to a supergroup carries the block over.
+- **Messages sent "as a chat"** — an anonymous group admin, or a channel commenting under its own
+  post — are identified by the *sending chat*, not by Telegram's shared GroupAnonymousBot /
+  Channel_Bot pseudo-accounts. So each channel gets its own rate-limit window, budget and spend
+  ledger, and its own whitelist/blacklist standing (as a chat) instead of sharing one bucket with
+  every anonymous sender everywhere. The owner is not recognized through their own channel — Telegram
+  exposes no link between the two — so whitelist the channel to let it in.
 - Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
 - **Model settings** — the admin model picker validates ids against OpenRouter's model list and
   shows price, modalities, tool and prompt-caching support. It also offers a **fallback chain**,

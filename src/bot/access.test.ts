@@ -202,3 +202,87 @@ describe("checkAccess", () => {
     ).toEqual({ allowed: true });
   });
 });
+
+// A message sent on behalf of a chat (an anonymous group admin, or a channel
+// commenting under its own post) is identified by the sending chat — see
+// `bot/identity.ts`. The gate reads it off the chat lists, which is where the
+// admin UI files a chat.
+describe("checkAccess for a message sent as a chat", () => {
+  test("a blacklisted sending channel is denied, wherever it posts", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist("chats", { id: "-1001" });
+    await storage.addWhitelist("chats", { id: "-500" });
+    expect(
+      await checkAccess({
+        storage,
+        ownerId: "1",
+        userId: "-1001",
+        chatId: "-500",
+        senderChatId: "-1001",
+        whitelistEnabled: true,
+      }),
+    ).toEqual({ allowed: false, reason: "blacklisted" });
+  });
+
+  test("blocking one channel does not block another posting in the same chat", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist("chats", { id: "-1001" });
+    expect(
+      await checkAccess({
+        storage,
+        ownerId: "1",
+        userId: "-2002",
+        chatId: "-500",
+        senderChatId: "-2002",
+        whitelistEnabled: false,
+      }),
+    ).toEqual({ allowed: true });
+  });
+
+  test("whitelisting the sending channel grants it access", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("chats", { id: "-1001" });
+    expect(
+      await checkAccess({
+        storage,
+        ownerId: "1",
+        userId: "-1001",
+        chatId: "-500",
+        senderChatId: "-1001",
+        whitelistEnabled: true,
+      }),
+    ).toEqual({ allowed: true });
+  });
+
+  test("a whitelist entry for a DIFFERENT channel does not carry over", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("chats", { id: "-1001" });
+    expect(
+      await checkAccess({
+        storage,
+        ownerId: "1",
+        userId: "-2002",
+        chatId: "-500",
+        senderChatId: "-2002",
+        whitelistEnabled: true,
+      }),
+    ).toEqual({ allowed: false, reason: "not_whitelisted" });
+  });
+
+  // The owner posting as their own channel is a stranger to the gate: nothing
+  // links a channel to the human behind it. Documented limitation — the way
+  // back in is whitelisting the channel (the test above).
+  test("the owner posting as their channel does NOT inherit owner immunity", async () => {
+    const storage = new MemoryStorage();
+    expect(
+      await checkAccess({
+        storage,
+        ownerId: "1",
+        userId: "-1001",
+        chatId: "-500",
+        senderChatId: "-1001",
+        whitelistEnabled: true,
+      }),
+    ).toEqual({ allowed: false, reason: "not_whitelisted" });
+  });
+});
