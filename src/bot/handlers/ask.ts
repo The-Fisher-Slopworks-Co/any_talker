@@ -37,6 +37,9 @@ export type AskInput = {
   now: number;
   chatId: string;
   userId: string;
+  // Set only when the message was sent on behalf of a chat, and then equal to
+  // `userId` — see `bot/identity.ts`. Only the access gate looks at it.
+  senderChatId?: string | null | undefined;
   askMessageId: number;
   sender: Sender;
   userText: string;
@@ -124,6 +127,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     ownerId: input.ownerId,
     userId: input.userId,
     chatId: input.chatId,
+    senderChatId: input.senderChatId,
     whitelistEnabled: settings.whitelistEnabled,
   });
   if (!access.allowed) return { kind: "denied", reason: access.reason };

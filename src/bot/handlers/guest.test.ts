@@ -117,6 +117,31 @@ describe("guestAskHandler", () => {
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
 
+  // Sent as a chat: identified by the sending chat (`bot/identity.ts`), so the
+  // chat lists stand in for the user list on both sides of the gate.
+  test("a blacklisted sending channel is denied in guest mode too", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist("chats", { id: "-1001" });
+    const out = await guestAskHandler(
+      baseInput({ storage, userId: "-1001", senderChatId: "-1001" }),
+    );
+    expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
+  });
+
+  test("a whitelisted sending channel is answered, an unlisted one is not", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("chats", { id: "-1001" });
+    const ai = new FakeAI({ text: "hi", totalTokens: 100 });
+    const allowed = await guestAskHandler(
+      baseInput({ storage, ai, userId: "-1001", senderChatId: "-1001" }),
+    );
+    expect(allowed.kind).toBe("answered");
+    const denied = await guestAskHandler(
+      baseInput({ storage, ai, userId: "-2002", senderChatId: "-2002" }),
+    );
+    expect(denied).toEqual({ kind: "denied", reason: "not_whitelisted" });
+  });
+
   test("an empty AI answer is an error turn, not an answered one (Telegram rejects empty messages)", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
