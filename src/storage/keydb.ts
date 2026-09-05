@@ -298,25 +298,30 @@ export class KeyDBStorage implements Storage {
     return list.some((e) => e.id === id);
   }
 
-  async listBlacklist(): Promise<WhitelistEntry[]> {
-    const raw = await this.client.get(`${PREFIX}blacklist:users`);
+  // `blacklist:users` is the key the user-only blacklist already wrote, so
+  // existing data keeps working unchanged; chats get their own sibling key.
+  async listBlacklist(kind: WhitelistKind): Promise<WhitelistEntry[]> {
+    const raw = await this.client.get(`${PREFIX}blacklist:${kind}`);
     return raw ? (JSON.parse(raw) as WhitelistEntry[]) : [];
   }
 
-  async addBlacklist(entry: WhitelistEntry): Promise<void> {
-    const list = await this.listBlacklist();
+  async addBlacklist(
+    kind: WhitelistKind,
+    entry: WhitelistEntry,
+  ): Promise<void> {
+    const list = await this.listBlacklist(kind);
     const next = [...list.filter((e) => e.id !== entry.id), { ...entry }];
-    await this.client.set(`${PREFIX}blacklist:users`, JSON.stringify(next));
+    await this.client.set(`${PREFIX}blacklist:${kind}`, JSON.stringify(next));
   }
 
-  async removeBlacklist(id: string): Promise<void> {
-    const list = await this.listBlacklist();
+  async removeBlacklist(kind: WhitelistKind, id: string): Promise<void> {
+    const list = await this.listBlacklist(kind);
     const next = list.filter((e) => e.id !== id);
-    await this.client.set(`${PREFIX}blacklist:users`, JSON.stringify(next));
+    await this.client.set(`${PREFIX}blacklist:${kind}`, JSON.stringify(next));
   }
 
-  async isBlacklisted(id: string): Promise<boolean> {
-    const list = await this.listBlacklist();
+  async isBlacklisted(kind: WhitelistKind, id: string): Promise<boolean> {
+    const list = await this.listBlacklist(kind);
     return list.some((e) => e.id === id);
   }
 

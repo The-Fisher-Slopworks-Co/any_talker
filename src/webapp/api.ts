@@ -856,35 +856,41 @@ export async function handleApi(
     }
   }
 
-  // User blacklist (users only — no chat blacklist). Mutations return the
-  // fresh list, like the whitelist routes.
+  // Blacklist, shaped exactly like the whitelist routes above (both kinds,
+  // mutations return the fresh list).
   if (req.path === "/api/blacklist" && req.method === "GET") {
-    const users = await deps.storage.listBlacklist();
-    return { status: 200, body: { users } };
+    const [users, chats] = await Promise.all([
+      deps.storage.listBlacklist("users"),
+      deps.storage.listBlacklist("chats"),
+    ]);
+    return { status: 200, body: { users, chats } };
   }
-  if (req.path === "/api/blacklist" && req.method === "POST") {
-    const body = (req.body ?? {}) as Partial<WhitelistEntry>;
-    if (typeof body.id !== "string" || body.id.length === 0) {
-      return { status: 400, body: { error: "id required" } };
+
+  for (const kind of ["users", "chats"] as const) {
+    if (req.path === `/api/blacklist/${kind}` && req.method === "POST") {
+      const body = (req.body ?? {}) as Partial<WhitelistEntry>;
+      if (typeof body.id !== "string" || body.id.length === 0) {
+        return { status: 400, body: { error: "id required" } };
+      }
+      // Blacklisting the owner would be a silent no-op (the access gates check
+      // ownership first), so reject it loudly instead of storing a dead entry.
+      // Holds for chats too: the owner's private chat id *is* their user id,
+      // and nobody else can speak there.
+      if (body.id === deps.ownerId) {
+        return { status: 400, body: { error: "cannot blacklist the owner" } };
+      }
+      await deps.storage.addBlacklist(kind, {
+        id: body.id,
+        ...(body.label !== undefined && { label: body.label }),
+      });
+      const list = await deps.storage.listBlacklist(kind);
+      return { status: 200, body: list };
     }
-    // Blacklisting the owner would be a silent no-op (the access gates check
-    // ownership first), so reject it loudly instead of storing a dead entry.
-    if (body.id === deps.ownerId) {
-      return { status: 400, body: { error: "cannot blacklist the owner" } };
-    }
-    await deps.storage.addBlacklist({
-      id: body.id,
-      ...(body.label !== undefined && { label: body.label }),
-    });
-    const users = await deps.storage.listBlacklist();
-    return { status: 200, body: users };
-  }
-  {
-    const m = req.path.match(/^\/api\/blacklist\/(.+)$/);
+    const m = req.path.match(new RegExp(`^/api/blacklist/${kind}/(.+)$`));
     if (m && req.method === "DELETE") {
-      await deps.storage.removeBlacklist(m[1]!);
-      const users = await deps.storage.listBlacklist();
-      return { status: 200, body: users };
+      await deps.storage.removeBlacklist(kind, m[1]!);
+      const list = await deps.storage.listBlacklist(kind);
+      return { status: 200, body: list };
     }
   }
 
@@ -972,7 +978,7 @@ export async function handleApi(
         deps.storage.getUserGender(id),
         deps.storage.getUserLang(id),
         deps.storage.isWhitelisted("users", id),
-        deps.storage.isBlacklisted(id),
+        deps.storage.isBlacklisted("users", id),
       ]);
       if (!user) return { status: 404, body: { error: "user not found" } };
       return {
@@ -1157,15 +1163,16 @@ export async function handleApi(
   if (chatMatch) {
     const id = chatMatch[1]!;
     if (req.method === "GET") {
-      const [chat, settings, whitelisted] = await Promise.all([
+      const [chat, settings, whitelisted, blacklisted] = await Promise.all([
         deps.storage.getChat(id),
         deps.storage.getChatSettings(id),
         deps.storage.isWhitelisted("chats", id),
+        deps.storage.isBlacklisted("chats", id),
       ]);
       if (!chat) return { status: 404, body: { error: "chat not found" } };
       return {
         status: 200,
-        body: { chat, settings: settings ?? {}, whitelisted },
+        body: { chat, settings: settings ?? {}, whitelisted, blacklisted },
       };
     }
     if (req.method === "PUT") {

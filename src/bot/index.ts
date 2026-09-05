@@ -41,6 +41,7 @@ import {
 } from "./video";
 import { createMediaGroupBuffer } from "./media-group-buffer";
 import { resolveReplyAuthor } from "./reply";
+import { resolveSenderIdentity } from "./identity";
 import { resolveReplyImages } from "./reply-images";
 import { buildRichMarkdown, buildEffectsTopBlock } from "./format";
 import type { PersonaResolver } from "../managed-bots/persona";
@@ -494,8 +495,11 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   ) => {
     const guestQueryId = msg.guest_query_id;
     if (!guestQueryId) return;
-    const userId = String(msg.from?.id ?? "");
-    if (!userId) return;
+    // Same rule as `dispatchAsk`: a guest speaking as a chat is identified by
+    // that chat, never by the shared pseudo-account (`bot/identity.ts`).
+    const identity = resolveSenderIdentity(msg);
+    if (!identity) return;
+    const userId = identity.userId;
     const chatId = String(msg.chat.id);
 
     const userText = (msg.text ?? msg.caption ?? "").trim();
@@ -586,8 +590,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       deps.storage.getUserGender(userId),
     ]);
     const sender = {
-      firstName: msg.from?.first_name ?? null,
-      lastName: msg.from?.last_name ?? null,
+      firstName: identity.firstName,
+      lastName: identity.lastName,
       nameOverride,
       gender,
     };
@@ -682,6 +686,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         now: Date.now(),
         chatId,
         userId,
+        senderChatId: identity.senderChatId,
         sender,
         userText,
         quote: msg.quote?.text ?? null,
@@ -872,9 +877,17 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
     if (args.forwardOrigin) return;
 
-    const userId = String(ctx.from?.id ?? "");
+    // Never `ctx.from.id` directly: a message sent as a chat carries a
+    // Telegram-wide pseudo-account there, and keying the rate limit, budget or
+    // memory on it would pool every anonymous sender everywhere into one
+    // identity. See `bot/identity.ts`.
+    const identity = resolveSenderIdentity({
+      from: ctx.from,
+      sender_chat: ctx.senderChat,
+    });
     const chatId = ctx.chat?.id;
-    if (!userId || chatId === undefined) return;
+    if (!identity || chatId === undefined) return;
+    const userId = identity.userId;
 
     const replyTarget = args.replyToMessage
       ? extractReplyTarget(args.replyToMessage)
@@ -968,8 +981,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       deps.storage.getUserGender(userId),
     ]);
     const sender = {
-      firstName: ctx.from?.first_name ?? null,
-      lastName: ctx.from?.last_name ?? null,
+      firstName: identity.firstName,
+      lastName: identity.lastName,
       nameOverride,
       gender,
     };
@@ -1004,6 +1017,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           now: Date.now(),
           chatId: String(chatId),
           userId,
+          senderChatId: identity.senderChatId,
           askMessageId: args.askMessageId,
           sender,
           userText: args.userText,

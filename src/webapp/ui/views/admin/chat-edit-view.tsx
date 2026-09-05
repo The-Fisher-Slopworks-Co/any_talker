@@ -28,6 +28,7 @@ import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
 import { TimezoneSelect } from "../../components/timezone-select";
 import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
+import { BlacklistToggleButton } from "../../components/blacklist-toggle-button";
 import {
   INPUT_CLS,
   ROW_CLS,
@@ -64,6 +65,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [whitelisted, setWhitelisted] = useState(false);
+  const [blacklisted, setBlacklisted] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getSettings(), api.getAdminChat(chatId)])
@@ -72,6 +74,7 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         setChat(d.chat);
         setOriginal(d.settings);
         setWhitelisted(d.whitelisted);
+        setBlacklisted(d.blacklisted);
         setPromptOverride(d.settings.systemPrompt !== undefined);
         setPromptValue(d.settings.systemPrompt ?? g.systemPrompt);
         setModelsOverride(d.settings.models !== undefined);
@@ -227,6 +230,12 @@ export function ChatEditView({ chatId }: { chatId: string }) {
           id={chat.id}
           label={chatTitle(s, chat)}
           initial={whitelisted}
+        />
+        <BlacklistToggleButton
+          kind="chats"
+          id={chat.id}
+          label={chatTitle(s, chat)}
+          initial={blacklisted}
         />
       </Card>
       <SectionFooter>

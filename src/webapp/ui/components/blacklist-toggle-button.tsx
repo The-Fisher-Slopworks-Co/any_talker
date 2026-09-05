@@ -4,13 +4,16 @@
 import { useState } from "react";
 import { useI18n } from "../i18n-context";
 import { api } from "../api-client";
+import type { WhitelistKind } from "../../../shared/types";
 import { RowButton } from "./controls";
 
 export function BlacklistToggleButton({
+  kind,
   id,
   label,
   initial,
 }: {
+  kind: WhitelistKind;
   id: string;
   label: string;
   initial: boolean;
@@ -22,10 +25,10 @@ export function BlacklistToggleButton({
     setBusy(true);
     try {
       if (blacklisted) {
-        await api.removeBlacklist(id);
+        await api.removeBlacklist(kind, id);
         setBlacklisted(false);
       } else {
-        await api.addBlacklist({ id, label });
+        await api.addBlacklist(kind, { id, label });
         setBlacklisted(true);
       }
     } finally {
