@@ -78,6 +78,7 @@ export type ChatSettingsResponse = {
   chat: Chat;
   settings: ChatSettings;
   whitelisted: boolean;
+  blacklisted: boolean;
 };
 export type SpendingResponse = {
   spending: SpendSummary;
@@ -144,11 +145,15 @@ export const api = {
     req<WhitelistEntry[]>("POST", `/api/whitelist/${kind}`, entry),
   removeWhitelist: (kind: WhitelistKind, id: string) =>
     req<WhitelistEntry[]>("DELETE", `/api/whitelist/${kind}/${id}`),
-  getBlacklist: () => req<{ users: WhitelistEntry[] }>("GET", "/api/blacklist"),
-  addBlacklist: (entry: WhitelistEntry) =>
-    req<WhitelistEntry[]>("POST", "/api/blacklist", entry),
-  removeBlacklist: (id: string) =>
-    req<WhitelistEntry[]>("DELETE", `/api/blacklist/${id}`),
+  getBlacklist: () =>
+    req<{ users: WhitelistEntry[]; chats: WhitelistEntry[] }>(
+      "GET",
+      "/api/blacklist",
+    ),
+  addBlacklist: (kind: WhitelistKind, entry: WhitelistEntry) =>
+    req<WhitelistEntry[]>("POST", `/api/blacklist/${kind}`, entry),
+  removeBlacklist: (kind: WhitelistKind, id: string) =>
+    req<WhitelistEntry[]>("DELETE", `/api/blacklist/${kind}/${id}`),
   getMyUsage: () => req<{ usage: UsageStatus }>("GET", "/api/ratelimit/me"),
   resetMyUsage: () =>
     req<{ usage: UsageStatus }>("PUT", "/api/ratelimit/me", { reset: true }),

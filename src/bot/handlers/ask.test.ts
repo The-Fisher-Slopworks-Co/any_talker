@@ -84,9 +84,38 @@ describe("askHandler", () => {
   test("blacklisted user denied with the reason for the log", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist({ id: "42" });
+    await storage.addBlacklist("users", { id: "42" });
     const out: AskOutcome = await askHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
+  });
+
+  test("blacklisted chat denied with the reason for the log", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.addBlacklist("chats", { id: "c1" });
+    const out: AskOutcome = await askHandler(baseInput({ storage }));
+    expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
+  });
+
+  // Sent as a chat: the identity is the sending chat (`bot/identity.ts`), so
+  // access hangs off the chat lists, per sending chat.
+  test("a blacklisted sending channel is denied", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist("chats", { id: "-1001" });
+    const out: AskOutcome = await askHandler(
+      baseInput({ storage, userId: "-1001", senderChatId: "-1001" }),
+    );
+    expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
+  });
+
+  test("another channel in the same chat is unaffected by that block", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist("chats", { id: "-1001" });
+    await storage.addWhitelist("chats", { id: "-2002" });
+    const out: AskOutcome = await askHandler(
+      baseInput({ storage, userId: "-2002", senderChatId: "-2002" }),
+    );
+    expect(out.kind).not.toBe("denied");
   });
 
   test("usage hint when text is empty and no reply", async () => {

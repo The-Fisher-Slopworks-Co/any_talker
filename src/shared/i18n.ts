@@ -222,7 +222,9 @@ type Strings = {
   ui_blacklist_add: string;
   ui_blacklist_remove: string;
   ui_blacklist_blocked_users: string;
-  ui_blacklist_footer: string;
+  ui_blacklist_blocked_chats: string;
+  ui_blacklist_footer_users: string;
+  ui_blacklist_footer_chats: string;
 
   ui_prompt_models: string;
   ui_prompt_system_prompt: string;
@@ -742,8 +744,11 @@ const en: Strings = {
   ui_blacklist_add: "Add to blacklist",
   ui_blacklist_remove: "Remove from blacklist",
   ui_blacklist_blocked_users: "Blocked Users",
-  ui_blacklist_footer:
+  ui_blacklist_blocked_chats: "Blocked Chats",
+  ui_blacklist_footer_users:
     'Blocked users are always denied — even when the whitelist is off, and even in whitelisted chats. Their pending reminders are dropped. Add entries from a user\'s page via "Add to blacklist".',
+  ui_blacklist_footer_chats:
+    'In a blocked chat everyone is denied (except you) — even when the whitelist is off, and even if the chat is whitelisted. Its pending reminders are dropped. Add entries from a chat\'s page via "Add to blacklist".',
 
   ui_prompt_models: "Models",
   ui_prompt_system_prompt: "System Prompt",
@@ -1233,8 +1238,11 @@ const ru: Strings = {
   ui_blacklist_add: "Добавить в чёрный список",
   ui_blacklist_remove: "Убрать из чёрного списка",
   ui_blacklist_blocked_users: "Заблокированные пользователи",
-  ui_blacklist_footer:
+  ui_blacklist_blocked_chats: "Заблокированные чаты",
+  ui_blacklist_footer_users:
     "Заблокированным пользователям бот отказывает всегда — даже при выключенном белом списке и даже в разрешённых чатах. Их отложенные напоминания не доставляются. Добавляйте записи со страницы пользователя через «Добавить в чёрный список».",
+  ui_blacklist_footer_chats:
+    "В заблокированном чате бот отказывает всем, кроме вас — даже при выключенном белом списке и даже если чат в белом списке. Отложенные напоминания этого чата не доставляются. Добавляйте записи со страницы чата через «Добавить в чёрный список».",
 
   ui_prompt_models: "Модели",
   ui_prompt_system_prompt: "Системный промпт",

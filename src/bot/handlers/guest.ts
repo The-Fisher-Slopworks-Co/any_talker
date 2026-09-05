@@ -46,6 +46,9 @@ export type GuestAskInput = {
   now: number;
   chatId: string;
   userId: string;
+  // Set only when the message was sent on behalf of a chat, and then equal to
+  // `userId` — see `bot/identity.ts`. Only the access gate looks at it.
+  senderChatId?: string | null | undefined;
   sender: Sender;
   userText: string;
   quote: string | null;
@@ -149,17 +152,29 @@ export async function guestAskHandler(
   ]);
   const timezone = userTimezone ?? settings.timezone;
 
-  // Access gate: owner always passes; a blacklisted user is always denied
-  // (regardless of `whitelistEnabled` or a whitelist entry); otherwise the user
-  // whitelist is consulted only while `whitelistEnabled` (guest queries have no
-  // chat membership, so only the user list applies). The budget guard is the
-  // safety net when off.
+  // Access gate: owner always passes; a blacklisted user — or any guest in a
+  // blacklisted chat — is always denied (regardless of `whitelistEnabled` or a
+  // whitelist entry); otherwise the user whitelist is consulted only while
+  // `whitelistEnabled` (guest queries have no chat membership, so only the user
+  // list *grants* access — a blocked chat still blocks everyone in it). The
+  // budget guard is the safety net when off.
+  // A guest speaking as a chat is identified by that chat (`bot/identity.ts`),
+  // so the chat lists stand in for the user list on both sides of the gate.
+  const senderChatId = input.senderChatId ?? null;
   if (!isOwner) {
-    if (await storage.isBlacklisted(input.userId)) {
+    if (
+      (await storage.isBlacklisted("users", input.userId)) ||
+      (await storage.isBlacklisted("chats", input.chatId)) ||
+      (senderChatId !== null &&
+        (await storage.isBlacklisted("chats", senderChatId)))
+    ) {
       return { kind: "denied", reason: "blacklisted" };
     }
     if (settings.whitelistEnabled) {
-      const isWhitelisted = await storage.isWhitelisted("users", input.userId);
+      const isWhitelisted =
+        (await storage.isWhitelisted("users", input.userId)) ||
+        (senderChatId !== null &&
+          (await storage.isWhitelisted("chats", senderChatId)));
       if (!isWhitelisted) return { kind: "denied", reason: "not_whitelisted" };
     }
   }
