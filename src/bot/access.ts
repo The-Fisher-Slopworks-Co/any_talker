@@ -4,8 +4,8 @@
 import type { Storage } from "../storage/types";
 
 // Why the gate said no. Carried on the `denied` outcome so the dispatcher can
-// log it — a blacklisted user and a merely-not-whitelisted one look identical
-// to the chat (silent deny) and must not look identical in the logs.
+// log it — a blacklisted user/chat and a merely-not-whitelisted one look
+// identical to the chat (silent deny) and must not look identical in the logs.
 export type AccessDenyReason = "blacklisted" | "not_whitelisted";
 
 export type AccessVerdict =
@@ -23,10 +23,14 @@ export async function checkAccess(args: {
 }): Promise<AccessVerdict> {
   const { storage, ownerId, userId, chatId, whitelistEnabled } = args;
   if (userId === ownerId) return { allowed: true };
-  // The blacklist always applies (only the owner is immune): a blocked user is
-  // denied even while the whitelist is off, and a whitelist entry (their own or
-  // the chat's) never overrides it.
-  if (await storage.isBlacklisted(userId)) {
+  // The blacklist always applies (only the owner is immune, checked above —
+  // same short-circuit the whitelist gets): a blocked user, and anyone speaking
+  // in a blocked chat, is denied even while the whitelist is off, and a
+  // whitelist entry (their own or the chat's) never overrides it.
+  if (
+    (await storage.isBlacklisted("users", userId)) ||
+    (await storage.isBlacklisted("chats", chatId))
+  ) {
     return { allowed: false, reason: "blacklisted" };
   }
   if (!whitelistEnabled) return { allowed: true };

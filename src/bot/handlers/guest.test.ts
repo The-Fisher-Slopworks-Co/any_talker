@@ -104,7 +104,15 @@ describe("guestAskHandler", () => {
   test("blacklisted user denied even when whitelisted, with the reason for the log", async () => {
     const storage = new MemoryStorage();
     await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist({ id: "42" });
+    await storage.addBlacklist("users", { id: "42" });
+    const out = await guestAskHandler(baseInput({ storage }));
+    expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
+  });
+
+  test("blacklisted chat denies its guests even when the user is whitelisted", async () => {
+    const storage = new MemoryStorage();
+    await storage.addWhitelist("users", { id: "42" });
+    await storage.addBlacklist("chats", { id: "c1" });
     const out = await guestAskHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });

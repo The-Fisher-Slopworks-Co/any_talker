@@ -98,6 +98,18 @@ describe("migrateChatData", () => {
     expect(entries.find((e) => e.id === "-42")).toBeDefined();
   });
 
+  test("moves the chat blacklist entry, so an upgrade can't unblock a group", async () => {
+    const storage = new MemoryStorage();
+    await storage.addBlacklist("chats", { id: OLD, label: "Trolls" });
+
+    await migrateChatData(storage, OLD, NEW, NOW);
+
+    expect(await storage.isBlacklisted("chats", NEW)).toBe(true);
+    expect(await storage.isBlacklisted("chats", OLD)).toBe(false);
+    const entries = await storage.listBlacklist("chats");
+    expect(entries.find((e) => e.id === NEW)?.label).toBe("Trolls");
+  });
+
   test("merges the directory row: supergroup identity, earliest firstSeenAt", async () => {
     const storage = new MemoryStorage();
     await storage.upsertChat({

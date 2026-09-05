@@ -71,14 +71,25 @@ async function runRuntimeTick(
   if (due.length === 0) return;
   await Promise.allSettled(
     due.map(async (reminder) => {
-      // A blacklisted user's reminder is dropped without delivery: delivery
-      // re-runs the LLM (it spends money), and the blacklist means "this user
-      // may not use the bot" — including asks they queued before being blocked.
-      if (await runtime.storage.isBlacklisted(reminder.userId)) {
+      // A blacklisted user's (or chat's) reminder is dropped without delivery:
+      // delivery re-runs the LLM (it spends money), and the blacklist means
+      // "this user/chat may not use the bot" — including asks queued before the
+      // block.
+      const blockedUser = await runtime.storage.isBlacklisted(
+        "users",
+        reminder.userId,
+      );
+      const blockedChat = await runtime.storage.isBlacklisted(
+        "chats",
+        reminder.chatId,
+      );
+      if (blockedUser || blockedChat) {
         await runtime.storage.deleteReminder(reminder.id, reminder.userId);
         remindersDeliveredTotal.inc({ outcome: "blocked" });
         console.log(
-          `[scheduler] dropped id=${reminder.id}: user ${reminder.userId} is blacklisted`,
+          blockedUser
+            ? `[scheduler] dropped id=${reminder.id}: user ${reminder.userId} is blacklisted`
+            : `[scheduler] dropped id=${reminder.id}: chat ${reminder.chatId} is blacklisted`,
         );
         return;
       }

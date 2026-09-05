@@ -116,7 +116,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // the prompt prefix on the next turn and cost the cache the whole history.
   const sentAt = { ms: input.now, timezone };
 
-  // Access gate: owner always passes; a blacklisted user is always denied;
+  // Access gate: owner always passes; a blacklisted user or chat is denied;
   // otherwise the whitelist is consulted only while `whitelistEnabled` (the
   // budget guard is the safety net when it's off).
   const access = await checkAccess({

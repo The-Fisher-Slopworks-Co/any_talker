@@ -60,14 +60,15 @@ export interface Storage {
   removeWhitelist(kind: WhitelistKind, id: string): Promise<void>;
   isWhitelisted(kind: WhitelistKind, id: string): Promise<boolean>;
 
-  // User blacklist (global, not affected by `forBot`; users only — there is no
-  // chat blacklist). A blacklisted user is denied regardless of
-  // `whitelistEnabled` or any whitelist entry; the owner is immune (the access
-  // gates check ownership first). Reuses the `WhitelistEntry` shape (id+label).
-  listBlacklist(): Promise<WhitelistEntry[]>;
-  addBlacklist(entry: WhitelistEntry): Promise<void>;
-  removeBlacklist(id: string): Promise<void>;
-  isBlacklisted(id: string): Promise<boolean>;
+  // Blacklist (global, not affected by `forBot`), over the same two kinds as the
+  // whitelist. A blacklisted user — or anyone speaking in a blacklisted chat —
+  // is denied regardless of `whitelistEnabled` or any whitelist entry; the owner
+  // is immune (the access gates check ownership first). Reuses the
+  // `WhitelistEntry` shape (id+label).
+  listBlacklist(kind: WhitelistKind): Promise<WhitelistEntry[]>;
+  addBlacklist(kind: WhitelistKind, entry: WhitelistEntry): Promise<void>;
+  removeBlacklist(kind: WhitelistKind, id: string): Promise<void>;
+  isBlacklisted(kind: WhitelistKind, id: string): Promise<boolean>;
 
   // Per-user dual-window token usage (5-hour + weekly). Global (not affected by
   // `forBot`): one budget per user, shared across all chats and family bots.

@@ -665,7 +665,7 @@ describe("blacklist endpoints", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ users: [] });
+    expect(r.body).toEqual({ users: [], chats: [] });
   });
 
   test("add and list", async () => {
@@ -673,7 +673,7 @@ describe("blacklist endpoints", () => {
     const added = await handleApi(
       {
         method: "POST",
-        path: "/api/blacklist",
+        path: "/api/blacklist/users",
         body: { id: "42", label: "mallory" },
       },
       d,
@@ -685,30 +685,75 @@ describe("blacklist endpoints", () => {
       d,
       owner,
     );
-    expect(r.body).toEqual({ users: [{ id: "42", label: "mallory" }] });
-    expect(await d.storage.isBlacklisted("42")).toBe(true);
+    expect(r.body).toEqual({
+      users: [{ id: "42", label: "mallory" }],
+      chats: [],
+    });
+    expect(await d.storage.isBlacklisted("users", "42")).toBe(true);
+  });
+
+  test("add and list chats", async () => {
+    const d = deps();
+    const added = await handleApi(
+      {
+        method: "POST",
+        path: "/api/blacklist/chats",
+        body: { id: "-100", label: "trolls" },
+      },
+      d,
+      owner,
+    );
+    expect(added.status).toBe(200);
+    const r = await handleApi(
+      { method: "GET", path: "/api/blacklist", body: null },
+      d,
+      owner,
+    );
+    expect(r.body).toEqual({
+      users: [],
+      chats: [{ id: "-100", label: "trolls" }],
+    });
+    expect(await d.storage.isBlacklisted("chats", "-100")).toBe(true);
+    expect(await d.storage.isBlacklisted("users", "-100")).toBe(false);
   });
 
   test("remove", async () => {
     const d = deps();
     await handleApi(
-      { method: "POST", path: "/api/blacklist", body: { id: "42" } },
+      { method: "POST", path: "/api/blacklist/users", body: { id: "42" } },
       d,
       owner,
     );
     const r = await handleApi(
-      { method: "DELETE", path: "/api/blacklist/42", body: null },
+      { method: "DELETE", path: "/api/blacklist/users/42", body: null },
       d,
       owner,
     );
     expect(r.status).toBe(200);
     expect(r.body).toEqual([]);
-    expect(await d.storage.isBlacklisted("42")).toBe(false);
+    expect(await d.storage.isBlacklisted("users", "42")).toBe(false);
+  });
+
+  test("remove chats", async () => {
+    const d = deps();
+    await handleApi(
+      { method: "POST", path: "/api/blacklist/chats", body: { id: "-100" } },
+      d,
+      owner,
+    );
+    const r = await handleApi(
+      { method: "DELETE", path: "/api/blacklist/chats/-100", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual([]);
+    expect(await d.storage.isBlacklisted("chats", "-100")).toBe(false);
   });
 
   test("rejects a missing id", async () => {
     const r = await handleApi(
-      { method: "POST", path: "/api/blacklist", body: {} },
+      { method: "POST", path: "/api/blacklist/users", body: {} },
       deps(),
       owner,
     );
@@ -718,12 +763,23 @@ describe("blacklist endpoints", () => {
   test("rejects blacklisting the owner", async () => {
     const d = deps();
     const r = await handleApi(
-      { method: "POST", path: "/api/blacklist", body: { id: ownerId } },
+      { method: "POST", path: "/api/blacklist/users", body: { id: ownerId } },
       d,
       owner,
     );
     expect(r.status).toBe(400);
-    expect(await d.storage.isBlacklisted(ownerId)).toBe(false);
+    expect(await d.storage.isBlacklisted("users", ownerId)).toBe(false);
+  });
+
+  test("rejects blacklisting the owner's own chat", async () => {
+    const d = deps();
+    const r = await handleApi(
+      { method: "POST", path: "/api/blacklist/chats", body: { id: ownerId } },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(400);
+    expect(await d.storage.isBlacklisted("chats", ownerId)).toBe(false);
   });
 
   test("non-owner gets 403", async () => {
@@ -745,9 +801,29 @@ describe("blacklist endpoints", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.addBlacklist({ id: "42" });
+    await d.storage.addBlacklist("users", { id: "42" });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42", body: null },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ whitelisted: false, blacklisted: true });
+  });
+
+  test("GET /api/admin/chats/:id reports blacklisted", async () => {
+    const d = deps();
+    await d.storage.upsertChat({
+      id: "-100",
+      type: "supergroup",
+      title: "Trolls",
+      username: null,
+      firstSeenAt: 1,
+      lastSeenAt: 1,
+    });
+    await d.storage.addBlacklist("chats", { id: "-100" });
+    const r = await handleApi(
+      { method: "GET", path: "/api/admin/chats/-100", body: null },
       d,
       owner,
     );
