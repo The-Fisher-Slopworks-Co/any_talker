@@ -52,7 +52,7 @@ function createRememberFactTool(deps: {
     execute: async ({ key, value }, ctx) => {
       return deps.storage
         .forBot(ctx.botId ?? null)
-        .rememberUserFact(ctx.userId, key, value);
+        .facts.remember(ctx.userId, key, value);
     },
   };
 }
@@ -68,7 +68,7 @@ function createListFactsTool(deps: {
       "Call this when you want to recall what you already know about the user before answering.",
     parameters: ListSchema,
     execute: async (_input, ctx) => {
-      return deps.storage.forBot(ctx.botId ?? null).listUserFacts(ctx.userId);
+      return deps.storage.forBot(ctx.botId ?? null).facts.list(ctx.userId);
     },
   };
 }
@@ -86,7 +86,7 @@ function createForgetFactTool(deps: {
     execute: async ({ key }, ctx) => {
       return deps.storage
         .forBot(ctx.botId ?? null)
-        .forgetUserFact(ctx.userId, key);
+        .facts.forget(ctx.userId, key);
     },
   };
 }

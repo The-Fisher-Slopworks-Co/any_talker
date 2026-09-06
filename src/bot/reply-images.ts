@@ -25,10 +25,10 @@ export async function resolveReplyImages(
   const mediaGroupId = args.replyToMessage.media_group_id;
   let albumIndexSize = 0;
   if (mediaGroupId !== undefined) {
-    const album = await args.storage
-      .getAlbumPhotos(args.chatId, mediaGroupId)
+    const album = await args.storage.photos
+      .listAlbum(args.chatId, mediaGroupId)
       .catch((err) => {
-        console.error("getAlbumPhotos failed:", err);
+        console.error("photos.listAlbum failed:", err);
         return [];
       });
     albumIndexSize = album.length;

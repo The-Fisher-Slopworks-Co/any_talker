@@ -84,7 +84,7 @@ const utcMs = (y: number, mo: number, d: number, h: number, mn: number) =>
 describe("runChecksTick fire path", () => {
   test("fires due check and sets pending state", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     const now = utcMs(2026, 5, 11, 23, 35);
 
@@ -106,7 +106,7 @@ describe("runChecksTick fire path", () => {
         ],
       },
     });
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.pendingMessageId).toBe(100);
     expect(saved?.pendingFiredAtMs).toBe(now);
     expect(saved?.lastFiredAtMs).toBe(now);
@@ -115,7 +115,7 @@ describe("runChecksTick fire path", () => {
   test("does not fire when lastFiredAtMs is past the scheduled time today", async () => {
     const storage = new MemoryStorage();
     const now = utcMs(2026, 5, 11, 23, 35);
-    await storage.saveCheck(makeCheck({ lastFiredAtMs: now - 60_000 }));
+    await storage.checks.save(makeCheck({ lastFiredAtMs: now - 60_000 }));
     const api = new FakeApi();
 
     await runChecksTick({ storage, api, nowMs: now });
@@ -124,7 +124,7 @@ describe("runChecksTick fire path", () => {
 
   test("does not fire when disabled", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck({ enabled: false }));
+    await storage.checks.save(makeCheck({ enabled: false }));
     const api = new FakeApi();
     await runChecksTick({
       storage,
@@ -137,7 +137,7 @@ describe("runChecksTick fire path", () => {
   test("does not fire if already pending", async () => {
     const storage = new MemoryStorage();
     const now = utcMs(2026, 5, 11, 23, 35);
-    await storage.saveCheck(
+    await storage.checks.save(
       makeCheck({
         pendingMessageId: 42,
         pendingFiredAtMs: now - 60_000,
@@ -154,7 +154,7 @@ describe("runChecksTick timeout path", () => {
   test("resolves as timeout when pending and timeoutMinutes elapsed", async () => {
     const storage = new MemoryStorage();
     const firedAt = utcMs(2026, 5, 11, 23, 30);
-    await storage.saveCheck(
+    await storage.checks.save(
       makeCheck({
         pendingMessageId: 42,
         pendingFiredAtMs: firedAt,
@@ -180,7 +180,7 @@ describe("runChecksTick timeout path", () => {
         other: { parse_mode: "HTML" },
       },
     ]);
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.counter).toBe(723);
     expect(saved?.pendingMessageId).toBeNull();
     expect(saved?.pendingFiredAtMs).toBeNull();
@@ -189,7 +189,7 @@ describe("runChecksTick timeout path", () => {
   test("does not resolve before timeout has elapsed", async () => {
     const storage = new MemoryStorage();
     const firedAt = utcMs(2026, 5, 11, 23, 30);
-    await storage.saveCheck(
+    await storage.checks.save(
       makeCheck({
         pendingMessageId: 42,
         pendingFiredAtMs: firedAt,
@@ -206,7 +206,7 @@ describe("runChecksTick timeout path", () => {
   test("does not run timeout for disabled check", async () => {
     const storage = new MemoryStorage();
     const firedAt = utcMs(2026, 5, 11, 23, 30);
-    await storage.saveCheck(
+    await storage.checks.save(
       makeCheck({
         enabled: false,
         pendingMessageId: 42,
@@ -228,7 +228,7 @@ describe("runChecksTick timeout path", () => {
 describe("runChecksTick date mode", () => {
   test("fires question with live days-since-anchor count", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(
+    await storage.checks.save(
       makeCheck({
         counter: 0,
         counterAnchorDate: "2005-02-10",
@@ -256,7 +256,7 @@ describe("runChecksTick chat migration", () => {
 
   test("repoints the check to the supergroup id and retries the send", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     const originalSend = api.sendMessage.bind(api);
     api.sendMessage = async (chat_id, text, other) => {
@@ -271,7 +271,7 @@ describe("runChecksTick chat migration", () => {
 
       expect(api.sent).toHaveLength(1);
       expect(api.sent[0]?.chat_id).toBe("-1003965869359");
-      const saved = await storage.getCheck("c1");
+      const saved = await storage.checks.get("c1");
       expect(saved?.chatId).toBe("-1003965869359");
       expect(saved?.pendingMessageId).toBe(100);
       expect(saved?.lastFiredAtMs).toBe(now);
@@ -282,7 +282,7 @@ describe("runChecksTick chat migration", () => {
 
   test("keeps the new chat id even when the retry fails", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     api.sendMessage = async (chat_id) => {
       if (chat_id === "chat-1") throw migrationError();
@@ -295,7 +295,7 @@ describe("runChecksTick chat migration", () => {
     try {
       await runChecksTick({ storage, api, nowMs: utcMs(2026, 5, 11, 23, 35) });
 
-      const saved = await storage.getCheck("c1");
+      const saved = await storage.checks.get("c1");
       expect(saved?.chatId).toBe("-1003965869359");
       // Not marked fired — the next tick retries against the migrated id.
       expect(saved?.pendingMessageId).toBeNull();
@@ -310,7 +310,7 @@ describe("runChecksTick chat migration", () => {
 describe("runChecksTick fire failure", () => {
   test("does not mark fired if send fails (retries next tick)", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     api.sendMessage = async () => {
       throw new Error("boom");
@@ -320,7 +320,7 @@ describe("runChecksTick fire failure", () => {
     try {
       const now = utcMs(2026, 5, 11, 23, 35);
       await runChecksTick({ storage, api, nowMs: now });
-      const saved = await storage.getCheck("c1");
+      const saved = await storage.checks.get("c1");
       expect(saved?.pendingMessageId).toBeNull();
       expect(saved?.lastFiredAtMs).toBe(0);
     } finally {

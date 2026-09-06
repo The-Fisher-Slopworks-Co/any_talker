@@ -67,7 +67,7 @@ async function runRuntimeTick(
   ownerId: string,
   nowMs: number,
 ): Promise<void> {
-  const due = await runtime.storage.fetchDueReminders(nowMs);
+  const due = await runtime.storage.reminders.fetchDue(nowMs);
   if (due.length === 0) return;
   await Promise.allSettled(
     due.map(async (reminder) => {
@@ -75,16 +75,16 @@ async function runRuntimeTick(
       // delivery re-runs the LLM (it spends money), and the blacklist means
       // "this user/chat may not use the bot" — including asks queued before the
       // block.
-      const blockedUser = await runtime.storage.isBlacklisted(
+      const blockedUser = await runtime.storage.access.isBlacklisted(
         "users",
         reminder.userId,
       );
-      const blockedChat = await runtime.storage.isBlacklisted(
+      const blockedChat = await runtime.storage.access.isBlacklisted(
         "chats",
         reminder.chatId,
       );
       if (blockedUser || blockedChat) {
-        await runtime.storage.deleteReminder(reminder.id, reminder.userId);
+        await runtime.storage.reminders.delete(reminder.id, reminder.userId);
         remindersDeliveredTotal.inc({ outcome: "blocked" });
         console.log(
           blockedUser
@@ -114,10 +114,10 @@ async function runRuntimeTick(
         return;
       }
       try {
-        await runtime.storage.deleteReminder(reminder.id, reminder.userId);
+        await runtime.storage.reminders.delete(reminder.id, reminder.userId);
       } catch (err) {
         console.error(
-          `[scheduler] deleteReminder failed id=${reminder.id}:`,
+          `[scheduler] reminders.delete failed id=${reminder.id}:`,
           err,
         );
       }

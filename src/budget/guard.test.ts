@@ -45,8 +45,8 @@ describe("SpendBudgetGuard", () => {
 
   test("disabled config always allows, even over every cap", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1000, NOW);
-    await storage.addChatSpend("c1", 1000, NOW);
+    await storage.spend.addGlobal(1000, NOW);
+    await storage.spend.addChat("c1", 1000, NOW);
     const guard = new SpendBudgetGuard(storage);
     expect(await guard.check(args(), cfg({ enabled: false }))).toEqual({
       allowed: true,
@@ -55,7 +55,7 @@ describe("SpendBudgetGuard", () => {
 
   test("owner is exempt when ownerExempt, despite a breached cap", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1000, NOW);
+    await storage.spend.addGlobal(1000, NOW);
     const guard = new SpendBudgetGuard(storage);
     expect(
       await guard.check(args({ isOwner: true }), cfg({ ownerExempt: true })),
@@ -64,7 +64,7 @@ describe("SpendBudgetGuard", () => {
 
   test("owner is NOT exempt when ownerExempt is false", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1000, NOW);
+    await storage.spend.addGlobal(1000, NOW);
     const guard = new SpendBudgetGuard(storage);
     expect(
       await guard.check(args({ isOwner: true }), cfg({ ownerExempt: false })),
@@ -74,7 +74,7 @@ describe("SpendBudgetGuard", () => {
   test("global monthly cap: spend on a past day this month denies today", async () => {
     const storage = new MemoryStorage();
     // 10 days ago — inside the 30-day month window but outside today/week.
-    await storage.addGlobalSpend(20, NOW - 10 * MS_PER_DAY);
+    await storage.spend.addGlobal(20, NOW - 10 * MS_PER_DAY);
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(args(), cfg({ globalMonthlyCapUsd: 18 }));
     expect(r).toEqual({ allowed: false, reason: "globalMonthly" });
@@ -82,7 +82,7 @@ describe("SpendBudgetGuard", () => {
 
   test("global daily cap denies when today's global spend is over", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(3, NOW);
+    await storage.spend.addGlobal(3, NOW);
     const guard = new SpendBudgetGuard(storage);
     // Month (3) is under 18, so the daily cap (2) is the binding one.
     const r = await guard.check(
@@ -94,7 +94,7 @@ describe("SpendBudgetGuard", () => {
 
   test("per-chat daily cap denies an over-spending chat", async () => {
     const storage = new MemoryStorage();
-    await storage.addChatSpend("c1", 2, NOW);
+    await storage.spend.addChat("c1", 2, NOW);
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(args(), cfg({ perChatDailyCapUsd: 1 }));
     expect(r).toEqual({ allowed: false, reason: "chatDaily" });
@@ -102,7 +102,7 @@ describe("SpendBudgetGuard", () => {
 
   test("per-chat cap is scoped to the chat that overspent", async () => {
     const storage = new MemoryStorage();
-    await storage.addChatSpend("c1", 5, NOW);
+    await storage.spend.addChat("c1", 5, NOW);
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(
       args({ chatId: "c2" }),
@@ -113,8 +113,8 @@ describe("SpendBudgetGuard", () => {
 
   test("new-user cap denies a freshly-seen user over the soft-start limit", async () => {
     const storage = new MemoryStorage();
-    await storage.upsertUser(seenUser("u1", NOW)); // seen today ⇒ new
-    await storage.addUserSpend("u1", 0.2, NOW);
+    await storage.users.upsert(seenUser("u1", NOW)); // seen today ⇒ new
+    await storage.spend.addUser("u1", 0.2, NOW);
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(
       args(),
@@ -125,8 +125,8 @@ describe("SpendBudgetGuard", () => {
 
   test("new-user cap does not apply once outside the window", async () => {
     const storage = new MemoryStorage();
-    await storage.upsertUser(seenUser("u1", NOW - 4 * MS_PER_DAY));
-    await storage.addUserSpend("u1", 0.2, NOW);
+    await storage.users.upsert(seenUser("u1", NOW - 4 * MS_PER_DAY));
+    await storage.spend.addUser("u1", 0.2, NOW);
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(
       args(),
@@ -137,7 +137,7 @@ describe("SpendBudgetGuard", () => {
 
   test("new-user cap is skipped when the user has no record yet", async () => {
     const storage = new MemoryStorage();
-    await storage.addUserSpend("u1", 5, NOW); // spend but no directory row
+    await storage.spend.addUser("u1", 5, NOW); // spend but no directory row
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(args(), cfg({ newUserDailyCapUsd: 0.1 }));
     expect(r).toEqual({ allowed: true });
@@ -145,7 +145,7 @@ describe("SpendBudgetGuard", () => {
 
   test("a brand-new user's first request is allowed (zero spend so far)", async () => {
     const storage = new MemoryStorage();
-    await storage.upsertUser(seenUser("u1", NOW));
+    await storage.users.upsert(seenUser("u1", NOW));
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(
       args(),
@@ -156,8 +156,8 @@ describe("SpendBudgetGuard", () => {
 
   test("precedence: monthly outranks daily outranks chat", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(50, NOW); // trips both monthly and daily
-    await storage.addChatSpend("c1", 50, NOW); // trips chat too
+    await storage.spend.addGlobal(50, NOW); // trips both monthly and daily
+    await storage.spend.addChat("c1", 50, NOW); // trips chat too
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(args(), cfg());
     expect(r).toEqual({ allowed: false, reason: "globalMonthly" });

@@ -18,7 +18,7 @@ async function exhaustUsage(
   now: number,
 ): Promise<void> {
   const starts = currentWindowStarts(userId, now);
-  await storage.addUserUsage(
+  await storage.usage.add(
     userId,
     DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
     starts.fiveHour,
@@ -80,21 +80,21 @@ describe("guestAskHandler", () => {
 
   test("denied when text empty even if whitelisted", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await guestAskHandler(baseInput({ storage, userText: "  " }));
     expect(out.kind).toBe("denied");
   });
 
   test("chat whitelist alone does NOT grant access in guest mode", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: "c1" });
+    await storage.access.addWhitelist("chats", { id: "c1" });
     const out = await guestAskHandler(baseInput({ storage }));
     expect(out.kind).toBe("denied");
   });
 
   test("whitelisted user is answered", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "hi", totalTokens: 100 });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
@@ -103,16 +103,16 @@ describe("guestAskHandler", () => {
 
   test("blacklisted user denied even when whitelisted, with the reason for the log", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addBlacklist("users", { id: "42" });
     const out = await guestAskHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
 
   test("blacklisted chat denies its guests even when the user is whitelisted", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist("chats", { id: "c1" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addBlacklist("chats", { id: "c1" });
     const out = await guestAskHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
@@ -121,7 +121,7 @@ describe("guestAskHandler", () => {
   // chat lists stand in for the user list on both sides of the gate.
   test("a blacklisted sending channel is denied in guest mode too", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-1001" });
+    await storage.access.addBlacklist("chats", { id: "-1001" });
     const out = await guestAskHandler(
       baseInput({ storage, userId: "-1001", senderChatId: "-1001" }),
     );
@@ -130,7 +130,7 @@ describe("guestAskHandler", () => {
 
   test("a whitelisted sending channel is answered, an unlisted one is not", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: "-1001" });
+    await storage.access.addWhitelist("chats", { id: "-1001" });
     const ai = new FakeAI({ text: "hi", totalTokens: 100 });
     const allowed = await guestAskHandler(
       baseInput({ storage, ai, userId: "-1001", senderChatId: "-1001" }),
@@ -144,7 +144,7 @@ describe("guestAskHandler", () => {
 
   test("an empty AI answer is an error turn, not an answered one (Telegram rejects empty messages)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "  \n", totalTokens: 50 });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("error");
@@ -152,7 +152,7 @@ describe("guestAskHandler", () => {
 
   test("owner with ownerExempt skips rate limit", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: true },
     });
@@ -167,7 +167,7 @@ describe("guestAskHandler", () => {
 
   test("owner without ownerExempt is rate limited", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
     });
@@ -182,7 +182,7 @@ describe("guestAskHandler", () => {
 
   test("rate-limit hit returns rateLimited", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "42", 1000);
     const rl = new DualWindowLimiter(rlStorage);
@@ -193,24 +193,24 @@ describe("guestAskHandler", () => {
 
   test("answered: records reported costUsd to the user's spend", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "hi", totalTokens: 50, costUsd: 0.02 });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
-    expect((await storage.getUserSpend("42", 1000)).day).toBeCloseTo(0.02, 6);
+    expect((await storage.spend.getUser("42", 1000)).day).toBeCloseTo(0.02, 6);
   });
 
   test("answered: records no spend when costUsd is absent", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "hi", totalTokens: 50 });
     await guestAskHandler(baseInput({ storage, ai }));
-    expect((await storage.getUserSpend("42", 1000)).month).toBe(0);
+    expect((await storage.spend.getUser("42", 1000)).month).toBe(0);
   });
 
   test("passes the configured models to the AI", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
@@ -220,13 +220,13 @@ describe("guestAskHandler", () => {
 
   test("answered: persistThread stores a fresh thread keyed by chatId", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "the answer", totalTokens: 200 });
     const out = await guestAskHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
     if (out.kind !== "answered") return;
     await out.persistThread();
-    expect(await storage.getGuestThread("c1")).toEqual({
+    expect(await storage.conversations.getGuest("c1")).toEqual({
       chatId: "c1",
       turns: [
         {
@@ -244,7 +244,7 @@ describe("guestAskHandler", () => {
 
   test("reply to a non-bot message is surfaced as context before the question", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await guestAskHandler(
       baseInput({
@@ -279,7 +279,7 @@ describe("guestAskHandler", () => {
 
   test("replyTarget falls back to placeholders for missing author/text", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await guestAskHandler(
       baseInput({
@@ -304,7 +304,7 @@ describe("guestAskHandler", () => {
 
   test("stored thread wins over replyTarget (no duplicate context header)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const priorThread = {
       chatId: "c1",
@@ -343,7 +343,7 @@ describe("guestAskHandler", () => {
 
   test("mismatched thread is dropped: reply to another conversation's answer uses the fallback", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     // The replier's own thread ends in "пока", but they replied to a bot
     // answer from a different conversation ("Привет").
@@ -383,7 +383,7 @@ describe("guestAskHandler", () => {
 
   test("mismatched thread: persistThread starts a fresh thread without the stale turns", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "fresh answer", totalTokens: 1 });
     const priorThread = {
       chatId: "c1",
@@ -406,7 +406,7 @@ describe("guestAskHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistThread();
-    const stored = await storage.getGuestThread("c1");
+    const stored = await storage.conversations.getGuest("c1");
     expect(stored?.turns).toEqual([
       {
         userQuestion: JSON.stringify({
@@ -421,7 +421,7 @@ describe("guestAskHandler", () => {
 
   test("thread survives rendering differences (markdown stripped, bot-name prefix added)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const priorThread = {
       chatId: "c1",
@@ -461,7 +461,7 @@ describe("guestAskHandler", () => {
 
   test("reply to a text-less bot message drops the thread (nothing to verify against)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const priorThread = {
       chatId: "c1",
@@ -492,7 +492,7 @@ describe("guestAskHandler", () => {
 
   test("emoji-only answer is unverifiable: the thread is kept", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const priorThread = {
       chatId: "c1",
@@ -531,7 +531,7 @@ describe("guestAskHandler", () => {
 
   test("empty text with a replyTarget is answered, not denied (bare-mention reply)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const out = await guestAskHandler(
       baseInput({
@@ -551,7 +551,7 @@ describe("guestAskHandler", () => {
 
   test("empty text with an image attached is answered, not denied", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await guestAskHandler(
       baseInput({
         storage,
@@ -565,7 +565,7 @@ describe("guestAskHandler", () => {
 
   test("own images and audio are attached to the envelope as media parts", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const img = new Uint8Array([1, 2]);
     const voice = new Uint8Array([3, 4]);
@@ -602,7 +602,7 @@ describe("guestAskHandler", () => {
 
   test("replied-to images and audio ride along with the context header", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const img = new Uint8Array([9]);
     const voice = new Uint8Array([8]);
@@ -634,7 +634,7 @@ describe("guestAskHandler", () => {
 
   test("persistThread stores own + reply image file ids on the turn", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "seen", totalTokens: 1 });
     const out = await guestAskHandler(
       baseInput({
@@ -647,7 +647,7 @@ describe("guestAskHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistThread();
-    const stored = await storage.getGuestThread("c1");
+    const stored = await storage.conversations.getGuest("c1");
     expect(stored?.turns[0]?.userImageFileIds).toEqual([
       "own1",
       "reply1",
@@ -657,7 +657,7 @@ describe("guestAskHandler", () => {
 
   test("prior-turn image file ids are re-fetched and attached to the chain", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const img = new Uint8Array([7, 7]);
     const fetched: string[] = [];
@@ -695,7 +695,7 @@ describe("guestAskHandler", () => {
 
   test("quote is embedded in the user envelope", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await guestAskHandler(baseInput({ storage, ai, quote: "как дела" }));
     const call = ai.calls[0] as {
@@ -716,7 +716,7 @@ describe("guestAskHandler", () => {
 
   test("answered with priorThread: prepends prior turns to AI messages", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "ok", totalTokens: 1 });
     const priorThread = {
       chatId: "c1",
@@ -743,7 +743,7 @@ describe("guestAskHandler", () => {
 
   test("answered with priorThread: persistThread appends the new turn", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "second answer", totalTokens: 1 });
     const priorThread = {
       chatId: "c1",
@@ -755,7 +755,7 @@ describe("guestAskHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistThread();
-    const stored = await storage.getGuestThread("c1");
+    const stored = await storage.conversations.getGuest("c1");
     expect(stored?.turns).toEqual([
       { userQuestion: "Q1", botAnswer: "A1" },
       {
@@ -772,7 +772,7 @@ describe("guestAskHandler", () => {
 
   test("priorThread is capped at MAX_REPLY_CHAIN_DEPTH on persist and AI input", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "newest", totalTokens: 1 });
     const overflowTurns = Array.from(
       { length: MAX_REPLY_CHAIN_DEPTH + 5 },
@@ -797,7 +797,7 @@ describe("guestAskHandler", () => {
     });
 
     await out.persistThread();
-    const stored = await storage.getGuestThread("c1");
+    const stored = await storage.conversations.getGuest("c1");
     expect(stored?.turns.length).toBe(MAX_REPLY_CHAIN_DEPTH);
     expect(stored?.turns[stored.turns.length - 1]?.botAnswer).toBe("newest");
     expect(stored?.turns[0]?.userQuestion).toBe(
@@ -807,7 +807,7 @@ describe("guestAskHandler", () => {
 
   test("answered: deducts tokens from bucket", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     const rl = new DualWindowLimiter(rlStorage);
     const ai = new FakeAI({ text: "ok", totalTokens: 777 });
@@ -815,13 +815,13 @@ describe("guestAskHandler", () => {
       baseInput({ storage, rateLimiter: rl, ai }),
     );
     expect(out.kind).toBe("answered");
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(777);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(777);
   });
 
   test("answered: returns botName from chat settings", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveChatSettings("c1", { botName: "Helper" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.chats.saveSettings("c1", { botName: "Helper" });
     const out = await guestAskHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.botName).toBe("Helper");
@@ -829,7 +829,7 @@ describe("guestAskHandler", () => {
 
   test("answered.text is the raw AI Rich Markdown (no HTML sanitization)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({
       text: "<b>bold</b> & raw <script>x</script>",
       totalTokens: 1,
@@ -841,8 +841,8 @@ describe("guestAskHandler", () => {
 
   test("AI is called with current settings (system, models, tools)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       systemPrompt: "Pirate.",
       models: ["m1", "m2"],
@@ -856,7 +856,7 @@ describe("guestAskHandler", () => {
 
   test("answered: propagates tool effects recorded into ctx.effects", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
 
     class EffectfulAI implements AIClient {
       async ask(opts: Parameters<AIClient["ask"]>[0]): Promise<AskResult> {
@@ -888,7 +888,7 @@ describe("guestAskHandler", () => {
     expect(events).toEqual([]);
 
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "42", 1000);
     const rl = new DualWindowLimiter(rlStorage);
@@ -903,7 +903,7 @@ describe("guestAskHandler", () => {
     expect(events).toEqual([]);
 
     const okStorage = new MemoryStorage();
-    await okStorage.addWhitelist("users", { id: "42" });
+    await okStorage.access.addWhitelist("users", { id: "42" });
     out = await guestAskHandler(
       baseInput({
         storage: okStorage,
@@ -930,7 +930,7 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
 
   test("persistThread keeps the turn's tool calls", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({
       text: "three of them got in",
       totalTokens: 1,
@@ -941,14 +941,14 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
     if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
     await out.persistThread();
 
-    expect((await storage.getGuestThread("c1"))!.turns[0]!.toolCalls).toEqual(
-      RECORDS,
-    );
+    expect(
+      (await storage.conversations.getGuest("c1"))!.turns[0]!.toolCalls,
+    ).toEqual(RECORDS);
   });
 
   test("a turn that called no tools stores no key at all", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "plain", totalTokens: 1, toolCalls: [] });
 
     const out = await guestAskHandler(baseInput({ storage, ai }));
@@ -956,13 +956,13 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
     await out.persistThread();
 
     expect(
-      (await storage.getGuestThread("c1"))!.turns[0]!.toolCalls,
+      (await storage.conversations.getGuest("c1"))!.turns[0]!.toolCalls,
     ).toBeUndefined();
   });
 
   test("a stored turn's tool results reach the next prompt", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await guestAskHandler(
       baseInput({

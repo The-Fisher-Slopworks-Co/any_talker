@@ -21,26 +21,26 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
 describe("MemoryStorage reminders", () => {
   test("save then fetch due returns reminder when fireAt <= now", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "r1", fireAtMs: 100 }));
-    expect(await s.fetchDueReminders(99)).toEqual([]);
-    expect(await s.fetchDueReminders(100)).toEqual([
+    await s.reminders.save(reminder({ id: "r1", fireAtMs: 100 }));
+    expect(await s.reminders.fetchDue(99)).toEqual([]);
+    expect(await s.reminders.fetchDue(100)).toEqual([
       reminder({ id: "r1", fireAtMs: 100 }),
     ]);
   });
 
-  test("fetchDueReminders sorts by fireAtMs ascending", async () => {
+  test("reminders.fetchDue sorts by fireAtMs ascending", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "late", fireAtMs: 200 }));
-    await s.saveReminder(reminder({ id: "early", fireAtMs: 100 }));
-    const due = await s.fetchDueReminders(300);
+    await s.reminders.save(reminder({ id: "late", fireAtMs: 200 }));
+    await s.reminders.save(reminder({ id: "early", fireAtMs: 100 }));
+    const due = await s.reminders.fetchDue(300);
     expect(due.map((r) => r.id)).toEqual(["early", "late"]);
   });
 
-  test("deleteReminder removes from listing", async () => {
+  test("reminders.delete removes from listing", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "r1", userId: "u1", fireAtMs: 100 }));
-    await s.deleteReminder("r1", "u1");
-    expect(await s.fetchDueReminders(1_000)).toEqual([]);
+    await s.reminders.save(reminder({ id: "r1", userId: "u1", fireAtMs: 100 }));
+    await s.reminders.delete("r1", "u1");
+    expect(await s.reminders.fetchDue(1_000)).toEqual([]);
   });
 
   test("guest_dm target round-trips", async () => {
@@ -49,82 +49,82 @@ describe("MemoryStorage reminders", () => {
       id: "g",
       target: { kind: "guest_dm", userId: "u42" },
     });
-    await s.saveReminder(r);
-    expect(await s.fetchDueReminders(r.fireAtMs)).toEqual([r]);
+    await s.reminders.save(r);
+    expect(await s.reminders.fetchDue(r.fireAtMs)).toEqual([r]);
   });
 
   test("save returns deep-cloned values (no aliasing)", async () => {
     const s = new MemoryStorage();
     const r = reminder({ id: "x" });
-    await s.saveReminder(r);
+    await s.reminders.save(r);
     r.text = "mutated";
-    const out = (await s.fetchDueReminders(10_000))[0];
+    const out = (await s.reminders.fetchDue(10_000))[0];
     expect(out?.text).toBe("ping");
   });
 
-  test("listRemindersForUser filters by userId, sorted by fireAt asc", async () => {
+  test("reminders.listForUser filters by userId, sorted by fireAt asc", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "a", userId: "u1", fireAtMs: 200 }));
-    await s.saveReminder(reminder({ id: "b", userId: "u2", fireAtMs: 100 }));
-    await s.saveReminder(reminder({ id: "c", userId: "u1", fireAtMs: 100 }));
-    expect((await s.listRemindersForUser("u1")).map((r) => r.id)).toEqual([
+    await s.reminders.save(reminder({ id: "a", userId: "u1", fireAtMs: 200 }));
+    await s.reminders.save(reminder({ id: "b", userId: "u2", fireAtMs: 100 }));
+    await s.reminders.save(reminder({ id: "c", userId: "u1", fireAtMs: 100 }));
+    expect((await s.reminders.listForUser("u1")).map((r) => r.id)).toEqual([
       "c",
       "a",
     ]);
-    expect((await s.listRemindersForUser("u2")).map((r) => r.id)).toEqual([
+    expect((await s.reminders.listForUser("u2")).map((r) => r.id)).toEqual([
       "b",
     ]);
-    expect(await s.listRemindersForUser("u3")).toEqual([]);
+    expect(await s.reminders.listForUser("u3")).toEqual([]);
   });
 
-  test("listAllReminders returns every saved reminder, sorted by fireAt asc", async () => {
+  test("reminders.listAll returns every saved reminder, sorted by fireAt asc", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "a", userId: "u1", fireAtMs: 200 }));
-    await s.saveReminder(reminder({ id: "b", userId: "u2", fireAtMs: 100 }));
-    expect((await s.listAllReminders()).map((r) => r.id)).toEqual(["b", "a"]);
+    await s.reminders.save(reminder({ id: "a", userId: "u1", fireAtMs: 200 }));
+    await s.reminders.save(reminder({ id: "b", userId: "u2", fireAtMs: 100 }));
+    expect((await s.reminders.listAll()).map((r) => r.id)).toEqual(["b", "a"]);
   });
 
-  test("getReminder returns a clone of the saved reminder, or null", async () => {
+  test("reminders.get returns a clone of the saved reminder, or null", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "r1", text: "ping" }));
-    const got = await s.getReminder("r1");
+    await s.reminders.save(reminder({ id: "r1", text: "ping" }));
+    const got = await s.reminders.get("r1");
     expect(got).toEqual(reminder({ id: "r1", text: "ping" }));
     // Mutating the returned object does not corrupt storage.
     got!.text = "mutated";
-    expect((await s.getReminder("r1"))!.text).toBe("ping");
-    expect(await s.getReminder("missing")).toBeNull();
+    expect((await s.reminders.get("r1"))!.text).toBe("ping");
+    expect(await s.reminders.get("missing")).toBeNull();
   });
 
-  test("countRemindersForUser counts only that user's reminders", async () => {
+  test("reminders.countForUser counts only that user's reminders", async () => {
     const s = new MemoryStorage();
-    await s.saveReminder(reminder({ id: "a", userId: "u1" }));
-    await s.saveReminder(reminder({ id: "b", userId: "u1" }));
-    await s.saveReminder(reminder({ id: "c", userId: "u2" }));
-    expect(await s.countRemindersForUser("u1")).toBe(2);
-    expect(await s.countRemindersForUser("u2")).toBe(1);
-    expect(await s.countRemindersForUser("u3")).toBe(0);
-    await s.deleteReminder("a", "u1");
-    expect(await s.countRemindersForUser("u1")).toBe(1);
+    await s.reminders.save(reminder({ id: "a", userId: "u1" }));
+    await s.reminders.save(reminder({ id: "b", userId: "u1" }));
+    await s.reminders.save(reminder({ id: "c", userId: "u2" }));
+    expect(await s.reminders.countForUser("u1")).toBe(2);
+    expect(await s.reminders.countForUser("u2")).toBe(1);
+    expect(await s.reminders.countForUser("u3")).toBe(0);
+    await s.reminders.delete("a", "u1");
+    expect(await s.reminders.countForUser("u1")).toBe(1);
   });
 });
 
 describe("MemoryStorage private chat flag", () => {
   test("starts unset", async () => {
     const s = new MemoryStorage();
-    expect(await s.userHasPrivateChat("u1")).toBe(false);
+    expect(await s.privateChats.has("u1")).toBe(false);
   });
 
   test("record then check", async () => {
     const s = new MemoryStorage();
-    await s.recordPrivateChat("u1");
-    expect(await s.userHasPrivateChat("u1")).toBe(true);
-    expect(await s.userHasPrivateChat("u2")).toBe(false);
+    await s.privateChats.record("u1");
+    expect(await s.privateChats.has("u1")).toBe(true);
+    expect(await s.privateChats.has("u2")).toBe(false);
   });
 
   test("record is idempotent", async () => {
     const s = new MemoryStorage();
-    await s.recordPrivateChat("u1");
-    await s.recordPrivateChat("u1");
-    expect(await s.userHasPrivateChat("u1")).toBe(true);
+    await s.privateChats.record("u1");
+    await s.privateChats.record("u1");
+    expect(await s.privateChats.has("u1")).toBe(true);
   });
 });

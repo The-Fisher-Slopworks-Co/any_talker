@@ -21,7 +21,7 @@ describe("checkAccess", () => {
 
   test("non-owner with whitelisted user passes in any chat", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     expect(
       await checkAccess({
         storage,
@@ -35,7 +35,7 @@ describe("checkAccess", () => {
 
   test("non-owner in whitelisted chat passes", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: "-100" });
+    await storage.access.addWhitelist("chats", { id: "-100" });
     expect(
       await checkAccess({
         storage,
@@ -88,7 +88,7 @@ describe("checkAccess", () => {
 
   test("blacklisted user denied even with whitelist disabled", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("users", { id: "42" });
+    await storage.access.addBlacklist("users", { id: "42" });
     expect(
       await checkAccess({
         storage,
@@ -102,8 +102,8 @@ describe("checkAccess", () => {
 
   test("blacklist wins over the user's own whitelist entry", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addBlacklist("users", { id: "42" });
     expect(
       await checkAccess({
         storage,
@@ -117,8 +117,8 @@ describe("checkAccess", () => {
 
   test("blacklist wins over a whitelisted chat", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: "-100" });
-    await storage.addBlacklist("users", { id: "42" });
+    await storage.access.addWhitelist("chats", { id: "-100" });
+    await storage.access.addBlacklist("users", { id: "42" });
     expect(
       await checkAccess({
         storage,
@@ -132,7 +132,7 @@ describe("checkAccess", () => {
 
   test("a blacklist entry for the owner's id has no effect", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("users", { id: "1" });
+    await storage.access.addBlacklist("users", { id: "1" });
     expect(
       await checkAccess({
         storage,
@@ -146,7 +146,7 @@ describe("checkAccess", () => {
 
   test("blacklisted chat denies its users even with whitelist disabled", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-100" });
+    await storage.access.addBlacklist("chats", { id: "-100" });
     expect(
       await checkAccess({
         storage,
@@ -160,9 +160,9 @@ describe("checkAccess", () => {
 
   test("a blacklisted chat wins over the user's own whitelist entry", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.addWhitelist("chats", { id: "-100" });
-    await storage.addBlacklist("chats", { id: "-100" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("chats", { id: "-100" });
+    await storage.access.addBlacklist("chats", { id: "-100" });
     expect(
       await checkAccess({
         storage,
@@ -176,7 +176,7 @@ describe("checkAccess", () => {
 
   test("a blacklisted chat does not block the same user elsewhere", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-100" });
+    await storage.access.addBlacklist("chats", { id: "-100" });
     expect(
       await checkAccess({
         storage,
@@ -190,7 +190,7 @@ describe("checkAccess", () => {
 
   test("the owner is immune to a blacklisted chat too", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-100" });
+    await storage.access.addBlacklist("chats", { id: "-100" });
     expect(
       await checkAccess({
         storage,
@@ -210,8 +210,8 @@ describe("checkAccess", () => {
 describe("checkAccess for a message sent as a chat", () => {
   test("a blacklisted sending channel is denied, wherever it posts", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-1001" });
-    await storage.addWhitelist("chats", { id: "-500" });
+    await storage.access.addBlacklist("chats", { id: "-1001" });
+    await storage.access.addWhitelist("chats", { id: "-500" });
     expect(
       await checkAccess({
         storage,
@@ -226,7 +226,7 @@ describe("checkAccess for a message sent as a chat", () => {
 
   test("blocking one channel does not block another posting in the same chat", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-1001" });
+    await storage.access.addBlacklist("chats", { id: "-1001" });
     expect(
       await checkAccess({
         storage,
@@ -241,7 +241,7 @@ describe("checkAccess for a message sent as a chat", () => {
 
   test("whitelisting the sending channel grants it access", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: "-1001" });
+    await storage.access.addWhitelist("chats", { id: "-1001" });
     expect(
       await checkAccess({
         storage,
@@ -256,7 +256,7 @@ describe("checkAccess for a message sent as a chat", () => {
 
   test("a whitelist entry for a DIFFERENT channel does not carry over", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: "-1001" });
+    await storage.access.addWhitelist("chats", { id: "-1001" });
     expect(
       await checkAccess({
         storage,

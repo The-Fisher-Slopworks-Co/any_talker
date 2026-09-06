@@ -15,7 +15,7 @@ describe("getOrInitSettings", () => {
     const storage = new MemoryStorage();
     const s = await getOrInitSettings(storage);
     expect(s).toEqual(DEFAULT_SETTINGS);
-    expect(await storage.getSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(await storage.settings.get()).toEqual(DEFAULT_SETTINGS);
   });
 
   test("returns existing settings", async () => {
@@ -25,7 +25,7 @@ describe("getOrInitSettings", () => {
       systemPrompt: "custom",
       models: ["openai/gpt-4o-mini"],
     };
-    await storage.saveSettings(custom);
+    await storage.settings.save(custom);
     expect(await getOrInitSettings(storage)).toEqual(custom);
   });
 });
@@ -116,7 +116,7 @@ describe("applyChatOverrides", () => {
       ...DEFAULT_SETTINGS,
       expandableBlockquoteThreshold: undefined,
     } as never;
-    await storage.saveSettings(legacy);
+    await storage.settings.save(legacy);
     const s = await getOrInitSettings(storage);
     expect(s.expandableBlockquoteThreshold).toBe(
       DEFAULT_SETTINGS.expandableBlockquoteThreshold,
@@ -125,7 +125,7 @@ describe("applyChatOverrides", () => {
 
   test("normalize rejects negative stored expandableBlockquoteThreshold", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       expandableBlockquoteThreshold: -50,
     });
@@ -141,21 +141,24 @@ describe("applyChatOverrides", () => {
       ...DEFAULT_SETTINGS,
       maxRemindersPerUser: undefined,
     } as never;
-    await storage.saveSettings(legacy);
+    await storage.settings.save(legacy);
     const s = await getOrInitSettings(storage);
     expect(s.maxRemindersPerUser).toBe(DEFAULT_SETTINGS.maxRemindersPerUser);
   });
 
   test("normalize rejects non-positive stored maxRemindersPerUser", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({ ...DEFAULT_SETTINGS, maxRemindersPerUser: 0 });
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      maxRemindersPerUser: 0,
+    });
     const s = await getOrInitSettings(storage);
     expect(s.maxRemindersPerUser).toBe(DEFAULT_SETTINGS.maxRemindersPerUser);
   });
 
   test("normalize floors a fractional maxRemindersPerUser", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       maxRemindersPerUser: 7.9,
     });
@@ -169,14 +172,14 @@ describe("applyChatOverrides", () => {
       ...DEFAULT_SETTINGS,
       whitelistEnabled: undefined,
     } as never;
-    await storage.saveSettings(legacy);
+    await storage.settings.save(legacy);
     const s = await getOrInitSettings(storage);
     expect(s.whitelistEnabled).toBe(true);
   });
 
   test("normalize preserves a stored whitelistEnabled=false", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       whitelistEnabled: false,
     });
@@ -186,7 +189,7 @@ describe("applyChatOverrides", () => {
 
   test("normalize preserves stored provider routing", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       providerSort: "throughput",
       provider: "deepinfra/fp4",
@@ -202,7 +205,7 @@ describe("applyChatOverrides", () => {
   // body, where a bad value would fail every ask instead of one save.
   test("normalize nulls out invalid stored provider routing", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       providerSort: "cheapest",
       provider: "not a slug",
@@ -220,7 +223,7 @@ describe("applyChatOverrides", () => {
     delete legacy.providerSort;
     delete legacy.provider;
     delete legacy.serviceTier;
-    await storage.saveSettings(legacy as never);
+    await storage.settings.save(legacy as never);
     const s = await getOrInitSettings(storage);
     expect(s.providerSort).toBeNull();
     expect(s.provider).toBeNull();
@@ -238,7 +241,7 @@ describe("applyChatOverrides", () => {
         ownerExempt: false,
       } as never,
     };
-    await storage.saveSettings(legacy);
+    await storage.settings.save(legacy);
     const s = await getOrInitSettings(storage);
     // Legacy burst capacity maps to the 5-hour budget; the rest defaults in.
     expect(s.rateLimit.fiveHourTokens).toBe(12345);
@@ -272,7 +275,7 @@ describe("getEffectiveSettings", () => {
 
   test("merges in chat overrides", async () => {
     const storage = new MemoryStorage();
-    await storage.saveChatSettings("c1", { systemPrompt: "chat" });
+    await storage.chats.saveSettings("c1", { systemPrompt: "chat" });
     const r = await getEffectiveSettings(storage, "c1");
     expect(r.systemPrompt).toBe("chat");
     expect(r.models).toEqual(DEFAULT_SETTINGS.models);

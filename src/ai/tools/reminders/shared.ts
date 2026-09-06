@@ -51,7 +51,7 @@ export async function persistReminder(
   const scoped = storage.forBot(ctx.botId ?? null);
 
   if (ctx.source === "guest") {
-    const allowed = await scoped.userHasPrivateChat(ctx.userId);
+    const allowed = await scoped.privateChats.has(ctx.userId);
     if (!allowed) {
       return {
         ok: false,
@@ -68,7 +68,7 @@ export async function persistReminder(
   // concurrent creations within one tool step could overshoot by a few, which
   // is harmless for a quota bound.
   const { maxRemindersPerUser } = await getOrInitSettings(storage);
-  const managedBots = await storage.listManagedBots();
+  const managedBots = await storage.managedBots.list();
   const scopeIds = new Set<string | null>([
     null,
     ctx.botId ?? null,
@@ -76,7 +76,7 @@ export async function persistReminder(
   ]);
   const counts = await Promise.all(
     [...scopeIds].map((id) =>
-      storage.forBot(id).countRemindersForUser(ctx.userId),
+      storage.forBot(id).reminders.countForUser(ctx.userId),
     ),
   );
   const count = counts.reduce((sum, n) => sum + n, 0);
@@ -88,7 +88,7 @@ export async function persistReminder(
   }
 
   const reminderId = crypto.randomUUID();
-  await scoped.saveReminder({
+  await scoped.reminders.save({
     id: reminderId,
     userId: ctx.userId,
     chatId: ctx.chatId,

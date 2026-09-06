@@ -36,42 +36,42 @@ function makeCheck(over: Partial<RecurringCheck> = {}): RecurringCheck {
 describe("MemoryStorage checks", () => {
   test("save then get round-trips", async () => {
     const s = new MemoryStorage();
-    await s.saveCheck(makeCheck());
-    expect(await s.getCheck("c1")).toEqual(makeCheck());
+    await s.checks.save(makeCheck());
+    expect(await s.checks.get("c1")).toEqual(makeCheck());
   });
 
   test("save returns deep-cloned values (no aliasing)", async () => {
     const s = new MemoryStorage();
     const c = makeCheck();
-    await s.saveCheck(c);
+    await s.checks.save(c);
     c.counter = 999;
-    const got = await s.getCheck("c1");
+    const got = await s.checks.get("c1");
     expect(got?.counter).toBe(0);
   });
 
-  test("listChecks returns all, sorted by createdAtMs asc", async () => {
+  test("checks.list returns all, sorted by createdAtMs asc", async () => {
     const s = new MemoryStorage();
-    await s.saveCheck(makeCheck({ id: "late", createdAtMs: 200 }));
-    await s.saveCheck(makeCheck({ id: "early", createdAtMs: 100 }));
-    const list = await s.listChecks();
+    await s.checks.save(makeCheck({ id: "late", createdAtMs: 200 }));
+    await s.checks.save(makeCheck({ id: "early", createdAtMs: 100 }));
+    const list = await s.checks.list();
     expect(list.map((c) => c.id)).toEqual(["early", "late"]);
   });
 
-  test("listChecks returns empty initially", async () => {
+  test("checks.list returns empty initially", async () => {
     const s = new MemoryStorage();
-    expect(await s.listChecks()).toEqual([]);
+    expect(await s.checks.list()).toEqual([]);
   });
 
-  test("deleteCheck removes it", async () => {
+  test("checks.delete removes it", async () => {
     const s = new MemoryStorage();
-    await s.saveCheck(makeCheck());
-    await s.deleteCheck("c1");
-    expect(await s.getCheck("c1")).toBeNull();
-    expect(await s.listChecks()).toEqual([]);
+    await s.checks.save(makeCheck());
+    await s.checks.delete("c1");
+    expect(await s.checks.get("c1")).toBeNull();
+    expect(await s.checks.list()).toEqual([]);
   });
 
-  test("getCheck returns null for unknown id", async () => {
+  test("checks.get returns null for unknown id", async () => {
     const s = new MemoryStorage();
-    expect(await s.getCheck("nope")).toBeNull();
+    expect(await s.checks.get("nope")).toBeNull();
   });
 });

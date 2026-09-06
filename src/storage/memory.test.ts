@@ -8,88 +8,92 @@ import { DEFAULT_SETTINGS } from "../shared/types";
 describe("MemoryStorage settings", () => {
   test("returns null when not set", async () => {
     const s = new MemoryStorage();
-    expect(await s.getSettings()).toBeNull();
+    expect(await s.settings.get()).toBeNull();
   });
 
   test("round-trips a saved value", async () => {
     const s = new MemoryStorage();
-    await s.saveSettings(DEFAULT_SETTINGS);
-    expect(await s.getSettings()).toEqual(DEFAULT_SETTINGS);
+    await s.settings.save(DEFAULT_SETTINGS);
+    expect(await s.settings.get()).toEqual(DEFAULT_SETTINGS);
   });
 });
 
 describe("MemoryStorage whitelist", () => {
   test("starts empty", async () => {
     const s = new MemoryStorage();
-    expect(await s.listWhitelist("users")).toEqual([]);
-    expect(await s.isWhitelisted("users", "1")).toBe(false);
+    expect(await s.access.listWhitelist("users")).toEqual([]);
+    expect(await s.access.isWhitelisted("users", "1")).toBe(false);
   });
 
   test("add then list and check", async () => {
     const s = new MemoryStorage();
-    await s.addWhitelist("users", { id: "42", label: "alice" });
-    await s.addWhitelist("chats", { id: "-100", label: "team" });
-    expect(await s.listWhitelist("users")).toEqual([
+    await s.access.addWhitelist("users", { id: "42", label: "alice" });
+    await s.access.addWhitelist("chats", { id: "-100", label: "team" });
+    expect(await s.access.listWhitelist("users")).toEqual([
       { id: "42", label: "alice" },
     ]);
-    expect(await s.isWhitelisted("users", "42")).toBe(true);
-    expect(await s.isWhitelisted("chats", "-100")).toBe(true);
-    expect(await s.isWhitelisted("users", "-100")).toBe(false);
+    expect(await s.access.isWhitelisted("users", "42")).toBe(true);
+    expect(await s.access.isWhitelisted("chats", "-100")).toBe(true);
+    expect(await s.access.isWhitelisted("users", "-100")).toBe(false);
   });
 
   test("add is idempotent on id, last label wins", async () => {
     const s = new MemoryStorage();
-    await s.addWhitelist("users", { id: "42", label: "a" });
-    await s.addWhitelist("users", { id: "42", label: "b" });
-    expect(await s.listWhitelist("users")).toEqual([{ id: "42", label: "b" }]);
+    await s.access.addWhitelist("users", { id: "42", label: "a" });
+    await s.access.addWhitelist("users", { id: "42", label: "b" });
+    expect(await s.access.listWhitelist("users")).toEqual([
+      { id: "42", label: "b" },
+    ]);
   });
 
   test("remove removes the entry", async () => {
     const s = new MemoryStorage();
-    await s.addWhitelist("users", { id: "42" });
-    await s.removeWhitelist("users", "42");
-    expect(await s.isWhitelisted("users", "42")).toBe(false);
+    await s.access.addWhitelist("users", { id: "42" });
+    await s.access.removeWhitelist("users", "42");
+    expect(await s.access.isWhitelisted("users", "42")).toBe(false);
   });
 });
 
 describe("MemoryStorage blacklist", () => {
   test("starts empty", async () => {
     const s = new MemoryStorage();
-    expect(await s.listBlacklist("users")).toEqual([]);
-    expect(await s.listBlacklist("chats")).toEqual([]);
-    expect(await s.isBlacklisted("users", "1")).toBe(false);
-    expect(await s.isBlacklisted("chats", "1")).toBe(false);
+    expect(await s.access.listBlacklist("users")).toEqual([]);
+    expect(await s.access.listBlacklist("chats")).toEqual([]);
+    expect(await s.access.isBlacklisted("users", "1")).toBe(false);
+    expect(await s.access.isBlacklisted("chats", "1")).toBe(false);
   });
 
   test("add then list and check; add is idempotent on id, last label wins", async () => {
     const s = new MemoryStorage();
-    await s.addBlacklist("users", { id: "42", label: "a" });
-    await s.addBlacklist("users", { id: "42", label: "b" });
-    expect(await s.listBlacklist("users")).toEqual([{ id: "42", label: "b" }]);
-    expect(await s.isBlacklisted("users", "42")).toBe(true);
-    expect(await s.isBlacklisted("users", "43")).toBe(false);
+    await s.access.addBlacklist("users", { id: "42", label: "a" });
+    await s.access.addBlacklist("users", { id: "42", label: "b" });
+    expect(await s.access.listBlacklist("users")).toEqual([
+      { id: "42", label: "b" },
+    ]);
+    expect(await s.access.isBlacklisted("users", "42")).toBe(true);
+    expect(await s.access.isBlacklisted("users", "43")).toBe(false);
   });
 
   test("remove removes the entry", async () => {
     const s = new MemoryStorage();
-    await s.addBlacklist("users", { id: "42" });
-    await s.removeBlacklist("users", "42");
-    expect(await s.isBlacklisted("users", "42")).toBe(false);
+    await s.access.addBlacklist("users", { id: "42" });
+    await s.access.removeBlacklist("users", "42");
+    expect(await s.access.isBlacklisted("users", "42")).toBe(false);
   });
 
   test("users and chats are separate lists", async () => {
     const s = new MemoryStorage();
-    await s.addBlacklist("chats", { id: "-100" });
-    expect(await s.isBlacklisted("chats", "-100")).toBe(true);
-    expect(await s.isBlacklisted("users", "-100")).toBe(false);
-    expect(await s.listBlacklist("users")).toEqual([]);
+    await s.access.addBlacklist("chats", { id: "-100" });
+    expect(await s.access.isBlacklisted("chats", "-100")).toBe(true);
+    expect(await s.access.isBlacklisted("users", "-100")).toBe(false);
+    expect(await s.access.listBlacklist("users")).toEqual([]);
   });
 
   test("is shared across forBot scopes (global, like the whitelist)", async () => {
     const s = new MemoryStorage();
-    await s.forBot("777").addBlacklist("users", { id: "42" });
-    expect(await s.isBlacklisted("users", "42")).toBe(true);
-    expect(await s.forBot(null).isBlacklisted("users", "42")).toBe(true);
+    await s.forBot("777").access.addBlacklist("users", { id: "42" });
+    expect(await s.access.isBlacklisted("users", "42")).toBe(true);
+    expect(await s.forBot(null).access.isBlacklisted("users", "42")).toBe(true);
   });
 });
 
@@ -97,18 +101,18 @@ describe("MemoryStorage usage", () => {
   test("accrues to both windows, rolling a window over on a new start", async () => {
     const s = new MemoryStorage();
     // First write seeds both windows at the given starts.
-    await s.addUserUsage("u1", 100, 1000, 5000);
-    expect(await s.getUserUsage("u1")).toEqual({
+    await s.usage.add("u1", 100, 1000, 5000);
+    expect(await s.usage.get("u1")).toEqual({
       fiveHour: { windowStart: 1000, used: 100 },
       weekly: { windowStart: 5000, used: 100 },
     });
     // Same starts accumulate.
-    await s.addUserUsage("u1", 50, 1000, 5000);
-    expect((await s.getUserUsage("u1"))?.fiveHour.used).toBe(150);
+    await s.usage.add("u1", 50, 1000, 5000);
+    expect((await s.usage.get("u1"))?.fiveHour.used).toBe(150);
     // A new 5-hour start resets that window's used; the weekly start is
     // unchanged, so it keeps accumulating.
-    await s.addUserUsage("u1", 30, 2000, 5000);
-    expect(await s.getUserUsage("u1")).toEqual({
+    await s.usage.add("u1", 30, 2000, 5000);
+    expect(await s.usage.get("u1")).toEqual({
       fiveHour: { windowStart: 2000, used: 30 },
       weekly: { windowStart: 5000, used: 180 },
     });
@@ -116,42 +120,42 @@ describe("MemoryStorage usage", () => {
 
   test("is per user and cleared by reset", async () => {
     const s = new MemoryStorage();
-    await s.addUserUsage("u1", 100, 1000, 5000);
-    expect(await s.getUserUsage("u2")).toBeNull();
-    await s.resetUserUsage("u1");
-    expect(await s.getUserUsage("u1")).toBeNull();
+    await s.usage.add("u1", 100, 1000, 5000);
+    expect(await s.usage.get("u2")).toBeNull();
+    await s.usage.reset("u1");
+    expect(await s.usage.get("u1")).toBeNull();
   });
 });
 
 describe("MemoryStorage conversation", () => {
   test("round-trips by (chatId, botMsgId)", async () => {
     const s = new MemoryStorage();
-    await s.saveConversation("c1", 10, {
+    await s.conversations.save("c1", 10, {
       userQuestion: "Q",
       botAnswer: "A",
       parentBotMsgId: null,
       ts: 1,
     });
-    expect(await s.getConversation("c1", 10)).toEqual({
+    expect(await s.conversations.get("c1", 10)).toEqual({
       userQuestion: "Q",
       botAnswer: "A",
       parentBotMsgId: null,
       ts: 1,
     });
-    expect(await s.getConversation("c1", 11)).toBeNull();
-    expect(await s.getConversation("c2", 10)).toBeNull();
+    expect(await s.conversations.get("c1", 11)).toBeNull();
+    expect(await s.conversations.get("c2", 10)).toBeNull();
   });
 
   test("round-trips userImageFileIds", async () => {
     const s = new MemoryStorage();
-    await s.saveConversation("c1", 10, {
+    await s.conversations.save("c1", 10, {
       userQuestion: "Q",
       botAnswer: "A",
       parentBotMsgId: null,
       ts: 1,
       userImageFileIds: ["fileA", "fileB"],
     });
-    expect(await s.getConversation("c1", 10)).toEqual({
+    expect(await s.conversations.get("c1", 10)).toEqual({
       userQuestion: "Q",
       botAnswer: "A",
       parentBotMsgId: null,
@@ -163,7 +167,7 @@ describe("MemoryStorage conversation", () => {
   test("returned userImageFileIds array is independent of stored copy", async () => {
     const s = new MemoryStorage();
     const ids = ["a", "b"];
-    await s.saveConversation("c1", 10, {
+    await s.conversations.save("c1", 10, {
       userQuestion: "Q",
       botAnswer: "A",
       parentBotMsgId: null,
@@ -171,10 +175,10 @@ describe("MemoryStorage conversation", () => {
       userImageFileIds: ids,
     });
     ids.push("c");
-    const got = await s.getConversation("c1", 10);
+    const got = await s.conversations.get("c1", 10);
     expect(got?.userImageFileIds).toEqual(["a", "b"]);
     got!.userImageFileIds!.push("d");
-    const again = await s.getConversation("c1", 10);
+    const again = await s.conversations.get("c1", 10);
     expect(again?.userImageFileIds).toEqual(["a", "b"]);
   });
 });
@@ -183,22 +187,22 @@ describe("MemoryStorage photo cache", () => {
   test("round-trips bytes by file_id", async () => {
     const s = new MemoryStorage();
     const bytes = new Uint8Array([1, 2, 3, 4, 5]);
-    await s.savePhotoBytes("file42", bytes);
-    const got = await s.getPhotoBytes("file42");
+    await s.photos.saveBytes("file42", bytes);
+    const got = await s.photos.getBytes("file42");
     expect(got).toEqual(bytes);
   });
 
   test("returns null for unknown file_id", async () => {
     const s = new MemoryStorage();
-    expect(await s.getPhotoBytes("unknown")).toBeNull();
+    expect(await s.photos.getBytes("unknown")).toBeNull();
   });
 
   test("returned bytes are independent of stored copy", async () => {
     const s = new MemoryStorage();
     const bytes = new Uint8Array([1, 2, 3]);
-    await s.savePhotoBytes("f", bytes);
+    await s.photos.saveBytes("f", bytes);
     bytes[0] = 99;
-    const got = await s.getPhotoBytes("f");
+    const got = await s.photos.getBytes("f");
     expect(got).toEqual(new Uint8Array([1, 2, 3]));
   });
 });
@@ -206,15 +210,15 @@ describe("MemoryStorage photo cache", () => {
 describe("MemoryStorage album index", () => {
   test("returns empty array for unknown album", async () => {
     const s = new MemoryStorage();
-    expect(await s.getAlbumPhotos("c1", "g1")).toEqual([]);
+    expect(await s.photos.listAlbum("c1", "g1")).toEqual([]);
   });
 
   test("appends multiple photos and returns them all", async () => {
     const s = new MemoryStorage();
-    await s.appendAlbumPhoto("c1", "g1", { messageId: 10, fileId: "a" });
-    await s.appendAlbumPhoto("c1", "g1", { messageId: 11, fileId: "b" });
-    await s.appendAlbumPhoto("c1", "g1", { messageId: 12, fileId: "c" });
-    const all = await s.getAlbumPhotos("c1", "g1");
+    await s.photos.appendAlbum("c1", "g1", { messageId: 10, fileId: "a" });
+    await s.photos.appendAlbum("c1", "g1", { messageId: 11, fileId: "b" });
+    await s.photos.appendAlbum("c1", "g1", { messageId: 12, fileId: "c" });
+    const all = await s.photos.listAlbum("c1", "g1");
     expect(all).toHaveLength(3);
     expect(all.sort((x, y) => x.messageId - y.messageId)).toEqual([
       { messageId: 10, fileId: "a" },
@@ -225,21 +229,21 @@ describe("MemoryStorage album index", () => {
 
   test("re-append for same message_id overwrites file_id, keeps single entry", async () => {
     const s = new MemoryStorage();
-    await s.appendAlbumPhoto("c1", "g1", { messageId: 1, fileId: "old" });
-    await s.appendAlbumPhoto("c1", "g1", { messageId: 1, fileId: "new" });
-    expect(await s.getAlbumPhotos("c1", "g1")).toEqual([
+    await s.photos.appendAlbum("c1", "g1", { messageId: 1, fileId: "old" });
+    await s.photos.appendAlbum("c1", "g1", { messageId: 1, fileId: "new" });
+    expect(await s.photos.listAlbum("c1", "g1")).toEqual([
       { messageId: 1, fileId: "new" },
     ]);
   });
 
   test("scopes by chat: same media_group_id in different chats is isolated", async () => {
     const s = new MemoryStorage();
-    await s.appendAlbumPhoto("c1", "g", { messageId: 1, fileId: "x" });
-    await s.appendAlbumPhoto("c2", "g", { messageId: 2, fileId: "y" });
-    expect(await s.getAlbumPhotos("c1", "g")).toEqual([
+    await s.photos.appendAlbum("c1", "g", { messageId: 1, fileId: "x" });
+    await s.photos.appendAlbum("c2", "g", { messageId: 2, fileId: "y" });
+    expect(await s.photos.listAlbum("c1", "g")).toEqual([
       { messageId: 1, fileId: "x" },
     ]);
-    expect(await s.getAlbumPhotos("c2", "g")).toEqual([
+    expect(await s.photos.listAlbum("c2", "g")).toEqual([
       { messageId: 2, fileId: "y" },
     ]);
   });
@@ -251,7 +255,7 @@ describe("MemoryStorage user spend", () => {
 
   test("returns all-zero summary for a user with no spend", async () => {
     const s = new MemoryStorage();
-    expect(await s.getUserSpend("42", NOW)).toEqual({
+    expect(await s.spend.getUser("42", NOW)).toEqual({
       day: 0,
       week: 0,
       month: 0,
@@ -260,9 +264,9 @@ describe("MemoryStorage user spend", () => {
 
   test("accrues same-day spend and buckets into day/week/month", async () => {
     const s = new MemoryStorage();
-    await s.addUserSpend("42", 0.5, NOW);
-    await s.addUserSpend("42", 0.25, NOW);
-    expect(await s.getUserSpend("42", NOW)).toEqual({
+    await s.spend.addUser("42", 0.5, NOW);
+    await s.spend.addUser("42", 0.25, NOW);
+    expect(await s.spend.getUser("42", NOW)).toEqual({
       day: 0.75,
       week: 0.75,
       month: 0.75,
@@ -271,10 +275,10 @@ describe("MemoryStorage user spend", () => {
 
   test("older spend falls out of the shorter windows", async () => {
     const s = new MemoryStorage();
-    await s.addUserSpend("42", 1, NOW);
-    await s.addUserSpend("42", 2, NOW - 3 * DAY);
-    await s.addUserSpend("42", 4, NOW - 10 * DAY);
-    expect(await s.getUserSpend("42", NOW)).toEqual({
+    await s.spend.addUser("42", 1, NOW);
+    await s.spend.addUser("42", 2, NOW - 3 * DAY);
+    await s.spend.addUser("42", 4, NOW - 10 * DAY);
+    expect(await s.spend.getUser("42", NOW)).toEqual({
       day: 1,
       week: 3,
       month: 7,
@@ -283,9 +287,9 @@ describe("MemoryStorage user spend", () => {
 
   test("ignores non-positive costs", async () => {
     const s = new MemoryStorage();
-    await s.addUserSpend("42", 0, NOW);
-    await s.addUserSpend("42", -5, NOW);
-    expect(await s.getUserSpend("42", NOW)).toEqual({
+    await s.spend.addUser("42", 0, NOW);
+    await s.spend.addUser("42", -5, NOW);
+    expect(await s.spend.getUser("42", NOW)).toEqual({
       day: 0,
       week: 0,
       month: 0,
@@ -294,19 +298,19 @@ describe("MemoryStorage user spend", () => {
 
   test("scopes spend per user", async () => {
     const s = new MemoryStorage();
-    await s.addUserSpend("1", 3, NOW);
-    await s.addUserSpend("2", 7, NOW);
-    expect((await s.getUserSpend("1", NOW)).day).toBe(3);
-    expect((await s.getUserSpend("2", NOW)).day).toBe(7);
+    await s.spend.addUser("1", 3, NOW);
+    await s.spend.addUser("2", 7, NOW);
+    expect((await s.spend.getUser("1", NOW)).day).toBe(3);
+    expect((await s.spend.getUser("2", NOW)).day).toBe(7);
   });
 
   test("prunes buckets beyond the retention window", async () => {
     const s = new MemoryStorage();
-    await s.addUserSpend("42", 9, NOW - 100 * DAY);
+    await s.spend.addUser("42", 9, NOW - 100 * DAY);
     // A later write triggers pruning of the stale bucket.
-    await s.addUserSpend("42", 1, NOW);
+    await s.spend.addUser("42", 1, NOW);
     // Query as of the old date: the pruned bucket is gone.
-    expect(await s.getUserSpend("42", NOW - 100 * DAY)).toEqual({
+    expect(await s.spend.getUser("42", NOW - 100 * DAY)).toEqual({
       day: 0,
       week: 0,
       month: 0,

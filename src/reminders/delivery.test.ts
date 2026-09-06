@@ -193,7 +193,7 @@ describe("deliverReminder (AI-driven)", () => {
     const ai = okAI("body");
     const api = new FakeTgApi();
     const storage = new MemoryStorage();
-    await storage.saveChatSettings("c1", { botName: "Capybara" });
+    await storage.chats.saveSettings("c1", { botName: "Capybara" });
 
     const r = reminderAsk();
     await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
@@ -206,8 +206,8 @@ describe("deliverReminder (AI-driven)", () => {
     const ai = okAI();
     const api = new FakeTgApi();
     const storage = new MemoryStorage();
-    await storage.setUserName("u1", "Alice");
-    await storage.setUserGender("u1", "female");
+    await storage.profile.setName("u1", "Alice");
+    await storage.profile.setGender("u1", "female");
     const r = reminderAsk();
     await deliverReminder(deps(ai, api, storage), r, r.fireAtMs);
     const envelope = JSON.parse(contentOf(ai.calls[0]!.messages[0]!) as string);
@@ -220,7 +220,7 @@ describe("deliverReminder (AI-driven)", () => {
     const ai = okAI();
     const api = new FakeTgApi();
     const storage = new MemoryStorage();
-    await storage.upsertUser({
+    await storage.users.upsert({
       id: "u1",
       firstName: "Bob",
       lastName: "Smith",
@@ -433,7 +433,7 @@ describe("deliverReminder (AI-driven)", () => {
     const ai = okAI();
     const api = new FakeTgApi();
     const storage = new MemoryStorage();
-    await storage.saveChatSettings("c1", {
+    await storage.chats.saveSettings("c1", {
       systemPrompt: "Be a pirate.",
       models: ["custom/model"],
     });
@@ -477,10 +477,14 @@ describe("deliverReminder accounting (the untracked-cost fix)", () => {
       r.fireAtMs,
     );
     expect(deducts).toEqual([{ userId: "u1", tokens: 42 }]);
-    expect((await storage.getUserSpend("u1", r.fireAtMs)).day).toBeCloseTo(0.3);
-    expect((await storage.getChatSpend("c1", r.fireAtMs)).day).toBeCloseTo(0.3);
-    expect((await storage.getGlobalSpend(r.fireAtMs)).day).toBeCloseTo(0.3);
-    expect((await storage.getModelSpend("m1", r.fireAtMs)).day).toBeCloseTo(
+    expect((await storage.spend.getUser("u1", r.fireAtMs)).day).toBeCloseTo(
+      0.3,
+    );
+    expect((await storage.spend.getChat("c1", r.fireAtMs)).day).toBeCloseTo(
+      0.3,
+    );
+    expect((await storage.spend.getGlobal(r.fireAtMs)).day).toBeCloseTo(0.3);
+    expect((await storage.spend.getModel("m1", r.fireAtMs)).day).toBeCloseTo(
       0.3,
     );
   });
@@ -516,6 +520,6 @@ describe("deliverReminder accounting (the untracked-cost fix)", () => {
       r.fireAtMs,
     );
     expect(deducts).toEqual([]); // owner is rate-limit-exempt by default
-    expect((await storage.getGlobalSpend(r.fireAtMs)).day).toBeCloseTo(0.3);
+    expect((await storage.spend.getGlobal(r.fireAtMs)).day).toBeCloseTo(0.3);
   });
 });

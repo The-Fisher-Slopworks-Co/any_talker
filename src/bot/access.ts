@@ -38,19 +38,21 @@ export async function checkAccess(args: {
   // a blocked chat, and any chat speaking as itself is denied even while the
   // whitelist is off, and a whitelist entry never overrides it.
   if (
-    (await storage.isBlacklisted("users", userId)) ||
-    (await storage.isBlacklisted("chats", chatId)) ||
+    (await storage.access.isBlacklisted("users", userId)) ||
+    (await storage.access.isBlacklisted("chats", chatId)) ||
     (senderChatId !== null &&
-      (await storage.isBlacklisted("chats", senderChatId)))
+      (await storage.access.isBlacklisted("chats", senderChatId)))
   ) {
     return { allowed: false, reason: "blacklisted" };
   }
   if (!whitelistEnabled) return { allowed: true };
-  if (await storage.isWhitelisted("users", userId)) return { allowed: true };
-  if (await storage.isWhitelisted("chats", chatId)) return { allowed: true };
+  if (await storage.access.isWhitelisted("users", userId))
+    return { allowed: true };
+  if (await storage.access.isWhitelisted("chats", chatId))
+    return { allowed: true };
   if (
     senderChatId !== null &&
-    (await storage.isWhitelisted("chats", senderChatId))
+    (await storage.access.isWhitelisted("chats", senderChatId))
   ) {
     return { allowed: true };
   }

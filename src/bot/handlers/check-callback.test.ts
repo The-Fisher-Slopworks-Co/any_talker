@@ -73,7 +73,7 @@ describe("handleCheckCallback", () => {
 
   test("stale when message id doesn't match pending", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     const out = await handleCheckCallback({
       storage,
@@ -89,7 +89,7 @@ describe("handleCheckCallback", () => {
 
   test("wrong_user when from is not target", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     const out = await handleCheckCallback({
       storage,
@@ -105,7 +105,7 @@ describe("handleCheckCallback", () => {
 
   test("resolved on valid click", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck());
+    await storage.checks.save(makeCheck());
     const api = new FakeApi();
     const out = await handleCheckCallback({
       storage,
@@ -118,14 +118,14 @@ describe("handleCheckCallback", () => {
     expect(out.kind).toBe("resolved");
     expect(api.sent).toHaveLength(1);
     expect(api.sent[0]?.text).toBe("Nikita n 11");
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.pendingMessageId).toBeNull();
     expect(saved?.counter).toBe(11);
   });
 
   test("stale when not pending", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck({ pendingMessageId: null }));
+    await storage.checks.save(makeCheck({ pendingMessageId: null }));
     const api = new FakeApi();
     const out = await handleCheckCallback({
       storage,

@@ -88,8 +88,8 @@ const runtimes = (
 describe("runReminderTick", () => {
   test("delivers due reminders and removes them", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
-    await storage.saveReminder(reminder({ id: "future", fireAtMs: 5_000 }));
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.reminders.save(reminder({ id: "future", fireAtMs: 5_000 }));
     const api = new FakeApi();
     const ai = new FakeAI();
 
@@ -103,13 +103,13 @@ describe("runReminderTick", () => {
 
     expect(api.calls).toHaveLength(1);
     expect(ai.calls).toBe(1);
-    const remaining = await storage.fetchDueReminders(10_000);
+    const remaining = await storage.reminders.fetchDue(10_000);
     expect(remaining.map((r) => r.id)).toEqual(["future"]);
   });
 
   test("transient TG failure keeps reminder for retry", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
     const api = new FakeApi(async () => {
       throw grammyErr(429);
     });
@@ -122,14 +122,14 @@ describe("runReminderTick", () => {
       ownerId: "owner",
       nowMs: 1_000,
     });
-    expect((await storage.fetchDueReminders(1_000)).map((r) => r.id)).toEqual([
+    expect((await storage.reminders.fetchDue(1_000)).map((r) => r.id)).toEqual([
       "due",
     ]);
   });
 
   test("transient AI failure keeps reminder for retry and does not call TG", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
     const api = new FakeApi();
     const ai = new FakeAI(async () => {
       throw new Error("ai down");
@@ -143,14 +143,14 @@ describe("runReminderTick", () => {
       nowMs: 1_000,
     });
     expect(api.calls).toEqual([]);
-    expect((await storage.fetchDueReminders(1_000)).map((r) => r.id)).toEqual([
+    expect((await storage.reminders.fetchDue(1_000)).map((r) => r.id)).toEqual([
       "due",
     ]);
   });
 
   test("permanent TG failure deletes reminder", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
     const api = new FakeApi(async () => {
       throw grammyErr(403);
     });
@@ -163,12 +163,12 @@ describe("runReminderTick", () => {
       ownerId: "owner",
       nowMs: 1_000,
     });
-    expect(await storage.fetchDueReminders(1_000)).toEqual([]);
+    expect(await storage.reminders.fetchDue(1_000)).toEqual([]);
   });
 
   test("no due reminders -> no api calls", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "future", fireAtMs: 5_000 }));
+    await storage.reminders.save(reminder({ id: "future", fireAtMs: 5_000 }));
     const api = new FakeApi();
     const ai = new FakeAI();
 
@@ -185,8 +185,8 @@ describe("runReminderTick", () => {
 
   test("blacklisted user's reminder is dropped without AI or TG calls", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
-    await storage.addBlacklist("users", { id: "u1" });
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.access.addBlacklist("users", { id: "u1" });
     const api = new FakeApi();
     const ai = new FakeAI();
 
@@ -200,13 +200,13 @@ describe("runReminderTick", () => {
 
     expect(api.calls).toEqual([]);
     expect(ai.calls).toBe(0);
-    expect(await storage.fetchDueReminders(10_000)).toEqual([]);
+    expect(await storage.reminders.fetchDue(10_000)).toEqual([]);
   });
 
   test("blacklisted chat's reminder is dropped without AI or TG calls", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "due", fireAtMs: 100 }));
-    await storage.addBlacklist("chats", { id: "c1" });
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
+    await storage.access.addBlacklist("chats", { id: "c1" });
     const api = new FakeApi();
     const ai = new FakeAI();
 
@@ -220,14 +220,14 @@ describe("runReminderTick", () => {
 
     expect(api.calls).toEqual([]);
     expect(ai.calls).toBe(0);
-    expect(await storage.fetchDueReminders(10_000)).toEqual([]);
+    expect(await storage.reminders.fetchDue(10_000)).toEqual([]);
   });
 
   test("delivers multiple due reminders in one tick", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "a", fireAtMs: 100 }));
-    await storage.saveReminder(reminder({ id: "b", fireAtMs: 200 }));
-    await storage.saveReminder(reminder({ id: "c", fireAtMs: 300 }));
+    await storage.reminders.save(reminder({ id: "a", fireAtMs: 100 }));
+    await storage.reminders.save(reminder({ id: "b", fireAtMs: 200 }));
+    await storage.reminders.save(reminder({ id: "c", fireAtMs: 300 }));
     const api = new FakeApi();
     const ai = new FakeAI();
 
@@ -241,6 +241,6 @@ describe("runReminderTick", () => {
 
     expect(api.calls).toHaveLength(3);
     expect(ai.calls).toBe(3);
-    expect(await storage.fetchDueReminders(10_000)).toEqual([]);
+    expect(await storage.reminders.fetchDue(10_000)).toEqual([]);
   });
 });

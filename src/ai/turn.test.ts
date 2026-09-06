@@ -4,6 +4,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import { z } from "zod";
 import { MemoryStorage } from "../storage/memory";
+import type { Storage, SpendStore } from "../storage/types";
 import { DualWindowLimiter } from "../ratelimit/dual-window";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { RateLimiter } from "../ratelimit/types";
@@ -199,7 +200,7 @@ describe("runAiTurn — token deduction", () => {
         ai: new FakeAI({ text: "ok", totalTokens: 500 }),
       }),
     );
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(500);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(500);
   });
 
   test("owner with ownerExempt skips the deduction", async () => {
@@ -213,7 +214,7 @@ describe("runAiTurn — token deduction", () => {
         ai: new FakeAI({ text: "ok", totalTokens: 300 }),
       }),
     );
-    expect(await rlStorage.getUserUsage("1")).toBeNull();
+    expect(await rlStorage.usage.get("1")).toBeNull();
   });
 
   test("owner without ownerExempt is still deducted", async () => {
@@ -227,7 +228,7 @@ describe("runAiTurn — token deduction", () => {
         ai: new FakeAI({ text: "ok", totalTokens: 300 }),
       }),
     );
-    expect((await rlStorage.getUserUsage("1"))?.fiveHour.used).toBe(300);
+    expect((await rlStorage.usage.get("1"))?.fiveHour.used).toBe(300);
   });
 
   test("wise detail level scales the deduction by wiseMultiplier (rounded)", async () => {
@@ -240,7 +241,7 @@ describe("runAiTurn — token deduction", () => {
         ai: new FakeAI({ text: "ok", totalTokens: 1000 }),
       }),
     );
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(1800);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1800);
   });
 
   test("short detail level deducts the raw total (multiplier 1)", async () => {
@@ -253,7 +254,7 @@ describe("runAiTurn — token deduction", () => {
         ai: new FakeAI({ text: "ok", totalTokens: 1000 }),
       }),
     );
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(1000);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1000);
   });
 
   test("a deduction failure propagates by default", async () => {
@@ -299,12 +300,12 @@ describe("runAiTurn — spend booking", () => {
         }),
       }),
     );
-    expect((await storage.getUserSpend("42", 1_000)).day).toBeCloseTo(0.5);
-    expect((await storage.getChatSpend("c1", 1_000)).day).toBeCloseTo(0.5);
-    expect((await storage.getGlobalSpend(1_000)).day).toBeCloseTo(0.5);
-    expect((await storage.getModelSpend("m1", 1_000)).day).toBeCloseTo(0.5);
-    expect(await storage.listSpendModels()).toEqual(["m1"]);
-    expect(await storage.listUnpricedModels()).toEqual([]);
+    expect((await storage.spend.getUser("42", 1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.spend.getChat("c1", 1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.spend.getGlobal(1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.spend.getModel("m1", 1_000)).day).toBeCloseTo(0.5);
+    expect(await storage.spend.listModels()).toEqual(["m1"]);
+    expect(await storage.spend.listUnpriced()).toEqual([]);
   });
 
   test("defaults missing modelId/costUsd/priced (no model attribution, $0, priced)", async () => {
@@ -316,11 +317,11 @@ describe("runAiTurn — spend booking", () => {
       }),
     );
     // costUsd defaults to 0 → user/chat/global ledgers record nothing.
-    expect((await storage.getUserSpend("42", 1_000)).month).toBe(0);
-    expect((await storage.getGlobalSpend(1_000)).day).toBe(0);
+    expect((await storage.spend.getUser("42", 1_000)).month).toBe(0);
+    expect((await storage.spend.getGlobal(1_000)).day).toBe(0);
     // modelId defaults to null → no per-model attribution, nothing flagged.
-    expect(await storage.listSpendModels()).toEqual([]);
-    expect(await storage.listUnpricedModels()).toEqual([]);
+    expect(await storage.spend.listModels()).toEqual([]);
+    expect(await storage.spend.listUnpriced()).toEqual([]);
     // The defaults are also surfaced on the returned result.
     expect(res.modelId).toBeNull();
     expect(res.costUsd).toBe(0);
@@ -341,19 +342,27 @@ describe("runAiTurn — spend booking", () => {
         }),
       }),
     );
-    expect(await storage.listUnpricedModels()).toEqual(["m-free"]);
-    expect((await storage.getGlobalSpend(1_000)).day).toBe(0);
+    expect(await storage.spend.listUnpriced()).toEqual(["m-free"]);
+    expect((await storage.spend.getGlobal(1_000)).day).toBe(0);
   });
 
   test("a spend-booking failure is swallowed so the turn still returns", async () => {
-    class ThrowingSpendStorage extends MemoryStorage {
-      override async addGlobalSpend(): Promise<void> {
-        throw new Error("spend storage down");
-      }
-    }
+    // Spend booking lives in its own namespace now, so instead of overriding a
+    // method we hand the turn a storage whose `spend` is a real MemorySpendStore
+    // with only `addGlobal` shadowed — every other domain (and the rest of
+    // `spend`) still works, exactly as when a single write fails in production.
+    const base = new MemoryStorage();
+    const spend: SpendStore = Object.create(base.spend) as SpendStore;
+    spend.addGlobal = () => {
+      throw new Error("spend storage down");
+    };
+    const throwingSpendStorage: Storage = Object.assign(
+      Object.create(base) as Storage,
+      { spend },
+    );
     const res = await runAiTurn(
       baseInput({
-        storage: new ThrowingSpendStorage(),
+        storage: throwingSpendStorage,
         ai: new FakeAI({
           text: "still answered",
           totalTokens: 100,

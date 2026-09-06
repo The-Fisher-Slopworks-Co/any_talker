@@ -95,9 +95,9 @@ describe("schedule_reminder_at", () => {
     expect(out).toEqual({ ok: false, reason: expect.stringContaining("DM") });
   });
 
-  test("guest path succeeds after recordPrivateChat", async () => {
+  test("guest path succeeds after privateChats.record", async () => {
     const storage = new MemoryStorage();
-    await storage.recordPrivateChat("u42");
+    await storage.privateChats.record("u42");
     const tool = createScheduleReminderAtTool({ storage });
     const out = await tool.execute(
       { datetime: "2026-06-01T10:00", text: "ping" },
@@ -110,7 +110,7 @@ describe("schedule_reminder_at", () => {
     );
     if (!("ok" in out) || !out.ok) throw new Error("expected ok");
     expect(out.fireAt).toBe("2026-06-01T10:00:00.000Z");
-    const due = await storage.fetchDueReminders(Date.UTC(2026, 5, 1, 10, 0));
+    const due = await storage.reminders.fetchDue(Date.UTC(2026, 5, 1, 10, 0));
     expect(due[0]?.target).toEqual({ kind: "guest_dm", userId: "u42" });
   });
 });

@@ -41,7 +41,7 @@ describe("matchDigestCommand", () => {
 describe("digestCommandHandler", () => {
   test("ignores non-owners and group chats", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1, NOW);
+    await storage.spend.addGlobal(1, NOW);
 
     expect(await run(storage, { fromUserId: "someone" })).toEqual({
       kind: "ignored",
@@ -53,9 +53,9 @@ describe("digestCommandHandler", () => {
 
   test("returns the digest markdown for the owner", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(0.004321, NOW);
-    await storage.addUserSpend("u1", 0.004321, NOW);
-    await storage.upsertUser({
+    await storage.spend.addGlobal(0.004321, NOW);
+    await storage.spend.addUser("u1", 0.004321, NOW);
+    await storage.users.upsert({
       id: "u1",
       firstName: "A",
       lastName: null,
@@ -78,22 +78,26 @@ describe("digestCommandHandler", () => {
 
   test("leaves the scheduler's cadence untouched", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1, NOW);
-    await storage.setDigestState({ lastSentAtMs: NOW - 5 * HOUR });
+    await storage.spend.addGlobal(1, NOW);
+    await storage.observability.setDigestState({
+      lastSentAtMs: NOW - 5 * HOUR,
+    });
 
     await run(storage);
 
-    expect(await storage.getDigestState()).toEqual({
+    expect(await storage.observability.getDigestState()).toEqual({
       lastSentAtMs: NOW - 5 * HOUR,
     });
   });
 
   test("counts 'new' from the last scheduled digest", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1, NOW);
-    await storage.setDigestState({ lastSentAtMs: NOW - 2 * HOUR });
+    await storage.spend.addGlobal(1, NOW);
+    await storage.observability.setDigestState({
+      lastSentAtMs: NOW - 2 * HOUR,
+    });
     // Seen before that mark, so not new; and one seen after, which is.
-    await storage.upsertUser({
+    await storage.users.upsert({
       id: "old",
       firstName: "Old",
       lastName: null,
@@ -101,7 +105,7 @@ describe("digestCommandHandler", () => {
       firstSeenAt: NOW - 10 * HOUR,
       lastSeenAt: NOW,
     });
-    await storage.upsertUser({
+    await storage.users.upsert({
       id: "fresh",
       firstName: "Fresh",
       lastName: null,
@@ -119,8 +123,8 @@ describe("digestCommandHandler", () => {
 
   test("excludes private chats from the chat table, as the scheduled digest does", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(5.5, NOW);
-    await storage.upsertChat({
+    await storage.spend.addGlobal(5.5, NOW);
+    await storage.chats.upsert({
       id: "-100",
       type: "supergroup",
       title: "The group",
@@ -128,7 +132,7 @@ describe("digestCommandHandler", () => {
       firstSeenAt: 1,
       lastSeenAt: NOW,
     });
-    await storage.upsertChat({
+    await storage.chats.upsert({
       id: "42",
       type: "private",
       title: null,
@@ -136,8 +140,8 @@ describe("digestCommandHandler", () => {
       firstSeenAt: 1,
       lastSeenAt: NOW,
     });
-    await storage.addChatSpend("-100", 0.5, NOW);
-    await storage.addChatSpend("42", 5, NOW);
+    await storage.spend.addChat("-100", 0.5, NOW);
+    await storage.spend.addChat("42", 5, NOW);
 
     const outcome = await run(storage);
     if (outcome.kind !== "digest") throw new Error("expected a digest");

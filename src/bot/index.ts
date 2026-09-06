@@ -266,7 +266,7 @@ function isContentMessage(message: Message | undefined): boolean {
 //   - service messages (no content) — including the `left_chat_member` broadcast
 //     of THIS bot's own removal.
 // Without this, a bot draining the burst of updates around its own removal would
-// re-`recordBotPresence` the presence its `my_chat_member` handler just cleared,
+// re-`presence.record` the presence its `my_chat_member` handler just cleared,
 // so a managed sibling would keep seeing it as "present" and stay silent on a
 // bare `/ask` until the 7-day TTL lapsed.
 export function shouldRefreshPresence(update: Update): boolean {
@@ -334,9 +334,9 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     let presence: Record<string, number> | null = null;
     if (chatId !== undefined) {
       try {
-        presence = await deps.storage.getBotPresence(String(chatId));
+        presence = await deps.storage.presence.get(String(chatId));
       } catch (err) {
-        console.error("getBotPresence failed:", err);
+        console.error("presence.get failed:", err);
       }
     }
     const now = Date.now();
@@ -374,8 +374,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const guestMsg = ctx.update.guest_message;
     const from = ctx.from ?? guestMsg?.from;
     if (from && !from.is_bot) {
-      void deps.storage
-        .upsertUser({
+      void deps.storage.users
+        .upsert({
           id: String(from.id),
           firstName: from.first_name ?? null,
           lastName: from.last_name ?? null,
@@ -385,7 +385,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           firstSeenAt: now,
           lastSeenAt: now,
         })
-        .catch((err) => console.error("upsertUser failed:", err));
+        .catch((err) => console.error("users.upsert failed:", err));
     }
     const chat = ctx.chat ?? guestMsg?.chat;
     if (chat) {
@@ -397,18 +397,18 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
         firstSeenAt: now,
         lastSeenAt: now,
       };
-      void deps.storage
-        .upsertChat(chatRecord)
+      void deps.storage.chats
+        .upsert(chatRecord)
         .then((res) => {
           // First-ever sighting of a non-private chat = a fresh group join.
           if (res.isNew) void alertNewGroup(ctx.api, chatRecord);
         })
-        .catch((err) => console.error("upsertChat failed:", err));
+        .catch((err) => console.error("chats.upsert failed:", err));
     }
     if (ctx.chat?.type === "private" && from && !from.is_bot) {
-      void scopedStorage
-        .recordPrivateChat(String(from.id))
-        .catch((err) => console.error("recordPrivateChat failed:", err));
+      void scopedStorage.privateChats
+        .record(String(from.id))
+        .catch((err) => console.error("privateChats.record failed:", err));
     }
     // Refresh this bot's presence in any group it is active in, so managed
     // siblings can tell who shares a chat (drives the bare-`/ask` alone-check).
@@ -422,18 +422,19 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       ctx.chat.type !== "private" &&
       shouldRefreshPresence(ctx.update)
     ) {
-      void deps.storage
-        .recordBotPresence(String(ctx.chat.id), String(ctx.me.id), now)
-        .catch((err) => console.error("recordBotPresence failed:", err));
+      void deps.storage.presence
+        .record(String(ctx.chat.id), String(ctx.me.id), now)
+        .catch((err) => console.error("presence.record failed:", err));
     }
     await next();
   });
 
   // Fire-and-forget owner DM when a GLOBAL budget cap first trips today. Deduped
-  // via `claimAlert` so the owner gets one DM per period per UTC day, not one per
-  // denied request. Only the global caps are alarms — the per-chat and new-user
-  // caps are routine guardrails and stay silent (they still show on the
-  // dashboard/metrics). Fires identically for the main bot and every managed bot.
+  // via `observability.claimAlert` so the owner gets one DM per period per UTC
+  // day, not one per denied request. Only the global caps are alarms — the
+  // per-chat and new-user caps are routine guardrails and stay silent (they
+  // still show on the dashboard/metrics). Fires identically for the main bot and
+  // every managed bot.
   const alertGlobalCapBreach = async (
     api: Api,
     reason: BudgetDenyReason,
@@ -443,14 +444,14 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       reason === "globalMonthly" ? "month" : "day";
     try {
       const now = Date.now();
-      const claimed = await deps.storage.claimAlert(
+      const claimed = await deps.storage.observability.claimAlert(
         `global_cap:${period}:${utcDateKey(now)}`,
         ALERT_TTL_SECONDS,
       );
       if (!claimed) return;
       const [global, ownerLang] = await Promise.all([
-        deps.storage.getGlobalSpend(now),
-        deps.storage.getUserLang(deps.ownerId),
+        deps.storage.spend.getGlobal(now),
+        deps.storage.profile.getLang(deps.ownerId),
       ]);
       const spent = period === "month" ? global.month : global.day;
       await api.sendMessage(
@@ -463,20 +464,21 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   };
 
   // Fire-and-forget owner DM the first time the bot is seen in a new non-private
-  // chat — i.e. it was just added to a group. Deduped via `claimAlert` so a rare
-  // concurrent double-`isNew` (the read-merge upsert isn't atomic) sends once.
+  // chat — i.e. it was just added to a group. Deduped via
+  // `observability.claimAlert` so a rare concurrent double-`isNew` (the
+  // read-merge upsert isn't atomic) sends once.
   const alertNewGroup = async (
     api: Api,
     chat: { id: string; type: ChatType; title: string | null },
   ): Promise<void> => {
     if (chat.type === "private") return;
     try {
-      const claimed = await deps.storage.claimAlert(
+      const claimed = await deps.storage.observability.claimAlert(
         `new_chat:${chat.id}`,
         7 * 24 * 60 * 60,
       );
       if (!claimed) return;
-      const ownerLang = await deps.storage.getUserLang(deps.ownerId);
+      const ownerLang = await deps.storage.profile.getLang(deps.ownerId);
       await api.sendMessage(
         deps.ownerId,
         t(ownerLang ?? "en").bot_owner_new_group(
@@ -587,7 +589,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
     const [nameOverride, gender] = await Promise.all([
       readValidDisplayName(deps.storage, userId),
-      deps.storage.getUserGender(userId),
+      deps.storage.profile.getGender(userId),
     ]);
     const sender = {
       firstName: identity.firstName,
@@ -599,7 +601,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const replyMsg = msg.reply_to_message;
     const replyToOurBot = replyMsg?.from?.id === ctx.me.id;
     const priorThread = replyToOurBot
-      ? await scopedStorage.getGuestThread(chatId)
+      ? await scopedStorage.conversations.getGuest(chatId)
       : null;
     // Always extracted when the query is a reply; the handler prefers the
     // stored thread and falls back to the raw replied-to message (mirrors
@@ -981,7 +983,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
 
     const [nameOverride, gender] = await Promise.all([
       readValidDisplayName(deps.storage, userId),
-      deps.storage.getUserGender(userId),
+      deps.storage.profile.getGender(userId),
     ]);
     const sender = {
       firstName: identity.firstName,
@@ -1364,12 +1366,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     if (msg.media_group_id !== undefined) {
       const picked = pickPhotoSize(msg.photo);
       if (picked) {
-        void scopedStorage
-          .appendAlbumPhoto(String(chatId), msg.media_group_id, {
+        void scopedStorage.photos
+          .appendAlbum(String(chatId), msg.media_group_id, {
             messageId: msg.message_id,
             fileId: picked.file_id,
           })
-          .catch((err) => console.error("appendAlbumPhoto failed:", err));
+          .catch((err) => console.error("photos.appendAlbum failed:", err));
       }
       bufferMediaGroupItem(chatId, msg.media_group_id, ctx, msg);
       return;
@@ -1487,12 +1489,12 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       // Index the clip's thumbnail alongside the album's photos so a later
       // reply to the album still surfaces something for this item.
       if (video.thumbnailFileId) {
-        void scopedStorage
-          .appendAlbumPhoto(String(chatId), msg.media_group_id, {
+        void scopedStorage.photos
+          .appendAlbum(String(chatId), msg.media_group_id, {
             messageId: msg.message_id,
             fileId: video.thumbnailFileId,
           })
-          .catch((err) => console.error("appendAlbumPhoto failed:", err));
+          .catch((err) => console.error("photos.appendAlbum failed:", err));
       }
       bufferMediaGroupItem(chatId, msg.media_group_id, ctx, msg);
       return;
@@ -1555,8 +1557,8 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     const selfId = String(ctx.me.id);
     try {
       if (present)
-        await deps.storage.recordBotPresence(chatId, selfId, Date.now());
-      else await deps.storage.removeBotPresence(chatId, selfId);
+        await deps.storage.presence.record(chatId, selfId, Date.now());
+      else await deps.storage.presence.remove(chatId, selfId);
     } catch (err) {
       console.error("my_chat_member presence update failed:", err);
     }
@@ -1575,7 +1577,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
   const runChatMigration = async (oldChatId: string, newChatId: string) => {
     // The supergroup is the same chat under a new id, not a fresh join — claim
     // the new-group alert key so the owner isn't DM'd about a "new" group.
-    void deps.storage
+    void deps.storage.observability
       .claimAlert(`new_chat:${newChatId}`, 7 * 24 * 60 * 60)
       .catch(() => {});
     console.warn(

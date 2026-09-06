@@ -68,7 +68,7 @@ export class BotManager {
   // logged and skipped so one broken bot can't take down the others (or block
   // the main bot's startup).
   async loadAndStartAll(): Promise<void> {
-    const records = await this.deps.storage.listManagedBots();
+    const records = await this.deps.storage.managedBots.list();
     for (const record of records) {
       try {
         const token = await this.resolveToken(record);
@@ -88,13 +88,13 @@ export class BotManager {
   // Prefer the stored token; if it is missing (e.g. a crash after persisting the
   // record but before the token), re-broker it from Telegram via the main bot.
   private async resolveToken(record: ManagedBot): Promise<string | null> {
-    const stored = await this.deps.storage.getManagedBotToken(record.botId);
+    const stored = await this.deps.storage.managedBots.getToken(record.botId);
     if (stored) return stored;
     try {
       const token = await this.deps.mainApi.getManagedBotToken(
         Number(record.botId),
       );
-      await this.deps.storage.setManagedBotToken(record.botId, token);
+      await this.deps.storage.managedBots.setToken(record.botId, token);
       return token;
     } catch (err) {
       console.error(
@@ -135,8 +135,8 @@ export class BotManager {
     }
     if (username !== record.username) {
       record = { ...record, username };
-      await this.deps.storage
-        .saveManagedBot(record)
+      await this.deps.storage.managedBots
+        .save(record)
         .catch((err) =>
           console.error(`[managed-bots] persist username failed:`, err),
         );
@@ -221,7 +221,7 @@ export class BotManager {
     }
     // The stored token just got a 401 and is dead either way — drop it so the
     // next boot re-brokers a token instead of starting with this one.
-    await this.deps.storage.setManagedBotToken(botId, null);
+    await this.deps.storage.managedBots.setToken(botId, null);
     let fresh: string;
     try {
       fresh = await this.deps.mainApi.getManagedBotToken(Number(botId));
@@ -240,10 +240,10 @@ export class BotManager {
       );
       return;
     }
-    const current = await this.deps.storage.getManagedBot(botId);
+    const current = await this.deps.storage.managedBots.get(botId);
     // Deleted via the admin UI while recovering — don't resurrect it.
     if (!current) return;
-    await this.deps.storage.setManagedBotToken(botId, fresh);
+    await this.deps.storage.managedBots.setToken(botId, fresh);
     console.log(
       `[managed-bots] token for ${botId} was rotated, restarting with the new one`,
     );
@@ -290,7 +290,7 @@ export class BotManager {
       return null;
     }
 
-    const existing = await this.deps.storage.getManagedBot(botId);
+    const existing = await this.deps.storage.managedBots.get(botId);
     const record: ManagedBot = existing ?? {
       botId,
       ownerUserId,
@@ -299,8 +299,8 @@ export class BotManager {
       systemPrompt: "",
       createdAtMs: Date.now(),
     };
-    await this.deps.storage.saveManagedBot(record);
-    await this.deps.storage.setManagedBotToken(botId, token);
+    await this.deps.storage.managedBots.save(record);
+    await this.deps.storage.managedBots.setToken(botId, token);
     await this.startBot(record, token);
     return record;
   }
@@ -310,15 +310,15 @@ export class BotManager {
   // orphaned reminders simply never fire (no scheduler iterates them).
   async deleteBot(botId: string): Promise<void> {
     await this.stopBot(botId);
-    await this.deps.storage.deleteManagedBot(botId);
-    await this.deps.storage.setManagedBotToken(botId, null);
+    await this.deps.storage.managedBots.delete(botId);
+    await this.deps.storage.managedBots.setToken(botId, null);
   }
 
   // Push the stored display name to Telegram for a running bot (best-effort).
   async syncProfileName(botId: string): Promise<void> {
     const entry = this.running.get(botId);
     if (!entry) return;
-    const record = await this.deps.storage.getManagedBot(botId);
+    const record = await this.deps.storage.managedBots.get(botId);
     if (!record) return;
     await entry.bot.api
       .setMyName(record.displayName)
