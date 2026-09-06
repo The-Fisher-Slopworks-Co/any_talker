@@ -30,9 +30,9 @@ export class SpendBudgetGuard implements BudgetGuard {
     // entirely when the soft-start window is disabled.
     const checkNewUser = config.newUserWindowDays > 0;
     const [global, chat, user] = await Promise.all([
-      this.storage.getGlobalSpend(now),
-      this.storage.getChatSpend(chatId, now),
-      checkNewUser ? this.storage.getUser(userId) : Promise.resolve(null),
+      this.storage.spend.getGlobal(now),
+      this.storage.spend.getChat(chatId, now),
+      checkNewUser ? this.storage.users.get(userId) : Promise.resolve(null),
     ]);
 
     if (global.month >= config.globalMonthlyCapUsd)
@@ -48,7 +48,7 @@ export class SpendBudgetGuard implements BudgetGuard {
       user !== null &&
       now - user.firstSeenAt < config.newUserWindowDays * MS_PER_DAY
     ) {
-      const userSpend = await this.storage.getUserSpend(userId, now);
+      const userSpend = await this.storage.spend.getUser(userId, now);
       if (userSpend.day >= config.newUserDailyCapUsd)
         return this.deny("newUser");
     }

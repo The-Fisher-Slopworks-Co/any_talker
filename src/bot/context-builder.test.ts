@@ -253,7 +253,7 @@ describe("buildContext", () => {
 
   test("reply to bot message walks single ancestor", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -283,13 +283,13 @@ describe("buildContext", () => {
 
   test("reply chain walks ancestors in chronological order", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
       ts: 1,
     });
-    await storage.saveConversation("c1", 200, {
+    await storage.conversations.save("c1", 200, {
       userQuestion: "Q2",
       botAnswer: "A2",
       parentBotMsgId: 100,
@@ -350,7 +350,7 @@ describe("buildContext", () => {
     const depth = 25;
     let prevId: number | null = null;
     for (let i = 1; i <= depth; i++) {
-      await storage.saveConversation("c1", i, {
+      await storage.conversations.save("c1", i, {
         userQuestion: `Q${i}`,
         botAnswer: `A${i}`,
         parentBotMsgId: prevId,
@@ -474,7 +474,7 @@ describe("buildContext", () => {
 
   test("empty userText with bot-msg reply: chain plus an empty envelope so the prompt still ends with a user turn", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -658,7 +658,7 @@ describe("buildContext", () => {
 
   test("quote-only message (empty text) still produces envelope when reply is to bot msg", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -750,7 +750,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const bytes1 = new Uint8Array([0xaa, 0x01]);
     const bytes2 = new Uint8Array([0xaa, 0x02]);
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q-with-photos",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -797,7 +797,7 @@ describe("buildContext", () => {
 
   test("chain walk drops images that fetchPhoto returns null for, keeps the text", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -831,7 +831,7 @@ describe("buildContext", () => {
   test("replied-to node falls back to replyTarget images when stored file ids fail (cross-bot chain)", async () => {
     const storage = new MemoryStorage();
     const replyBytes = new Uint8Array([0xbb, 0x01]);
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q-photo",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -872,7 +872,7 @@ describe("buildContext", () => {
     const storage = new MemoryStorage();
     const chainBytes = new Uint8Array([0xcc, 0x01]);
     const replyBytes = new Uint8Array([0xcc, 0x02]);
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q-photo",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -907,14 +907,14 @@ describe("buildContext", () => {
   test("fallback covers only the replied-to node — a failing ancestor stays text-only", async () => {
     const storage = new MemoryStorage();
     const replyBytes = new Uint8Array([0xdd, 0x01]);
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1-photo",
       botAnswer: "A1",
       parentBotMsgId: null,
       ts: 1,
       userImageFileIds: ["other-bots-file-id"],
     });
-    await storage.saveConversation("c1", 200, {
+    await storage.conversations.save("c1", 200, {
       userQuestion: "Q2-photo",
       botAnswer: "A2",
       parentBotMsgId: 100,
@@ -956,7 +956,7 @@ describe("buildContext", () => {
 
   test("chain walk leaves entries text-only when fetchPhoto is not provided", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -1012,7 +1012,7 @@ describe("buildContext — replayed tool calls", () => {
 
   test("a turn's calls come back between its question and answer", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -1033,7 +1033,7 @@ describe("buildContext — replayed tool calls", () => {
   // ran none has none either. Both must produce the old two-message shape.
   test("a turn with no calls is unchanged", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -1051,14 +1051,14 @@ describe("buildContext — replayed tool calls", () => {
 
   test("each turn in a chain replays its own calls, in order", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
       ts: 1,
       toolCalls: [{ ...CALL, callId: "call_1", name: "first" }],
     });
-    await storage.saveConversation("c1", 200, {
+    await storage.conversations.save("c1", 200, {
       userQuestion: "Q2",
       botAnswer: "A2",
       parentBotMsgId: 100,
@@ -1091,7 +1091,7 @@ describe("buildContext — replayed tool calls", () => {
   // A turn may have fired several; each is its own call/result pair.
   test("several calls in one turn each become their own message", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,

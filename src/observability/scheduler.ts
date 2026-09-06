@@ -47,7 +47,7 @@ export async function runObservabilityTick(
   deps: ObservabilityTickDeps,
 ): Promise<void> {
   const settings = await getOrInitSettings(deps.storage);
-  const lang = (await deps.storage.getUserLang(deps.ownerId)) ?? "en";
+  const lang = (await deps.storage.profile.getLang(deps.ownerId)) ?? "en";
   await scanSpikes(deps, settings.anomaly, lang);
   await maybeSendDigest(deps, settings.anomaly, lang);
 }
@@ -83,16 +83,16 @@ async function scanKind(
   cfg: SpikeConfig,
   lang: Lang,
 ): Promise<void> {
-  const ids = await deps.storage.listSpendActiveEntities(kind, deps.nowMs);
+  const ids = await deps.storage.spend.listActiveEntities(kind, deps.nowMs);
   await Promise.all(
     ids.map(async (id) => {
       const summary =
         kind === "user"
-          ? await deps.storage.getUserSpend(id, deps.nowMs)
-          : await deps.storage.getChatSpend(id, deps.nowMs);
+          ? await deps.storage.spend.getUser(id, deps.nowMs)
+          : await deps.storage.spend.getChat(id, deps.nowMs);
       const { isSpike, baseline } = detectSpike(summary, cfg);
       if (!isSpike) return;
-      const claimed = await deps.storage.claimAlert(
+      const claimed = await deps.storage.observability.claimAlert(
         `spike:${kind}:${id}:${utcDateKey(deps.nowMs)}`,
         ALERT_TTL_SECONDS,
       );
@@ -119,10 +119,10 @@ async function resolveLabel(
   id: string,
 ): Promise<string> {
   if (kind === "user") {
-    const u = await storage.getUser(id);
+    const u = await storage.users.get(id);
     return u ? userLabel(u) : id;
   }
-  const c = await storage.getChat(id);
+  const c = await storage.chats.get(id);
   return c ? chatLabel(c) : id;
 }
 
@@ -131,11 +131,13 @@ async function maybeSendDigest(
   anomaly: AnomalyConfig,
   lang: Lang,
 ): Promise<void> {
-  const state = await deps.storage.getDigestState();
+  const state = await deps.storage.observability.getDigestState();
   // First run establishes the cadence baseline; the first digest fires one
   // interval later (no immediate "startup" digest).
   if (state === null) {
-    await deps.storage.setDigestState({ lastSentAtMs: deps.nowMs });
+    await deps.storage.observability.setDigestState({
+      lastSentAtMs: deps.nowMs,
+    });
     return;
   }
   const intervalMs = anomaly.digestIntervalHours * 60 * 60 * 1000;
@@ -149,7 +151,7 @@ async function maybeSendDigest(
   const markdown = buildDigestMarkdown(overview, lang);
   // Advance the clock whether or not we send, so a quiet interval doesn't cause
   // a re-gather on every subsequent tick.
-  await deps.storage.setDigestState({ lastSentAtMs: deps.nowMs });
+  await deps.storage.observability.setDigestState({ lastSentAtMs: deps.nowMs });
   if (markdown) await sendDigest(deps, markdown);
 }
 

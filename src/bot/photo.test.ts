@@ -72,7 +72,7 @@ describe("fetchTelegramPhoto", () => {
   test("returns cached bytes without hitting Telegram on cache hit", async () => {
     const storage = new MemoryStorage();
     const cached = new Uint8Array([0xff, 0xd8, 0x42]);
-    await storage.savePhotoBytes("fid", cached);
+    await storage.photos.saveBytes("fid", cached);
     const got = await fetchTelegramPhoto({
       storage,
       botToken: "INVALID",

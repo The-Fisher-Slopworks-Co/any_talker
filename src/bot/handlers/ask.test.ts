@@ -20,7 +20,7 @@ async function exhaustUsage(
   now: number,
 ): Promise<void> {
   const starts = currentWindowStarts(userId, now);
-  await storage.addUserUsage(
+  await storage.usage.add(
     userId,
     DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
     starts.fiveHour,
@@ -83,16 +83,16 @@ describe("askHandler", () => {
 
   test("blacklisted user denied with the reason for the log", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addBlacklist("users", { id: "42" });
     const out: AskOutcome = await askHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
 
   test("blacklisted chat denied with the reason for the log", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.addBlacklist("chats", { id: "c1" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addBlacklist("chats", { id: "c1" });
     const out: AskOutcome = await askHandler(baseInput({ storage }));
     expect(out).toEqual({ kind: "denied", reason: "blacklisted" });
   });
@@ -101,7 +101,7 @@ describe("askHandler", () => {
   // access hangs off the chat lists, per sending chat.
   test("a blacklisted sending channel is denied", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-1001" });
+    await storage.access.addBlacklist("chats", { id: "-1001" });
     const out: AskOutcome = await askHandler(
       baseInput({ storage, userId: "-1001", senderChatId: "-1001" }),
     );
@@ -110,8 +110,8 @@ describe("askHandler", () => {
 
   test("another channel in the same chat is unaffected by that block", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: "-1001" });
-    await storage.addWhitelist("chats", { id: "-2002" });
+    await storage.access.addBlacklist("chats", { id: "-1001" });
+    await storage.access.addWhitelist("chats", { id: "-2002" });
     const out: AskOutcome = await askHandler(
       baseInput({ storage, userId: "-2002", senderChatId: "-2002" }),
     );
@@ -120,14 +120,14 @@ describe("askHandler", () => {
 
   test("usage hint when text is empty and no reply", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await askHandler(baseInput({ storage, userText: "" }));
     expect(out.kind).toBe("usage");
   });
 
   test("voice-only request (empty text, audio attached) is not a usage hint", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const out = await askHandler(
       baseInput({
@@ -154,8 +154,8 @@ describe("askHandler", () => {
 
   test("usage hint when text is empty and reply is to the bot's own chain", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveConversation("c1", 100, {
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -178,10 +178,10 @@ describe("askHandler", () => {
 
   test("bare /ask replying to a chain node that carries media is a real question", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     // The user's own /ask-captioned photo, persisted under the ask message id
     // with its image file id — exactly what persistTurn stores (issue #81).
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -216,7 +216,7 @@ describe("askHandler", () => {
 
   test("empty text replying to a foreign message still asks about it", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const out = await askHandler(
       baseInput({
@@ -240,8 +240,8 @@ describe("askHandler", () => {
 
   test("quote-only reply into the bot's own chain is a real question, not usage", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveConversation("c1", 100, {
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1 with details",
       parentBotMsgId: null,
@@ -265,7 +265,7 @@ describe("askHandler", () => {
 
   test("rate-limit hit returns rateLimited", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "42", 1000);
     const rl = new DualWindowLimiter(rlStorage);
@@ -276,7 +276,7 @@ describe("askHandler", () => {
 
   test("owner with ownerExempt skips rate limit", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: true },
     });
@@ -291,7 +291,7 @@ describe("askHandler", () => {
 
   test("owner without ownerExempt is rate limited", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
     });
@@ -309,8 +309,8 @@ describe("askHandler", () => {
   // just quietly goes wherever the gateway feels like, at whatever tier.
   test("passes the effective provider routing to the AI", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       providerSort: "throughput",
       provider: "deepinfra",
@@ -327,15 +327,15 @@ describe("askHandler", () => {
 
   test("a chat's routing override reaches the AI over the global one", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       providerSort: "price",
       provider: "together",
       serviceTier: "priority",
     });
     // An explicit null is an override too — "ignore the global pin in this chat".
-    await storage.saveChatSettings("c1", {
+    await storage.chats.saveSettings("c1", {
       providerSort: "latency",
       provider: null,
     });
@@ -350,7 +350,7 @@ describe("askHandler", () => {
 
   test("passes the configured models to the AI", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     const rl = new DualWindowLimiter(new MemoryStorage());
     await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
@@ -360,7 +360,7 @@ describe("askHandler", () => {
 
   test("answered: returns text and persistConversation callback to apply after sending", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "hi back", totalTokens: 250 });
     const rl = new DualWindowLimiter(new MemoryStorage());
     const out = await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
@@ -370,7 +370,7 @@ describe("askHandler", () => {
       expect(out.botName).toBe(null);
       // After bot sends message id 999 in the chat, caller invokes:
       await out.persistConversation(999);
-      const node = await storage.getConversation("c1", 999);
+      const node = await storage.conversations.get("c1", 999);
       expect(node).toEqual({
         userQuestion: JSON.stringify({
           author: "John Doe",
@@ -383,7 +383,7 @@ describe("askHandler", () => {
       });
       // The turn is also keyed by the user's ask message id, so replying to
       // one's own question resolves the chain too.
-      expect(await storage.getConversation("c1", 1)).toEqual(node!);
+      expect(await storage.conversations.get("c1", 1)).toEqual(node!);
     }
   });
 
@@ -393,8 +393,8 @@ describe("askHandler", () => {
   // the whole history falls out of the provider's prompt cache.
   test("the persisted envelope is byte-identical to the one sent to the model", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       timezone: "Europe/Moscow",
     });
@@ -405,7 +405,7 @@ describe("askHandler", () => {
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistConversation(999);
     const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
-    const stored = await storage.getConversation("c1", 999);
+    const stored = await storage.conversations.get("c1", 999);
     expect(stored!.userQuestion).toBe(sent.at(-1)!.content as string);
     // Stamped in the chat's timezone, not UTC.
     expect(JSON.parse(stored!.userQuestion).time).toBe("2026-05-08 18:42");
@@ -413,8 +413,8 @@ describe("askHandler", () => {
 
   test("answered: persistConversation links parent when reply was to existing bot msg", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveConversation("c1", 100, {
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -433,7 +433,7 @@ describe("askHandler", () => {
     );
     if (out.kind === "answered") {
       await out.persistConversation(200);
-      expect(await storage.getConversation("c1", 200)).toMatchObject({
+      expect(await storage.conversations.get("c1", 200)).toMatchObject({
         parentBotMsgId: 100,
       });
     } else {
@@ -443,8 +443,8 @@ describe("askHandler", () => {
 
   test("rateLimited: persistConversation saves the turn under the notice and ask message ids", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveConversation("c1", 2, {
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.conversations.save("c1", 2, {
       userQuestion: "Q1",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -478,13 +478,13 @@ describe("askHandler", () => {
       parentBotMsgId: 2,
       ts: 1000,
     };
-    expect(await storage.getConversation("c1", 4)).toEqual(expected);
-    expect(await storage.getConversation("c1", 3)).toEqual(expected);
+    expect(await storage.conversations.get("c1", 4)).toEqual(expected);
+    expect(await storage.conversations.get("c1", 3)).toEqual(expected);
   });
 
   test("error: persistConversation saves the turn so the chain survives provider failures", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     class ThrowingAI implements AIClient {
       async ask(): Promise<AskResult> {
         throw new Error("provider down");
@@ -505,13 +505,13 @@ describe("askHandler", () => {
       parentBotMsgId: null,
       ts: 1000,
     };
-    expect(await storage.getConversation("c1", 4)).toEqual(expected);
-    expect(await storage.getConversation("c1", 3)).toEqual(expected);
+    expect(await storage.conversations.get("c1", 4)).toEqual(expected);
+    expect(await storage.conversations.get("c1", 3)).toEqual(expected);
   });
 
   test("an empty AI answer is an error turn, not an answered one (Telegram rejects empty messages)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await askHandler(
       baseInput({ storage, ai: new FakeAI({ text: "  \n", totalTokens: 50 }) }),
     );
@@ -520,7 +520,7 @@ describe("askHandler", () => {
 
   test("a rate-limited turn does not sever the chain: reply to own ask message carries full history", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
 
     // Turn 1: "/ask hello" (msg 1) → answered "Hi!" (msg 2).
     const first = await askHandler(
@@ -592,7 +592,7 @@ describe("askHandler", () => {
 
   test("onAIStart fires immediately before the AI call", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const events: string[] = [];
 
     class WatchAI implements AIClient {
@@ -623,7 +623,7 @@ describe("askHandler", () => {
 
   test("onAIStart is NOT called when rate-limited", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "42", 1000);
     const rl = new DualWindowLimiter(rlStorage);
@@ -637,8 +637,8 @@ describe("askHandler", () => {
 
   test("answered: passes composed system instruction to AI", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       systemPrompt: "Grumpy pirate.",
     });
@@ -653,7 +653,7 @@ describe("askHandler", () => {
 
   test("detail level short: brief answer + low reasoning effort", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai, detailLevel: "short" }));
     const call = ai.calls[0] as { system: string; reasoningEffort: unknown };
@@ -664,7 +664,7 @@ describe("askHandler", () => {
 
   test("detail level wise: detailed answer + high reasoning effort", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai, detailLevel: "wise" }));
     const call = ai.calls[0] as { system: string; reasoningEffort: unknown };
@@ -675,13 +675,13 @@ describe("askHandler", () => {
 
   test("timezone resolution: user > chat > global", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       timezone: "Europe/London",
     });
-    await storage.saveChatSettings("c1", { timezone: "Asia/Tokyo" });
-    await storage.setUserTimezone("42", "Asia/Yekaterinburg");
+    await storage.chats.saveSettings("c1", { timezone: "Asia/Tokyo" });
+    await storage.profile.setTimezone("42", "Asia/Yekaterinburg");
 
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
@@ -691,12 +691,12 @@ describe("askHandler", () => {
 
   test("timezone resolution falls back to chat when user has no override", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       timezone: "Europe/London",
     });
-    await storage.saveChatSettings("c1", { timezone: "Asia/Tokyo" });
+    await storage.chats.saveSettings("c1", { timezone: "Asia/Tokyo" });
 
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
@@ -706,8 +706,8 @@ describe("askHandler", () => {
 
   test("timezone resolution falls back to global when nothing else set", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       timezone: "Europe/London",
     });
@@ -720,8 +720,8 @@ describe("askHandler", () => {
 
   test("answered: returns botName from chat settings when set", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveChatSettings("c1", { botName: "  Helper  " });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.chats.saveSettings("c1", { botName: "  Helper  " });
     const out = await askHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.botName).toBe("Helper");
@@ -729,8 +729,8 @@ describe("askHandler", () => {
 
   test("answered: returns null botName when chat settings has empty botName", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveChatSettings("c1", { systemPrompt: "p" });
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.chats.saveSettings("c1", { systemPrompt: "p" });
     const out = await askHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.botName).toBe(null);
@@ -738,19 +738,19 @@ describe("askHandler", () => {
 
   test("answered: deducts tokens from bucket", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     const rl = new DualWindowLimiter(rlStorage);
     const ai = new FakeAI({ text: "ok", totalTokens: 1234 });
     const out = await askHandler(baseInput({ storage, rateLimiter: rl, ai }));
     expect(out.kind).toBe("answered");
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(1234);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1234);
   });
 
   test("wise level multiplies deduction by wiseMultiplier", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
@@ -763,13 +763,13 @@ describe("askHandler", () => {
     await askHandler(
       baseInput({ storage, rateLimiter: rl, ai, detailLevel: "wise" }),
     );
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(1800);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1800);
   });
 
   test("short level deducts raw tokens (multiplier = 1)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
-    await storage.saveSettings({
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
@@ -782,43 +782,43 @@ describe("askHandler", () => {
     await askHandler(
       baseInput({ storage, rateLimiter: rl, ai, detailLevel: "short" }),
     );
-    expect((await rlStorage.getUserUsage("42"))?.fiveHour.used).toBe(1000);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1000);
   });
 
   test("answered: records reported costUsd to the user's spend", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "ok", totalTokens: 100, costUsd: 0.0123 });
     const out = await askHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
-    const spend = await storage.getUserSpend("42", 1000);
+    const spend = await storage.spend.getUser("42", 1000);
     expect(spend.day).toBeCloseTo(0.0123, 6);
     expect(spend.month).toBeCloseTo(0.0123, 6);
   });
 
   test("answered: records spend even when rate-limit exempt (owner)", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: true },
     });
     const ai = new FakeAI({ text: "ok", totalTokens: 10, costUsd: 0.5 });
     const out = await askHandler(baseInput({ storage, ai, userId: "1" }));
     expect(out.kind).toBe("answered");
-    expect((await storage.getUserSpend("1", 1000)).day).toBeCloseTo(0.5, 6);
+    expect((await storage.spend.getUser("1", 1000)).day).toBeCloseTo(0.5, 6);
   });
 
   test("answered: records no spend when costUsd is absent or zero", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "ok", totalTokens: 100 });
     await askHandler(baseInput({ storage, ai }));
-    expect((await storage.getUserSpend("42", 1000)).month).toBe(0);
+    expect((await storage.spend.getUser("42", 1000)).month).toBe(0);
   });
 
   test("answered: propagates tool effects recorded into ctx.effects", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
 
     class EffectfulAI implements AIClient {
       async ask(opts: Parameters<AIClient["ask"]>[0]): Promise<AskResult> {
@@ -844,7 +844,7 @@ describe("askHandler", () => {
 
   test("answered: effects defaults to an empty array when no tools fire", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await askHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     expect(out.effects).toEqual([]);
@@ -852,7 +852,7 @@ describe("askHandler", () => {
 
   test("answered: persists userImageFileIds when images were attached", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const bytes = new Uint8Array([0xff, 0xd8]);
     const out = await askHandler(
       baseInput({
@@ -863,13 +863,13 @@ describe("askHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistConversation(555);
-    const node = await storage.getConversation("c1", 555);
+    const node = await storage.conversations.get("c1", 555);
     expect(node?.userImageFileIds).toEqual(["telegram_file_xyz"]);
   });
 
   test("answered: persists replyImageFileIds when images came from a reply target", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await askHandler(
       baseInput({
         storage,
@@ -884,13 +884,13 @@ describe("askHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistConversation(556);
-    const node = await storage.getConversation("c1", 556);
+    const node = await storage.conversations.get("c1", 556);
     expect(node?.userImageFileIds).toEqual(["album_file_1", "album_file_2"]);
   });
 
   test("answered: merges direct and reply image file IDs (direct first)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await askHandler(
       baseInput({
         storage,
@@ -907,13 +907,13 @@ describe("askHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistConversation(557);
-    const node = await storage.getConversation("c1", 557);
+    const node = await storage.conversations.get("c1", 557);
     expect(node?.userImageFileIds).toEqual(["direct_file", "album_file_1"]);
   });
 
   test("follow-up /ask replaying the chain still surfaces reply-target images", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const replayBytes = new Uint8Array([7, 7, 7]);
 
     const first = await askHandler(
@@ -969,17 +969,17 @@ describe("askHandler", () => {
 
   test("answered: omits userImageFileIds when no images were attached", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const out = await askHandler(baseInput({ storage }));
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistConversation(555);
-    const node = await storage.getConversation("c1", 555);
+    const node = await storage.conversations.get("c1", 555);
     expect(node?.userImageFileIds).toBeUndefined();
   });
 
   test("cross-bot context: a managed bot replays the chain when replying to the main bot's group message", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const groupChat = "-1001"; // negative id => group chat
 
     // The main bot answered earlier in the group (its message id is 100).
@@ -1039,14 +1039,14 @@ describe("askHandler", () => {
     // The managed answer is stored in the shared (group) namespace and links its
     // parent across the bot boundary.
     await out.persistConversation(200);
-    expect(await storage.getConversation(groupChat, 200)).toMatchObject({
+    expect(await storage.conversations.get(groupChat, 200)).toMatchObject({
       parentBotMsgId: 100,
     });
   });
 
   test("DM conversations stay per-character: cross-bot context does NOT leak in a private chat", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const dm = "42"; // private chat id == user id (positive)
 
     const mainAi = new FakeAI({ text: "Main DM answer", totalTokens: 10 });
@@ -1093,17 +1093,17 @@ describe("askHandler", () => {
     // The managed answer is scoped to the managed bot, not the shared namespace,
     // and is not linked to the main bot's node.
     await out.persistConversation(200);
-    expect(await storage.forBot(null).getConversation(dm, 200)).toBeNull();
+    expect(await storage.forBot(null).conversations.get(dm, 200)).toBeNull();
     expect(
-      await storage.forBot("cat-bot").getConversation(dm, 200),
+      await storage.forBot("cat-bot").conversations.get(dm, 200),
     ).toMatchObject({ parentBotMsgId: null });
   });
 
   test("forwards fetchPhoto to buildContext for chain image replay", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const replayBytes = new Uint8Array([1, 2, 3]);
-    await storage.saveConversation("c1", 100, {
+    await storage.conversations.save("c1", 100, {
       userQuestion: "Q-with-photo",
       botAnswer: "A1",
       parentBotMsgId: null,
@@ -1139,21 +1139,21 @@ describe("askHandler", () => {
 
   test("budget cap hit returns budgetLimited (after passing the whitelist)", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     // Push global monthly spend over the default $18 cap.
-    await storage.addGlobalSpend(20, 1_000);
+    await storage.spend.addGlobal(20, 1_000);
     const out = await askHandler(baseInput({ storage }));
     expect(out.kind).toBe("budgetLimited");
     if (out.kind === "budgetLimited") expect(out.reason).toBe("globalMonthly");
     // A denial counts toward the "who hits limits most" ranking.
-    expect(await storage.topDenied(1_000, 10)).toEqual([
+    expect(await storage.observability.topDenied(1_000, 10)).toEqual([
       { userId: "42", count: 1 },
     ]);
   });
 
   test("answered: records spend across user/chat/global/model ledgers", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({
       text: "ok",
       totalTokens: 100,
@@ -1163,17 +1163,17 @@ describe("askHandler", () => {
     });
     const out = await askHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
-    expect((await storage.getUserSpend("42", 1_000)).day).toBeCloseTo(0.5);
-    expect((await storage.getChatSpend("c1", 1_000)).day).toBeCloseTo(0.5);
-    expect((await storage.getGlobalSpend(1_000)).day).toBeCloseTo(0.5);
-    expect((await storage.getModelSpend("m1", 1_000)).day).toBeCloseTo(0.5);
-    expect(await storage.listSpendModels()).toEqual(["m1"]);
-    expect(await storage.listUnpricedModels()).toEqual([]);
+    expect((await storage.spend.getUser("42", 1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.spend.getChat("c1", 1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.spend.getGlobal(1_000)).day).toBeCloseTo(0.5);
+    expect((await storage.spend.getModel("m1", 1_000)).day).toBeCloseTo(0.5);
+    expect(await storage.spend.listModels()).toEqual(["m1"]);
+    expect(await storage.spend.listUnpriced()).toEqual([]);
   });
 
   test("answered with an unpriced model flags it and records $0", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({
       text: "ok",
       totalTokens: 100,
@@ -1183,8 +1183,8 @@ describe("askHandler", () => {
     });
     const out = await askHandler(baseInput({ storage, ai }));
     expect(out.kind).toBe("answered");
-    expect(await storage.listUnpricedModels()).toEqual(["m-free"]);
-    expect((await storage.getGlobalSpend(1_000)).day).toBe(0);
+    expect(await storage.spend.listUnpriced()).toEqual(["m-free"]);
+    expect((await storage.spend.getGlobal(1_000)).day).toBe(0);
   });
 });
 
@@ -1204,7 +1204,7 @@ describe("askHandler — tool calls on the persisted turn", () => {
 
   test("answered: the turn's tool calls are stored with it", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({
       text: "hi back",
       totalTokens: 10,
@@ -1216,11 +1216,11 @@ describe("askHandler — tool calls on the persisted turn", () => {
     if (out.kind !== "answered") return;
     await out.persistConversation(999);
 
-    expect((await storage.getConversation("c1", 999))!.toolCalls).toEqual(
+    expect((await storage.conversations.get("c1", 999))!.toolCalls).toEqual(
       RECORDS,
     );
     // Both keys of the turn carry them, as with every other node field.
-    expect((await storage.getConversation("c1", 1))!.toolCalls).toEqual(
+    expect((await storage.conversations.get("c1", 1))!.toolCalls).toEqual(
       RECORDS,
     );
   });
@@ -1229,7 +1229,7 @@ describe("askHandler — tool calls on the persisted turn", () => {
   // rendered chain; a turn that called nothing must look exactly as before.
   test("a turn that called no tools stores no key at all", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "hi", totalTokens: 10, toolCalls: [] });
 
     const out = await askHandler(baseInput({ storage, ai }));
@@ -1237,7 +1237,7 @@ describe("askHandler — tool calls on the persisted turn", () => {
     await out.persistConversation(999);
 
     expect(
-      (await storage.getConversation("c1", 999))!.toolCalls,
+      (await storage.conversations.get("c1", 999))!.toolCalls,
     ).toBeUndefined();
   });
 
@@ -1246,7 +1246,7 @@ describe("askHandler — tool calls on the persisted turn", () => {
   // pays for the same fetches again.
   test("an empty answer still persists what the tools returned", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "  ", totalTokens: 10, toolCalls: RECORDS });
 
     const out = await askHandler(baseInput({ storage, ai }));
@@ -1254,7 +1254,7 @@ describe("askHandler — tool calls on the persisted turn", () => {
     if (out.kind !== "error") return;
     await out.persistConversation(4, "AI error");
 
-    const node = await storage.getConversation("c1", 4);
+    const node = await storage.conversations.get("c1", 4);
     expect(node!.botAnswer).toBe("AI error");
     expect(node!.toolCalls).toEqual(RECORDS);
   });
@@ -1262,7 +1262,7 @@ describe("askHandler — tool calls on the persisted turn", () => {
   // End to end: turn 1 fetches, turn 2 replies into it and must see the page.
   test("the next turn's prompt carries the previous turn's tool results", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "42" });
     const first = await askHandler(
       baseInput({
         storage,

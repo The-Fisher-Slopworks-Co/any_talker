@@ -23,7 +23,7 @@ export function createMainPersonaResolver(storage: Storage): PersonaResolver {
   return async (chatId) => {
     const [settings, chatSettings] = await Promise.all([
       getEffectiveSettings(storage, chatId),
-      storage.getChatSettings(chatId),
+      storage.chats.getSettings(chatId),
     ]);
     return { settings, botName: chatSettings?.botName?.trim() || null };
   };
@@ -44,7 +44,7 @@ export function createManagedPersonaResolver(
   return async () => {
     const [global, bot] = await Promise.all([
       getOrInitSettings(storage),
-      storage.getManagedBot(botId),
+      storage.managedBots.get(botId),
     ]);
     if (!bot) return { settings: global, botName: null };
     return {

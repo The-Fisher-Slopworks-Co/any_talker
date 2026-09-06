@@ -34,9 +34,9 @@ function posInt(v: unknown, def: number): number {
 }
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
-  const existing = await storage.getSettings();
+  const existing = await storage.settings.get();
   if (existing) return normalize(existing);
-  await storage.saveSettings(DEFAULT_SETTINGS);
+  await storage.settings.save(DEFAULT_SETTINGS);
   return DEFAULT_SETTINGS;
 }
 
@@ -218,7 +218,7 @@ export async function getEffectiveSettings(
 ): Promise<Settings> {
   const [global, chat] = await Promise.all([
     getOrInitSettings(storage),
-    storage.getChatSettings(chatId),
+    storage.chats.getSettings(chatId),
   ]);
   return applyChatOverrides(global, chat);
 }

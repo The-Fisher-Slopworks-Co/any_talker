@@ -16,7 +16,7 @@ export function makeKeywordFilterMiddleware(
       await next();
       return;
     }
-    const settings = await storage.getChatSettings(String(chatId));
+    const settings = await storage.chats.getSettings(String(chatId));
     const filter = settings?.keywordFilter;
     if (!filter || !filter.enabled || filter.keywords.length === 0) {
       await next();
