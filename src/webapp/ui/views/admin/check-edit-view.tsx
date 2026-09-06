@@ -3,82 +3,27 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
-import { useDateFmt } from "../../datetime-context";
-import { TimeNote } from "../../components/time-note";
 import { api } from "../../api-client";
-import type {
-  CheckCounterMode,
-  RecurringCheck,
-} from "../../../../checks/types";
-import { localDateString } from "../../../../shared/tz";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../../components/layout";
+import type { RecurringCheck } from "../../../../checks/types";
+import { Card, SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
+import { DeleteButton, SaveButton } from "../../components/controls";
+import { useFormReducer } from "../../lib/use-form-reducer";
+import { checkToDraft, DEFAULT_DRAFT } from "./check-edit-form";
 import {
-  DeleteButton,
-  NumberInput,
-  SaveButton,
-  Toggle,
-} from "../../components/controls";
-import { SelectRow } from "../../components/select-row";
-import { TimezoneSelect } from "../../components/timezone-select";
-import {
-  INPUT_CLS,
-  ROW_CLS,
-  ROW_LABEL_CLS,
-  ROW_VALUE_CLS,
-} from "../../components/row";
-
-const TEXTAREA_CLS =
-  "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[100px]";
-
-const DEFAULT_DRAFT = {
-  title: "",
-  chatId: "",
-  targetUserId: "",
-  targetName: "",
-  scheduleHour: 23,
-  scheduleMinute: 30,
-  timezone: "Europe/Moscow",
-  question: "{name}, занялся ли ты сегодня спортом?",
-  yesButton: "Да",
-  noButton: "Нет",
-  yesReply: "{name}, хотя бы себе не ври. День без спорта {count}",
-  noReply: "{name}. День без спорта {count}",
-  timeoutMinutes: 25,
-  counter: 0,
-  counterMode: "always_increment" as CheckCounterMode,
-  counterAnchorDate: null as string | null,
-  enabled: true,
-};
-
-type Draft = typeof DEFAULT_DRAFT;
-
-function checkToDraft(c: RecurringCheck): Draft {
-  return {
-    title: c.title,
-    chatId: c.chatId,
-    targetUserId: c.targetUserId,
-    targetName: c.targetName,
-    scheduleHour: c.scheduleHour,
-    scheduleMinute: c.scheduleMinute,
-    timezone: c.timezone,
-    question: c.question,
-    yesButton: c.yesButton,
-    noButton: c.noButton,
-    yesReply: c.yesReply,
-    noReply: c.noReply,
-    timeoutMinutes: c.timeoutMinutes,
-    counter: c.counter,
-    counterMode: c.counterMode,
-    counterAnchorDate: c.counterAnchorDate ?? null,
-    enabled: c.enabled,
-  };
-}
+  ButtonsSection,
+  CheckStatusCard,
+  CounterModeSection,
+  CounterSourceSection,
+  CounterValueSection,
+  EnabledSection,
+  QuestionSection,
+  RepliesSection,
+  ScheduleSection,
+  TargetSection,
+  TimezoneSection,
+  TitleSection,
+} from "./check-edit-sections";
 
 export function CheckEditView({
   checkId,
@@ -88,36 +33,31 @@ export function CheckEditView({
   onClose: () => void;
 }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
   const isNew = checkId === null;
   const [check, setCheck] = useState<RecurringCheck | null>(null);
-  const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT);
   const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, set, resetDraft] = useFormReducer(DEFAULT_DRAFT);
 
   useEffect(() => {
     if (isNew) {
       setCheck(null);
-      setDraft(DEFAULT_DRAFT);
+      resetDraft(DEFAULT_DRAFT);
       return;
     }
     api
       .getCheck(checkId)
       .then((r) => {
         setCheck(r.check);
-        setDraft(checkToDraft(r.check));
+        resetDraft(checkToDraft(r.check));
       })
       .catch(() => setNotFound(true));
-  }, [checkId, isNew]);
+  }, [checkId, isNew, resetDraft]);
 
   if (notFound) return <LoadingState text={s.ui_check_not_found} />;
   if (!isNew && !check) return <LoadingState />;
-
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    setDraft((d) => ({ ...d, [key]: value }));
-  };
 
   const submit = async () => {
     setSaving(true);
@@ -149,265 +89,21 @@ export function CheckEditView({
     }
   };
 
-  const lastFiredText = check?.lastFiredAtMs
-    ? format(check.lastFiredAtMs)
-    : s.ui_check_last_fired_never;
-
   return (
     <Stack>
-      <SectionHeader>{s.ui_check_title}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_title}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_title_placeholder}
-            value={draft.title}
-            onChange={(e) => set("title", e.target.value)}
-            maxLength={120}
-          />
-        </label>
-      </Card>
+      <TitleSection draft={draft} set={set} />
+      <TargetSection draft={draft} set={set} />
+      <ScheduleSection draft={draft} set={set} />
+      <TimezoneSection draft={draft} set={set} />
+      <QuestionSection draft={draft} set={set} />
+      <ButtonsSection draft={draft} set={set} />
+      <RepliesSection draft={draft} set={set} />
+      <CounterSourceSection draft={draft} set={set} />
+      <CounterValueSection draft={draft} set={set} />
+      <CounterModeSection draft={draft} set={set} />
+      <EnabledSection draft={draft} set={set} />
 
-      <SectionHeader>{s.ui_check_chat_id}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_chat_id}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_chat_id_placeholder}
-            value={draft.chatId}
-            onChange={(e) => set("chatId", e.target.value)}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_target_user_id}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_target_user_id_placeholder}
-            value={draft.targetUserId}
-            onChange={(e) => set("targetUserId", e.target.value)}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_target_name}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_target_name_placeholder}
-            value={draft.targetName}
-            onChange={(e) => set("targetName", e.target.value)}
-            maxLength={64}
-          />
-        </label>
-      </Card>
-      <SectionFooter>{s.ui_check_target_name_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_check_schedule}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_schedule}</span>
-          <span className="flex-1" />
-          <NumberInput
-            className="w-12 bg-transparent border-0 p-0 text-base text-tg-text text-right"
-            integer
-            min={0}
-            max={23}
-            value={draft.scheduleHour}
-            onChange={(n) => set("scheduleHour", n)}
-          />
-          <span className="text-tg-hint">:</span>
-          <NumberInput
-            className="w-12 bg-transparent border-0 p-0 text-base text-tg-text text-right"
-            integer
-            min={0}
-            max={59}
-            value={draft.scheduleMinute}
-            onChange={(n) => set("scheduleMinute", n)}
-          />
-        </div>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_timeout}</span>
-          <NumberInput
-            className={INPUT_CLS}
-            integer
-            min={1}
-            max={24 * 60}
-            value={draft.timeoutMinutes}
-            onChange={(n) => set("timeoutMinutes", n)}
-          />
-        </label>
-      </Card>
-      <SectionFooter>{s.ui_check_schedule_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_check_timezone}</SectionHeader>
-      <TimezoneSelect
-        value={draft.timezone}
-        onChange={(tz) => set("timezone", tz)}
-      />
-      <SectionFooter>{s.ui_check_timezone_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_check_question}</SectionHeader>
-      <Card>
-        <textarea
-          className={TEXTAREA_CLS}
-          placeholder={s.ui_check_question_placeholder}
-          value={draft.question}
-          onChange={(e) => set("question", e.target.value)}
-        />
-      </Card>
-      <SectionFooter>{s.ui_check_question_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_check_yes_button}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_yes_button}</span>
-          <input
-            className={INPUT_CLS}
-            value={draft.yesButton}
-            onChange={(e) => set("yesButton", e.target.value)}
-            maxLength={32}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_no_button}</span>
-          <input
-            className={INPUT_CLS}
-            value={draft.noButton}
-            onChange={(e) => set("noButton", e.target.value)}
-            maxLength={32}
-          />
-        </label>
-      </Card>
-
-      <SectionHeader>{s.ui_check_yes_reply}</SectionHeader>
-      <Card>
-        <textarea
-          className={TEXTAREA_CLS}
-          placeholder={s.ui_check_yes_reply_placeholder}
-          value={draft.yesReply}
-          onChange={(e) => set("yesReply", e.target.value)}
-        />
-      </Card>
-
-      <SectionHeader>{s.ui_check_no_reply}</SectionHeader>
-      <Card>
-        <textarea
-          className={TEXTAREA_CLS}
-          placeholder={s.ui_check_no_reply_placeholder}
-          value={draft.noReply}
-          onChange={(e) => set("noReply", e.target.value)}
-        />
-      </Card>
-      <SectionFooter>{s.ui_check_replies_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_check_counter_source}</SectionHeader>
-      <Card>
-        <SelectRow
-          label={s.ui_check_counter_source_manual}
-          selected={draft.counterAnchorDate === null}
-          onSelect={() => set("counterAnchorDate", null)}
-        />
-        <SelectRow
-          label={s.ui_check_counter_source_date}
-          selected={draft.counterAnchorDate !== null}
-          onSelect={() => {
-            if (draft.counterAnchorDate === null) {
-              set(
-                "counterAnchorDate",
-                localDateString(Date.now(), draft.timezone),
-              );
-            }
-          }}
-        />
-      </Card>
-      <SectionFooter>{s.ui_check_counter_source_footer}</SectionFooter>
-
-      {draft.counterAnchorDate === null ? (
-        <>
-          <SectionHeader>{s.ui_check_counter}</SectionHeader>
-          <Card>
-            <label className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>{s.ui_check_counter}</span>
-              <NumberInput
-                className={INPUT_CLS}
-                integer
-                min={0}
-                value={draft.counter}
-                onChange={(n) => set("counter", n)}
-              />
-            </label>
-          </Card>
-          <SectionFooter>{s.ui_check_counter_footer}</SectionFooter>
-        </>
-      ) : (
-        <>
-          <SectionHeader>{s.ui_check_counter_anchor_date}</SectionHeader>
-          <Card>
-            <label className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>
-                {s.ui_check_counter_anchor_date}
-              </span>
-              <input
-                type="date"
-                className={INPUT_CLS}
-                value={draft.counterAnchorDate ?? ""}
-                onChange={(e) =>
-                  set("counterAnchorDate", e.target.value || null)
-                }
-              />
-            </label>
-          </Card>
-          <SectionFooter>{s.ui_check_counter_anchor_date_footer}</SectionFooter>
-        </>
-      )}
-
-      <SectionHeader>{s.ui_check_counter_mode}</SectionHeader>
-      <Card>
-        <SelectRow
-          label={s.ui_check_counter_mode_always}
-          selected={draft.counterMode === "always_increment"}
-          onSelect={() => set("counterMode", "always_increment")}
-        />
-        <SelectRow
-          label={s.ui_check_counter_mode_reset}
-          selected={draft.counterMode === "reset_on_yes"}
-          onSelect={() => set("counterMode", "reset_on_yes")}
-        />
-      </Card>
-      <SectionFooter>{s.ui_check_counter_mode_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_check_enabled_label}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_enabled_label}</span>
-          <span className="flex-1" />
-          <Toggle value={draft.enabled} onChange={(v) => set("enabled", v)} />
-        </div>
-      </Card>
-      <SectionFooter>{s.ui_check_enabled_footer}</SectionFooter>
-
-      {check && (
-        <>
-          <SectionHeader>{s.ui_check_last_fired}</SectionHeader>
-          <Card>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>{s.ui_check_last_fired}</span>
-              <span className={ROW_VALUE_CLS}>{lastFiredText}</span>
-            </div>
-            <div className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>{s.ui_check_pending}</span>
-              <span className={ROW_VALUE_CLS}>
-                {check.pendingMessageId !== null
-                  ? s.ui_check_pending_yes
-                  : s.ui_check_pending_no}
-              </span>
-            </div>
-          </Card>
-          <SectionFooter>
-            <TimeNote />
-          </SectionFooter>
-        </>
-      )}
+      {check && <CheckStatusCard check={check} />}
 
       {error && (
         <SectionFooter>{s.ui_check_save_validation_error(error)}</SectionFooter>
