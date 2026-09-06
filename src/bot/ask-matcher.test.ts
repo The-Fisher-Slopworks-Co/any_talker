@@ -10,7 +10,7 @@ import {
   isPresenceFresh,
   BOT_PRESENCE_TTL_MS,
   type AskMatch,
-} from "./index";
+} from "./routing";
 
 const SELF = "MainBot";
 

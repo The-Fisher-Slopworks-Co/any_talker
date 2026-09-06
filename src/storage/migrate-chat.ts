@@ -8,7 +8,7 @@ import type { Chat } from "../shared/types";
 // successor, so an upgraded chat keeps its settings, whitelist access, checks,
 // reminders, spend history, directory row and bot presence. Triggered by the
 // Telegram `migrate_to_chat_id` / `migrate_from_chat_id` service messages (see
-// `bot/index.ts`), with the send-time migrate-and-retry in checks/reminders as
+// `bot/listeners/chat-events.ts`), with the send-time migrate-and-retry in checks/reminders as
 // the backstop when both service messages were missed.
 //
 // Every family bot in the chat receives its own copy of the service message,

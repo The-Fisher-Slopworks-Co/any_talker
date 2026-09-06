@@ -3,7 +3,7 @@
 
 import { test, expect } from "bun:test";
 import type { Update } from "grammy/types";
-import { shouldRefreshPresence } from "./index";
+import { shouldRefreshPresence } from "./routing";
 
 const CHAT = { id: -1001723761423, type: "supergroup", title: "Group" };
 const USER = { id: 5, is_bot: false, first_name: "User" };
