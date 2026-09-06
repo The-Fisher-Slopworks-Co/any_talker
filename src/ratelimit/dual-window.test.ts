@@ -33,7 +33,7 @@ describe("DualWindowLimiter", () => {
     const storage = new MemoryStorage();
     const lim = new DualWindowLimiter(storage);
     const s = currentWindowStarts(U, NOW);
-    await storage.addUserUsage(U, cfg.fiveHourTokens, s.fiveHour, s.weekly);
+    await storage.usage.add(U, cfg.fiveHourTokens, s.fiveHour, s.weekly);
     const r = await lim.check(U, cfg, NOW);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
@@ -49,7 +49,7 @@ describe("DualWindowLimiter", () => {
     const s = currentWindowStarts(U, NOW);
     // Weekly budget spent, but against a *previous* 5-hour window — so the
     // current 5-hour window still has room and the weekly cap is what binds.
-    await storage.addUserUsage(
+    await storage.usage.add(
       U,
       cfg.weeklyTokens,
       s.fiveHour - FIVE_HOUR_MS,
@@ -71,7 +71,7 @@ describe("DualWindowLimiter", () => {
     const weekReset = windowStart(U, WEEK_MS, NOW) + WEEK_MS;
     expect(weekReset).toBeGreaterThan(fiveReset);
     const s = currentWindowStarts(U, NOW);
-    await storage.addUserUsage(U, cfg.weeklyTokens, s.fiveHour, s.weekly);
+    await storage.usage.add(U, cfg.weeklyTokens, s.fiveHour, s.weekly);
     const r = await lim.check(U, cfg, NOW);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
@@ -91,7 +91,7 @@ describe("DualWindowLimiter", () => {
     const weekReset = windowStart(id, WEEK_MS, now) + WEEK_MS;
     expect(fiveReset).toBeGreaterThan(weekReset); // precondition for this case
     const s = currentWindowStarts(id, now);
-    await storage.addUserUsage(id, cfg.weeklyTokens, s.fiveHour, s.weekly);
+    await storage.usage.add(id, cfg.weeklyTokens, s.fiveHour, s.weekly);
     const r = await lim.check(id, cfg, now);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
@@ -106,7 +106,7 @@ describe("DualWindowLimiter", () => {
     const lim = new DualWindowLimiter(storage);
     await lim.deduct(U, 30, NOW);
     await lim.deduct(U, 20, NOW);
-    const u = await storage.getUserUsage(U);
+    const u = await storage.usage.get(U);
     expect(u?.fiveHour.used).toBe(50);
     expect(u?.weekly.used).toBe(50);
   });
@@ -118,7 +118,7 @@ describe("DualWindowLimiter", () => {
     // One 5-hour window later: the 5-hour used restarts, weekly accumulates.
     const later = NOW + FIVE_HOUR_MS;
     await lim.deduct(U, 10, later);
-    const u = await storage.getUserUsage(U);
+    const u = await storage.usage.get(U);
     expect(u?.fiveHour.used).toBe(10);
     expect(u?.weekly.used).toBe(50);
   });
@@ -136,7 +136,7 @@ describe("DualWindowLimiter", () => {
     const lim = new DualWindowLimiter(storage);
     await lim.deduct(U, 50, NOW);
     await lim.reset(U);
-    expect(await storage.getUserUsage(U)).toBeNull();
+    expect(await storage.usage.get(U)).toBeNull();
     expect((await lim.check(U, cfg, NOW)).allowed).toBe(true);
   });
 
@@ -148,6 +148,6 @@ describe("DualWindowLimiter", () => {
       lim.deduct(U, 10, NOW),
       lim.deduct(U, 10, NOW),
     ]);
-    expect((await storage.getUserUsage(U))?.fiveHour.used).toBe(30);
+    expect((await storage.usage.get(U))?.fiveHour.used).toBe(30);
   });
 });

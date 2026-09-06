@@ -49,10 +49,10 @@ function createGetUserSettingsTool(deps: {
       const [nameOverride, tzOverride, gender, langOverride, user] =
         await Promise.all([
           readValidDisplayName(deps.storage, ctx.userId),
-          deps.storage.getUserTimezone(ctx.userId),
-          deps.storage.getUserGender(ctx.userId),
-          deps.storage.getUserLang(ctx.userId),
-          deps.storage.getUser(ctx.userId),
+          deps.storage.profile.getTimezone(ctx.userId),
+          deps.storage.profile.getGender(ctx.userId),
+          deps.storage.profile.getLang(ctx.userId),
+          deps.storage.users.get(ctx.userId),
         ]);
       const telegramName = composeFullName(user?.firstName, user?.lastName);
       // ctx.timezone / ctx.lang are already the resolved effective values for
@@ -113,13 +113,13 @@ function applyChange(
 ): Promise<void> {
   switch (c.field) {
     case "name":
-      return storage.setUserName(userId, c.value);
+      return storage.profile.setName(userId, c.value);
     case "timezone":
-      return storage.setUserTimezone(userId, c.value);
+      return storage.profile.setTimezone(userId, c.value);
     case "gender":
-      return storage.setUserGender(userId, c.value as Gender | null);
+      return storage.profile.setGender(userId, c.value as Gender | null);
     case "language":
-      return storage.setUserLang(userId, c.value as Lang | null);
+      return storage.profile.setLang(userId, c.value as Lang | null);
   }
 }
 
@@ -156,7 +156,7 @@ function createUpdateUserSettingsTool(deps: {
         changes.push({ field: "name", value: r.value });
       }
       if (input.timezone !== undefined) {
-        // setUserTimezone does NO validation of its own — an invalid zone here
+        // profile.setTimezone does NO validation of its own — an invalid zone here
         // would later throw when the system prompt formats the date. Canonicalise
         // ('europe/moscow' → 'Europe/Moscow') and reject anything unrecognised.
         const canonical = canonicalizeTimezone(input.timezone);

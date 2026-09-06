@@ -177,7 +177,7 @@ export async function buildContext(
   const messages: AIMessage[] = [];
 
   if (replyTarget !== null) {
-    const node = await storage.getConversation(chatId, replyTarget.messageId);
+    const node = await storage.conversations.get(chatId, replyTarget.messageId);
     if (node) {
       const chain = await collectChain(
         storage,
@@ -274,7 +274,7 @@ async function collectChain(
   const chain: ChainEntry[] = [];
   let cursor: number | null = startBotMsgId;
   while (cursor !== null && chain.length < maxDepth) {
-    const node = await storage.getConversation(chatId, cursor);
+    const node = await storage.conversations.get(chatId, cursor);
     if (!node) break;
     chain.unshift({
       userQuestion: node.userQuestion,

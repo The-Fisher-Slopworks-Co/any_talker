@@ -26,14 +26,14 @@ describe("contactHandler", () => {
       baseInput({ storage, isPrivateChat: false }),
     );
     expect(out.kind).toBe("ignored");
-    expect(await storage.listWhitelist("users")).toEqual([]);
+    expect(await storage.access.listWhitelist("users")).toEqual([]);
   });
 
   test("ignored when sender is not the owner", async () => {
     const storage = new MemoryStorage();
     const out = await contactHandler(baseInput({ storage, fromUserId: "999" }));
     expect(out.kind).toBe("ignored");
-    expect(await storage.listWhitelist("users")).toEqual([]);
+    expect(await storage.access.listWhitelist("users")).toEqual([]);
   });
 
   test("noUserId when contact has no user_id (not on Telegram)", async () => {
@@ -45,7 +45,7 @@ describe("contactHandler", () => {
       }),
     );
     expect(out.kind).toBe("noUserId");
-    expect(await storage.listWhitelist("users")).toEqual([]);
+    expect(await storage.access.listWhitelist("users")).toEqual([]);
   });
 
   test("isOwner when owner shares their own contact", async () => {
@@ -57,7 +57,7 @@ describe("contactHandler", () => {
       }),
     );
     expect(out.kind).toBe("isOwner");
-    expect(await storage.listWhitelist("users")).toEqual([]);
+    expect(await storage.access.listWhitelist("users")).toEqual([]);
   });
 
   test("added: writes whitelist entry and creates a stub user record", async () => {
@@ -66,10 +66,10 @@ describe("contactHandler", () => {
     expect(out.kind).toBe("added");
     if (out.kind === "added") expect(out.label).toBe("Alice Smith");
 
-    expect(await storage.listWhitelist("users")).toEqual([
+    expect(await storage.access.listWhitelist("users")).toEqual([
       { id: "42", label: "Alice Smith" },
     ]);
-    expect(await storage.getUser("42")).toEqual({
+    expect(await storage.users.get("42")).toEqual({
       id: "42",
       firstName: "Alice",
       lastName: "Smith",
@@ -89,7 +89,7 @@ describe("contactHandler", () => {
     );
     expect(out.kind).toBe("added");
     if (out.kind === "added") expect(out.label).toBe("Alice");
-    expect(await storage.getUser("42")).toEqual({
+    expect(await storage.users.get("42")).toEqual({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -101,7 +101,7 @@ describe("contactHandler", () => {
 
   test("added: existing user record is preserved (not overwritten)", async () => {
     const storage = new MemoryStorage();
-    await storage.upsertUser({
+    await storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: "Smith",
@@ -111,7 +111,7 @@ describe("contactHandler", () => {
     });
     const out = await contactHandler(baseInput({ storage }));
     expect(out.kind).toBe("added");
-    expect(await storage.getUser("42")).toEqual({
+    expect(await storage.users.get("42")).toEqual({
       id: "42",
       firstName: "Alice",
       lastName: "Smith",
@@ -123,8 +123,11 @@ describe("contactHandler", () => {
 
   test("alreadyWhitelisted: returns existing label without mutating storage", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("users", { id: "42", label: "Old Label" });
-    await storage.upsertUser({
+    await storage.access.addWhitelist("users", {
+      id: "42",
+      label: "Old Label",
+    });
+    await storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: "Smith",
@@ -137,10 +140,10 @@ describe("contactHandler", () => {
     if (out.kind === "alreadyWhitelisted")
       expect(out.label).toBe("Alice Smith");
 
-    expect(await storage.listWhitelist("users")).toEqual([
+    expect(await storage.access.listWhitelist("users")).toEqual([
       { id: "42", label: "Old Label" },
     ]);
-    expect(await storage.getUser("42")).toEqual({
+    expect(await storage.users.get("42")).toEqual({
       id: "42",
       firstName: "Alice",
       lastName: "Smith",

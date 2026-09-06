@@ -34,7 +34,7 @@ function makeTools(): { tools: ToolsByName; storage: MemoryStorage } {
 }
 
 async function seedUser(storage: MemoryStorage): Promise<void> {
-  await storage.upsertUser({
+  await storage.users.upsert({
     id: "u1",
     firstName: "Tucker",
     lastName: "Carlson",
@@ -76,10 +76,10 @@ describe("get_user_settings", () => {
   test("reflects explicit overrides via isDefault, value stays the turn's effective", async () => {
     const { tools, storage } = makeTools();
     await seedUser(storage);
-    await storage.setUserName("u1", "Vasya");
-    await storage.setUserTimezone("u1", "Europe/Moscow");
-    await storage.setUserGender("u1", "male");
-    await storage.setUserLang("u1", "ru");
+    await storage.profile.setName("u1", "Vasya");
+    await storage.profile.setTimezone("u1", "Europe/Moscow");
+    await storage.profile.setGender("u1", "male");
+    await storage.profile.setLang("u1", "ru");
 
     // ctx carries the already-resolved effective tz/lang for the turn; the read
     // tool reports those as `value` and uses the stored overrides only for the
@@ -163,7 +163,7 @@ describe("update_user_settings execute", () => {
       ok: true,
       applied: [{ field: "name", value: "Vasya" }],
     });
-    expect(await storage.getUserName("u1")).toBe("Vasya");
+    expect(await storage.profile.getName("u1")).toBe("Vasya");
     expect(c.effects).toEqual([
       {
         type: "settings_updated",
@@ -181,7 +181,7 @@ describe("update_user_settings execute", () => {
     )) as { ok: false; reason: string };
     expect(out.ok).toBe(false);
     expect(out.reason).toContain("invalid_name");
-    expect(await storage.getUserName("u1")).toBeNull();
+    expect(await storage.profile.getName("u1")).toBeNull();
     expect(c.effects).toEqual([]);
   });
 
@@ -195,7 +195,7 @@ describe("update_user_settings execute", () => {
       ok: true,
       applied: [{ field: "timezone", value: "Europe/Moscow" }],
     });
-    expect(await storage.getUserTimezone("u1")).toBe("Europe/Moscow");
+    expect(await storage.profile.getTimezone("u1")).toBe("Europe/Moscow");
   });
 
   test("rejects an invalid timezone without writing", async () => {
@@ -206,7 +206,7 @@ describe("update_user_settings execute", () => {
     )) as { ok: false; reason: string };
     expect(out.ok).toBe(false);
     expect(out.reason).toContain("invalid_timezone");
-    expect(await storage.getUserTimezone("u1")).toBeNull();
+    expect(await storage.profile.getTimezone("u1")).toBeNull();
   });
 
   test("sets gender and language", async () => {
@@ -222,14 +222,14 @@ describe("update_user_settings execute", () => {
         { field: "language", value: "ru" },
       ],
     });
-    expect(await storage.getUserGender("u1")).toBe("female");
-    expect(await storage.getUserLang("u1")).toBe("ru");
+    expect(await storage.profile.getGender("u1")).toBe("female");
+    expect(await storage.profile.getLang("u1")).toBe("ru");
   });
 
   test("clears fields back to their default", async () => {
     const { tools, storage } = makeTools();
-    await storage.setUserName("u1", "Vasya");
-    await storage.setUserGender("u1", "male");
+    await storage.profile.setName("u1", "Vasya");
+    await storage.profile.setGender("u1", "male");
     const c = ctx();
     const out = await tools.update_user_settings.execute(
       { clear: ["name", "gender"] },
@@ -242,8 +242,8 @@ describe("update_user_settings execute", () => {
         { field: "gender", value: null },
       ],
     });
-    expect(await storage.getUserName("u1")).toBeNull();
-    expect(await storage.getUserGender("u1")).toBeNull();
+    expect(await storage.profile.getName("u1")).toBeNull();
+    expect(await storage.profile.getGender("u1")).toBeNull();
   });
 
   test("is atomic: a later invalid field aborts the whole call", async () => {
@@ -255,7 +255,7 @@ describe("update_user_settings execute", () => {
     )) as { ok: false; reason: string };
     expect(out.ok).toBe(false);
     // The valid name must NOT have been written, since the timezone failed.
-    expect(await storage.getUserName("u1")).toBeNull();
+    expect(await storage.profile.getName("u1")).toBeNull();
     expect(c.effects).toEqual([]);
   });
 
@@ -290,7 +290,7 @@ describe("update_user_settings execute", () => {
 
   test("clearing the timezone resets ctx to the chat/global default", async () => {
     const { tools, storage } = makeTools();
-    await storage.setUserTimezone("u1", "Asia/Yekaterinburg");
+    await storage.profile.setTimezone("u1", "Asia/Yekaterinburg");
     const c = ctx({ timezone: "Asia/Yekaterinburg" });
     await tools.update_user_settings.execute({ clear: ["timezone"] }, c);
     // No chat/global override is set, so the effective default is UTC.
@@ -299,7 +299,7 @@ describe("update_user_settings execute", () => {
 
   test("applies a set and a clear of different fields together", async () => {
     const { tools, storage } = makeTools();
-    await storage.setUserGender("u1", "male");
+    await storage.profile.setGender("u1", "male");
     const out = (await tools.update_user_settings.execute(
       { language: "en", clear: ["gender"] },
       ctx(),
@@ -308,7 +308,7 @@ describe("update_user_settings execute", () => {
       { field: "language", value: "en" },
       { field: "gender", value: null },
     ]);
-    expect(await storage.getUserLang("u1")).toBe("en");
-    expect(await storage.getUserGender("u1")).toBeNull();
+    expect(await storage.profile.getLang("u1")).toBe("en");
+    expect(await storage.profile.getGender("u1")).toBeNull();
   });
 });

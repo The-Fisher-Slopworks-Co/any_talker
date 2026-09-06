@@ -19,7 +19,7 @@ export class DualWindowLimiter implements RateLimiter {
     config: RateLimitConfig,
     now: number,
   ): Promise<CheckResult> {
-    const stored = await this.storage.getUserUsage(userId);
+    const stored = await this.storage.usage.get(userId);
     const status = summarizeUsage(userId, config, stored, now);
     const weeklyExhausted = status.weekly.remaining <= 0;
     const fiveExhausted = status.fiveHour.remaining <= 0;
@@ -47,7 +47,7 @@ export class DualWindowLimiter implements RateLimiter {
   async deduct(userId: string, tokens: number, now: number): Promise<void> {
     if (tokens > 0) rateLimitTokensDeductedTotal.inc(tokens);
     const starts = currentWindowStarts(userId, now);
-    await this.storage.addUserUsage(
+    await this.storage.usage.add(
       userId,
       tokens,
       starts.fiveHour,
@@ -56,6 +56,6 @@ export class DualWindowLimiter implements RateLimiter {
   }
 
   async reset(userId: string): Promise<void> {
-    await this.storage.resetUserUsage(userId);
+    await this.storage.usage.reset(userId);
   }
 }

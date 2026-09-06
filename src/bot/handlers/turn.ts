@@ -110,7 +110,7 @@ export async function runGatedAiTurn(
 
   // Surface the user's remembered facts in the system prompt so the model can
   // use them without having to call list_facts on every turn.
-  const facts = await input.storage.listUserFacts(input.userId);
+  const facts = await input.storage.facts.list(input.userId);
 
   // Assemble the request, run the model, and do the post-call accounting
   // (owner-exempt token deduction with the detail-level multiplier + the

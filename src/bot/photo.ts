@@ -66,14 +66,16 @@ export async function fetchTelegramPhoto(args: {
   botToken: string;
   fileId: string;
 }): Promise<Uint8Array> {
-  const cached = await args.storage.getPhotoBytes(args.fileId).catch((err) => {
-    console.error("photo cache read failed:", err);
-    photoCacheErrorsTotal.inc({ op: "read" });
-    return null;
-  });
+  const cached = await args.storage.photos
+    .getBytes(args.fileId)
+    .catch((err) => {
+      console.error("photo cache read failed:", err);
+      photoCacheErrorsTotal.inc({ op: "read" });
+      return null;
+    });
   if (cached) return cached;
   const bytes = await downloadTelegramFile(args.botToken, args.fileId);
-  args.storage.savePhotoBytes(args.fileId, bytes).catch((err) => {
+  args.storage.photos.saveBytes(args.fileId, bytes).catch((err) => {
     console.error("photo cache write failed:", err);
     photoCacheErrorsTotal.inc({ op: "write" });
   });

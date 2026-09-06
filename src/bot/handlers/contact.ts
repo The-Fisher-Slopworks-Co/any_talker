@@ -48,13 +48,13 @@ export async function contactHandler(
   );
 
   const [isWl, existing] = await Promise.all([
-    input.storage.isWhitelisted("users", targetId),
-    input.storage.getUser(targetId),
+    input.storage.access.isWhitelisted("users", targetId),
+    input.storage.users.get(targetId),
   ]);
   if (isWl) return { kind: "alreadyWhitelisted", label };
 
   if (!existing) {
-    await input.storage.upsertUser({
+    await input.storage.users.upsert({
       id: targetId,
       firstName: input.contact.first_name,
       lastName: input.contact.last_name ?? null,
@@ -64,6 +64,6 @@ export async function contactHandler(
     });
   }
 
-  await input.storage.addWhitelist("users", { id: targetId, label });
+  await input.storage.access.addWhitelist("users", { id: targetId, label });
   return { kind: "added", label };
 }

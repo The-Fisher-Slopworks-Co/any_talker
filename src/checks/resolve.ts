@@ -74,7 +74,7 @@ export async function resolveCheck(args: {
 
   // The group may have been upgraded to a supergroup since the question was
   // sent; on the migration error switch to the new chat id, retry the reply
-  // once, and persist the new id in the final saveCheck below.
+  // once, and persist the new id in the final checks.save below.
   let chatId = check.chatId;
   const sendReply = (chat: string) =>
     api.sendMessage(chat, reply, {
@@ -130,7 +130,7 @@ export async function resolveCheck(args: {
     }
   }
 
-  await storage.saveCheck({
+  await storage.checks.save({
     ...check,
     ...patch,
     chatId,
