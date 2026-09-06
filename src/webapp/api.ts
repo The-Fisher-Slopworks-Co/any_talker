@@ -9,6 +9,7 @@ import type {
   Settings,
   User,
   WhitelistEntry,
+  WhitelistKind,
   ChatSettings,
   RateLimitConfig,
   BudgetConfig,
@@ -212,6 +213,97 @@ function normalizeEnumInput<T extends string>(
   const trimmed = input.trim();
   if (trimmed === "") return null;
   return isValid(trimmed) ? trimmed : "invalid";
+}
+
+// The profile fields both `PUT /api/me` and the admin `PUT /api/admin/users/:id`
+// patch. `dateFormat` is absent on the admin side (see `includeDateFormat`), so
+// it is optional here and the key never appears in that route's response.
+type UserProfileFields = {
+  displayName: string | null;
+  timezone: string | null;
+  gender: Gender | null;
+  language: Lang | null;
+  dateFormat?: DateFormat | null;
+};
+
+type UserFieldUpdates =
+  { ok: true; fields: UserProfileFields } | { ok: false; error: ApiResponse };
+
+// Validates the patch field by field (in the order the API has always reported
+// errors in), starting each accepted write as it goes and awaiting them only
+// once the whole body has passed. `includeDateFormat` is the single asymmetry
+// between the two callers: only the self-service route exposes dateFormat, so
+// the admin route must leave it untouched even if the body carries one.
+async function applyUserFieldUpdates(
+  storage: Storage,
+  userId: string,
+  body: Record<string, unknown>,
+  current: UserProfileFields,
+  options: { includeDateFormat: boolean },
+): Promise<UserFieldUpdates> {
+  const fields: UserProfileFields = { ...current };
+  const writes: Promise<void>[] = [];
+
+  if ("displayName" in body) {
+    const r = validateDisplayName(body.displayName);
+    if (!r.ok) return { ok: false, error: badDisplayName(r.reason) };
+    fields.displayName = r.value;
+    writes.push(storage.setUserName(userId, r.value));
+  }
+  if ("timezone" in body) {
+    if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
+      const next = normalizeTimezoneOrNull(body.timezone);
+      if (next === null) return { ok: false, error: BAD_TIMEZONE };
+      fields.timezone = next;
+    } else {
+      fields.timezone = null;
+    }
+    writes.push(storage.setUserTimezone(userId, fields.timezone));
+  }
+  if ("gender" in body) {
+    const nextGender = normalizeEnumInput(body.gender, isValidGender);
+    if (nextGender === "invalid") return { ok: false, error: BAD_GENDER };
+    fields.gender = nextGender;
+    writes.push(storage.setUserGender(userId, nextGender));
+  }
+  if ("language" in body) {
+    const nextLang = normalizeEnumInput(body.language, isValidLang);
+    if (nextLang === "invalid") return { ok: false, error: BAD_LANG };
+    fields.language = nextLang;
+    writes.push(storage.setUserLang(userId, nextLang));
+  }
+  if (options.includeDateFormat && "dateFormat" in body) {
+    const nextDf = normalizeEnumInput(body.dateFormat, isValidDateFormat);
+    if (nextDf === "invalid") return { ok: false, error: BAD_DATE_FORMAT };
+    fields.dateFormat = nextDf;
+    writes.push(storage.setUserDateFormat(userId, nextDf));
+  }
+
+  await Promise.all(writes);
+  return { ok: true, fields };
+}
+
+// Whitelist and blacklist POSTs are the same route: validate the id, optionally
+// refuse it, add the entry, answer with the fresh list. `reject` carries the
+// blacklist's owner guard; the whitelist passes none.
+async function handleListMutation(
+  kind: WhitelistKind,
+  rawBody: unknown,
+  add: (kind: WhitelistKind, entry: WhitelistEntry) => Promise<void>,
+  list: (kind: WhitelistKind) => Promise<WhitelistEntry[]>,
+  reject?: (id: string) => ApiResponse | null,
+): Promise<ApiResponse> {
+  const body = (rawBody ?? {}) as Partial<WhitelistEntry>;
+  if (typeof body.id !== "string" || body.id.length === 0) {
+    return { status: 400, body: { error: "id required" } };
+  }
+  const rejection = reject?.(body.id);
+  if (rejection) return rejection;
+  await add(kind, {
+    id: body.id,
+    ...(body.label !== undefined && { label: body.label }),
+  });
+  return { status: 200, body: await list(kind) };
 }
 
 const BAD_MODELS: ApiResponse = {
@@ -512,59 +604,23 @@ export async function handleApi(
           deps.storage.getUserLang(actor.userId),
           deps.storage.getUserDateFormat(actor.userId),
         ]);
-      let displayName = currentName;
-      let timezone = currentTz;
-      let gender: Gender | null = currentGender;
-      let language: Lang | null = currentLang;
-      let dateFormat: DateFormat | null = currentDf;
-      const writes: Promise<void>[] = [];
-
-      if ("displayName" in body) {
-        const r = validateDisplayName(body.displayName);
-        if (!r.ok) return badDisplayName(r.reason);
-        displayName = r.value;
-        writes.push(deps.storage.setUserName(actor.userId, displayName));
-      }
-      if ("timezone" in body) {
-        if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
-          const next = normalizeTimezoneOrNull(body.timezone);
-          if (next === null) return BAD_TIMEZONE;
-          timezone = next;
-        } else {
-          timezone = null;
-        }
-        writes.push(deps.storage.setUserTimezone(actor.userId, timezone));
-      }
-      if ("gender" in body) {
-        const nextGender = normalizeEnumInput(body.gender, isValidGender);
-        if (nextGender === "invalid") return BAD_GENDER;
-        gender = nextGender;
-        writes.push(deps.storage.setUserGender(actor.userId, gender));
-      }
-      if ("language" in body) {
-        const nextLang = normalizeEnumInput(body.language, isValidLang);
-        if (nextLang === "invalid") return BAD_LANG;
-        language = nextLang;
-        writes.push(deps.storage.setUserLang(actor.userId, language));
-      }
-      if ("dateFormat" in body) {
-        const nextDf = normalizeEnumInput(body.dateFormat, isValidDateFormat);
-        if (nextDf === "invalid") return BAD_DATE_FORMAT;
-        dateFormat = nextDf;
-        writes.push(deps.storage.setUserDateFormat(actor.userId, dateFormat));
-      }
-
-      await Promise.all(writes);
+      const updated = await applyUserFieldUpdates(
+        deps.storage,
+        actor.userId,
+        body,
+        {
+          displayName: currentName,
+          timezone: currentTz,
+          gender: currentGender,
+          language: currentLang,
+          dateFormat: currentDf,
+        },
+        { includeDateFormat: true },
+      );
+      if (!updated.ok) return updated.error;
       return {
         status: 200,
-        body: {
-          isOwner: actor.isOwner,
-          displayName,
-          timezone,
-          gender,
-          language,
-          dateFormat,
-        },
+        body: { isOwner: actor.isOwner, ...updated.fields },
       };
     }
   }
@@ -837,16 +893,12 @@ export async function handleApi(
 
   for (const kind of ["users", "chats"] as const) {
     if (req.path === `/api/whitelist/${kind}` && req.method === "POST") {
-      const body = (req.body ?? {}) as Partial<WhitelistEntry>;
-      if (typeof body.id !== "string" || body.id.length === 0) {
-        return { status: 400, body: { error: "id required" } };
-      }
-      await deps.storage.addWhitelist(kind, {
-        id: body.id,
-        ...(body.label !== undefined && { label: body.label }),
-      });
-      const list = await deps.storage.listWhitelist(kind);
-      return { status: 200, body: list };
+      return handleListMutation(
+        kind,
+        req.body,
+        (k, entry) => deps.storage.addWhitelist(k, entry),
+        (k) => deps.storage.listWhitelist(k),
+      );
     }
     const m = req.path.match(new RegExp(`^/api/whitelist/${kind}/(.+)$`));
     if (m && req.method === "DELETE") {
@@ -868,23 +920,20 @@ export async function handleApi(
 
   for (const kind of ["users", "chats"] as const) {
     if (req.path === `/api/blacklist/${kind}` && req.method === "POST") {
-      const body = (req.body ?? {}) as Partial<WhitelistEntry>;
-      if (typeof body.id !== "string" || body.id.length === 0) {
-        return { status: 400, body: { error: "id required" } };
-      }
-      // Blacklisting the owner would be a silent no-op (the access gates check
-      // ownership first), so reject it loudly instead of storing a dead entry.
-      // Holds for chats too: the owner's private chat id *is* their user id,
-      // and nobody else can speak there.
-      if (body.id === deps.ownerId) {
-        return { status: 400, body: { error: "cannot blacklist the owner" } };
-      }
-      await deps.storage.addBlacklist(kind, {
-        id: body.id,
-        ...(body.label !== undefined && { label: body.label }),
-      });
-      const list = await deps.storage.listBlacklist(kind);
-      return { status: 200, body: list };
+      return handleListMutation(
+        kind,
+        req.body,
+        (k, entry) => deps.storage.addBlacklist(k, entry),
+        (k) => deps.storage.listBlacklist(k),
+        // Blacklisting the owner would be a silent no-op (the access gates
+        // check ownership first), so reject it loudly instead of storing a dead
+        // entry. Holds for chats too: the owner's private chat id *is* their
+        // user id, and nobody else can speak there.
+        (entryId) =>
+          entryId === deps.ownerId
+            ? { status: 400, body: { error: "cannot blacklist the owner" } }
+            : null,
+      );
     }
     const m = req.path.match(new RegExp(`^/api/blacklist/${kind}/(.+)$`));
     if (m && req.method === "DELETE") {
@@ -1005,46 +1054,22 @@ export async function handleApi(
           deps.storage.getUserGender(id),
           deps.storage.getUserLang(id),
         ]);
-      let displayName = currentName;
-      let timezone = currentTz;
-      let gender: Gender | null = currentGender;
-      let language: Lang | null = currentLang;
-      const writes: Promise<void>[] = [];
-
-      if ("displayName" in body) {
-        const r = validateDisplayName(body.displayName);
-        if (!r.ok) return badDisplayName(r.reason);
-        displayName = r.value;
-        writes.push(deps.storage.setUserName(id, displayName));
-      }
-      if ("timezone" in body) {
-        if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
-          const next = normalizeTimezoneOrNull(body.timezone);
-          if (next === null) return BAD_TIMEZONE;
-          timezone = next;
-        } else {
-          timezone = null;
-        }
-        writes.push(deps.storage.setUserTimezone(id, timezone));
-      }
-      if ("gender" in body) {
-        const nextGender = normalizeEnumInput(body.gender, isValidGender);
-        if (nextGender === "invalid") return BAD_GENDER;
-        gender = nextGender;
-        writes.push(deps.storage.setUserGender(id, gender));
-      }
-      if ("language" in body) {
-        const nextLang = normalizeEnumInput(body.language, isValidLang);
-        if (nextLang === "invalid") return BAD_LANG;
-        language = nextLang;
-        writes.push(deps.storage.setUserLang(id, language));
-      }
-
-      await Promise.all(writes);
-      return {
-        status: 200,
-        body: { user, displayName, timezone, gender, language },
-      };
+      // No dateFormat here: it stays the user's own setting, unreachable from
+      // the admin route even if the body carries one.
+      const updated = await applyUserFieldUpdates(
+        deps.storage,
+        id,
+        body,
+        {
+          displayName: currentName,
+          timezone: currentTz,
+          gender: currentGender,
+          language: currentLang,
+        },
+        { includeDateFormat: false },
+      );
+      if (!updated.ok) return updated.error;
+      return { status: 200, body: { user, ...updated.fields } };
     }
   }
 

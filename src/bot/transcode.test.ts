@@ -2,13 +2,14 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { transcodeOggToMp3, type SpawnFn } from "./transcode";
+import { transcodeOggToMp3 } from "./transcode";
+import type { FfmpegSpawnFn } from "./ffmpeg";
 
 const ogg = new Uint8Array([0x4f, 0x67, 0x67, 0x53]); // "OggS"
 
 // A fake subprocess whose stdout streams `out` and which exits with `code`.
 const fakeSpawn =
-  (out: Uint8Array, code: number): SpawnFn =>
+  (out: Uint8Array, code: number): FfmpegSpawnFn =>
   () => ({
     stdout: new ReadableStream<Uint8Array>({
       start(controller) {
@@ -37,7 +38,7 @@ describe("transcodeOggToMp3", () => {
   });
 
   test("returns null when spawning throws (e.g. ffmpeg missing)", async () => {
-    const throwingSpawn: SpawnFn = () => {
+    const throwingSpawn: FfmpegSpawnFn = () => {
       throw new Error("ENOENT: ffmpeg not found");
     };
     const result = await transcodeOggToMp3(ogg, throwingSpawn);

@@ -5,8 +5,7 @@ import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
-import { recordDenial } from "../../spending/record";
-import { runAiTurn } from "../../ai/turn";
+import { runGatedAiTurn } from "./turn";
 import {
   buildReplyFallbackMessage,
   buildUserEnvelope,
@@ -179,38 +178,6 @@ export async function guestAskHandler(
     }
   }
 
-  // Hard USD budget gate (money), before the token rate limit (fairness).
-  const budgetVerdict = await input.budgetGuard.check(
-    {
-      userId: input.userId,
-      chatId: input.chatId,
-      isOwner,
-      now: input.now,
-    },
-    settings.budget,
-  );
-  if (!budgetVerdict.allowed) {
-    recordDenial(storage, input.userId, input.now);
-    return { kind: "budgetLimited", reason: budgetVerdict.reason };
-  }
-
-  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
-  if (!skipRateLimit) {
-    const r = await input.rateLimiter.check(
-      input.userId,
-      settings.rateLimit,
-      input.now,
-    );
-    if (!r.allowed) {
-      recordDenial(storage, input.userId, input.now);
-      return {
-        kind: "rateLimited",
-        limitedBy: r.limitedBy,
-        msUntilReset: r.msUntilReset,
-      };
-    }
-  }
-
   // One envelope, used both for the request and for the persisted thread turn,
   // so the stored text is byte-identical to what the model saw — a prefix that
   // still matches on the next turn is what keeps the prompt cache warm.
@@ -233,122 +200,115 @@ export async function guestAskHandler(
       ? null
       : input.priorThread;
   const priorTurns = priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
-  const messages: AIMessage[] = [];
-  for (const turn of priorTurns) {
-    const chainImages = await loadChainImages(
-      turn.userImageFileIds,
-      input.fetchPhoto,
-    );
-    if (chainImages.length > 0) {
-      messages.push({
-        role: "user",
-        content: withMedia(turn.userQuestion, chainImages, []),
-      });
-    } else {
-      messages.push({ role: "user", content: turn.userQuestion });
-    }
-    // Between question and answer, where the calls happened — as in
-    // `buildContext`'s reply-chain replay.
-    if (turn.toolCalls) messages.push(...toolCallMessages(turn.toolCalls));
-    messages.push({ role: "assistant", content: turn.botAnswer });
-  }
-  // A stored thread already contains the replied-to bot answer; the raw
-  // replied-to message only fills in when there is no thread to speak for it.
-  if (priorTurns.length === 0 && input.replyTarget) {
-    messages.push(buildReplyFallbackMessage(input.replyTarget));
-  }
-  if (input.images.length > 0 || audios.length > 0 || videos.length > 0) {
-    messages.push({
-      role: "user",
-      content: withMedia(envelope, input.images, audios, videos),
-    });
-  } else {
-    messages.push({ role: "user", content: envelope });
-  }
 
-  input.onAIStart?.();
-
-  const facts = await storage.listUserFacts(input.userId);
-
-  // Assemble the request, run the model, and do the post-call accounting in the
-  // shared turn runner. Guest queries are always single-turn "short" asks (no
-  // /askwise), so no detail level is passed — the deduction is the raw token
-  // total (multiplier 1) and the system prompt carries no detail-level section.
-  let result;
-  try {
-    result = await runAiTurn({
-      ai: input.ai,
-      rateLimiter: input.rateLimiter,
-      storage,
-      models: settings.models,
-      systemPrompt: settings.systemPrompt,
-      rateLimit: settings.rateLimit,
-      routing: {
-        providerSort: settings.providerSort,
-        provider: settings.provider,
-        serviceTier: settings.serviceTier,
-      },
-      userId: input.userId,
-      ownerId: input.ownerId,
-      chatId: input.chatId,
-      botId: input.botId ?? null,
-      source: "guest",
-      replyToMessageId: null,
-      timezone,
-      lang: input.lang,
-      now: input.now,
-      messages,
-      facts,
-      contextMessages: messages,
-    });
-  } catch (err) {
-    return {
-      kind: "error",
-      message: err instanceof Error ? err.message : String(err),
-    };
-  }
-
-  // A model can legitimately finish with no text (e.g. an output-token cap hit
-  // mid-reasoning). Surface it as an error turn — Telegram rejects empty
-  // messages, so trying to send it would only crash the dispatcher.
-  if (result.text.trim() === "") {
-    return { kind: "error", message: "AI returned an empty answer" };
-  }
-
-  // Sent verbatim as Rich Markdown (parsed server-side by Telegram) — no HTML
-  // sanitization. The same text is persisted as the guest-thread context.
-  const body = result.text;
-
-  return {
-    kind: "answered",
-    text: body,
-    botName,
-    totalTokens: result.totalTokens,
-    effects: result.effects,
-    expandableThreshold: settings.expandableBlockquoteThreshold,
-    persistThread: async () => {
-      const allImageFileIds = [
-        ...input.imageFileIds,
-        ...input.replyImageFileIds,
-      ];
-      const turns = [
-        ...priorTurns,
-        {
-          userQuestion: envelope,
-          botAnswer: body,
-          // As in ask.ts: absent, never explicitly undefined — the stored turn
-          // uses key presence to tell "none" from "predates the field".
-          ...(allImageFileIds.length > 0 && {
-            userImageFileIds: allImageFileIds,
-          }),
-          ...(result.toolCalls.length > 0 && { toolCalls: result.toolCalls }),
-        },
-      ].slice(-MAX_REPLY_CHAIN_DEPTH);
-      await storage.saveGuestThread(input.chatId, {
-        chatId: input.chatId,
-        turns,
-        ts: input.now,
-      });
+  // Guest queries are always single-turn "short" asks (no /askwise), so no
+  // detail level is passed — the deduction is the raw token total
+  // (multiplier 1) and the system prompt carries no detail-level section.
+  const turn = await runGatedAiTurn({
+    ai: input.ai,
+    rateLimiter: input.rateLimiter,
+    budgetGuard: input.budgetGuard,
+    storage,
+    settings,
+    userId: input.userId,
+    ownerId: input.ownerId,
+    chatId: input.chatId,
+    botId: input.botId ?? null,
+    source: "guest",
+    replyToMessageId: null,
+    timezone,
+    lang: input.lang,
+    now: input.now,
+    buildMessages: async () => {
+      const messages: AIMessage[] = [];
+      for (const priorTurn of priorTurns) {
+        const chainImages = await loadChainImages(
+          priorTurn.userImageFileIds,
+          input.fetchPhoto,
+        );
+        if (chainImages.length > 0) {
+          messages.push({
+            role: "user",
+            content: withMedia(priorTurn.userQuestion, chainImages, []),
+          });
+        } else {
+          messages.push({ role: "user", content: priorTurn.userQuestion });
+        }
+        // Between question and answer, where the calls happened — as in
+        // `buildContext`'s reply-chain replay.
+        if (priorTurn.toolCalls) {
+          messages.push(...toolCallMessages(priorTurn.toolCalls));
+        }
+        messages.push({ role: "assistant", content: priorTurn.botAnswer });
+      }
+      // A stored thread already contains the replied-to bot answer; the raw
+      // replied-to message only fills in when there is no thread to speak for
+      // it.
+      if (priorTurns.length === 0 && input.replyTarget) {
+        messages.push(buildReplyFallbackMessage(input.replyTarget));
+      }
+      if (input.images.length > 0 || audios.length > 0 || videos.length > 0) {
+        messages.push({
+          role: "user",
+          content: withMedia(envelope, input.images, audios, videos),
+        });
+      } else {
+        messages.push({ role: "user", content: envelope });
+      }
+      return messages;
     },
-  };
+    onAIStart: input.onAIStart,
+  });
+
+  switch (turn.kind) {
+    case "budgetLimited":
+      return { kind: "budgetLimited", reason: turn.reason };
+    case "rateLimited":
+      return {
+        kind: "rateLimited",
+        limitedBy: turn.limitedBy,
+        msUntilReset: turn.msUntilReset,
+      };
+    case "error":
+      return { kind: "error", message: turn.message };
+    case "answered": {
+      // Sent verbatim as Rich Markdown (parsed server-side by Telegram) — no
+      // HTML sanitization. The same text is persisted as the guest-thread
+      // context.
+      const body = turn.text;
+      return {
+        kind: "answered",
+        text: body,
+        botName,
+        totalTokens: turn.totalTokens,
+        effects: turn.effects,
+        expandableThreshold: settings.expandableBlockquoteThreshold,
+        persistThread: async () => {
+          const allImageFileIds = [
+            ...input.imageFileIds,
+            ...input.replyImageFileIds,
+          ];
+          const turns = [
+            ...priorTurns,
+            {
+              userQuestion: envelope,
+              botAnswer: body,
+              // As in ask.ts: absent, never explicitly undefined — the stored
+              // turn uses key presence to tell "none" from "predates the
+              // field".
+              ...(allImageFileIds.length > 0 && {
+                userImageFileIds: allImageFileIds,
+              }),
+              ...(turn.toolCalls.length > 0 && { toolCalls: turn.toolCalls }),
+            },
+          ].slice(-MAX_REPLY_CHAIN_DEPTH);
+          await storage.saveGuestThread(input.chatId, {
+            chatId: input.chatId,
+            turns,
+            ts: input.now,
+          });
+        },
+      };
+    }
+  }
 }
