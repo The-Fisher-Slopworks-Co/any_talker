@@ -10,13 +10,13 @@ export async function resolveToken(
   runtime: ManagerRuntime,
   record: ManagedBot,
 ): Promise<string | null> {
-  const stored = await runtime.deps.storage.getManagedBotToken(record.botId);
+  const stored = await runtime.deps.storage.managedBots.getToken(record.botId);
   if (stored) return stored;
   try {
     const token = await runtime.deps.mainApi.getManagedBotToken(
       Number(record.botId),
     );
-    await runtime.deps.storage.setManagedBotToken(record.botId, token);
+    await runtime.deps.storage.managedBots.setToken(record.botId, token);
     return token;
   } catch (err) {
     console.error(
@@ -54,7 +54,7 @@ export async function rebrokerRevokedToken(
   botId: string,
   deadToken: string,
 ): Promise<string | null> {
-  await runtime.deps.storage.setManagedBotToken(botId, null);
+  await runtime.deps.storage.managedBots.setToken(botId, null);
   let fresh: string;
   try {
     fresh = await runtime.deps.mainApi.getManagedBotToken(Number(botId));

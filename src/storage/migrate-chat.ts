@@ -8,13 +8,13 @@ import type { Chat } from "../shared/types";
 // successor, so an upgraded chat keeps its settings, whitelist access, checks,
 // reminders, spend history, directory row and bot presence. Triggered by the
 // Telegram `migrate_to_chat_id` / `migrate_from_chat_id` service messages (see
-// `bot/index.ts`), with the send-time migrate-and-retry in checks/reminders as
+// `bot/listeners/chat-events.ts`), with the send-time migrate-and-retry in checks/reminders as
 // the backstop when both service messages were missed.
 //
 // Every family bot in the chat receives its own copy of the service message,
 // so this runs concurrently with itself: each step is idempotent (re-running
 // converges on the same end state), and the one non-idempotent piece — summing
-// spend buckets — is atomic inside `moveChatSpend`. A failing step is logged
+// spend buckets — is atomic inside `spend.moveChat`. A failing step is logged
 // and skipped rather than aborting the rest, so one unavailable entity can't
 // hold the whole chat's data hostage.
 //
@@ -44,7 +44,7 @@ export async function migrateChatData(
     ["checks", () => migrateChecks(storage, oldChatId, newChatId)],
     ["reminders", () => migrateReminders(storage, oldChatId, newChatId)],
     ["presence", () => migratePresence(storage, oldChatId, newChatId)],
-    ["spend", () => storage.moveChatSpend(oldChatId, newChatId, nowMs)],
+    ["spend", () => storage.spend.moveChat(oldChatId, newChatId, nowMs)],
   ];
   for (const [name, run] of steps) {
     try {
@@ -63,13 +63,13 @@ async function migrateSettings(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const old = await storage.getChatSettings(oldChatId);
+  const old = await storage.chats.getSettings(oldChatId);
   if (!old) return;
   // Anything already written under the new id (a concurrent admin edit) wins
   // over the migrated values; saving `{}` deletes the old key.
-  const existing = await storage.getChatSettings(newChatId);
-  await storage.saveChatSettings(newChatId, { ...old, ...existing });
-  await storage.saveChatSettings(oldChatId, {});
+  const existing = await storage.chats.getSettings(newChatId);
+  await storage.chats.saveSettings(newChatId, { ...old, ...existing });
+  await storage.chats.saveSettings(oldChatId, {});
 }
 
 async function migrateWhitelist(
@@ -77,11 +77,11 @@ async function migrateWhitelist(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const entries = await storage.listWhitelist("chats");
+  const entries = await storage.access.listWhitelist("chats");
   const old = entries.find((e) => e.id === oldChatId);
   if (!old) return;
-  await storage.addWhitelist("chats", { ...old, id: newChatId });
-  await storage.removeWhitelist("chats", oldChatId);
+  await storage.access.addWhitelist("chats", { ...old, id: newChatId });
+  await storage.access.removeWhitelist("chats", oldChatId);
 }
 
 // Carried over for the same reason as the whitelist, but the failure mode is
@@ -91,11 +91,11 @@ async function migrateBlacklist(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const entries = await storage.listBlacklist("chats");
+  const entries = await storage.access.listBlacklist("chats");
   const old = entries.find((e) => e.id === oldChatId);
   if (!old) return;
-  await storage.addBlacklist("chats", { ...old, id: newChatId });
-  await storage.removeBlacklist("chats", oldChatId);
+  await storage.access.addBlacklist("chats", { ...old, id: newChatId });
+  await storage.access.removeBlacklist("chats", oldChatId);
 }
 
 async function migrateDirectory(
@@ -103,19 +103,19 @@ async function migrateDirectory(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const old = await storage.getChat(oldChatId);
+  const old = await storage.chats.get(oldChatId);
   if (!old) return;
   // The middleware may already have upserted the supergroup row (fresher
   // title/type); keep its identity fields but carry over the old group's
   // first-seen instant so the chat is never mistaken for a brand-new group.
-  const existing = await storage.getChat(newChatId);
+  const existing = await storage.chats.get(newChatId);
   const merged: Chat = {
     ...(existing ?? { ...old, id: newChatId }),
     firstSeenAt: Math.min(old.firstSeenAt, existing?.firstSeenAt ?? Infinity),
     lastSeenAt: Math.max(old.lastSeenAt, existing?.lastSeenAt ?? 0),
   };
-  await storage.upsertChat(merged);
-  await storage.deleteChat(oldChatId);
+  await storage.chats.upsert(merged);
+  await storage.chats.delete(oldChatId);
 }
 
 async function migrateChecks(
@@ -123,10 +123,10 @@ async function migrateChecks(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const checks = await storage.listChecks();
+  const checks = await storage.checks.list();
   for (const check of checks) {
     if (check.chatId !== oldChatId) continue;
-    await storage.saveCheck({ ...check, chatId: newChatId });
+    await storage.checks.save({ ...check, chatId: newChatId });
   }
 }
 
@@ -139,17 +139,17 @@ async function migrateReminders(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const bots = await storage.listManagedBots();
+  const bots = await storage.managedBots.list();
   for (const botId of [null, ...bots.map((b) => b.botId)]) {
     const view = storage.forBot(botId);
-    const reminders = await view.listAllReminders();
+    const reminders = await view.reminders.listAll();
     for (const r of reminders) {
       const target =
         r.target.kind === "ask_reply" && r.target.chatId === oldChatId
           ? { ...r.target, chatId: newChatId }
           : r.target;
       if (r.chatId !== oldChatId && target === r.target) continue;
-      await view.saveReminder({
+      await view.reminders.save({
         ...r,
         chatId: r.chatId === oldChatId ? newChatId : r.chatId,
         target,
@@ -163,9 +163,9 @@ async function migratePresence(
   oldChatId: string,
   newChatId: string,
 ): Promise<void> {
-  const presence = await storage.getBotPresence(oldChatId);
+  const presence = await storage.presence.get(oldChatId);
   for (const [botId, atMs] of Object.entries(presence)) {
-    await storage.recordBotPresence(newChatId, botId, atMs);
-    await storage.removeBotPresence(oldChatId, botId);
+    await storage.presence.record(newChatId, botId, atMs);
+    await storage.presence.remove(oldChatId, botId);
   }
 }

@@ -55,7 +55,7 @@ describe("schedule_reminder_in", () => {
       askCtx,
     );
     if (!("ok" in out) || !out.ok) throw new Error("expected ok");
-    const due = await storage.fetchDueReminders(askCtx.now + 5 * 60_000);
+    const due = await storage.reminders.fetchDue(askCtx.now + 5 * 60_000);
     expect(due).toHaveLength(1);
     expect(due[0]).toMatchObject({
       userId: "u42",
@@ -73,21 +73,21 @@ describe("schedule_reminder_in", () => {
       guestCtx,
     );
     expect(out).toEqual({ ok: false, reason: expect.stringContaining("DM") });
-    expect(await storage.fetchDueReminders(askCtx.now + 60 * 60_000)).toEqual(
+    expect(await storage.reminders.fetchDue(askCtx.now + 60 * 60_000)).toEqual(
       [],
     );
   });
 
-  test("guest: persists with guest_dm target after recordPrivateChat", async () => {
+  test("guest: persists with guest_dm target after privateChats.record", async () => {
     const storage = new MemoryStorage();
-    await storage.recordPrivateChat("u42");
+    await storage.privateChats.record("u42");
     const tool = createScheduleReminderInTool({ storage });
     const out = await tool.execute(
       { amount: 1, unit: "hours", text: "ping" },
       guestCtx,
     );
     if (!("ok" in out) || !out.ok) throw new Error("expected ok");
-    const due = await storage.fetchDueReminders(askCtx.now + 60 * 60_000);
+    const due = await storage.reminders.fetchDue(askCtx.now + 60 * 60_000);
     expect(due).toHaveLength(1);
     expect(due[0]?.target).toEqual({ kind: "guest_dm", userId: "u42" });
   });

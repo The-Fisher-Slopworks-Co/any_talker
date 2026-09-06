@@ -58,7 +58,7 @@ export async function digestCommandHandler(
   if (!input.isPrivateChat) return { kind: "ignored" };
   if (input.fromUserId !== input.ownerId) return { kind: "ignored" };
 
-  const state = await input.storage.getDigestState();
+  const state = await input.storage.observability.getDigestState();
   const newSinceMs = state?.lastSentAtMs ?? input.nowMs - FALLBACK_WINDOW_MS;
 
   const overview = await gatherSpendOverview(input.storage, input.nowMs, {

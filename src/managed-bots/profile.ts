@@ -11,7 +11,7 @@ export async function pushProfileName(
 ): Promise<void> {
   const entry = runtime.running.get(botId);
   if (!entry) return;
-  const record = await runtime.deps.storage.getManagedBot(botId);
+  const record = await runtime.deps.storage.managedBots.get(botId);
   if (!record) return;
   await entry.bot.api
     .setMyName(record.displayName)

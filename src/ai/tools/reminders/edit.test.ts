@@ -30,7 +30,7 @@ describe("edit_reminder", () => {
 
   test("edits the note while keeping the fire time and original context", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({
         id: "r1",
         fireAtMs: 2_000_000,
@@ -46,7 +46,7 @@ describe("edit_reminder", () => {
       fireAt: new Date(2_000_000).toISOString(),
     });
 
-    const saved = await storage.getReminder("r1");
+    const saved = await storage.reminders.get("r1");
     expect(saved?.text).toBe("new note");
     expect(saved?.fireAtMs).toBe(2_000_000);
     expect(saved?.createdAtMs).toBe(500_000);
@@ -55,7 +55,7 @@ describe("edit_reminder", () => {
 
   test("reschedules with a relative duration ('in')", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
     const tool = createEditReminderTool({ storage });
     // ctx.now is 1_000_000; +2 minutes = 1_120_000.
     const out = await tool.execute(
@@ -66,12 +66,12 @@ describe("edit_reminder", () => {
       ok: true,
       fireAt: new Date(1_120_000).toISOString(),
     });
-    expect((await storage.getReminder("r1"))?.fireAtMs).toBe(1_120_000);
+    expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(1_120_000);
   });
 
   test("reschedules with an absolute datetime ('at')", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
     const tool = createEditReminderTool({ storage });
     const out = await tool.execute(
       {
@@ -85,12 +85,12 @@ describe("edit_reminder", () => {
       ok: true,
       fireAt: new Date(expectedMs).toISOString(),
     });
-    expect((await storage.getReminder("r1"))?.fireAtMs).toBe(expectedMs);
+    expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(expectedMs);
   });
 
   test("changes both note and time in one call", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({ id: "r1", fireAtMs: 2_000_000, text: "old" }),
     );
     const tool = createEditReminderTool({ storage });
@@ -107,14 +107,14 @@ describe("edit_reminder", () => {
       ok: true,
       fireAt: new Date(expectedMs).toISOString(),
     });
-    const saved = await storage.getReminder("r1");
+    const saved = await storage.reminders.get("r1");
     expect(saved?.text).toBe("new");
     expect(saved?.fireAtMs).toBe(expectedMs);
   });
 
   test("pushes a reminder_updated effect with the new fire time", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
     const effects: ToolEffect[] = [];
     const tool = createEditReminderTool({ storage });
     await tool.execute(
@@ -132,7 +132,7 @@ describe("edit_reminder", () => {
 
   test("rejects a new time under the 1-minute lead and leaves the reminder unchanged", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
     const effects: ToolEffect[] = [];
     const tool = createEditReminderTool({ storage });
     // ctx.now is 1_000_000 ms (1970-01-01T00:16 UTC); the epoch start is in the
@@ -145,26 +145,26 @@ describe("edit_reminder", () => {
       { ...ctx, timezone: "UTC", effects },
     );
     expect(out.ok).toBe(false);
-    expect((await storage.getReminder("r1"))?.fireAtMs).toBe(2_000_000);
+    expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(2_000_000);
     expect(effects).toEqual([]);
   });
 
   test("a note-only edit is allowed even when the reminder is about to fire", async () => {
     const storage = new MemoryStorage();
     // fireAtMs is only 10s after now — below MIN_LEAD, but we're not moving it.
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 1_010_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 1_010_000 }));
     const tool = createEditReminderTool({ storage });
     const out = await tool.execute({ reminderId: "r1", text: "tweak" }, ctx);
     expect(out).toEqual({
       ok: true,
       fireAt: new Date(1_010_000).toISOString(),
     });
-    expect((await storage.getReminder("r1"))?.text).toBe("tweak");
+    expect((await storage.reminders.get("r1"))?.text).toBe("tweak");
   });
 
   test("refuses to edit another user's reminder", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({ id: "r1", userId: "u2", text: "theirs" }),
     );
     const effects: ToolEffect[] = [];
@@ -174,7 +174,7 @@ describe("edit_reminder", () => {
       { ...ctx, effects },
     );
     expect(out.ok).toBe(false);
-    expect((await storage.getReminder("r1"))?.text).toBe("theirs");
+    expect((await storage.reminders.get("r1"))?.text).toBe("theirs");
     expect(effects).toEqual([]);
   });
 
@@ -192,13 +192,13 @@ describe("edit_reminder", () => {
 
   test("cannot edit a reminder from a different bot scope", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", text: "main-scope" }));
+    await storage.reminders.save(reminder({ id: "r1", text: "main-scope" }));
     const tool = createEditReminderTool({ storage });
     const out = await tool.execute(
       { reminderId: "r1", text: "x" },
       { ...ctx, botId: "bot9" },
     );
     expect(out.ok).toBe(false);
-    expect((await storage.getReminder("r1"))?.text).toBe("main-scope");
+    expect((await storage.reminders.get("r1"))?.text).toBe("main-scope");
   });
 });

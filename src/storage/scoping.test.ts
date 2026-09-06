@@ -46,21 +46,21 @@ test("user_facts written via a managed bot's tool scope are invisible to the mai
   await remember.execute({ key: "mood", value: "playful" }, ctx("cat-bot"));
 
   // Cat sees it through BOTH paths: the tool path AND the handler path
-  // (storage.forBot(botId).listUserFacts, used to surface facts in the prompt).
+  // (storage.forBot(botId).facts.list, used to surface facts in the prompt).
   const catViaTool = (await list.execute({}, ctx("cat-bot"))) as Array<{
     key: string;
     value: string;
   }>;
   expect(catViaTool).toEqual([{ key: "mood", value: "playful" }]);
-  expect(await storage.forBot("cat-bot").listUserFacts("user-1")).toEqual([
+  expect(await storage.forBot("cat-bot").facts.list("user-1")).toEqual([
     { key: "mood", value: "playful" },
   ]);
 
   // The main bot (null scope) sees nothing — neither via the tool nor directly.
   const mainViaTool = (await list.execute({}, ctx(null))) as unknown[];
   expect(mainViaTool).toEqual([]);
-  expect(await storage.listUserFacts("user-1")).toEqual([]);
-  expect(await storage.forBot(null).listUserFacts("user-1")).toEqual([]);
+  expect(await storage.facts.list("user-1")).toEqual([]);
+  expect(await storage.forBot(null).facts.list("user-1")).toEqual([]);
 });
 
 test("user_facts are isolated per managed bot", async () => {
@@ -71,10 +71,10 @@ test("user_facts are isolated per managed bot", async () => {
   await remember.execute({ key: "name", value: "guts" }, ctx("bot-a"));
   await remember.execute({ key: "name", value: "kitty" }, ctx("bot-b"));
 
-  expect(await storage.forBot("bot-a").listUserFacts("user-1")).toEqual([
+  expect(await storage.forBot("bot-a").facts.list("user-1")).toEqual([
     { key: "name", value: "guts" },
   ]);
-  expect(await storage.forBot("bot-b").listUserFacts("user-1")).toEqual([
+  expect(await storage.forBot("bot-b").facts.list("user-1")).toEqual([
     { key: "name", value: "kitty" },
   ]);
 });
@@ -87,10 +87,10 @@ test("a fact written by the main bot is invisible to managed bots and vice versa
   // Main bot writes via the base storage path (no botId set).
   await remember.execute({ key: "topic", value: "swords" }, ctx(null));
 
-  expect(await storage.listUserFacts("user-1")).toEqual([
+  expect(await storage.facts.list("user-1")).toEqual([
     { key: "topic", value: "swords" },
   ]);
-  expect(await storage.forBot("cat-bot").listUserFacts("user-1")).toEqual([]);
+  expect(await storage.forBot("cat-bot").facts.list("user-1")).toEqual([]);
 });
 
 test("reminders created via a managed bot's tool scope only fire on that bot's scheduler", async () => {
@@ -108,17 +108,17 @@ test("reminders created via a managed bot's tool scope only fire on that bot's s
   const afterFire = now + 11 * 60_000;
 
   // The cat's scheduler (its scoped storage) sees the due reminder.
-  const catDue = await storage.forBot("cat-bot").fetchDueReminders(afterFire);
+  const catDue = await storage.forBot("cat-bot").reminders.fetchDue(afterFire);
   expect(catDue).toHaveLength(1);
   expect(catDue[0]!.text).toBe("feed me");
 
   // The main bot's scheduler does not — neither the base nor the null scope.
-  expect(await storage.fetchDueReminders(afterFire)).toHaveLength(0);
-  expect(await storage.forBot(null).fetchDueReminders(afterFire)).toHaveLength(
+  expect(await storage.reminders.fetchDue(afterFire)).toHaveLength(0);
+  expect(await storage.forBot(null).reminders.fetchDue(afterFire)).toHaveLength(
     0,
   );
   expect(
-    await storage.forBot("other-bot").fetchDueReminders(afterFire),
+    await storage.forBot("other-bot").reminders.fetchDue(afterFire),
   ).toHaveLength(0);
 });
 
@@ -153,7 +153,7 @@ test("list_reminders and cancel_reminder are scoped to the calling bot", async (
   )) as { cancelled: boolean };
   expect(mainCancel.cancelled).toBe(false);
   expect(
-    await storage.forBot("cat-bot").fetchDueReminders(now + 11 * 60_000),
+    await storage.forBot("cat-bot").reminders.fetchDue(now + 11 * 60_000),
   ).toHaveLength(1);
 
   // ... but the cat can.
@@ -163,23 +163,23 @@ test("list_reminders and cancel_reminder are scoped to the calling bot", async (
   )) as { cancelled: boolean };
   expect(catCancel.cancelled).toBe(true);
   expect(
-    await storage.forBot("cat-bot").fetchDueReminders(now + 11 * 60_000),
+    await storage.forBot("cat-bot").reminders.fetchDue(now + 11 * 60_000),
   ).toHaveLength(0);
 });
 
 test("forBot(null) is byte-identical scope to the base main storage", async () => {
   const storage = new MemoryStorage();
-  await storage.saveConversation("chat-9", 100, {
+  await storage.conversations.save("chat-9", 100, {
     userQuestion: "hi",
     botAnswer: "hello",
     parentBotMsgId: null,
     ts: 1,
   });
   // Reading back through forBot(null) must return the same node the base wrote.
-  const viaNull = await storage.forBot(null).getConversation("chat-9", 100);
+  const viaNull = await storage.forBot(null).conversations.get("chat-9", 100);
   expect(viaNull?.botAnswer).toBe("hello");
   // A managed scope must not see it.
   expect(
-    await storage.forBot("cat-bot").getConversation("chat-9", 100),
+    await storage.forBot("cat-bot").conversations.get("chat-9", 100),
   ).toBeNull();
 });

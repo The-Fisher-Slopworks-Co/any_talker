@@ -85,18 +85,18 @@ export async function gatherSpendOverview(
 ): Promise<SpendOverview> {
   const [users, chats, modelIds, unpricedModels, denied, global] =
     await Promise.all([
-      storage.listUsers(),
-      storage.listChats(),
-      storage.listSpendModels(),
-      storage.listUnpricedModels(),
-      storage.topDenied(nowMs, opts.limit),
-      storage.getGlobalSpend(nowMs),
+      storage.users.list(),
+      storage.chats.list(),
+      storage.spend.listModels(),
+      storage.spend.listUnpriced(),
+      storage.observability.topDenied(nowMs, opts.limit),
+      storage.spend.getGlobal(nowMs),
     ]);
 
   const [userSpends, chatSpends, modelSpends] = await Promise.all([
-    Promise.all(users.map((u) => storage.getUserSpend(u.id, nowMs))),
-    Promise.all(chats.map((c) => storage.getChatSpend(c.id, nowMs))),
-    Promise.all(modelIds.map((m) => storage.getModelSpend(m, nowMs))),
+    Promise.all(users.map((u) => storage.spend.getUser(u.id, nowMs))),
+    Promise.all(chats.map((c) => storage.spend.getChat(c.id, nowMs))),
+    Promise.all(modelIds.map((m) => storage.spend.getModel(m, nowMs))),
   ]);
 
   const topUsers = users

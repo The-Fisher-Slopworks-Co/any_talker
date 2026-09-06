@@ -109,7 +109,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
 
   const [{ settings, botName }, userTimezone] = await Promise.all([
     input.resolver(input.chatId),
-    storage.getUserTimezone(input.userId),
+    storage.profile.getTimezone(input.userId),
   ]);
   const timezone = userTimezone ?? settings.timezone;
   // The one clock reading this turn uses. Both envelope builds below — the one
@@ -155,7 +155,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       (input.replyTarget.audios?.length ?? 0) > 0 ||
       (input.replyTarget.videos?.length ?? 0) > 0;
     if (!replyHasMedia) {
-      const node = await convStorage.getConversation(
+      const node = await convStorage.conversations.get(
         input.chatId,
         input.replyTarget.messageId,
       );
@@ -179,7 +179,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   const persistTurn = async (botMsgId: number, botAnswer: string) => {
     let parentBotMsgId: number | null = null;
     if (input.replyTarget) {
-      const existing = await convStorage.getConversation(
+      const existing = await convStorage.conversations.get(
         input.chatId,
         input.replyTarget.messageId,
       );
@@ -204,8 +204,8 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       ...(turnToolCalls.length > 0 && { toolCalls: turnToolCalls }),
     };
     await Promise.all([
-      convStorage.saveConversation(input.chatId, botMsgId, node),
-      convStorage.saveConversation(input.chatId, input.askMessageId, node),
+      convStorage.conversations.save(input.chatId, botMsgId, node),
+      convStorage.conversations.save(input.chatId, input.askMessageId, node),
     ]);
   };
 

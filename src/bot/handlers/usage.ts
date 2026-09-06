@@ -58,7 +58,7 @@ export async function usageCommandHandler(
 
   if (exempt) return { kind: "usage", text: s.bot_usage_exempt };
 
-  const stored = await input.storage.getUserUsage(input.fromUserId);
+  const stored = await input.storage.usage.get(input.fromUserId);
   const share = usageShare(
     summarizeUsage(input.fromUserId, settings.rateLimit, stored, input.nowMs),
     exempt,

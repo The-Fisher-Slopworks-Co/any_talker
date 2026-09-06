@@ -33,15 +33,15 @@ export async function recordSpend(
 ): Promise<void> {
   const cost = entry.costUsd;
   await Promise.all([
-    storage.addUserSpend(entry.userId, cost, nowMs),
-    storage.addChatSpend(entry.chatId, cost, nowMs),
-    storage.addGlobalSpend(cost, nowMs),
+    storage.spend.addUser(entry.userId, cost, nowMs),
+    storage.spend.addChat(entry.chatId, cost, nowMs),
+    storage.spend.addGlobal(cost, nowMs),
     entry.modelId
-      ? storage.addModelSpend(entry.modelId, cost, nowMs)
+      ? storage.spend.addModel(entry.modelId, cost, nowMs)
       : Promise.resolve(),
   ]);
   if (entry.modelId && !entry.priced) {
-    await storage.flagUnpricedModel(entry.modelId);
+    await storage.spend.flagUnpriced(entry.modelId);
   }
 }
 
@@ -53,7 +53,7 @@ export function recordDenial(
   userId: string,
   nowMs: number,
 ): void {
-  void storage
-    .incrementDenialCount(userId, nowMs)
+  void storage.observability
+    .incrementDenial(userId, nowMs)
     .catch((err) => console.error("recording denial failed:", err));
 }

@@ -79,8 +79,10 @@ export function validateDisplayName(input: unknown): DisplayNameResult {
 }
 
 type UserNameStore = {
-  getUserName(userId: string): Promise<string | null>;
-  setUserName(userId: string, name: string | null): Promise<void>;
+  profile: {
+    getName(userId: string): Promise<string | null>;
+    setName(userId: string, name: string | null): Promise<void>;
+  };
 };
 
 // Reads a stored display name and lazily purges values that no longer
@@ -90,12 +92,12 @@ export async function readValidDisplayName(
   store: UserNameStore,
   userId: string,
 ): Promise<string | null> {
-  const raw = await store.getUserName(userId);
+  const raw = await store.profile.getName(userId);
   if (raw === null) return null;
   const r = validateDisplayName(raw);
   const next = r.ok ? r.value : null;
   if (next !== raw) {
-    await store.setUserName(userId, next);
+    await store.profile.setName(userId, next);
   }
   return next;
 }

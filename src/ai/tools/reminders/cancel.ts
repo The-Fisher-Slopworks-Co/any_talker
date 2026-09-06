@@ -27,14 +27,14 @@ export function createCancelReminderTool(deps: {
     parameters: Schema,
     execute: async ({ reminderId }, ctx) => {
       const scoped = deps.storage.forBot(ctx.botId ?? null);
-      // O(1) fetch doubles as the ownership gate: deleteReminder itself does not
+      // O(1) fetch doubles as the ownership gate: reminders.delete itself does not
       // verify the owner, so we confirm the reminder is this user's before
       // removing it (and reuse fireAtMs for the confirmation blockquote).
-      const reminder = await scoped.getReminder(reminderId);
+      const reminder = await scoped.reminders.get(reminderId);
       if (!reminder || reminder.userId !== ctx.userId) {
         return { cancelled: false };
       }
-      await scoped.deleteReminder(reminderId, ctx.userId);
+      await scoped.reminders.delete(reminderId, ctx.userId);
       ctx.effects?.push({
         type: "reminder_cancelled",
         fireAtMs: reminder.fireAtMs,

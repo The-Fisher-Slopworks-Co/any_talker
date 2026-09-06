@@ -147,7 +147,7 @@ export async function guestAskHandler(
 
   const [{ settings, botName }, userTimezone] = await Promise.all([
     input.resolver(input.chatId),
-    storage.getUserTimezone(input.userId),
+    storage.profile.getTimezone(input.userId),
   ]);
   const timezone = userTimezone ?? settings.timezone;
 
@@ -162,18 +162,18 @@ export async function guestAskHandler(
   const senderChatId = input.senderChatId ?? null;
   if (!isOwner) {
     if (
-      (await storage.isBlacklisted("users", input.userId)) ||
-      (await storage.isBlacklisted("chats", input.chatId)) ||
+      (await storage.access.isBlacklisted("users", input.userId)) ||
+      (await storage.access.isBlacklisted("chats", input.chatId)) ||
       (senderChatId !== null &&
-        (await storage.isBlacklisted("chats", senderChatId)))
+        (await storage.access.isBlacklisted("chats", senderChatId)))
     ) {
       return { kind: "denied", reason: "blacklisted" };
     }
     if (settings.whitelistEnabled) {
       const isWhitelisted =
-        (await storage.isWhitelisted("users", input.userId)) ||
+        (await storage.access.isWhitelisted("users", input.userId)) ||
         (senderChatId !== null &&
-          (await storage.isWhitelisted("chats", senderChatId)));
+          (await storage.access.isWhitelisted("chats", senderChatId)));
       if (!isWhitelisted) return { kind: "denied", reason: "not_whitelisted" };
     }
   }
@@ -302,7 +302,7 @@ export async function guestAskHandler(
               ...(turn.toolCalls.length > 0 && { toolCalls: turn.toolCalls }),
             },
           ].slice(-MAX_REPLY_CHAIN_DEPTH);
-          await storage.saveGuestThread(input.chatId, {
+          await storage.conversations.saveGuest(input.chatId, {
             chatId: input.chatId,
             turns,
             ts: input.now,

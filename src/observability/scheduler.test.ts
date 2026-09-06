@@ -37,7 +37,7 @@ describe("runObservabilityTick — spike scan", () => {
   test("alerts the owner once when a user's spend spikes, then dedupes", async () => {
     const storage = new MemoryStorage();
     // $2 today, over the default $0.5 user absolute threshold.
-    await storage.addUserSpend("u1", 2, NOW);
+    await storage.spend.addUser("u1", 2, NOW);
     const api = new FakeNotify();
 
     await tick(storage, api, NOW);
@@ -52,7 +52,7 @@ describe("runObservabilityTick — spike scan", () => {
 
   test("no spike DM when spend is below threshold", async () => {
     const storage = new MemoryStorage();
-    await storage.addUserSpend("u1", 0.01, NOW);
+    await storage.spend.addUser("u1", 0.01, NOW);
     const api = new FakeNotify();
     await tick(storage, api, NOW);
     expect(api.sent).toEqual([]);
@@ -62,16 +62,18 @@ describe("runObservabilityTick — spike scan", () => {
 describe("runObservabilityTick — digest", () => {
   test("first tick establishes cadence without sending", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1, NOW);
+    await storage.spend.addGlobal(1, NOW);
     const api = new FakeNotify();
     await tick(storage, api, NOW);
     expect(api.rich).toEqual([]);
-    expect(await storage.getDigestState()).toEqual({ lastSentAtMs: NOW });
+    expect(await storage.observability.getDigestState()).toEqual({
+      lastSentAtMs: NOW,
+    });
   });
 
   test("sends the digest as a rich message once the interval has elapsed", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1, NOW);
+    await storage.spend.addGlobal(1, NOW);
     const api = new FakeNotify();
     await tick(storage, api, NOW); // establish
     await tick(storage, api, NOW + 25 * HOUR); // > 24h default
@@ -83,7 +85,7 @@ describe("runObservabilityTick — digest", () => {
 
   test("falls back to a plain DM when the rich send fails", async () => {
     const storage = new MemoryStorage();
-    await storage.addGlobalSpend(1, NOW);
+    await storage.spend.addGlobal(1, NOW);
     const api = new FakeNotify();
     api.richFails = true;
     await tick(storage, api, NOW); // establish
@@ -100,7 +102,7 @@ describe("runObservabilityTick — digest", () => {
     await tick(storage, api, NOW + 25 * HOUR);
     expect(api.sent).toEqual([]);
     expect(api.rich).toEqual([]);
-    expect(await storage.getDigestState()).toEqual({
+    expect(await storage.observability.getDigestState()).toEqual({
       lastSentAtMs: NOW + 25 * HOUR,
     });
   });
@@ -110,7 +112,7 @@ describe("runObservabilityTick — digest", () => {
     const api = new FakeNotify();
     await tick(storage, api, NOW); // establish at NOW
     // A user first seen after the baseline.
-    await storage.upsertUser({
+    await storage.users.upsert({
       id: "u9",
       firstName: "New",
       lastName: null,
@@ -127,7 +129,7 @@ describe("runObservabilityTick — digest", () => {
   test("private chats are left out of the chat ranking", async () => {
     const storage = new MemoryStorage();
     const api = new FakeNotify();
-    await storage.upsertChat({
+    await storage.chats.upsert({
       id: "-100",
       type: "supergroup",
       title: "The group",
@@ -135,7 +137,7 @@ describe("runObservabilityTick — digest", () => {
       firstSeenAt: 1,
       lastSeenAt: NOW,
     });
-    await storage.upsertChat({
+    await storage.chats.upsert({
       id: "42",
       type: "private",
       title: null,
@@ -144,9 +146,9 @@ describe("runObservabilityTick — digest", () => {
       lastSeenAt: NOW,
     });
     // The private chat outspends the group, so it would top the ranking.
-    await storage.addChatSpend("-100", 0.5, NOW);
-    await storage.addChatSpend("42", 5, NOW);
-    await storage.addGlobalSpend(5.5, NOW);
+    await storage.spend.addChat("-100", 0.5, NOW);
+    await storage.spend.addChat("42", 5, NOW);
+    await storage.spend.addGlobal(5.5, NOW);
     await tick(storage, api, NOW); // establish
     await tick(storage, api, NOW + 25 * HOUR);
 

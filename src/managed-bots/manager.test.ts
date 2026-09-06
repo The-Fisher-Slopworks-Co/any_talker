@@ -60,7 +60,7 @@ test("a managed_bot update from a non-owner is ignored entirely", async () => {
 
   expect(res).toBeNull();
   expect(tokenCalls).toEqual([]); // no token brokered
-  expect(await storage.listManagedBots()).toEqual([]); // no record persisted
+  expect(await storage.managedBots.list()).toEqual([]); // no record persisted
 });
 
 test("a managed_bot update from the owner brokers, persists and starts", async () => {
@@ -75,7 +75,7 @@ test("a managed_bot update from the owner brokers, persists and starts", async (
 
   expect(res?.botId).toBe("555");
   expect(tokenCalls).toEqual([555]);
-  expect(await storage.getManagedBotToken("555")).toBe("token-555");
+  expect(await storage.managedBots.getToken("555")).toBe("token-555");
   expect(manager.starts).toEqual([
     { record: res as ManagedBot, token: "token-555" },
   ]);
@@ -92,13 +92,13 @@ test("deleteBot removes the registry record and the stored token", async () => {
     systemPrompt: "p",
     createdAtMs: 0,
   };
-  await storage.saveManagedBot(record);
-  await storage.setManagedBotToken("555", "tok");
+  await storage.managedBots.save(record);
+  await storage.managedBots.setToken("555", "tok");
 
   await manager.deleteBot("555");
 
-  expect(await storage.getManagedBot("555")).toBeNull();
-  expect(await storage.getManagedBotToken("555")).toBeNull();
+  expect(await storage.managedBots.get("555")).toBeNull();
+  expect(await storage.managedBots.getToken("555")).toBeNull();
   expect(manager.isRunning("555")).toBe(false);
 });
 

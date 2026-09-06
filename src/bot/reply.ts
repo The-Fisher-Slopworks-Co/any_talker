@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Message } from "grammy/types";
+import type { ReplyTarget } from "./context-builder";
 
 export function resolveReplyAuthor(reply: Message): string | null {
   const fo = reply.forward_origin;
@@ -22,4 +23,15 @@ export function resolveReplyAuthor(reply: Message): string | null {
     }
   }
   return reply.from?.first_name ?? null;
+}
+
+export function extractReplyTarget(reply: Message): ReplyTarget {
+  const text = reply.text ?? reply.caption ?? null;
+  return {
+    messageId: reply.message_id,
+    text,
+    authorFirstName: resolveReplyAuthor(reply),
+    images: [],
+    audios: [],
+  };
 }
