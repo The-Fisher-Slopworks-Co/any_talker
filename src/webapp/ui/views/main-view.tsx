@@ -6,7 +6,7 @@ import { useI18n } from "../i18n-context";
 import { api, type MeResponse, type SpendSummary } from "../api-client";
 import { SpendingCard } from "../components/spending-card";
 import { composeFullName, type Gender } from "../../../shared/types";
-import { SUPPORTED_LANGS, type Lang } from "../../../shared/i18n";
+import { type Lang } from "../../../shared/i18n";
 import {
   DATE_FORMATS,
   DATE_FORMAT_SAMPLE_MS,
@@ -14,18 +14,18 @@ import {
   type DateFormat,
 } from "../../../shared/date-format";
 import { validateDisplayName } from "../../../shared/display-name";
-import { DISPLAY_NAME_ERR_KEY } from "../lib/labels";
 import {
   Card,
   SectionFooter,
   SectionHeader,
   Stack,
 } from "../components/layout";
-import { RowButton, SaveButton, Toggle } from "../components/controls";
+import { RowButton, SaveButton } from "../components/controls";
 import { SelectRow } from "../components/select-row";
-import { TimezoneSelect } from "../components/timezone-select";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../components/row";
-import { LANG_LABEL_KEY } from "../lib/labels";
+import { DisplayNameField } from "../components/display-name-field";
+import { GenderField } from "../components/gender-field";
+import { TimezoneField } from "../components/timezone-field";
+import { LanguageField } from "../components/language-field";
 
 export function MainView({
   me,
@@ -99,64 +99,28 @@ export function MainView({
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_main_display_name}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_main_name}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={tgName || s.ui_main_your_name}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-      </Card>
-      <SectionFooter>
-        {nameError ? (
-          <span className="text-tg-destructive">
-            {s[DISPLAY_NAME_ERR_KEY[nameError]]}
-          </span>
-        ) : (
-          s.ui_main_name_footer
-        )}
-      </SectionFooter>
+      <DisplayNameField
+        label={s.ui_main_name}
+        placeholder={tgName || s.ui_main_your_name}
+        footer={s.ui_main_name_footer}
+        value={name}
+        onChange={setName}
+        error={nameError}
+      />
 
-      <SectionHeader>{s.ui_main_gender}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_main_tell_ai}</span>
-          <span className="flex-1" />
-          <Toggle value={genderOn} onChange={setGenderOn} />
-        </div>
-      </Card>
-      {genderOn ? (
-        <Card>
-          <SelectRow
-            label={s.ui_main_male}
-            selected={genderValue === "male"}
-            onSelect={() => setGenderValue("male")}
-          />
-          <SelectRow
-            label={s.ui_main_female}
-            selected={genderValue === "female"}
-            onSelect={() => setGenderValue("female")}
-          />
-        </Card>
-      ) : null}
-      <SectionFooter>{s.ui_main_gender_footer}</SectionFooter>
+      <GenderField
+        enabled={genderOn}
+        onEnabledChange={setGenderOn}
+        value={genderValue}
+        onChange={setGenderValue}
+      />
 
-      <SectionHeader>{s.ui_main_timezone}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_main_use_my_tz}</span>
-          <span className="flex-1" />
-          <Toggle value={tzOverride} onChange={setTzOverride} />
-        </div>
-      </Card>
-      {tzOverride ? (
-        <TimezoneSelect value={tzValue} onChange={setTzValue} />
-      ) : null}
-      <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
+      <TimezoneField
+        enabled={tzOverride}
+        onEnabledChange={setTzOverride}
+        value={tzValue}
+        onChange={setTzValue}
+      />
 
       <SectionHeader>{s.ui_main_time_format}</SectionHeader>
       <Card>
@@ -176,18 +140,7 @@ export function MainView({
       </Card>
       <SectionFooter>{s.ui_main_time_format_footer}</SectionFooter>
 
-      <SectionHeader>{s.ui_main_language}</SectionHeader>
-      <Card>
-        {SUPPORTED_LANGS.map((code) => (
-          <SelectRow
-            key={code}
-            label={s[LANG_LABEL_KEY[code]]}
-            selected={langValue === code}
-            onSelect={() => setLangValue(code)}
-          />
-        ))}
-      </Card>
-      <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
+      <LanguageField value={langValue} onChange={setLangValue} />
 
       <SaveButton
         saving={saving}

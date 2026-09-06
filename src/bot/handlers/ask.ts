@@ -6,8 +6,7 @@ import type { RateLimiter } from "../../ratelimit/types";
 import type { ToolCallRecord } from "../../shared/types";
 import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
-import { recordDenial } from "../../spending/record";
-import { runAiTurn } from "../../ai/turn";
+import { runGatedAiTurn } from "./turn";
 import { checkAccess, type AccessDenyReason } from "../access";
 import {
   buildContext,
@@ -210,138 +209,81 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     ]);
   };
 
-  const isOwner = input.userId === input.ownerId;
+  const turn = await runGatedAiTurn({
+    ai: input.ai,
+    rateLimiter: input.rateLimiter,
+    budgetGuard: input.budgetGuard,
+    storage,
+    settings,
+    userId: input.userId,
+    ownerId: input.ownerId,
+    chatId: input.chatId,
+    botId: input.botId ?? null,
+    source: "ask",
+    replyToMessageId: input.askMessageId,
+    detailLevel: input.detailLevel,
+    timezone,
+    lang: input.lang,
+    now: input.now,
+    buildMessages: () =>
+      buildContext({
+        storage: convStorage,
+        chatId: input.chatId,
+        sender: input.sender,
+        userText: input.userText,
+        quote: input.quote,
+        images: input.images,
+        audios,
+        videos,
+        attachments: input.attachments,
+        replyTarget: input.replyTarget,
+        sentAt,
+        fetchPhoto: input.fetchPhoto,
+      }),
+    onAIStart: input.onAIStart,
+  });
 
-  // Hard USD budget gate (money), checked before the token rate limit
-  // (fairness) — the coarser, cheaper "is the bot even allowed to spend more"
-  // question. Disabled/owner-exempt short-circuit inside the guard.
-  const budgetVerdict = await input.budgetGuard.check(
-    {
-      userId: input.userId,
-      chatId: input.chatId,
-      isOwner,
-      now: input.now,
-    },
-    settings.budget,
-  );
-  if (!budgetVerdict.allowed) {
-    recordDenial(storage, input.userId, input.now);
-    return {
-      kind: "budgetLimited",
-      reason: budgetVerdict.reason,
-      persistConversation: persistTurn,
-    };
-  }
-
-  const skipRateLimit = isOwner && settings.rateLimit.ownerExempt;
-  if (!skipRateLimit) {
-    const r = await input.rateLimiter.check(
-      input.userId,
-      settings.rateLimit,
-      input.now,
-    );
-    if (!r.allowed) {
-      recordDenial(storage, input.userId, input.now);
+  switch (turn.kind) {
+    case "budgetLimited":
+      return {
+        kind: "budgetLimited",
+        reason: turn.reason,
+        persistConversation: persistTurn,
+      };
+    case "rateLimited":
       return {
         kind: "rateLimited",
-        limitedBy: r.limitedBy,
-        msUntilReset: r.msUntilReset,
+        limitedBy: turn.limitedBy,
+        msUntilReset: turn.msUntilReset,
         persistConversation: persistTurn,
+      };
+    case "error":
+      // A turn whose tools ran but whose final output came back blank still
+      // persists what they returned: the failure notice becomes `botAnswer`,
+      // and the next turn picks up from the material instead of re-fetching
+      // it. A turn that threw inside the model call has nothing to record.
+      turnToolCalls = turn.toolCalls;
+      return {
+        kind: "error",
+        message: turn.message,
+        persistConversation: persistTurn,
+      };
+    case "answered": {
+      turnToolCalls = turn.toolCalls;
+      // The AI now emits Rich Markdown sent verbatim via sendRichMessage;
+      // Telegram parses it server-side (only supported tags/schemes are
+      // honored), so there is no HTML sanitization step. The same text is
+      // persisted as conversation context for later turns.
+      const body = turn.text;
+      return {
+        kind: "answered",
+        text: body,
+        botName,
+        totalTokens: turn.totalTokens,
+        effects: turn.effects,
+        expandableThreshold: settings.expandableBlockquoteThreshold,
+        persistConversation: (botMsgId) => persistTurn(botMsgId, body),
       };
     }
   }
-
-  const messages = await buildContext({
-    storage: convStorage,
-    chatId: input.chatId,
-    sender: input.sender,
-    userText: input.userText,
-    quote: input.quote,
-    images: input.images,
-    audios,
-    videos,
-    attachments: input.attachments,
-    replyTarget: input.replyTarget,
-    sentAt,
-    fetchPhoto: input.fetchPhoto,
-  });
-
-  input.onAIStart?.();
-
-  // Surface the user's remembered facts in the system prompt so the model can
-  // use them without having to call list_facts on every turn.
-  const facts = await storage.listUserFacts(input.userId);
-
-  // Assemble the request, run the model, and do the post-call accounting
-  // (owner-exempt token deduction with the detail-level multiplier + the
-  // four-ledger spend booking) in one place shared with guest mode and reminder
-  // delivery. A thrown `ai.ask` propagates before any accounting runs.
-  let result;
-  try {
-    result = await runAiTurn({
-      ai: input.ai,
-      rateLimiter: input.rateLimiter,
-      storage,
-      models: settings.models,
-      systemPrompt: settings.systemPrompt,
-      rateLimit: settings.rateLimit,
-      routing: {
-        providerSort: settings.providerSort,
-        provider: settings.provider,
-        serviceTier: settings.serviceTier,
-      },
-      userId: input.userId,
-      ownerId: input.ownerId,
-      chatId: input.chatId,
-      botId: input.botId ?? null,
-      source: "ask",
-      replyToMessageId: input.askMessageId,
-      timezone,
-      lang: input.lang,
-      now: input.now,
-      messages,
-      detailLevel: input.detailLevel,
-      facts,
-      contextMessages: messages,
-    });
-  } catch (err) {
-    return {
-      kind: "error",
-      message: err instanceof Error ? err.message : String(err),
-      persistConversation: persistTurn,
-    };
-  }
-  // Set before the empty-answer check below, so a turn whose tools ran but
-  // whose final output came back blank still persists what they returned: the
-  // failure notice becomes `botAnswer`, and the next turn picks up from the
-  // material instead of re-fetching it. A turn that threw inside `runAiTurn`
-  // returned above with nothing to record.
-  turnToolCalls = result.toolCalls;
-
-  // A model can legitimately finish with no text (e.g. an output-token cap hit
-  // mid-reasoning). Surface it as an error turn — Telegram rejects empty
-  // messages, so trying to send it would only crash the dispatcher.
-  if (result.text.trim() === "") {
-    return {
-      kind: "error",
-      message: "AI returned an empty answer",
-      persistConversation: persistTurn,
-    };
-  }
-
-  // The AI now emits Rich Markdown sent verbatim via sendRichMessage; Telegram
-  // parses it server-side (only supported tags/schemes are honored), so there
-  // is no HTML sanitization step. The same text is persisted as conversation
-  // context for later turns.
-  const body = result.text;
-
-  return {
-    kind: "answered",
-    text: body,
-    botName,
-    totalTokens: result.totalTokens,
-    effects: result.effects,
-    expandableThreshold: settings.expandableBlockquoteThreshold,
-    persistConversation: (botMsgId) => persistTurn(botMsgId, body),
-  };
 }

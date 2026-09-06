@@ -636,28 +636,13 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     // Same supplementary-context sample as /ask's reply video (see there).
     const replyVideo = replyMsg ? pickVideo(replyMsg) : null;
     if (replyTarget && replyVideo) {
-      const parts = await loadVideoParts(
+      const merged = await mergeReplyVideo(
         chatId,
         replyVideo,
-        REPLY_VIDEO_FRAMES,
+        replyTarget,
+        replyImageFileIds,
       );
-      if (parts.ok) {
-        const media = videoMedia(replyVideo, parts);
-        replyTarget.images = [...replyTarget.images, ...media.images];
-        if (media.audios.length > 0) {
-          replyTarget.audios = [...(replyTarget.audios ?? []), ...media.audios];
-        }
-        if (media.videos.length > 0) {
-          replyTarget.videos = [...(replyTarget.videos ?? []), ...media.videos];
-        }
-        replyTarget.mediaNote = media.attachments;
-        if (replyVideo.thumbnailFileId) {
-          replyImageFileIds = [
-            ...replyImageFileIds,
-            replyVideo.thumbnailFileId,
-          ];
-        }
-      }
+      if (merged) replyImageFileIds = merged.replyImageFileIds;
     }
 
     debugLog("guest_dispatch", {
@@ -861,6 +846,42 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           }),
         };
 
+  // Fold a replied-to clip into the reply target it belongs to. A replied-to
+  // clip is supplementary context, so it contributes a smaller frame sample than
+  // a clip the ask is *about*, and a failure just drops it (the user asked about
+  // their own message, not this one). Returns null when nothing could be
+  // resolved and the target is left untouched; otherwise the resolved mode and
+  // the reply file ids extended with the clip's thumbnail — neither a clip nor a
+  // frame carries a Telegram file id, the thumbnail does, so a follow-up turn
+  // keeps a still of it.
+  const mergeReplyVideo = async (
+    chatId: string,
+    video: VideoAttachment,
+    replyTarget: ReplyTarget,
+    replyImageFileIds: string[],
+  ): Promise<{
+    mode: VideoParts["mode"];
+    replyImageFileIds: string[];
+  } | null> => {
+    const parts = await loadVideoParts(chatId, video, REPLY_VIDEO_FRAMES);
+    if (!parts.ok) return null;
+    const media = videoMedia(video, parts);
+    replyTarget.images = [...replyTarget.images, ...media.images];
+    if (media.audios.length > 0) {
+      replyTarget.audios = [...(replyTarget.audios ?? []), ...media.audios];
+    }
+    if (media.videos.length > 0) {
+      replyTarget.videos = [...(replyTarget.videos ?? []), ...media.videos];
+    }
+    replyTarget.mediaNote = media.attachments;
+    return {
+      mode: parts.mode,
+      replyImageFileIds: video.thumbnailFileId
+        ? [...replyImageFileIds, video.thumbnailFileId]
+        : replyImageFileIds,
+    };
+  };
+
   const dispatchAsk = async (ctx: BotContext, args: AskDispatch) => {
     debugLog("ask_dispatch", {
       chat_id: ctx.chat?.id,
@@ -937,41 +958,23 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
       }
     }
 
-    // A replied-to clip is supplementary context, so it contributes a smaller
-    // frame sample than a clip the ask is *about*, and a failure just drops it
-    // (the user asked about their own message, not this one).
     const replyVideo = args.replyToMessage
       ? pickVideo(args.replyToMessage)
       : null;
     if (replyTarget && replyVideo) {
-      const parts = await loadVideoParts(
+      const merged = await mergeReplyVideo(
         String(chatId),
         replyVideo,
-        REPLY_VIDEO_FRAMES,
+        replyTarget,
+        replyImageFileIds,
       );
-      if (parts.ok) {
-        const media = videoMedia(replyVideo, parts);
-        replyTarget.images = [...replyTarget.images, ...media.images];
-        if (media.audios.length > 0) {
-          replyTarget.audios = [...(replyTarget.audios ?? []), ...media.audios];
-        }
-        if (media.videos.length > 0) {
-          replyTarget.videos = [...(replyTarget.videos ?? []), ...media.videos];
-        }
-        replyTarget.mediaNote = media.attachments;
-        // Neither a clip nor a frame carries a Telegram file id; the clip's
-        // thumbnail is a real one, so a follow-up turn keeps a still of it.
-        if (replyVideo.thumbnailFileId) {
-          replyImageFileIds = [
-            ...replyImageFileIds,
-            replyVideo.thumbnailFileId,
-          ];
-        }
+      if (merged) {
+        replyImageFileIds = merged.replyImageFileIds;
         debugLog("reply_video_resolved", {
           chat_id: chatId,
           reply_message_id: args.replyToMessage?.message_id,
           kind: replyVideo.kind,
-          mode: parts.mode,
+          mode: merged.mode,
         });
       }
     }
@@ -1224,6 +1227,23 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
     },
   });
 
+  // An album item is never answered on its own: it joins the buffer keyed by
+  // chat + media group and the whole group is dispatched once it settles.
+  const bufferMediaGroupItem = (
+    chatId: number,
+    groupId: string,
+    ctx: BotContext,
+    msg: Message,
+  ) => {
+    const key = `${chatId}:${groupId}`;
+    mediaGroupBuffer.push({ key, context: ctx, item: msg });
+    debugLog("media_group_push", {
+      key,
+      message_id: msg.message_id,
+      pending_groups: mediaGroupBuffer.pendingCount(),
+    });
+  };
+
   const dispatchTextCommand = async (
     ctx: BotContext,
     detailLevel: DetailLevel,
@@ -1351,17 +1371,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           })
           .catch((err) => console.error("appendAlbumPhoto failed:", err));
       }
-      const key = `${chatId}:${msg.media_group_id}`;
-      mediaGroupBuffer.push({
-        key,
-        context: ctx,
-        item: msg,
-      });
-      debugLog("media_group_push", {
-        key,
-        message_id: msg.message_id,
-        pending_groups: mediaGroupBuffer.pendingCount(),
-      });
+      bufferMediaGroupItem(chatId, msg.media_group_id, ctx, msg);
       return;
     }
 
@@ -1484,13 +1494,7 @@ export function createBot(deps: BotDeps): Bot<BotContext> {
           })
           .catch((err) => console.error("appendAlbumPhoto failed:", err));
       }
-      const key = `${chatId}:${msg.media_group_id}`;
-      mediaGroupBuffer.push({ key, context: ctx, item: msg });
-      debugLog("media_group_push", {
-        key,
-        message_id: msg.message_id,
-        pending_groups: mediaGroupBuffer.pendingCount(),
-      });
+      bufferMediaGroupItem(chatId, msg.media_group_id, ctx, msg);
       return;
     }
 

@@ -14,11 +14,7 @@ import {
 import { SpendingCard } from "../../components/spending-card";
 import { UsageCard } from "../../components/usage-card";
 import type { Gender } from "../../../../shared/types";
-import {
-  SUPPORTED_LANGS,
-  DEFAULT_LANG,
-  type Lang,
-} from "../../../../shared/i18n";
+import { DEFAULT_LANG, type Lang } from "../../../../shared/i18n";
 import {
   Card,
   SectionFooter,
@@ -26,23 +22,16 @@ import {
   Stack,
 } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
-import { RowButton, SaveButton, Toggle } from "../../components/controls";
+import { RowButton, SaveButton } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
-import { TimezoneSelect } from "../../components/timezone-select";
+import { DisplayNameField } from "../../components/display-name-field";
+import { GenderField } from "../../components/gender-field";
+import { TimezoneField } from "../../components/timezone-field";
+import { LanguageField } from "../../components/language-field";
 import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
 import { BlacklistToggleButton } from "../../components/blacklist-toggle-button";
-import {
-  INPUT_CLS,
-  ROW_CLS,
-  ROW_LABEL_CLS,
-  ROW_VALUE_CLS,
-} from "../../components/row";
-import {
-  botLabel,
-  DISPLAY_NAME_ERR_KEY,
-  LANG_LABEL_KEY,
-  userDisplayName,
-} from "../../lib/labels";
+import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
+import { botLabel, userDisplayName } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 import { openTelegramProfile } from "../../lib/telegram";
 import { validateDisplayName } from "../../../../shared/display-name";
@@ -174,86 +163,34 @@ export function UserEditView({ userId }: { userId: string }) {
         <TimeNote />
       </SectionFooter>
 
-      <SectionHeader>{s.ui_main_display_name}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={fallbackName}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-      </Card>
-      <SectionFooter>
-        {nameError ? (
-          <span className="text-tg-destructive">
-            {s[DISPLAY_NAME_ERR_KEY[nameError]]}
-          </span>
-        ) : (
-          s.ui_user_display_name_footer
-        )}
-      </SectionFooter>
+      <DisplayNameField
+        label={s.ui_user_name}
+        placeholder={fallbackName}
+        footer={s.ui_user_display_name_footer}
+        value={name}
+        onChange={setName}
+        error={nameError}
+      />
 
-      <SectionHeader>{s.ui_main_gender}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_main_tell_ai}</span>
-          <span className="flex-1" />
-          <Toggle value={genderOn} onChange={setGenderOn} />
-        </div>
-      </Card>
-      {genderOn ? (
-        <Card>
-          <SelectRow
-            label={s.ui_main_male}
-            selected={genderValue === "male"}
-            onSelect={() => setGenderValue("male")}
-          />
-          <SelectRow
-            label={s.ui_main_female}
-            selected={genderValue === "female"}
-            onSelect={() => setGenderValue("female")}
-          />
-        </Card>
-      ) : null}
-      <SectionFooter>{s.ui_main_gender_footer}</SectionFooter>
+      <GenderField
+        enabled={genderOn}
+        onEnabledChange={setGenderOn}
+        value={genderValue}
+        onChange={setGenderValue}
+      />
 
-      <SectionHeader>{s.ui_main_timezone}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_main_use_my_tz}</span>
-          <span className="flex-1" />
-          <Toggle value={tzOverride} onChange={setTzOverride} />
-        </div>
-      </Card>
-      {tzOverride ? (
-        <TimezoneSelect value={tzValue} onChange={setTzValue} />
-      ) : null}
-      <SectionFooter>{s.ui_main_tz_footer}</SectionFooter>
+      <TimezoneField
+        enabled={tzOverride}
+        onEnabledChange={setTzOverride}
+        value={tzValue}
+        onChange={setTzValue}
+      />
 
-      <SectionHeader>{s.ui_main_language}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_user_set_language}</span>
-          <span className="flex-1" />
-          <Toggle value={langOn} onChange={setLangOn} />
-        </div>
-      </Card>
-      {langOn ? (
-        <Card>
-          {SUPPORTED_LANGS.map((code) => (
-            <SelectRow
-              key={code}
-              label={s[LANG_LABEL_KEY[code]]}
-              selected={langValue === code}
-              onSelect={() => setLangValue(code)}
-            />
-          ))}
-        </Card>
-      ) : null}
-      <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
+      <LanguageField
+        value={langValue}
+        onChange={setLangValue}
+        toggle={{ enabled: langOn, onEnabledChange: setLangOn }}
+      />
 
       <SaveButton
         saving={saving}
