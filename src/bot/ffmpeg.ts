@@ -2,11 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 // The one place ffmpeg is actually run. Both callers — the voice transcode
-// (`transcode.ts`) and the video frame/soundtrack passes (`video.ts`) — want the
-// same thing: spawn ffmpeg, read stdout whole, and treat anything that is not a
-// clean exit carrying bytes as "this pass produced nothing". They differ only in
-// the argv, how the input arrives (piped bytes vs a path ffmpeg opens itself)
-// and how long the pass is allowed to take.
+// (`transcode.ts`) and the video frame/soundtrack passes (`video/decode.ts`) —
+// want the same thing: spawn ffmpeg, read stdout whole, and treat anything that
+// is not a clean exit carrying bytes as "this pass produced nothing". They
+// differ only in the argv, how the input arrives (piped bytes vs a path ffmpeg
+// opens itself) and how long the pass is allowed to take.
 
 // The slice of a spawned subprocess this module touches, narrowed so tests can
 // inject a fake without constructing a real one.
