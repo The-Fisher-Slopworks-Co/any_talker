@@ -9,12 +9,14 @@ function makeStore(initial: string | null) {
   const setCalls: (string | null)[] = [];
   return {
     store: {
-      async getUserName() {
-        return value;
-      },
-      async setUserName(_id: string, next: string | null) {
-        value = next;
-        setCalls.push(next);
+      profile: {
+        async getName() {
+          return value;
+        },
+        async setName(_id: string, next: string | null) {
+          value = next;
+          setCalls.push(next);
+        },
       },
     },
     setCalls,

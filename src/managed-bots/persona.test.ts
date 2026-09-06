@@ -21,19 +21,19 @@ const bot: ManagedBot = {
 
 test("managed resolver: global settings + character prompt, no name prefix, ignoring per-chat overrides", async () => {
   const storage = new MemoryStorage();
-  await storage.saveSettings({
+  await storage.settings.save({
     ...DEFAULT_SETTINGS,
     systemPrompt: "global prompt",
     models: ["m-global"],
   });
   // A per-chat override configured on the main bot must NOT bleed into a
   // managed bot — that is the confirmed inheritance rule (global only).
-  await storage.saveChatSettings("chat-1", {
+  await storage.chats.saveSettings("chat-1", {
     systemPrompt: "chat override",
     models: ["m-chat"],
     botName: "ChatName",
   });
-  await storage.saveManagedBot(bot);
+  await storage.managedBots.save(bot);
 
   const { settings, botName } = await createManagedPersonaResolver(
     storage,
@@ -48,7 +48,7 @@ test("managed resolver: global settings + character prompt, no name prefix, igno
 
 test("managed resolver: falls back to global settings if the record vanished", async () => {
   const storage = new MemoryStorage();
-  await storage.saveSettings({
+  await storage.settings.save({
     ...DEFAULT_SETTINGS,
     systemPrompt: "global prompt",
   });
@@ -64,12 +64,12 @@ test("managed resolver: falls back to global settings if the record vanished", a
 
 test("main resolver: effective settings (global + chat override) + chat botName", async () => {
   const storage = new MemoryStorage();
-  await storage.saveSettings({
+  await storage.settings.save({
     ...DEFAULT_SETTINGS,
     systemPrompt: "global prompt",
     models: ["m-global"],
   });
-  await storage.saveChatSettings("chat-1", {
+  await storage.chats.saveSettings("chat-1", {
     systemPrompt: "chat override",
     botName: "ChatName",
   });

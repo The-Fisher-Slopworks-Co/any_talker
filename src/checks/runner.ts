@@ -20,7 +20,7 @@ export async function runChecksTick(deps: {
   api: CheckApi;
   nowMs: number;
 }): Promise<void> {
-  const checks = await deps.storage.listChecks();
+  const checks = await deps.storage.checks.list();
   await Promise.allSettled(
     checks.map(async (check) => {
       try {
@@ -114,7 +114,7 @@ async function fireCheck(
       return;
     }
     check = { ...check, chatId: newChatId };
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     console.warn(
       `[checks] chat migrated to supergroup id=${check.id}, now targeting ${newChatId}`,
     );
@@ -128,7 +128,7 @@ async function fireCheck(
     }
   }
 
-  await storage.saveCheck({
+  await storage.checks.save({
     ...check,
     lastFiredAtMs: nowMs,
     pendingMessageId: messageId,

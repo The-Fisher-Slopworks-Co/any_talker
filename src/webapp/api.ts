@@ -121,7 +121,7 @@ async function userUsageStatus(
   config: RateLimitConfig,
   now: number,
 ): Promise<UsageStatus> {
-  const stored = await storage.getUserUsage(userId);
+  const stored = await storage.usage.get(userId);
   return summarizeUsage(userId, config, stored, now);
 }
 
@@ -174,7 +174,7 @@ async function resolveFactsStorage(
   scope: string,
 ): Promise<Storage | null> {
   if (scope === MAIN_BOT_SCOPE) return storage.forBot(null);
-  const bot = await storage.getManagedBot(scope);
+  const bot = await storage.managedBots.get(scope);
   return bot ? storage.forBot(scope) : null;
 }
 
@@ -185,7 +185,7 @@ async function respondFacts(
   scoped: Storage,
   userId: string,
 ): Promise<ApiResponse> {
-  const facts = await scoped.listUserFacts(userId);
+  const facts = await scoped.facts.list(userId);
   return { status: 200, body: { facts, cap: USER_FACTS_MAX_PER_USER } };
 }
 
@@ -248,7 +248,7 @@ async function applyUserFieldUpdates(
     const r = validateDisplayName(body.displayName);
     if (!r.ok) return { ok: false, error: badDisplayName(r.reason) };
     fields.displayName = r.value;
-    writes.push(storage.setUserName(userId, r.value));
+    writes.push(storage.profile.setName(userId, r.value));
   }
   if ("timezone" in body) {
     if (typeof body.timezone === "string" && body.timezone.trim() !== "") {
@@ -258,25 +258,25 @@ async function applyUserFieldUpdates(
     } else {
       fields.timezone = null;
     }
-    writes.push(storage.setUserTimezone(userId, fields.timezone));
+    writes.push(storage.profile.setTimezone(userId, fields.timezone));
   }
   if ("gender" in body) {
     const nextGender = normalizeEnumInput(body.gender, isValidGender);
     if (nextGender === "invalid") return { ok: false, error: BAD_GENDER };
     fields.gender = nextGender;
-    writes.push(storage.setUserGender(userId, nextGender));
+    writes.push(storage.profile.setGender(userId, nextGender));
   }
   if ("language" in body) {
     const nextLang = normalizeEnumInput(body.language, isValidLang);
     if (nextLang === "invalid") return { ok: false, error: BAD_LANG };
     fields.language = nextLang;
-    writes.push(storage.setUserLang(userId, nextLang));
+    writes.push(storage.profile.setLang(userId, nextLang));
   }
   if (options.includeDateFormat && "dateFormat" in body) {
     const nextDf = normalizeEnumInput(body.dateFormat, isValidDateFormat);
     if (nextDf === "invalid") return { ok: false, error: BAD_DATE_FORMAT };
     fields.dateFormat = nextDf;
-    writes.push(storage.setUserDateFormat(userId, nextDf));
+    writes.push(storage.profile.setDateFormat(userId, nextDf));
   }
 
   await Promise.all(writes);
@@ -437,7 +437,7 @@ async function collectReminderChats(
   }
   if (ids.size === 0) return {};
   const entries = await Promise.all(
-    [...ids].map(async (id) => [id, await storage.getChat(id)] as const),
+    [...ids].map(async (id) => [id, await storage.chats.get(id)] as const),
   );
   const out: Record<string, Chat> = {};
   for (const [id, chat] of entries) {
@@ -460,7 +460,7 @@ async function collectReminderUsers(
       async (id) =>
         [
           id,
-          await storage.getUser(id),
+          await storage.users.get(id),
           await readValidDisplayName(storage, id),
         ] as const,
     ),
@@ -568,7 +568,7 @@ export async function handleApi(
   if (req.path === "/api/me/reminders" && req.method === "GET") {
     return respondMyReminders(
       deps.storage,
-      await deps.storage.listRemindersForUser(actor.userId),
+      await deps.storage.reminders.listForUser(actor.userId),
     );
   }
 
@@ -577,10 +577,10 @@ export async function handleApi(
       const [displayName, timezone, gender, language, dateFormat] =
         await Promise.all([
           readValidDisplayName(deps.storage, actor.userId),
-          deps.storage.getUserTimezone(actor.userId),
-          deps.storage.getUserGender(actor.userId),
-          deps.storage.getUserLang(actor.userId),
-          deps.storage.getUserDateFormat(actor.userId),
+          deps.storage.profile.getTimezone(actor.userId),
+          deps.storage.profile.getGender(actor.userId),
+          deps.storage.profile.getLang(actor.userId),
+          deps.storage.profile.getDateFormat(actor.userId),
         ]);
       return {
         status: 200,
@@ -599,10 +599,10 @@ export async function handleApi(
       const [currentName, currentTz, currentGender, currentLang, currentDf] =
         await Promise.all([
           readValidDisplayName(deps.storage, actor.userId),
-          deps.storage.getUserTimezone(actor.userId),
-          deps.storage.getUserGender(actor.userId),
-          deps.storage.getUserLang(actor.userId),
-          deps.storage.getUserDateFormat(actor.userId),
+          deps.storage.profile.getTimezone(actor.userId),
+          deps.storage.profile.getGender(actor.userId),
+          deps.storage.profile.getLang(actor.userId),
+          deps.storage.profile.getDateFormat(actor.userId),
         ]);
       const updated = await applyUserFieldUpdates(
         deps.storage,
@@ -626,7 +626,7 @@ export async function handleApi(
   }
 
   if (req.path === "/api/me/spending" && req.method === "GET") {
-    const spending = await deps.storage.getUserSpend(actor.userId, Date.now());
+    const spending = await deps.storage.spend.getUser(actor.userId, Date.now());
     return { status: 200, body: { spending } };
   }
 
@@ -639,7 +639,7 @@ export async function handleApi(
   if (req.path === "/api/me/usage" && req.method === "GET") {
     const settings = await getOrInitSettings(deps.storage);
     const now = Date.now();
-    const stored = await deps.storage.getUserUsage(actor.userId);
+    const stored = await deps.storage.usage.get(actor.userId);
     const status = summarizeUsage(
       actor.userId,
       settings.rateLimit,
@@ -655,7 +655,7 @@ export async function handleApi(
   // ownerUserId that a non-owner must not see. Bot names/usernames are already
   // public via Telegram, so exposing the roster to any authenticated user is fine.
   if (req.path === "/api/me/bots" && req.method === "GET") {
-    const managed = await deps.storage.listManagedBots();
+    const managed = await deps.storage.managedBots.list();
     const bots: Array<{
       botId: string | null;
       displayName: string | null;
@@ -690,12 +690,12 @@ export async function handleApi(
       // explicit UI add must be rejected at the limit, never silently evict a
       // memory the way the AI's remember_fact does. Upserting an existing key
       // doesn't grow the count, so it is always allowed.
-      const existing = await scoped.listUserFacts(actor.userId);
+      const existing = await scoped.facts.list(actor.userId);
       const isUpdate = existing.some((f) => f.key === key);
       if (!isUpdate && existing.length >= USER_FACTS_MAX_PER_USER) {
         return FACTS_LIMIT_REACHED;
       }
-      await scoped.rememberUserFact(actor.userId, key, value);
+      await scoped.facts.remember(actor.userId, key, value);
       return respondFacts(scoped, actor.userId);
     }
   }
@@ -713,7 +713,7 @@ export async function handleApi(
       const body = (req.body ?? {}) as Record<string, unknown>;
       const value = normalizeFactValue(body.value);
       if (value === null) return BAD_FACT_VALUE;
-      const facts = await scoped.listUserFacts(actor.userId);
+      const facts = await scoped.facts.list(actor.userId);
       if (!facts.some((f) => f.key === key)) return FACT_NOT_FOUND;
       let nextKey = key;
       if (body.newKey !== undefined) {
@@ -726,16 +726,16 @@ export async function handleApi(
         if (facts.some((f) => f.key === nextKey)) return FACT_KEY_EXISTS;
         // Delete-then-create: freeing the old slot first means a rename can
         // never trip the cap, even at exactly 50/50.
-        await scoped.forgetUserFact(actor.userId, key);
+        await scoped.facts.forget(actor.userId, key);
       }
-      await scoped.rememberUserFact(actor.userId, nextKey, value);
+      await scoped.facts.remember(actor.userId, nextKey, value);
       return respondFacts(scoped, actor.userId);
     }
 
     if (req.method === "DELETE") {
       // Idempotent: deleting an already-gone fact succeeds, mirroring
       // forget_fact's {existed:false}-is-not-an-error semantics.
-      await scoped.forgetUserFact(actor.userId, key);
+      await scoped.facts.forget(actor.userId, key);
       return respondFacts(scoped, actor.userId);
     }
   }
@@ -878,15 +878,15 @@ export async function handleApi(
         budget: { ...current.budget, ...patch.budget },
         anomaly: { ...current.anomaly, ...patch.anomaly },
       };
-      await deps.storage.saveSettings(next);
+      await deps.storage.settings.save(next);
       return { status: 200, body: next };
     }
   }
 
   if (req.path === "/api/whitelist" && req.method === "GET") {
     const [users, chats] = await Promise.all([
-      deps.storage.listWhitelist("users"),
-      deps.storage.listWhitelist("chats"),
+      deps.storage.access.listWhitelist("users"),
+      deps.storage.access.listWhitelist("chats"),
     ]);
     return { status: 200, body: { users, chats } };
   }
@@ -896,14 +896,14 @@ export async function handleApi(
       return handleListMutation(
         kind,
         req.body,
-        (k, entry) => deps.storage.addWhitelist(k, entry),
-        (k) => deps.storage.listWhitelist(k),
+        (k, entry) => deps.storage.access.addWhitelist(k, entry),
+        (k) => deps.storage.access.listWhitelist(k),
       );
     }
     const m = req.path.match(new RegExp(`^/api/whitelist/${kind}/(.+)$`));
     if (m && req.method === "DELETE") {
-      await deps.storage.removeWhitelist(kind, m[1]!);
-      const list = await deps.storage.listWhitelist(kind);
+      await deps.storage.access.removeWhitelist(kind, m[1]!);
+      const list = await deps.storage.access.listWhitelist(kind);
       return { status: 200, body: list };
     }
   }
@@ -912,8 +912,8 @@ export async function handleApi(
   // mutations return the fresh list).
   if (req.path === "/api/blacklist" && req.method === "GET") {
     const [users, chats] = await Promise.all([
-      deps.storage.listBlacklist("users"),
-      deps.storage.listBlacklist("chats"),
+      deps.storage.access.listBlacklist("users"),
+      deps.storage.access.listBlacklist("chats"),
     ]);
     return { status: 200, body: { users, chats } };
   }
@@ -923,8 +923,8 @@ export async function handleApi(
       return handleListMutation(
         kind,
         req.body,
-        (k, entry) => deps.storage.addBlacklist(k, entry),
-        (k) => deps.storage.listBlacklist(k),
+        (k, entry) => deps.storage.access.addBlacklist(k, entry),
+        (k) => deps.storage.access.listBlacklist(k),
         // Blacklisting the owner would be a silent no-op (the access gates
         // check ownership first), so reject it loudly instead of storing a dead
         // entry. Holds for chats too: the owner's private chat id *is* their
@@ -937,22 +937,22 @@ export async function handleApi(
     }
     const m = req.path.match(new RegExp(`^/api/blacklist/${kind}/(.+)$`));
     if (m && req.method === "DELETE") {
-      await deps.storage.removeBlacklist(kind, m[1]!);
-      const list = await deps.storage.listBlacklist(kind);
+      await deps.storage.access.removeBlacklist(kind, m[1]!);
+      const list = await deps.storage.access.listBlacklist(kind);
       return { status: 200, body: list };
     }
   }
 
   if (req.path === "/api/admin/users" && req.method === "GET") {
     const now = Date.now();
-    const users = await deps.storage.listUsers();
+    const users = await deps.storage.users.list();
     const rows = await Promise.all(
       users.map(
         async (u) =>
           [
             u.id,
             await readValidDisplayName(deps.storage, u.id),
-            await deps.storage.getUserSpend(u.id, now),
+            await deps.storage.spend.getUser(u.id, now),
           ] as const,
       ),
     );
@@ -968,7 +968,7 @@ export async function handleApi(
   if (req.path === "/api/admin/reminders" && req.method === "GET") {
     return respondAdminReminders(
       deps.storage,
-      await deps.storage.listAllReminders(),
+      await deps.storage.reminders.listAll(),
     );
   }
 
@@ -988,7 +988,7 @@ export async function handleApi(
     /^\/api\/admin\/users\/(.+)\/spending$/,
   );
   if (userSpendMatch && req.method === "GET") {
-    const spending = await deps.storage.getUserSpend(
+    const spending = await deps.storage.spend.getUser(
       userSpendMatch[1]!,
       Date.now(),
     );
@@ -1021,13 +1021,13 @@ export async function handleApi(
         whitelisted,
         blacklisted,
       ] = await Promise.all([
-        deps.storage.getUser(id),
+        deps.storage.users.get(id),
         readValidDisplayName(deps.storage, id),
-        deps.storage.getUserTimezone(id),
-        deps.storage.getUserGender(id),
-        deps.storage.getUserLang(id),
-        deps.storage.isWhitelisted("users", id),
-        deps.storage.isBlacklisted("users", id),
+        deps.storage.profile.getTimezone(id),
+        deps.storage.profile.getGender(id),
+        deps.storage.profile.getLang(id),
+        deps.storage.access.isWhitelisted("users", id),
+        deps.storage.access.isBlacklisted("users", id),
       ]);
       if (!user) return { status: 404, body: { error: "user not found" } };
       return {
@@ -1044,15 +1044,15 @@ export async function handleApi(
       };
     }
     if (req.method === "PUT") {
-      const user = await deps.storage.getUser(id);
+      const user = await deps.storage.users.get(id);
       if (!user) return { status: 404, body: { error: "user not found" } };
       const body = (req.body ?? {}) as Record<string, unknown>;
       const [currentName, currentTz, currentGender, currentLang] =
         await Promise.all([
           readValidDisplayName(deps.storage, id),
-          deps.storage.getUserTimezone(id),
-          deps.storage.getUserGender(id),
-          deps.storage.getUserLang(id),
+          deps.storage.profile.getTimezone(id),
+          deps.storage.profile.getGender(id),
+          deps.storage.profile.getLang(id),
         ]);
       // No dateFormat here: it stays the user's own setting, unreachable from
       // the admin route even if the body carries one.
@@ -1126,13 +1126,13 @@ export async function handleApi(
   }
 
   if (req.path === "/api/admin/chats" && req.method === "GET") {
-    const chats = await deps.storage.listChats();
+    const chats = await deps.storage.chats.list();
     return { status: 200, body: { chats } };
   }
 
   if (req.path === "/api/admin/checks") {
     if (req.method === "GET") {
-      const checks = await deps.storage.listChecks();
+      const checks = await deps.storage.checks.list();
       return { status: 200, body: { checks } };
     }
     if (req.method === "POST") {
@@ -1149,7 +1149,7 @@ export async function handleApi(
         pendingFiredAtMs: null,
         createdAtMs: now,
       };
-      await deps.storage.saveCheck(check);
+      await deps.storage.checks.save(check);
       return { status: 200, body: { check } };
     }
   }
@@ -1158,12 +1158,12 @@ export async function handleApi(
   if (checkMatch) {
     const id = checkMatch[1]!;
     if (req.method === "GET") {
-      const check = await deps.storage.getCheck(id);
+      const check = await deps.storage.checks.get(id);
       if (!check) return { status: 404, body: { error: "check not found" } };
       return { status: 200, body: { check } };
     }
     if (req.method === "PUT") {
-      const existing = await deps.storage.getCheck(id);
+      const existing = await deps.storage.checks.get(id);
       if (!existing) {
         return { status: 404, body: { error: "check not found" } };
       }
@@ -1175,11 +1175,11 @@ export async function handleApi(
         ...existing,
         ...parsed.value,
       };
-      await deps.storage.saveCheck(next);
+      await deps.storage.checks.save(next);
       return { status: 200, body: { check: next } };
     }
     if (req.method === "DELETE") {
-      await deps.storage.deleteCheck(id);
+      await deps.storage.checks.delete(id);
       return { status: 200, body: { ok: true } };
     }
   }
@@ -1189,10 +1189,10 @@ export async function handleApi(
     const id = chatMatch[1]!;
     if (req.method === "GET") {
       const [chat, settings, whitelisted, blacklisted] = await Promise.all([
-        deps.storage.getChat(id),
-        deps.storage.getChatSettings(id),
-        deps.storage.isWhitelisted("chats", id),
-        deps.storage.isBlacklisted("chats", id),
+        deps.storage.chats.get(id),
+        deps.storage.chats.getSettings(id),
+        deps.storage.access.isWhitelisted("chats", id),
+        deps.storage.access.isBlacklisted("chats", id),
       ]);
       if (!chat) return { status: 404, body: { error: "chat not found" } };
       return {
@@ -1201,20 +1201,20 @@ export async function handleApi(
       };
     }
     if (req.method === "PUT") {
-      const chat = await deps.storage.getChat(id);
+      const chat = await deps.storage.chats.get(id);
       if (!chat) return { status: 404, body: { error: "chat not found" } };
       const next = normalizeChatSettings(req.body);
       if (next.models) {
         const bad = await unknownModelsError(deps.modelCatalog, next.models);
         if (bad) return bad;
       }
-      await deps.storage.saveChatSettings(id, next);
+      await deps.storage.chats.saveSettings(id, next);
       return { status: 200, body: { chat, settings: next } };
     }
   }
 
   if (req.path === "/api/admin/managed-bots" && req.method === "GET") {
-    const bots = await deps.storage.listManagedBots();
+    const bots = await deps.storage.managedBots.list();
     const rows = bots.map((b) => ({
       ...b,
       running: deps.managedBots?.isRunning(b.botId) ?? false,
@@ -1252,7 +1252,7 @@ export async function handleApi(
   if (mbMatch) {
     const id = mbMatch[1]!;
     if (req.method === "GET") {
-      const bot = await deps.storage.getManagedBot(id);
+      const bot = await deps.storage.managedBots.get(id);
       if (!bot)
         return { status: 404, body: { error: "managed bot not found" } };
       return {
@@ -1261,14 +1261,14 @@ export async function handleApi(
       };
     }
     if (req.method === "PUT") {
-      const existing = await deps.storage.getManagedBot(id);
+      const existing = await deps.storage.managedBots.get(id);
       if (!existing) {
         return { status: 404, body: { error: "managed bot not found" } };
       }
       const parsed = normalizeManagedBotInput(req.body);
       if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
       const next: ManagedBot = { ...existing, ...parsed.value };
-      await deps.storage.saveManagedBot(next);
+      await deps.storage.managedBots.save(next);
       // Push the (possibly changed) display name to Telegram for the live bot.
       await deps.managedBots?.syncProfileName(id);
       return {
@@ -1280,8 +1280,8 @@ export async function handleApi(
       if (deps.managedBots) {
         await deps.managedBots.deleteBot(id);
       } else {
-        await deps.storage.deleteManagedBot(id);
-        await deps.storage.setManagedBotToken(id, null);
+        await deps.storage.managedBots.delete(id);
+        await deps.storage.managedBots.setToken(id, null);
       }
       return { status: 200, body: { ok: true } };
     }

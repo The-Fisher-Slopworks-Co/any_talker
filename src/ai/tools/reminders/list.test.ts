@@ -19,10 +19,10 @@ describe("list_reminders", () => {
 
   test("returns the user's reminders soonest first with id/fireAt/note", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({ id: "late", fireAtMs: 3_000_000, text: "later" }),
     );
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({ id: "soon", fireAtMs: 2_000_000, text: "sooner" }),
     );
     const tool = createListRemindersTool({ storage });
@@ -39,8 +39,8 @@ describe("list_reminders", () => {
 
   test("only the calling user's reminders are returned", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "mine", userId: "u1" }));
-    await storage.saveReminder(reminder({ id: "theirs", userId: "u2" }));
+    await storage.reminders.save(reminder({ id: "mine", userId: "u1" }));
+    await storage.reminders.save(reminder({ id: "theirs", userId: "u2" }));
     const tool = createListRemindersTool({ storage });
     const out = await tool.execute({}, ctx);
     expect(out.reminders.map((r) => r.id)).toEqual(["mine"]);
@@ -49,8 +49,8 @@ describe("list_reminders", () => {
   test("only reminders from the current chat are returned", async () => {
     const storage = new MemoryStorage();
     // Same user, two different chats; the tool runs in chat "c1" (baseAskCtx).
-    await storage.saveReminder(reminder({ id: "here", chatId: "c1" }));
-    await storage.saveReminder(reminder({ id: "elsewhere", chatId: "c2" }));
+    await storage.reminders.save(reminder({ id: "here", chatId: "c1" }));
+    await storage.reminders.save(reminder({ id: "elsewhere", chatId: "c2" }));
     const tool = createListRemindersTool({ storage });
     const out = await tool.execute({}, ctx);
     expect(out.reminders.map((r) => r.id)).toEqual(["here"]);
@@ -66,10 +66,10 @@ describe("list_reminders", () => {
     // (e.g. a guest-DM reminder delivered here but recorded against another
     // chat, or one whose chat id changed under it). Distinct fire times keep
     // the soonest-first assertion deterministic.
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({ id: "here", chatId: "u1", fireAtMs: 2_000_000 }),
     );
-    await storage.saveReminder(
+    await storage.reminders.save(
       reminder({ id: "elsewhere", chatId: "c2", fireAtMs: 3_000_000 }),
     );
     const tool = createListRemindersTool({ storage });
@@ -82,7 +82,7 @@ describe("list_reminders", () => {
 
   test("truncates a long note to a bounded preview ending with an ellipsis", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ text: "x".repeat(500) }));
+    await storage.reminders.save(reminder({ text: "x".repeat(500) }));
     const tool = createListRemindersTool({ storage });
     const out = await tool.execute({}, ctx);
     const note = out.reminders[0]!.note;
@@ -92,7 +92,7 @@ describe("list_reminders", () => {
 
   test("truncates a note of emoji without producing a lone surrogate", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ text: "😀".repeat(200) }));
+    await storage.reminders.save(reminder({ text: "😀".repeat(200) }));
     const tool = createListRemindersTool({ storage });
     const out = await tool.execute({}, ctx);
     const note = out.reminders[0]!.note;
@@ -110,7 +110,7 @@ describe("list_reminders", () => {
   test("caps the result and flags truncation when over the limit", async () => {
     const storage = new MemoryStorage();
     for (let i = 0; i < 60; i++) {
-      await storage.saveReminder(
+      await storage.reminders.save(
         reminder({ id: `r${i}`, fireAtMs: 2_000_000 + i }),
       );
     }
@@ -126,7 +126,7 @@ describe("list_reminders", () => {
   test("a managed bot only sees its own scoped reminders", async () => {
     const storage = new MemoryStorage();
     // Reminder created under the main bot namespace.
-    await storage.saveReminder(reminder({ id: "main" }));
+    await storage.reminders.save(reminder({ id: "main" }));
     const tool = createListRemindersTool({ storage });
     const out = await tool.execute({}, { ...ctx, botId: "bot9" });
     expect(out.reminders).toEqual([]);

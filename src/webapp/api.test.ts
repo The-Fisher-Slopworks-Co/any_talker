@@ -99,7 +99,7 @@ describe("model validation against the catalogue", () => {
     expect(r.status).toBe(400);
     expect(r.body).toEqual({ error: "unknown model", models: ["made-up"] });
     // A rejected write must not touch storage.
-    expect((await d.storage.getSettings())?.models).toEqual(
+    expect((await d.storage.settings.get())?.models).toEqual(
       DEFAULT_SETTINGS.models,
     );
   });
@@ -112,7 +112,7 @@ describe("model validation against the catalogue", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect((await d.storage.getSettings())?.models).toEqual(["gpt-4o"]);
+    expect((await d.storage.settings.get())?.models).toEqual(["gpt-4o"]);
   });
 
   test("PUT /api/settings allows any model when the catalogue is empty", async () => {
@@ -123,12 +123,12 @@ describe("model validation against the catalogue", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect((await d.storage.getSettings())?.models).toEqual(["anything"]);
+    expect((await d.storage.settings.get())?.models).toEqual(["anything"]);
   });
 
   test("PUT /api/admin/chats/:id rejects an unknown override model", async () => {
     const d = { ...deps(), modelCatalog: catalogOf("gpt-4o") };
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -146,7 +146,7 @@ describe("model validation against the catalogue", () => {
       owner,
     );
     expect(r.status).toBe(400);
-    expect(await d.storage.getChatSettings("-100")).toBeNull();
+    expect(await d.storage.chats.getSettings("-100")).toBeNull();
   });
 });
 
@@ -273,7 +273,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    const saved = await d.storage.getSettings();
+    const saved = await d.storage.settings.get();
     expect(saved?.systemPrompt).toBe("new");
     expect(saved?.models).toEqual([
       "openai/gpt-4o",
@@ -298,7 +298,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    const saved = await d.storage.getSettings();
+    const saved = await d.storage.settings.get();
     expect(saved?.providerSort).toBe("throughput");
     expect(saved?.provider).toBe("deepinfra/fp4");
     expect(saved?.serviceTier).toBe("flex");
@@ -306,7 +306,7 @@ describe("PUT /api/settings", () => {
 
   test("an explicit null clears routing back to the gateway's own choice", async () => {
     const d = deps();
-    await d.storage.saveSettings({
+    await d.storage.settings.save({
       ...DEFAULT_SETTINGS,
       providerSort: "price",
       provider: "deepinfra",
@@ -322,7 +322,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    const saved = await d.storage.getSettings();
+    const saved = await d.storage.settings.get();
     expect(saved?.providerSort).toBeNull();
     expect(saved?.provider).toBeNull();
     expect(saved?.serviceTier).toBeNull();
@@ -336,7 +336,7 @@ describe("PUT /api/settings", () => {
       { serviceTier: "platinum" },
     ]) {
       const d = deps();
-      await d.storage.saveSettings({
+      await d.storage.settings.save({
         ...DEFAULT_SETTINGS,
         providerSort: "price",
         provider: "deepinfra",
@@ -348,7 +348,7 @@ describe("PUT /api/settings", () => {
         owner,
       );
       expect(res.status).toBe(400);
-      const saved = await d.storage.getSettings();
+      const saved = await d.storage.settings.get();
       expect(saved?.providerSort).toBe("price");
       expect(saved?.provider).toBe("deepinfra");
       expect(saved?.serviceTier).toBe("flex");
@@ -367,7 +367,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(400);
-    expect((await d.storage.getSettings())?.models).toEqual(
+    expect((await d.storage.settings.get())?.models).toEqual(
       DEFAULT_SETTINGS.models,
     );
   });
@@ -433,7 +433,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    const saved = await d.storage.getSettings();
+    const saved = await d.storage.settings.get();
     expect(saved?.rateLimit.fiveHourTokens).toBe(50000);
     expect(saved?.rateLimit.weeklyTokens).toBe(400000);
     expect(saved?.rateLimit.ownerExempt).toBe(false);
@@ -452,9 +452,9 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.expandableBlockquoteThreshold).toBe(
-      800,
-    );
+    expect(
+      (await d.storage.settings.get())?.expandableBlockquoteThreshold,
+    ).toBe(800);
   });
 
   test("accepts expandableBlockquoteThreshold of 0", async () => {
@@ -469,9 +469,9 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.expandableBlockquoteThreshold).toBe(
-      0,
-    );
+    expect(
+      (await d.storage.settings.get())?.expandableBlockquoteThreshold,
+    ).toBe(0);
   });
 
   test("rejects a negative expandableBlockquoteThreshold", async () => {
@@ -528,7 +528,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.maxRemindersPerUser).toBe(120);
+    expect((await d.storage.settings.get())?.maxRemindersPerUser).toBe(120);
   });
 
   test("rejects maxRemindersPerUser below 1", async () => {
@@ -571,7 +571,7 @@ describe("PUT /api/settings", () => {
       owner,
     );
     expect(res.status).toBe(200);
-    expect((await d.storage.getSettings())?.whitelistEnabled).toBe(false);
+    expect((await d.storage.settings.get())?.whitelistEnabled).toBe(false);
   });
 
   test("rejects a non-boolean whitelistEnabled", async () => {
@@ -689,7 +689,7 @@ describe("blacklist endpoints", () => {
       users: [{ id: "42", label: "mallory" }],
       chats: [],
     });
-    expect(await d.storage.isBlacklisted("users", "42")).toBe(true);
+    expect(await d.storage.access.isBlacklisted("users", "42")).toBe(true);
   });
 
   test("add and list chats", async () => {
@@ -713,8 +713,8 @@ describe("blacklist endpoints", () => {
       users: [],
       chats: [{ id: "-100", label: "trolls" }],
     });
-    expect(await d.storage.isBlacklisted("chats", "-100")).toBe(true);
-    expect(await d.storage.isBlacklisted("users", "-100")).toBe(false);
+    expect(await d.storage.access.isBlacklisted("chats", "-100")).toBe(true);
+    expect(await d.storage.access.isBlacklisted("users", "-100")).toBe(false);
   });
 
   test("remove", async () => {
@@ -731,7 +731,7 @@ describe("blacklist endpoints", () => {
     );
     expect(r.status).toBe(200);
     expect(r.body).toEqual([]);
-    expect(await d.storage.isBlacklisted("users", "42")).toBe(false);
+    expect(await d.storage.access.isBlacklisted("users", "42")).toBe(false);
   });
 
   test("remove chats", async () => {
@@ -748,7 +748,7 @@ describe("blacklist endpoints", () => {
     );
     expect(r.status).toBe(200);
     expect(r.body).toEqual([]);
-    expect(await d.storage.isBlacklisted("chats", "-100")).toBe(false);
+    expect(await d.storage.access.isBlacklisted("chats", "-100")).toBe(false);
   });
 
   test("rejects a missing id", async () => {
@@ -768,7 +768,7 @@ describe("blacklist endpoints", () => {
       owner,
     );
     expect(r.status).toBe(400);
-    expect(await d.storage.isBlacklisted("users", ownerId)).toBe(false);
+    expect(await d.storage.access.isBlacklisted("users", ownerId)).toBe(false);
   });
 
   test("rejects blacklisting the owner's own chat", async () => {
@@ -779,7 +779,7 @@ describe("blacklist endpoints", () => {
       owner,
     );
     expect(r.status).toBe(400);
-    expect(await d.storage.isBlacklisted("chats", ownerId)).toBe(false);
+    expect(await d.storage.access.isBlacklisted("chats", ownerId)).toBe(false);
   });
 
   test("non-owner gets 403", async () => {
@@ -793,7 +793,7 @@ describe("blacklist endpoints", () => {
 
   test("GET /api/admin/users/:id reports blacklisted", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Mallory",
       lastName: null,
@@ -801,7 +801,7 @@ describe("blacklist endpoints", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.addBlacklist("users", { id: "42" });
+    await d.storage.access.addBlacklist("users", { id: "42" });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42", body: null },
       d,
@@ -813,7 +813,7 @@ describe("blacklist endpoints", () => {
 
   test("GET /api/admin/chats/:id reports blacklisted", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "supergroup",
       title: "Trolls",
@@ -821,7 +821,7 @@ describe("blacklist endpoints", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.addBlacklist("chats", { id: "-100" });
+    await d.storage.access.addBlacklist("chats", { id: "-100" });
     const r = await handleApi(
       { method: "GET", path: "/api/admin/chats/-100", body: null },
       d,
@@ -852,7 +852,7 @@ describe("ratelimit endpoints", () => {
   test("PUT /api/ratelimit/me { reset: true } clears the owner's usage", async () => {
     const d = deps();
     const starts = currentWindowStarts(ownerId, Date.now());
-    await d.storage.addUserUsage(ownerId, 100, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add(ownerId, 100, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       { method: "PUT", path: "/api/ratelimit/me", body: { reset: true } },
       d,
@@ -860,13 +860,13 @@ describe("ratelimit endpoints", () => {
     );
     expect(r.status).toBe(200);
     expect((r.body as { usage: UsageStatus }).usage.fiveHour.used).toBe(0);
-    expect(await d.storage.getUserUsage(ownerId)).toBeNull();
+    expect(await d.storage.usage.get(ownerId)).toBeNull();
   });
 
   test("GET /api/ratelimit/user/:id returns that user's usage", async () => {
     const d = deps();
     const starts = currentWindowStarts("42", Date.now());
-    await d.storage.addUserUsage("42", 1234, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add("42", 1234, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       { method: "GET", path: "/api/ratelimit/user/42", body: null },
       d,
@@ -884,7 +884,7 @@ describe("ratelimit endpoints", () => {
   test("PUT /api/ratelimit/user/:id { reset: true } clears that user's usage", async () => {
     const d = deps();
     const starts = currentWindowStarts("42", Date.now());
-    await d.storage.addUserUsage("42", 5000, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add("42", 5000, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       {
         method: "PUT",
@@ -896,7 +896,7 @@ describe("ratelimit endpoints", () => {
     );
     expect(r.status).toBe(200);
     expect((r.body as { usage: UsageStatus }).usage.fiveHour.used).toBe(0);
-    expect(await d.storage.getUserUsage("42")).toBeNull();
+    expect(await d.storage.usage.get("42")).toBeNull();
   });
 
   test("non-owner gets 403 from /api/ratelimit/user/:id", async () => {
@@ -912,7 +912,7 @@ describe("ratelimit endpoints", () => {
 describe("GET /api/me/usage", () => {
   // Percentages of the caller's OWN budget, reachable without owner rights.
   const setLimits = async (d: ReturnType<typeof deps>) => {
-    await d.storage.saveSettings({
+    await d.storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
@@ -931,7 +931,7 @@ describe("GET /api/me/usage", () => {
     const d = deps();
     await setLimits(d);
     const starts = currentWindowStarts("42", Date.now());
-    await d.storage.addUserUsage("42", 250, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
 
     const r = await get(d, guest("42"));
     expect(r.status).toBe(200);
@@ -952,7 +952,7 @@ describe("GET /api/me/usage", () => {
     const d = deps();
     await setLimits(d);
     const starts = currentWindowStarts("42", Date.now());
-    await d.storage.addUserUsage("42", 250, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
 
     const r = await get(d, guest("42"));
     const json = JSON.stringify(r.body);
@@ -967,7 +967,7 @@ describe("GET /api/me/usage", () => {
     const d = deps();
     await setLimits(d);
     const starts = currentWindowStarts("99", Date.now());
-    await d.storage.addUserUsage("99", 1000, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add("99", 1000, starts.fiveHour, starts.weekly);
 
     const r = await get(d, guest("42"));
     const { usage } = r.body as {
@@ -985,7 +985,7 @@ describe("GET /api/me/usage", () => {
 
   test("the owner is not flagged exempt when exemption is off", async () => {
     const d = deps();
-    await d.storage.saveSettings({
+    await d.storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
     });
@@ -1045,7 +1045,7 @@ describe("/api/me", () => {
 
   test("PUT empty / whitespace clears the override", async () => {
     const d = deps();
-    await d.storage.setUserName("42", "Alice");
+    await d.storage.profile.setName("42", "Alice");
     const put = await handleApi(
       { method: "PUT", path: "/api/me", body: { displayName: "   " } },
       d,
@@ -1059,7 +1059,7 @@ describe("/api/me", () => {
       language: null,
       dateFormat: null,
     });
-    expect(await d.storage.getUserName("42")).toBeNull();
+    expect(await d.storage.profile.getName("42")).toBeNull();
   });
 
   test("PUT rejects displayName with newline", async () => {
@@ -1074,7 +1074,7 @@ describe("/api/me", () => {
       error: "invalid display name",
       reason: "multiline",
     });
-    expect(await d.storage.getUserName("42")).toBeNull();
+    expect(await d.storage.profile.getName("42")).toBeNull();
   });
 
   test("PUT rejects displayName over 32 chars", async () => {
@@ -1166,7 +1166,7 @@ describe("/api/me", () => {
       language: null,
       dateFormat: null,
     });
-    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.profile.getTimezone("42")).toBe("Europe/Moscow");
   });
 
   test("PUT rejects an invalid timezone with 400", async () => {
@@ -1203,7 +1203,7 @@ describe("/api/me", () => {
       language: null,
       dateFormat: null,
     });
-    expect(await d.storage.getUserGender("42")).toBe("female");
+    expect(await d.storage.profile.getGender("42")).toBe("female");
   });
 
   test("PUT rejects an invalid gender with 400", async () => {
@@ -1222,7 +1222,7 @@ describe("/api/me", () => {
 
   test("PUT clears gender when null is provided", async () => {
     const d = deps();
-    await d.storage.setUserGender("42", "male");
+    await d.storage.profile.setGender("42", "male");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1233,12 +1233,12 @@ describe("/api/me", () => {
       guest("42"),
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserGender("42")).toBeNull();
+    expect(await d.storage.profile.getGender("42")).toBeNull();
   });
 
   test("PUT clears timezone when empty string is provided", async () => {
     const d = deps();
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1249,14 +1249,14 @@ describe("/api/me", () => {
       guest("42"),
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserTimezone("42")).toBeNull();
+    expect(await d.storage.profile.getTimezone("42")).toBeNull();
   });
 
   test("PUT with only displayName preserves timezone and gender", async () => {
     const d = deps();
-    await d.storage.setUserName("42", "OldName");
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
-    await d.storage.setUserGender("42", "female");
+    await d.storage.profile.setName("42", "OldName");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setGender("42", "female");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1275,14 +1275,14 @@ describe("/api/me", () => {
       language: null,
       dateFormat: null,
     });
-    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
-    expect(await d.storage.getUserGender("42")).toBe("female");
+    expect(await d.storage.profile.getTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.profile.getGender("42")).toBe("female");
   });
 
   test("PUT with only timezone preserves displayName and gender", async () => {
     const d = deps();
-    await d.storage.setUserName("42", "Alice");
-    await d.storage.setUserGender("42", "male");
+    await d.storage.profile.setName("42", "Alice");
+    await d.storage.profile.setGender("42", "male");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1293,16 +1293,16 @@ describe("/api/me", () => {
       guest("42"),
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserName("42")).toBe("Alice");
-    expect(await d.storage.getUserGender("42")).toBe("male");
-    expect(await d.storage.getUserTimezone("42")).toBe("America/New_York");
+    expect(await d.storage.profile.getName("42")).toBe("Alice");
+    expect(await d.storage.profile.getGender("42")).toBe("male");
+    expect(await d.storage.profile.getTimezone("42")).toBe("America/New_York");
   });
 
   test("PUT with empty body preserves all fields", async () => {
     const d = deps();
-    await d.storage.setUserName("42", "Alice");
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
-    await d.storage.setUserGender("42", "female");
+    await d.storage.profile.setName("42", "Alice");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setGender("42", "female");
     const r = await handleApi(
       { method: "PUT", path: "/api/me", body: {} },
       d,
@@ -1327,7 +1327,7 @@ describe("/api/me", () => {
     );
     expect(r.status).toBe(200);
     expect((r.body as { language: string }).language).toBe("ru");
-    expect(await d.storage.getUserLang("42")).toBe("ru");
+    expect(await d.storage.profile.getLang("42")).toBe("ru");
   });
 
   test("PUT rejects an invalid language with 400", async () => {
@@ -1342,14 +1342,14 @@ describe("/api/me", () => {
 
   test("PUT clears language when null is provided", async () => {
     const d = deps();
-    await d.storage.setUserLang("42", "ru");
+    await d.storage.profile.setLang("42", "ru");
     const r = await handleApi(
       { method: "PUT", path: "/api/me", body: { language: null } },
       d,
       guest("42"),
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserLang("42")).toBeNull();
+    expect(await d.storage.profile.getLang("42")).toBeNull();
   });
 
   test("PUT accepts a valid date format and persists it", async () => {
@@ -1361,7 +1361,7 @@ describe("/api/me", () => {
     );
     expect(r.status).toBe(200);
     expect((r.body as { dateFormat: string }).dateFormat).toBe("iso");
-    expect(await d.storage.getUserDateFormat("42")).toBe("iso");
+    expect(await d.storage.profile.getDateFormat("42")).toBe("iso");
   });
 
   test("PUT rejects an unknown date format with 400", async () => {
@@ -1372,24 +1372,24 @@ describe("/api/me", () => {
       guest("42"),
     );
     expect(r.status).toBe(400);
-    expect(await d.storage.getUserDateFormat("42")).toBeNull();
+    expect(await d.storage.profile.getDateFormat("42")).toBeNull();
   });
 
   test("PUT clears date format when null is provided", async () => {
     const d = deps();
-    await d.storage.setUserDateFormat("42", "ru-RU");
+    await d.storage.profile.setDateFormat("42", "ru-RU");
     const r = await handleApi(
       { method: "PUT", path: "/api/me", body: { dateFormat: null } },
       d,
       guest("42"),
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserDateFormat("42")).toBeNull();
+    expect(await d.storage.profile.getDateFormat("42")).toBeNull();
   });
 
   test("GET returns the stored date format", async () => {
     const d = deps();
-    await d.storage.setUserDateFormat("42", "en-GB");
+    await d.storage.profile.setDateFormat("42", "en-GB");
     const r = await handleApi(
       { method: "GET", path: "/api/me", body: null },
       d,
@@ -1412,7 +1412,7 @@ describe("/api/admin/users", () => {
 
   test("GET list returns upserted users sorted by lastSeenAt desc", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "10",
       firstName: "Alice",
       lastName: null,
@@ -1420,7 +1420,7 @@ describe("/api/admin/users", () => {
       firstSeenAt: 100,
       lastSeenAt: 100,
     });
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "20",
       firstName: "Bob",
       lastName: null,
@@ -1448,7 +1448,7 @@ describe("/api/admin/users", () => {
 
   test("PUT /api/admin/users/:id sets displayName for that user", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1466,12 +1466,12 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserName("42")).toBe("Override");
+    expect(await d.storage.profile.getName("42")).toBe("Override");
   });
 
   test("PUT empty/whitespace clears displayName", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1479,7 +1479,7 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserName("42", "Override");
+    await d.storage.profile.setName("42", "Override");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1490,12 +1490,12 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserName("42")).toBeNull();
+    expect(await d.storage.profile.getName("42")).toBeNull();
   });
 
   test("GET /api/admin/users/:id returns timezone and gender", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1503,8 +1503,8 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
-    await d.storage.setUserGender("42", "female");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setGender("42", "female");
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42", body: null },
       d,
@@ -1521,7 +1521,7 @@ describe("/api/admin/users", () => {
 
   test("PUT /api/admin/users/:id sets timezone and gender", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1539,13 +1539,13 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
-    expect(await d.storage.getUserGender("42")).toBe("female");
+    expect(await d.storage.profile.getTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.profile.getGender("42")).toBe("female");
   });
 
   test("PUT null/empty clears timezone and gender", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1553,8 +1553,8 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
-    await d.storage.setUserGender("42", "female");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setGender("42", "female");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1565,13 +1565,13 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserTimezone("42")).toBeNull();
-    expect(await d.storage.getUserGender("42")).toBeNull();
+    expect(await d.storage.profile.getTimezone("42")).toBeNull();
+    expect(await d.storage.profile.getGender("42")).toBeNull();
   });
 
   test("PUT with only displayName preserves timezone and gender", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1579,8 +1579,8 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
-    await d.storage.setUserGender("42", "female");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setGender("42", "female");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1591,14 +1591,14 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserName("42")).toBe("NewName");
-    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
-    expect(await d.storage.getUserGender("42")).toBe("female");
+    expect(await d.storage.profile.getName("42")).toBe("NewName");
+    expect(await d.storage.profile.getTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.profile.getGender("42")).toBe("female");
   });
 
   test("PUT rejects invalid timezone with 400", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1620,7 +1620,7 @@ describe("/api/admin/users", () => {
 
   test("PUT rejects invalid gender with 400", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1642,7 +1642,7 @@ describe("/api/admin/users", () => {
 
   test("GET /api/admin/users/:id returns language", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1650,7 +1650,7 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserLang("42", "ru");
+    await d.storage.profile.setLang("42", "ru");
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42", body: null },
       d,
@@ -1662,7 +1662,7 @@ describe("/api/admin/users", () => {
 
   test("PUT /api/admin/users/:id sets language for that user", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1681,12 +1681,12 @@ describe("/api/admin/users", () => {
     );
     expect(r.status).toBe(200);
     expect((r.body as { language: string | null }).language).toBe("ru");
-    expect(await d.storage.getUserLang("42")).toBe("ru");
+    expect(await d.storage.profile.getLang("42")).toBe("ru");
   });
 
   test("PUT null clears language", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1694,7 +1694,7 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserLang("42", "ru");
+    await d.storage.profile.setLang("42", "ru");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1705,12 +1705,12 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserLang("42")).toBeNull();
+    expect(await d.storage.profile.getLang("42")).toBeNull();
   });
 
   test("PUT rejects invalid language with 400", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1732,7 +1732,7 @@ describe("/api/admin/users", () => {
 
   test("PUT with only language preserves displayName, timezone, and gender", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Alice",
       lastName: null,
@@ -1740,9 +1740,9 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.setUserName("42", "Override");
-    await d.storage.setUserTimezone("42", "Europe/Moscow");
-    await d.storage.setUserGender("42", "female");
+    await d.storage.profile.setName("42", "Override");
+    await d.storage.profile.setTimezone("42", "Europe/Moscow");
+    await d.storage.profile.setGender("42", "female");
     const r = await handleApi(
       {
         method: "PUT",
@@ -1753,10 +1753,10 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getUserLang("42")).toBe("ru");
-    expect(await d.storage.getUserName("42")).toBe("Override");
-    expect(await d.storage.getUserTimezone("42")).toBe("Europe/Moscow");
-    expect(await d.storage.getUserGender("42")).toBe("female");
+    expect(await d.storage.profile.getLang("42")).toBe("ru");
+    expect(await d.storage.profile.getName("42")).toBe("Override");
+    expect(await d.storage.profile.getTimezone("42")).toBe("Europe/Moscow");
+    expect(await d.storage.profile.getGender("42")).toBe("female");
   });
 
   test("non-owner gets 403", async () => {
@@ -1770,7 +1770,7 @@ describe("/api/admin/users", () => {
 
   test("GET list includes a spend summary per user", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Spender",
       lastName: null,
@@ -1778,7 +1778,7 @@ describe("/api/admin/users", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.addUserSpend("42", 0.75, Date.now());
+    await d.storage.spend.addUser("42", 0.75, Date.now());
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users", body: null },
       d,
@@ -1792,7 +1792,7 @@ describe("/api/admin/users", () => {
 describe("spending endpoints", () => {
   test("GET /api/me/spending returns the caller's summary", async () => {
     const d = deps();
-    await d.storage.addUserSpend("42", 1.5, Date.now());
+    await d.storage.spend.addUser("42", 1.5, Date.now());
     const r = await handleApi(
       { method: "GET", path: "/api/me/spending", body: null },
       d,
@@ -1816,7 +1816,7 @@ describe("spending endpoints", () => {
 
   test("GET /api/admin/users/:id/spending returns that user's summary", async () => {
     const d = deps();
-    await d.storage.addUserSpend("42", 2.25, Date.now());
+    await d.storage.spend.addUser("42", 2.25, Date.now());
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42/spending", body: null },
       d,
@@ -1850,7 +1850,7 @@ describe("/api/admin/chats", () => {
 
   test("GET list returns upserted chats sorted by lastSeenAt desc", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "supergroup",
       title: "Old",
@@ -1858,7 +1858,7 @@ describe("/api/admin/chats", () => {
       firstSeenAt: 100,
       lastSeenAt: 100,
     });
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-200",
       type: "group",
       title: "New",
@@ -1886,7 +1886,7 @@ describe("/api/admin/chats", () => {
 
   test("GET returns empty settings when none set", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -1905,7 +1905,7 @@ describe("/api/admin/chats", () => {
 
   test("PUT stores per-chat routing overrides, including an explicit null", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -1929,7 +1929,7 @@ describe("/api/admin/chats", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       providerSort: "latency",
       provider: null,
       serviceTier: "priority",
@@ -1938,7 +1938,7 @@ describe("/api/admin/chats", () => {
 
   test("PUT drops invalid routing overrides rather than storing them", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -1961,14 +1961,14 @@ describe("/api/admin/chats", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       systemPrompt: "keep",
     });
   });
 
   test("PUT saves only the override fields, drops invalid models", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -1990,13 +1990,13 @@ describe("/api/admin/chats", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    const saved = await d.storage.getChatSettings("-100");
+    const saved = await d.storage.chats.getSettings("-100");
     expect(saved).toEqual({ systemPrompt: "chat-prompt" });
   });
 
   test("PUT with all override fields saves all of them", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2024,7 +2024,7 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    const saved = await d.storage.getChatSettings("-100");
+    const saved = await d.storage.chats.getSettings("-100");
     expect(saved).toEqual({
       systemPrompt: "p",
       models: ["openai/gpt-4o"],
@@ -2033,7 +2033,7 @@ describe("/api/admin/chats", () => {
 
   test("PUT trims and saves botName", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2050,14 +2050,14 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       botName: "Helper",
     });
   });
 
   test("PUT accepts timezone override", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2074,14 +2074,14 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       timezone: "Asia/Yekaterinburg",
     });
   });
 
   test("PUT silently drops invalid timezone for chat overrides", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2098,14 +2098,14 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       systemPrompt: "p",
     });
   });
 
   test("PUT with whitespace-only botName clears it", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2113,7 +2113,7 @@ describe("/api/admin/chats", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.saveChatSettings("-100", { botName: "Old" });
+    await d.storage.chats.saveSettings("-100", { botName: "Old" });
     await handleApi(
       {
         method: "PUT",
@@ -2123,12 +2123,12 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toBeNull();
+    expect(await d.storage.chats.getSettings("-100")).toBeNull();
   });
 
   test("PUT trims and saves keywordFilter", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2147,14 +2147,14 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       keywordFilter: { enabled: true, keywords: ["Foo", "bar"] },
     });
   });
 
   test("PUT keeps keywordFilter when disabled but keywords present", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2171,14 +2171,14 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toEqual({
+    expect(await d.storage.chats.getSettings("-100")).toEqual({
       keywordFilter: { enabled: false, keywords: ["foo"] },
     });
   });
 
   test("PUT drops keywordFilter when disabled and keywords empty", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2186,7 +2186,7 @@ describe("/api/admin/chats", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.saveChatSettings("-100", {
+    await d.storage.chats.saveSettings("-100", {
       keywordFilter: { enabled: true, keywords: ["x"] },
     });
     await handleApi(
@@ -2198,12 +2198,12 @@ describe("/api/admin/chats", () => {
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toBeNull();
+    expect(await d.storage.chats.getSettings("-100")).toBeNull();
   });
 
   test("PUT with empty body clears the chat overrides", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "-100",
       type: "group",
       title: "T",
@@ -2211,13 +2211,13 @@ describe("/api/admin/chats", () => {
       firstSeenAt: 1,
       lastSeenAt: 1,
     });
-    await d.storage.saveChatSettings("-100", { systemPrompt: "x" });
+    await d.storage.chats.saveSettings("-100", { systemPrompt: "x" });
     await handleApi(
       { method: "PUT", path: "/api/admin/chats/-100", body: {} },
       d,
       owner,
     );
-    expect(await d.storage.getChatSettings("-100")).toBeNull();
+    expect(await d.storage.chats.getSettings("-100")).toBeNull();
   });
 
   test("non-owner gets 403", async () => {
@@ -2262,7 +2262,7 @@ describe("admin gating", () => {
 describe("/api/me/reminders", () => {
   test("returns only the actor's reminders, sorted by fireAt asc", async () => {
     const d = deps();
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "a",
       userId: "42",
       chatId: "42",
@@ -2273,7 +2273,7 @@ describe("/api/me/reminders", () => {
       createdAtMs: 0,
       contextMessages: [],
     });
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "b",
       userId: "42",
       chatId: "42",
@@ -2284,7 +2284,7 @@ describe("/api/me/reminders", () => {
       createdAtMs: 0,
       contextMessages: [],
     });
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "c",
       userId: "99",
       chatId: "99",
@@ -2321,7 +2321,7 @@ describe("/api/me/reminders", () => {
 
   test("includes chat metadata for ask_reply targets", async () => {
     const d = deps();
-    await d.storage.upsertChat({
+    await d.storage.chats.upsert({
       id: "c1",
       type: "supergroup",
       title: "Team Chat",
@@ -2329,7 +2329,7 @@ describe("/api/me/reminders", () => {
       firstSeenAt: 1000,
       lastSeenAt: 1000,
     });
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "r1",
       userId: "42",
       chatId: "c1",
@@ -2354,7 +2354,7 @@ describe("/api/me/reminders", () => {
 describe("/api/admin/reminders", () => {
   test("returns all reminders for owner", async () => {
     const d = deps();
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "a",
       userId: "42",
       chatId: "42",
@@ -2365,7 +2365,7 @@ describe("/api/admin/reminders", () => {
       createdAtMs: 0,
       contextMessages: [],
     });
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "b",
       userId: "99",
       chatId: "c1",
@@ -2394,7 +2394,7 @@ describe("/api/admin/reminders", () => {
 
   test("admin response embeds known user records", async () => {
     const d = deps();
-    await d.storage.upsertUser({
+    await d.storage.users.upsert({
       id: "42",
       firstName: "Jane",
       lastName: "Doe",
@@ -2402,7 +2402,7 @@ describe("/api/admin/reminders", () => {
       firstSeenAt: 100,
       lastSeenAt: 100,
     });
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "r1",
       userId: "42",
       chatId: "42",
@@ -2424,7 +2424,7 @@ describe("/api/admin/reminders", () => {
 
   test("user response does NOT include users field", async () => {
     const d = deps();
-    await d.storage.saveReminder({
+    await d.storage.reminders.save({
       id: "r",
       userId: "42",
       chatId: "42",
@@ -2494,7 +2494,7 @@ describe("/api/admin/checks", () => {
     expect(r.status).toBe(200);
     const body = r.body as { check: { id: string; lastFiredAtMs: number } };
     expect(body.check.lastFiredAtMs).toBe(0);
-    const list = await d.storage.listChecks();
+    const list = await d.storage.checks.list();
     expect(list).toHaveLength(1);
     expect(list[0]?.title).toBe("Sport for Nikita");
   });
@@ -2548,9 +2548,9 @@ describe("/api/admin/checks", () => {
       owner,
     );
     const id = (create.body as { check: { id: string } }).check.id;
-    const existing = await d.storage.getCheck(id);
+    const existing = await d.storage.checks.get(id);
     if (!existing) throw new Error("missing");
-    await d.storage.saveCheck({
+    await d.storage.checks.save({
       ...existing,
       pendingMessageId: 99,
       pendingFiredAtMs: 1234,
@@ -2567,7 +2567,7 @@ describe("/api/admin/checks", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    const updated = await d.storage.getCheck(id);
+    const updated = await d.storage.checks.get(id);
     expect(updated?.counter).toBe(999);
     expect(updated?.pendingMessageId).toBe(99);
     expect(updated?.lastFiredAtMs).toBe(5678);
@@ -2600,7 +2600,7 @@ describe("/api/admin/checks", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(await d.storage.getCheck(id)).toBeNull();
+    expect(await d.storage.checks.get(id)).toBeNull();
   });
 
   test("non-owner gets 403", async () => {
@@ -2648,7 +2648,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("GET /api/me/bots lists characters via a narrow DTO (no systemPrompt leak)", async () => {
     const d = deps();
-    await d.storage.saveManagedBot(charBot);
+    await d.storage.managedBots.save(charBot);
     const r = await handleApi(
       { method: "GET", path: "/api/me/bots", body: null },
       d,
@@ -2665,7 +2665,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("GET /api/me/facts/main returns the actor's facts and the cap", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const r = await handleApi(
       { method: "GET", path: "/api/me/facts/main", body: null },
       d,
@@ -2680,7 +2680,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("facts are scoped to the actor, never another user", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const r = await handleApi(
       { method: "GET", path: "/api/me/facts/main", body: null },
       d,
@@ -2758,7 +2758,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
   test("POST with a new key at the cap is rejected and never evicts", async () => {
     const d = deps();
     for (let i = 0; i < 50; i++) {
-      await d.storage.rememberUserFact("42", `fact_${i}`, `v${i}`);
+      await d.storage.facts.remember("42", `fact_${i}`, `v${i}`);
     }
     const r = await handleApi(
       {
@@ -2771,7 +2771,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
     );
     expect(r.status).toBe(400);
     expect(r.body).toEqual({ error: "limit reached" });
-    const facts = await d.storage.listUserFacts("42");
+    const facts = await d.storage.facts.list("42");
     expect(facts.length).toBe(50);
     expect(facts.some((f) => f.key === "fact_0")).toBe(true);
     expect(facts.some((f) => f.key === "one_too_many")).toBe(false);
@@ -2780,7 +2780,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
   test("POST with an existing key at the cap is an update and allowed", async () => {
     const d = deps();
     for (let i = 0; i < 50; i++) {
-      await d.storage.rememberUserFact("42", `fact_${i}`, `v${i}`);
+      await d.storage.facts.remember("42", `fact_${i}`, `v${i}`);
     }
     const r = await handleApi(
       {
@@ -2800,7 +2800,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("PUT updates the value in place", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const r = await handleApi(
       {
         method: "PUT",
@@ -2818,7 +2818,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("PUT renames via newKey", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const r = await handleApi(
       {
         method: "PUT",
@@ -2837,7 +2837,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
   test("PUT rename succeeds at exactly the cap (old slot freed first)", async () => {
     const d = deps();
     for (let i = 0; i < 50; i++) {
-      await d.storage.rememberUserFact("42", `fact_${i}`, `v${i}`);
+      await d.storage.facts.remember("42", `fact_${i}`, `v${i}`);
     }
     const r = await handleApi(
       {
@@ -2857,8 +2857,8 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("PUT rename onto another existing key is a 409, both facts intact", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
-    await d.storage.rememberUserFact("42", "job", "welder");
+    await d.storage.facts.remember("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "job", "welder");
     const r = await handleApi(
       {
         method: "PUT",
@@ -2870,7 +2870,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
     );
     expect(r.status).toBe(409);
     expect(r.body).toEqual({ error: "fact key exists" });
-    const facts = await d.storage.listUserFacts("42");
+    const facts = await d.storage.facts.list("42");
     expect(facts).toEqual([
       { key: "job", value: "welder" },
       { key: "pets", value: "two cats" },
@@ -2893,7 +2893,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("DELETE removes a fact and is idempotent", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const first = await handleApi(
       { method: "DELETE", path: "/api/me/facts/main/pets", body: null },
       d,
@@ -2912,7 +2912,7 @@ describe("memory vault (/api/me/bots, /api/me/facts)", () => {
 
   test("facts are isolated per character scope", async () => {
     const d = deps();
-    await d.storage.saveManagedBot(charBot);
+    await d.storage.managedBots.save(charBot);
     await handleApi(
       {
         method: "POST",
@@ -2964,7 +2964,7 @@ describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
 
   test("the owner reads another user's facts", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42/facts/main", body: null },
       d,
@@ -2979,9 +2979,9 @@ describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
 
   test("respects character scoping via forBot", async () => {
     const d = deps();
-    await d.storage.saveManagedBot(charBot);
-    await d.storage.rememberUserFact("42", "main_fact", "main");
-    await d.storage.forBot("777").rememberUserFact("42", "char_fact", "char");
+    await d.storage.managedBots.save(charBot);
+    await d.storage.facts.remember("42", "main_fact", "main");
+    await d.storage.forBot("777").facts.remember("42", "char_fact", "char");
 
     const mainList = await handleApi(
       { method: "GET", path: "/api/admin/users/42/facts/main", body: null },
@@ -3014,7 +3014,7 @@ describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
 
   test("is admin-only: a non-owner gets 403, even for their own id", async () => {
     const d = deps();
-    await d.storage.rememberUserFact("42", "pets", "two cats");
+    await d.storage.facts.remember("42", "pets", "two cats");
     const r = await handleApi(
       { method: "GET", path: "/api/admin/users/42/facts/main", body: null },
       d,
@@ -3035,7 +3035,7 @@ describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
       owner,
     );
     expect(r.status).toBe(404);
-    expect(await d.storage.listUserFacts("42")).toEqual([]);
+    expect(await d.storage.facts.list("42")).toEqual([]);
   });
 });
 
@@ -3043,9 +3043,9 @@ describe("GET /api/admin/spend/overview", () => {
   test("returns the aggregated overview for the owner", async () => {
     const d = deps();
     const now = Date.now();
-    await d.storage.addGlobalSpend(2, now);
-    await d.storage.addUserSpend("42", 2, now);
-    await d.storage.upsertUser({
+    await d.storage.spend.addGlobal(2, now);
+    await d.storage.spend.addUser("42", 2, now);
+    await d.storage.users.upsert({
       id: "42",
       firstName: "A",
       lastName: null,

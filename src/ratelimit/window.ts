@@ -58,7 +58,7 @@ export function windowStart(
   return Math.floor((now - offset) / lengthMs) * lengthMs + offset;
 }
 
-// The current window starts for both windows, as passed into `addUserUsage`.
+// The current window starts for both windows, as passed into `usage.add`.
 export function currentWindowStarts(
   userId: string,
   now: number,

@@ -163,10 +163,10 @@ async function composeReminderMessage(
   const [{ settings, botName }, userTimezone, displayName, user, gender] =
     await Promise.all([
       deps.resolver(reminder.chatId),
-      deps.storage.getUserTimezone(reminder.userId),
+      deps.storage.profile.getTimezone(reminder.userId),
       readValidDisplayName(deps.storage, reminder.userId),
-      deps.storage.getUser(reminder.userId),
-      deps.storage.getUserGender(reminder.userId),
+      deps.storage.users.get(reminder.userId),
+      deps.storage.profile.getGender(reminder.userId),
     ]);
 
   const timezone = userTimezone ?? settings.timezone;

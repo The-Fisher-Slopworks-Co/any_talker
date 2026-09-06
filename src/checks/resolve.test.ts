@@ -86,7 +86,7 @@ describe("resolveCheck", () => {
   test("on No: increments counter, sends noReply, clears pending", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck();
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({
@@ -116,7 +116,7 @@ describe("resolveCheck", () => {
         other: { parse_mode: "HTML" },
       },
     ]);
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.counter).toBe(723);
     expect(saved?.pendingMessageId).toBeNull();
     expect(saved?.pendingFiredAtMs).toBeNull();
@@ -125,7 +125,7 @@ describe("resolveCheck", () => {
   test("on Yes with always_increment: counter goes up, yesReply", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck();
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({
@@ -141,13 +141,13 @@ describe("resolveCheck", () => {
       newCounter: 723,
       reply: "Nikita, lying. Day 723",
     });
-    expect((await storage.getCheck("c1"))?.counter).toBe(723);
+    expect((await storage.checks.get("c1"))?.counter).toBe(723);
   });
 
   test("on Yes with reset_on_yes: counter resets to 0", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck({ counterMode: "reset_on_yes", counter: 5 });
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({
@@ -163,13 +163,13 @@ describe("resolveCheck", () => {
       newCounter: 0,
       reply: "Nikita, lying. Day 0",
     });
-    expect((await storage.getCheck("c1"))?.counter).toBe(0);
+    expect((await storage.checks.get("c1"))?.counter).toBe(0);
   });
 
   test("on No with reset_on_yes: counter still increments", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck({ counterMode: "reset_on_yes", counter: 5 });
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({
@@ -187,7 +187,7 @@ describe("resolveCheck", () => {
   test("timeout treated as no", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck();
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({
@@ -216,7 +216,7 @@ describe("resolveCheck", () => {
   test("wrong_user: doesn't change state or send", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck();
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({
@@ -229,7 +229,7 @@ describe("resolveCheck", () => {
 
     expect(out.kind).toBe("wrong_user");
     expect(api.sent).toHaveLength(0);
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.counter).toBe(722);
     expect(saved?.pendingMessageId).toBe(42);
   });
@@ -241,7 +241,7 @@ describe("resolveCheck", () => {
       counterAnchorDate: "2005-02-10",
       timezone: "UTC",
     });
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const nowMs = Date.UTC(2005, 1, 20, 12, 0); // 10 days later
@@ -259,7 +259,7 @@ describe("resolveCheck", () => {
       newCounter: 10,
       reply: "Nikita. Day 10",
     });
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.counterAnchorDate).toBe("2005-02-10");
     expect(saved?.counter).toBe(0);
   });
@@ -272,7 +272,7 @@ describe("resolveCheck", () => {
       timezone: "UTC",
       counterMode: "reset_on_yes",
     });
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const nowMs = Date.UTC(2026, 4, 11, 12, 0);
@@ -290,14 +290,14 @@ describe("resolveCheck", () => {
       newCounter: 0,
       reply: "Nikita, lying. Day 0",
     });
-    const saved = await storage.getCheck("c1");
+    const saved = await storage.checks.get("c1");
     expect(saved?.counterAnchorDate).toBe("2026-05-11");
   });
 
   test("chat migration: retries reply at the supergroup id and persists it", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck();
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
     const originalSend = api.sendMessage.bind(api);
     api.sendMessage = async (chat_id, text, other) => {
@@ -328,7 +328,7 @@ describe("resolveCheck", () => {
       expect(api.sent[0]?.chat_id).toBe("-1003965869359");
       expect(api.editedText[0]?.chat_id).toBe("-1003965869359");
       expect(api.editedMarkup[0]?.chat_id).toBe("-1003965869359");
-      const saved = await storage.getCheck("c1");
+      const saved = await storage.checks.get("c1");
       expect(saved?.chatId).toBe("-1003965869359");
       expect(saved?.counter).toBe(723);
       expect(saved?.pendingMessageId).toBeNull();
@@ -340,7 +340,7 @@ describe("resolveCheck", () => {
   test("not_pending: returns not_pending if pendingMessageId is null", async () => {
     const storage = new MemoryStorage();
     const check = makeCheck({ pendingMessageId: null });
-    await storage.saveCheck(check);
+    await storage.checks.save(check);
     const api = new FakeApi();
 
     const out = await resolveCheck({

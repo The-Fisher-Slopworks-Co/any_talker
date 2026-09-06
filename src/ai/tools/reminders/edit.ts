@@ -63,9 +63,9 @@ export function createEditReminderTool(deps: {
     execute: async ({ reminderId, text, newTime }, ctx) => {
       const scoped = deps.storage.forBot(ctx.botId ?? null);
       // O(1) fetch doubles as the ownership gate, exactly as cancel_reminder:
-      // saveReminder overwrites by id and does not verify the owner, so confirm
+      // reminders.save overwrites by id and does not verify the owner, so confirm
       // the reminder is this user's before mutating it.
-      const reminder = await scoped.getReminder(reminderId);
+      const reminder = await scoped.reminders.get(reminderId);
       if (!reminder || reminder.userId !== ctx.userId) {
         return { ok: false, reason: "no such reminder belongs to the user" };
       }
@@ -96,7 +96,7 @@ export function createEditReminderTool(deps: {
       // Spread the stored reminder so id, userId, chatId, lang, target,
       // createdAtMs and the original contextMessages snapshot are preserved;
       // only the note and/or fire time change.
-      await scoped.saveReminder({
+      await scoped.reminders.save({
         ...reminder,
         text: text ?? reminder.text,
         fireAtMs,

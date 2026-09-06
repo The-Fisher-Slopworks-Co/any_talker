@@ -57,28 +57,28 @@ function makeReminder(over: Partial<Reminder> = {}): Reminder {
 describe("migrateChatData", () => {
   test("moves chat settings to the new id, deleting the old key", async () => {
     const storage = new MemoryStorage();
-    await storage.saveChatSettings(OLD, {
+    await storage.chats.saveSettings(OLD, {
       botName: "Capybara",
       timezone: "UTC",
     });
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getChatSettings(NEW)).toEqual({
+    expect(await storage.chats.getSettings(NEW)).toEqual({
       botName: "Capybara",
       timezone: "UTC",
     });
-    expect(await storage.getChatSettings(OLD)).toBeNull();
+    expect(await storage.chats.getSettings(OLD)).toBeNull();
   });
 
   test("settings already written under the new id win over migrated ones", async () => {
     const storage = new MemoryStorage();
-    await storage.saveChatSettings(OLD, { botName: "Old", timezone: "UTC" });
-    await storage.saveChatSettings(NEW, { botName: "New" });
+    await storage.chats.saveSettings(OLD, { botName: "Old", timezone: "UTC" });
+    await storage.chats.saveSettings(NEW, { botName: "New" });
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getChatSettings(NEW)).toEqual({
+    expect(await storage.chats.getSettings(NEW)).toEqual({
       botName: "New",
       timezone: "UTC",
     });
@@ -86,33 +86,33 @@ describe("migrateChatData", () => {
 
   test("moves the chat whitelist entry, keeping its label", async () => {
     const storage = new MemoryStorage();
-    await storage.addWhitelist("chats", { id: OLD, label: "Our group" });
-    await storage.addWhitelist("chats", { id: "-42", label: "Other" });
+    await storage.access.addWhitelist("chats", { id: OLD, label: "Our group" });
+    await storage.access.addWhitelist("chats", { id: "-42", label: "Other" });
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.isWhitelisted("chats", NEW)).toBe(true);
-    expect(await storage.isWhitelisted("chats", OLD)).toBe(false);
-    const entries = await storage.listWhitelist("chats");
+    expect(await storage.access.isWhitelisted("chats", NEW)).toBe(true);
+    expect(await storage.access.isWhitelisted("chats", OLD)).toBe(false);
+    const entries = await storage.access.listWhitelist("chats");
     expect(entries.find((e) => e.id === NEW)?.label).toBe("Our group");
     expect(entries.find((e) => e.id === "-42")).toBeDefined();
   });
 
   test("moves the chat blacklist entry, so an upgrade can't unblock a group", async () => {
     const storage = new MemoryStorage();
-    await storage.addBlacklist("chats", { id: OLD, label: "Trolls" });
+    await storage.access.addBlacklist("chats", { id: OLD, label: "Trolls" });
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.isBlacklisted("chats", NEW)).toBe(true);
-    expect(await storage.isBlacklisted("chats", OLD)).toBe(false);
-    const entries = await storage.listBlacklist("chats");
+    expect(await storage.access.isBlacklisted("chats", NEW)).toBe(true);
+    expect(await storage.access.isBlacklisted("chats", OLD)).toBe(false);
+    const entries = await storage.access.listBlacklist("chats");
     expect(entries.find((e) => e.id === NEW)?.label).toBe("Trolls");
   });
 
   test("merges the directory row: supergroup identity, earliest firstSeenAt", async () => {
     const storage = new MemoryStorage();
-    await storage.upsertChat({
+    await storage.chats.upsert({
       id: OLD,
       type: "group",
       title: "Chat",
@@ -122,7 +122,7 @@ describe("migrateChatData", () => {
     });
     // The middleware already upserted the supergroup row with a fresh
     // firstSeenAt (the migration service message itself).
-    await storage.upsertChat({
+    await storage.chats.upsert({
       id: NEW,
       type: "supergroup",
       title: "Chat",
@@ -133,8 +133,8 @@ describe("migrateChatData", () => {
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getChat(OLD)).toBeNull();
-    const merged = await storage.getChat(NEW);
+    expect(await storage.chats.get(OLD)).toBeNull();
+    const merged = await storage.chats.get(NEW);
     expect(merged?.type).toBe("supergroup");
     expect(merged?.firstSeenAt).toBe(1000);
     expect(merged?.lastSeenAt).toBe(NOW);
@@ -142,7 +142,7 @@ describe("migrateChatData", () => {
 
   test("creates the directory row under the new id when none exists yet", async () => {
     const storage = new MemoryStorage();
-    await storage.upsertChat({
+    await storage.chats.upsert({
       id: OLD,
       type: "group",
       title: "Chat",
@@ -153,26 +153,26 @@ describe("migrateChatData", () => {
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getChat(OLD)).toBeNull();
-    const moved = await storage.getChat(NEW);
+    expect(await storage.chats.get(OLD)).toBeNull();
+    const moved = await storage.chats.get(NEW);
     expect(moved?.title).toBe("Chat");
     expect(moved?.firstSeenAt).toBe(1000);
   });
 
   test("repoints checks in the migrated chat only", async () => {
     const storage = new MemoryStorage();
-    await storage.saveCheck(makeCheck({ id: "c1" }));
-    await storage.saveCheck(makeCheck({ id: "c2", chatId: "-42" }));
+    await storage.checks.save(makeCheck({ id: "c1" }));
+    await storage.checks.save(makeCheck({ id: "c2", chatId: "-42" }));
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect((await storage.getCheck("c1"))?.chatId).toBe(NEW);
-    expect((await storage.getCheck("c2"))?.chatId).toBe("-42");
+    expect((await storage.checks.get("c1"))?.chatId).toBe(NEW);
+    expect((await storage.checks.get("c2"))?.chatId).toBe("-42");
   });
 
   test("repoints reminders in the main and every managed bot's namespace", async () => {
     const storage = new MemoryStorage();
-    await storage.saveManagedBot({
+    await storage.managedBots.save({
       botId: "777",
       ownerUserId: "owner",
       username: "cat_bot",
@@ -180,9 +180,11 @@ describe("migrateChatData", () => {
       systemPrompt: "meow",
       createdAtMs: 0,
     });
-    await storage.saveReminder(makeReminder({ id: "r-main" }));
-    await storage.forBot("777").saveReminder(makeReminder({ id: "r-managed" }));
-    await storage.saveReminder(
+    await storage.reminders.save(makeReminder({ id: "r-main" }));
+    await storage
+      .forBot("777")
+      .reminders.save(makeReminder({ id: "r-managed" }));
+    await storage.reminders.save(
       makeReminder({
         id: "r-other",
         chatId: "-42",
@@ -192,27 +194,27 @@ describe("migrateChatData", () => {
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    const main = await storage.getReminder("r-main");
+    const main = await storage.reminders.get("r-main");
     expect(main?.chatId).toBe(NEW);
     expect(main?.target).toEqual({
       kind: "ask_reply",
       chatId: NEW,
       replyToMessageId: 7,
     });
-    const managed = await storage.forBot("777").getReminder("r-managed");
+    const managed = await storage.forBot("777").reminders.get("r-managed");
     expect(managed?.chatId).toBe(NEW);
     expect(managed?.target).toEqual({
       kind: "ask_reply",
       chatId: NEW,
       replyToMessageId: 7,
     });
-    const other = await storage.getReminder("r-other");
+    const other = await storage.reminders.get("r-other");
     expect(other?.chatId).toBe("-42");
   });
 
   test("repoints a guest-dm reminder's origin chat but not its target", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(
+    await storage.reminders.save(
       makeReminder({
         id: "r-guest",
         target: { kind: "guest_dm", userId: "u1" },
@@ -221,45 +223,45 @@ describe("migrateChatData", () => {
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    const r = await storage.getReminder("r-guest");
+    const r = await storage.reminders.get("r-guest");
     expect(r?.chatId).toBe(NEW);
     expect(r?.target).toEqual({ kind: "guest_dm", userId: "u1" });
   });
 
   test("moves bot presence to the new chat id", async () => {
     const storage = new MemoryStorage();
-    await storage.recordBotPresence(OLD, "111", 5000);
-    await storage.recordBotPresence(OLD, "222", 6000);
+    await storage.presence.record(OLD, "111", 5000);
+    await storage.presence.record(OLD, "222", 6000);
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getBotPresence(NEW)).toEqual({
+    expect(await storage.presence.get(NEW)).toEqual({
       "111": 5000,
       "222": 6000,
     });
-    expect(await storage.getBotPresence(OLD)).toEqual({});
+    expect(await storage.presence.get(OLD)).toEqual({});
   });
 
   test("moves spend history and never doubles it on a re-run", async () => {
     const storage = new MemoryStorage();
-    await storage.addChatSpend(OLD, 0.5, NOW - 86_400_000);
-    await storage.addChatSpend(OLD, 0.25, NOW);
-    await storage.addChatSpend(NEW, 0.1, NOW);
+    await storage.spend.addChat(OLD, 0.5, NOW - 86_400_000);
+    await storage.spend.addChat(OLD, 0.25, NOW);
+    await storage.spend.addChat(NEW, 0.1, NOW);
 
     await migrateChatData(storage, OLD, NEW, NOW);
     // Both service-message variants (and every family bot) trigger the same
     // migration — a second run must be a no-op.
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    const moved = await storage.getChatSpend(NEW, NOW);
+    const moved = await storage.spend.getChat(NEW, NOW);
     expect(moved.day).toBeCloseTo(0.35);
     expect(moved.week).toBeCloseTo(0.85);
-    expect((await storage.getChatSpend(OLD, NOW)).week).toBeCloseTo(0);
+    expect((await storage.spend.getChat(OLD, NOW)).week).toBeCloseTo(0);
   });
 
   test("leaves conversation nodes under the old id (different message-id spaces)", async () => {
     const storage = new MemoryStorage();
-    await storage.saveConversation(OLD, 5, {
+    await storage.conversations.save(OLD, 5, {
       userQuestion: "q",
       botAnswer: "a",
       parentBotMsgId: null,
@@ -268,15 +270,15 @@ describe("migrateChatData", () => {
 
     await migrateChatData(storage, OLD, NEW, NOW);
 
-    expect(await storage.getConversation(NEW, 5)).toBeNull();
-    expect(await storage.getConversation(OLD, 5)).not.toBeNull();
+    expect(await storage.conversations.get(NEW, 5)).toBeNull();
+    expect(await storage.conversations.get(OLD, 5)).not.toBeNull();
   });
 
   test("a failing step does not abort the remaining steps", async () => {
     const storage = new MemoryStorage();
-    await storage.saveChatSettings(OLD, { botName: "Capybara" });
-    await storage.saveCheck(makeCheck());
-    storage.listWhitelist = async () => {
+    await storage.chats.saveSettings(OLD, { botName: "Capybara" });
+    await storage.checks.save(makeCheck());
+    storage.access.listWhitelist = async () => {
       throw new Error("keydb down");
     };
     const originalError = console.error;
@@ -287,14 +289,14 @@ describe("migrateChatData", () => {
       console.error = originalError;
     }
 
-    expect((await storage.getChatSettings(NEW))?.botName).toBe("Capybara");
-    expect((await storage.getCheck("c1"))?.chatId).toBe(NEW);
+    expect((await storage.chats.getSettings(NEW))?.botName).toBe("Capybara");
+    expect((await storage.checks.get("c1"))?.chatId).toBe(NEW);
   });
 
   test("no-op when old and new ids are equal", async () => {
     const storage = new MemoryStorage();
-    await storage.saveChatSettings(OLD, { botName: "Capybara" });
+    await storage.chats.saveSettings(OLD, { botName: "Capybara" });
     await migrateChatData(storage, OLD, OLD, NOW);
-    expect((await storage.getChatSettings(OLD))?.botName).toBe("Capybara");
+    expect((await storage.chats.getSettings(OLD))?.botName).toBe("Capybara");
   });
 });

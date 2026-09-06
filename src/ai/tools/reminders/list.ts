@@ -49,7 +49,7 @@ export function createListRemindersTool(deps: {
     execute: async (_input, ctx) => {
       const stored = await deps.storage
         .forBot(ctx.botId ?? null)
-        .listRemindersForUser(ctx.userId);
+        .reminders.listForUser(ctx.userId);
       // Reminders are stored per-user (one due-index across all of a user's
       // chats), but each records the chat it was created in. In a group (or
       // business) chat, listing reminders created elsewhere would leak one
@@ -59,7 +59,7 @@ export function createListRemindersTool(deps: {
       // guest-DM reminders, which are delivered there but recorded against the
       // business chat they were created in, and reminders whose chat id changed
       // under them (e.g. a group upgraded to a supergroup). So in the DM return
-      // everything. Either way listRemindersForUser returns soonest-first, and
+      // everything. Either way reminders.listForUser returns soonest-first, and
       // filtering preserves that order.
       const inPrivateDm = ctx.chatId === ctx.userId;
       const all = inPrivateDm
