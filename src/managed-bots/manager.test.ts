@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect } from "bun:test";
-import { GrammyError, type Api } from "grammy";
+import type { Api } from "grammy";
 import { MemoryStorage } from "../storage/memory";
 import { BotManager, type BotManagerDeps } from "./manager";
 import type { RateLimiter } from "../ratelimit/types";
@@ -12,19 +12,14 @@ import type { ManagedBot } from "./types";
 
 // The manager only brokers tokens through the main bot's api here; the
 // network-bound startBot path (getMe + bot.start) is exercised in live runs,
-// not unit tests, matching the project's no-live-network test policy.
-function makeManager(
-  storage: MemoryStorage,
-  // Overrides the token brokered per re-fetch; throw to simulate a bot that no
-  // longer exists in @BotFather.
-  broker: (userId: number) => Promise<string> = async (userId) =>
-    `token-${userId}`,
-) {
+// not unit tests, matching the project's no-live-network test policy. The
+// polling supervisor's own recovery matrix lives in `supervisor.test.ts`.
+function makeManager(storage: MemoryStorage) {
   const tokenCalls: number[] = [];
   const mainApi = {
     getManagedBotToken: async (userId: number) => {
       tokenCalls.push(userId);
-      return broker(userId);
+      return `token-${userId}`;
     },
     getMe: async () => ({ username: "Manager", can_manage_bots: true }),
   } as unknown as Api;
@@ -41,15 +36,15 @@ function makeManager(
     logIncomingUpdates: false,
     logDebug: false,
   };
-  return { manager: new RestartSpyManager(deps), tokenCalls };
+  return { manager: new StartSpyManager(deps), tokenCalls };
 }
 
 // Records startBot calls instead of spinning up a real (network-bound) grammY
-// bot, so crash-recovery tests stay offline.
-class RestartSpyManager extends BotManager {
-  readonly restarts: Array<{ record: ManagedBot; token: string }> = [];
+// bot, so these tests stay offline.
+class StartSpyManager extends BotManager {
+  readonly starts: Array<{ record: ManagedBot; token: string }> = [];
   override async startBot(record: ManagedBot, token: string): Promise<void> {
-    this.restarts.push({ record, token });
+    this.starts.push({ record, token });
   }
 }
 
@@ -66,6 +61,24 @@ test("a managed_bot update from a non-owner is ignored entirely", async () => {
   expect(res).toBeNull();
   expect(tokenCalls).toEqual([]); // no token brokered
   expect(await storage.listManagedBots()).toEqual([]); // no record persisted
+});
+
+test("a managed_bot update from the owner brokers, persists and starts", async () => {
+  const storage = new MemoryStorage();
+  const { manager, tokenCalls } = makeManager(storage);
+
+  const res = await manager.handleManagedBotCreated("1", {
+    id: 555,
+    username: "CatBot",
+    first_name: "Cat",
+  });
+
+  expect(res?.botId).toBe("555");
+  expect(tokenCalls).toEqual([555]);
+  expect(await storage.getManagedBotToken("555")).toBe("token-555");
+  expect(manager.starts).toEqual([
+    { record: res as ManagedBot, token: "token-555" },
+  ]);
 });
 
 test("deleteBot removes the registry record and the stored token", async () => {
@@ -95,88 +108,11 @@ test("reminderRuntimes is empty when no managed bots are running", () => {
   expect(manager.reminderRuntimes()).toEqual([]);
 });
 
-// --- polling-crash recovery ---
-
-const record555: ManagedBot = {
-  botId: "555",
-  ownerUserId: "1",
-  username: "CatBot",
-  displayName: "Cat",
-  systemPrompt: "p",
-  createdAtMs: 0,
-};
-
-const unauthorized = () =>
-  new GrammyError(
-    "Call to 'getUpdates' failed!",
-    { ok: false, error_code: 401, description: "Unauthorized" },
-    "getUpdates",
-    {},
-  );
-
-test("a non-401 polling crash leaves the bot stopped without re-brokering", async () => {
+test("managerInfo reports the main bot's username and can_manage_bots", async () => {
   const storage = new MemoryStorage();
-  const { manager, tokenCalls } = makeManager(storage);
-  await storage.saveManagedBot(record555);
-  await storage.setManagedBotToken("555", "tok");
-
-  await manager.handlePollingCrash(record555, "tok", new Error("boom"));
-
-  expect(tokenCalls).toEqual([]);
-  expect(manager.restarts).toEqual([]);
-  // The token got no 401 — it may still be valid (e.g. a 409 conflict).
-  expect(await storage.getManagedBotToken("555")).toBe("tok");
-});
-
-test("a 401 crash for a bot deleted in BotFather drops the revoked token, keeps the record", async () => {
-  const storage = new MemoryStorage();
-  const { manager, tokenCalls } = makeManager(storage, async () => {
-    throw new Error("bot not found");
+  const { manager } = makeManager(storage);
+  expect(await manager.managerInfo()).toEqual({
+    username: "Manager",
+    canManageBots: true,
   });
-  await storage.saveManagedBot(record555);
-  await storage.setManagedBotToken("555", "tok");
-
-  await manager.handlePollingCrash(record555, "tok", unauthorized());
-
-  expect(tokenCalls).toEqual([555]);
-  expect(manager.restarts).toEqual([]);
-  expect(await storage.getManagedBotToken("555")).toBeNull();
-  // The record stays so the owner can delete the bot from the admin UI.
-  expect(await storage.getManagedBot("555")).toEqual(record555);
-});
-
-test("a 401 crash with an unchanged re-brokered token does not restart (no crash loop)", async () => {
-  const storage = new MemoryStorage();
-  const { manager } = makeManager(storage, async () => "tok");
-  await storage.saveManagedBot(record555);
-  await storage.setManagedBotToken("555", "tok");
-
-  await manager.handlePollingCrash(record555, "tok", unauthorized());
-
-  expect(manager.restarts).toEqual([]);
-  expect(await storage.getManagedBotToken("555")).toBeNull();
-});
-
-test("a 401 crash after a token rotation restarts the bot with the fresh token", async () => {
-  const storage = new MemoryStorage();
-  const { manager } = makeManager(storage, async () => "tok-rotated");
-  await storage.saveManagedBot(record555);
-  await storage.setManagedBotToken("555", "tok");
-
-  await manager.handlePollingCrash(record555, "tok", unauthorized());
-
-  expect(manager.restarts).toEqual([
-    { record: record555, token: "tok-rotated" },
-  ]);
-  expect(await storage.getManagedBotToken("555")).toBe("tok-rotated");
-});
-
-test("a 401 crash does not resurrect a bot deleted via the admin UI meanwhile", async () => {
-  const storage = new MemoryStorage();
-  const { manager } = makeManager(storage, async () => "tok-rotated");
-  // No record in storage: deleteBot won the race against recovery.
-  await manager.handlePollingCrash(record555, "tok", unauthorized());
-
-  expect(manager.restarts).toEqual([]);
-  expect(await storage.getManagedBotToken("555")).toBeNull();
 });
