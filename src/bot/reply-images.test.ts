@@ -49,15 +49,15 @@ describe("resolveReplyImages", () => {
 
   test("album reply: pulls all photos from storage index, sorted by message_id", async () => {
     const storage = new MemoryStorage();
-    await storage.appendAlbumPhoto("c1", "group42", {
+    await storage.photos.appendAlbum("c1", "group42", {
       messageId: 102,
       fileId: "third",
     });
-    await storage.appendAlbumPhoto("c1", "group42", {
+    await storage.photos.appendAlbum("c1", "group42", {
       messageId: 100,
       fileId: "first",
     });
-    await storage.appendAlbumPhoto("c1", "group42", {
+    await storage.photos.appendAlbum("c1", "group42", {
       messageId: 101,
       fileId: "second",
     });
@@ -122,7 +122,7 @@ describe("resolveReplyImages", () => {
 
   test("album indexed in a different chat is not visible", async () => {
     const storage = new MemoryStorage();
-    await storage.appendAlbumPhoto("other_chat", "g1", {
+    await storage.photos.appendAlbum("other_chat", "g1", {
       messageId: 1,
       fileId: "x",
     });
@@ -144,8 +144,8 @@ describe("resolveReplyImages", () => {
 
   test("album fetch failure returns empty images but source stays 'album'", async () => {
     const storage = new MemoryStorage();
-    await storage.appendAlbumPhoto("c1", "g", { messageId: 1, fileId: "a" });
-    await storage.appendAlbumPhoto("c1", "g", { messageId: 2, fileId: "b" });
+    await storage.photos.appendAlbum("c1", "g", { messageId: 1, fileId: "a" });
+    await storage.photos.appendAlbum("c1", "g", { messageId: 2, fileId: "b" });
     const replyToMessage = makeMessage({
       message_id: 1,
       media_group_id: "g",
@@ -168,8 +168,14 @@ describe("resolveReplyImages", () => {
 
   test("duplicate appends for the same message_id keep one entry", async () => {
     const storage = new MemoryStorage();
-    await storage.appendAlbumPhoto("c1", "g", { messageId: 1, fileId: "old" });
-    await storage.appendAlbumPhoto("c1", "g", { messageId: 1, fileId: "new" });
+    await storage.photos.appendAlbum("c1", "g", {
+      messageId: 1,
+      fileId: "old",
+    });
+    await storage.photos.appendAlbum("c1", "g", {
+      messageId: 1,
+      fileId: "new",
+    });
     const replyToMessage = makeMessage({
       message_id: 1,
       media_group_id: "g",

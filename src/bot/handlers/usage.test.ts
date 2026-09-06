@@ -27,12 +27,12 @@ const run = (
 // Accrues `tokens` into both of the user's current windows.
 async function spend(storage: MemoryStorage, userId: string, tokens: number) {
   const starts = currentWindowStarts(userId, NOW);
-  await storage.addUserUsage(userId, tokens, starts.fiveHour, starts.weekly);
+  await storage.usage.add(userId, tokens, starts.fiveHour, starts.weekly);
 }
 
 async function withLimits(five: number, weekly: number) {
   const storage = new MemoryStorage();
-  await storage.saveSettings({
+  await storage.settings.save({
     ...DEFAULT_SETTINGS,
     rateLimit: {
       ...DEFAULT_SETTINGS.rateLimit,
@@ -141,7 +141,7 @@ describe("usageCommandHandler", () => {
 
   test("reports real percentages for the owner when exemption is off", async () => {
     const storage = new MemoryStorage();
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
@@ -159,8 +159,8 @@ describe("usageCommandHandler", () => {
   test("does not accrue usage — asking is free", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);
-    const before = await storage.getUserUsage(USER);
+    const before = await storage.usage.get(USER);
     await run(storage);
-    expect(await storage.getUserUsage(USER)).toEqual(before);
+    expect(await storage.usage.get(USER)).toEqual(before);
   });
 });

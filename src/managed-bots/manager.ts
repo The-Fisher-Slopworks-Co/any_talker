@@ -46,7 +46,7 @@ export class BotManager {
   // logged and skipped so one broken bot can't take down the others (or block
   // the main bot's startup).
   async loadAndStartAll(): Promise<void> {
-    const records = await this.runtime.deps.storage.listManagedBots();
+    const records = await this.runtime.deps.storage.managedBots.list();
     for (const record of records) {
       try {
         const token = await resolveToken(this.runtime, record);
@@ -100,7 +100,7 @@ export class BotManager {
     if (!token) return null;
 
     const storage = this.runtime.deps.storage;
-    const existing = await storage.getManagedBot(botId);
+    const existing = await storage.managedBots.get(botId);
     const record: ManagedBot = existing ?? {
       botId,
       ownerUserId,
@@ -109,8 +109,8 @@ export class BotManager {
       systemPrompt: "",
       createdAtMs: Date.now(),
     };
-    await storage.saveManagedBot(record);
-    await storage.setManagedBotToken(botId, token);
+    await storage.managedBots.save(record);
+    await storage.managedBots.setToken(botId, token);
     await this.startBot(record, token);
     return record;
   }
@@ -120,8 +120,8 @@ export class BotManager {
   // orphaned reminders simply never fire (no scheduler iterates them).
   async deleteBot(botId: string): Promise<void> {
     await this.stopBot(botId);
-    await this.runtime.deps.storage.deleteManagedBot(botId);
-    await this.runtime.deps.storage.setManagedBotToken(botId, null);
+    await this.runtime.deps.storage.managedBots.delete(botId);
+    await this.runtime.deps.storage.managedBots.setToken(botId, null);
   }
 
   async syncProfileName(botId: string): Promise<void> {

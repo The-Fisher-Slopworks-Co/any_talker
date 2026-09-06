@@ -19,17 +19,17 @@ describe("cancel_reminder", () => {
 
   test("cancels the user's own reminder and removes it", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
     const tool = createCancelReminderTool({ storage });
     const out = await tool.execute({ reminderId: "r1" }, ctx);
     expect(out).toEqual({ cancelled: true });
-    expect(await storage.getReminder("r1")).toBeNull();
-    expect(await storage.countRemindersForUser("u1")).toBe(0);
+    expect(await storage.reminders.get("r1")).toBeNull();
+    expect(await storage.reminders.countForUser("u1")).toBe(0);
   });
 
   test("pushes a reminder_cancelled effect with the reminder's fire time", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
     const effects: ToolEffect[] = [];
     const tool = createCancelReminderTool({ storage });
     await tool.execute(
@@ -56,20 +56,20 @@ describe("cancel_reminder", () => {
 
   test("refuses to cancel another user's reminder", async () => {
     const storage = new MemoryStorage();
-    await storage.saveReminder(reminder({ id: "r1", userId: "u2" }));
+    await storage.reminders.save(reminder({ id: "r1", userId: "u2" }));
     const effects: ToolEffect[] = [];
     const tool = createCancelReminderTool({ storage });
     const out = await tool.execute({ reminderId: "r1" }, { ...ctx, effects });
     expect(out).toEqual({ cancelled: false });
     // The other user's reminder is untouched.
-    expect(await storage.getReminder("r1")).not.toBeNull();
+    expect(await storage.reminders.get("r1")).not.toBeNull();
     expect(effects).toEqual([]);
   });
 
   test("cannot cancel a reminder from a different bot scope", async () => {
     const storage = new MemoryStorage();
     // Created under the main bot namespace.
-    await storage.saveReminder(reminder({ id: "r1" }));
+    await storage.reminders.save(reminder({ id: "r1" }));
     const tool = createCancelReminderTool({ storage });
     const out = await tool.execute(
       { reminderId: "r1" },
@@ -77,6 +77,6 @@ describe("cancel_reminder", () => {
     );
     expect(out).toEqual({ cancelled: false });
     // Still present in the main namespace.
-    expect(await storage.getReminder("r1")).not.toBeNull();
+    expect(await storage.reminders.get("r1")).not.toBeNull();
   });
 });

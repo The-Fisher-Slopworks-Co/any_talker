@@ -184,7 +184,7 @@ describe("remember_fact + list_facts + forget_fact round-trip", () => {
     expect(after).toEqual([{ key: "favourite_colour", value: "blue" }]);
 
     // Sanity: also confirm via storage directly.
-    expect(await storage.listUserFacts("u-happy")).toEqual([
+    expect(await storage.facts.list("u-happy")).toEqual([
       { key: "favourite_colour", value: "blue" },
     ]);
   });
@@ -224,7 +224,7 @@ describe("userId plumbing", () => {
     // Forget on alice should not touch bob.
     await tools.forget_fact.execute({ key: "lang" }, alice);
     expect(await tools.list_facts.execute({}, alice)).toEqual([]);
-    expect(await storage.listUserFacts("bob")).toEqual([
+    expect(await storage.facts.list("bob")).toEqual([
       { key: "lang", value: "go" },
     ]);
   });
@@ -249,14 +249,14 @@ describe("userId plumbing", () => {
     const { tools, storage } = makeTools();
     const c = ctx({ userId: "u-cap" });
     for (let i = 0; i < 50; i++) {
-      await storage.rememberUserFact("u-cap", `k${i}`, "v");
+      await storage.facts.remember("u-cap", `k${i}`, "v");
     }
     const r = await tools.remember_fact.execute(
       { key: "overflow", value: "v" },
       c,
     );
     expect(r).toEqual({ ok: true });
-    const keys = (await storage.listUserFacts("u-cap")).map((f) => f.key);
+    const keys = (await storage.facts.list("u-cap")).map((f) => f.key);
     expect(keys.length).toBe(50);
     expect(keys).not.toContain("k0");
     expect(keys).toContain("overflow");

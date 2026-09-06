@@ -19,8 +19,8 @@ export function makeLangMiddleware(storage: Storage): MiddlewareFn<BotContext> {
     const userId = from && !from.is_bot ? String(from.id) : null;
 
     const stored = userId
-      ? await storage.getUserLang(userId).catch((err) => {
-          console.error("getUserLang failed:", err);
+      ? await storage.profile.getLang(userId).catch((err) => {
+          console.error("profile.getLang failed:", err);
           return null;
         })
       : null;

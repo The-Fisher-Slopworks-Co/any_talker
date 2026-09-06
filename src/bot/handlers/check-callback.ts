@@ -23,7 +23,7 @@ export type CheckCallbackOutcome =
 export async function handleCheckCallback(
   input: CheckCallbackInput,
 ): Promise<CheckCallbackOutcome> {
-  const check = await input.storage.getCheck(input.checkId);
+  const check = await input.storage.checks.get(input.checkId);
   if (!check) return { kind: "not_found" };
   if (check.pendingMessageId !== input.callbackMessageId) {
     return { kind: "stale" };

@@ -46,8 +46,8 @@ async function startBotInner(
   }
   if (username !== record.username) {
     record = { ...record, username };
-    await runtime.deps.storage
-      .saveManagedBot(record)
+    await runtime.deps.storage.managedBots
+      .save(record)
       .catch((err) =>
         console.error(`[managed-bots] persist username failed:`, err),
       );
@@ -130,10 +130,10 @@ export async function recoverFromPollingCrash(
   }
   const fresh = await rebrokerRevokedToken(runtime, botId, deadToken);
   if (!fresh) return;
-  const current = await runtime.deps.storage.getManagedBot(botId);
+  const current = await runtime.deps.storage.managedBots.get(botId);
   // Deleted via the admin UI while recovering — don't resurrect it.
   if (!current) return;
-  await runtime.deps.storage.setManagedBotToken(botId, fresh);
+  await runtime.deps.storage.managedBots.setToken(botId, fresh);
   console.log(
     `[managed-bots] token for ${botId} was rotated, restarting with the new one`,
   );

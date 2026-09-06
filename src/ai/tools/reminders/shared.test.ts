@@ -138,7 +138,7 @@ describe("persistReminder context capture", () => {
     };
     const out = await persistReminder(storage, ctx, fireAtMs, "milk");
     if (!out.ok) throw new Error("expected ok");
-    const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
+    const stored = (await storage.reminders.fetchDue(fireAtMs))[0]!;
     expect(stored.contextMessages).toEqual([
       { role: "user", content: "remind me about milk" },
       { role: "assistant", content: "ok" },
@@ -167,7 +167,7 @@ describe("persistReminder context capture", () => {
     };
     const out = await persistReminder(storage, ctx, fireAtMs, "x");
     if (!out.ok) throw new Error("expected ok");
-    const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
+    const stored = (await storage.reminders.fetchDue(fireAtMs))[0]!;
     const parts = contentOf(stored.contextMessages[0]!) as Array<{
       type: string;
     }>;
@@ -185,7 +185,7 @@ describe("persistReminder context capture", () => {
     const fireAtMs = baseCtx.now + 5 * 60_000;
     const out = await persistReminder(storage, baseCtx, fireAtMs, "x");
     if (!out.ok) throw new Error("expected ok");
-    const stored = (await storage.fetchDueReminders(fireAtMs))[0]!;
+    const stored = (await storage.reminders.fetchDue(fireAtMs))[0]!;
     expect(stored.contextMessages).toEqual([]);
   });
 });
@@ -237,7 +237,7 @@ describe("persistReminder per-user cap", () => {
   const future = (n: number) => baseCtx.now + (n + 1) * 60_000;
 
   async function withCap(storage: MemoryStorage, cap: number): Promise<void> {
-    await storage.saveSettings({
+    await storage.settings.save({
       ...DEFAULT_SETTINGS,
       maxRemindersPerUser: cap,
     });
@@ -258,7 +258,7 @@ describe("persistReminder per-user cap", () => {
       reason: expect.stringContaining("limit_reached"),
     });
     // The rejected reminder was not saved.
-    expect(await storage.countRemindersForUser("u1")).toBe(2);
+    expect(await storage.reminders.countForUser("u1")).toBe(2);
   });
 
   test("does not record an effect when rejected by the cap", async () => {
@@ -306,7 +306,7 @@ describe("persistReminder per-user cap", () => {
   test("reminders held by a managed bot count against the main bot's cap", async () => {
     const storage = new MemoryStorage();
     await withCap(storage, 1);
-    await storage.saveManagedBot({
+    await storage.managedBots.save({
       botId: "bot9",
       ownerUserId: "owner",
       username: "bot9_bot",
