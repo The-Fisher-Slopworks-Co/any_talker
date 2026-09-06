@@ -4,6 +4,7 @@
 import { test, expect, describe } from "bun:test";
 import {
   DEFAULT_LANG,
+  DOMAIN_MESSAGES,
   MESSAGES,
   isValidLang,
   languageSection,
@@ -61,10 +62,21 @@ describe("isValidLang", () => {
 });
 
 describe("MESSAGES parity", () => {
-  test("every locale has the same key set", () => {
-    const en = Object.keys(MESSAGES.en).sort();
-    const ru = Object.keys(MESSAGES.ru).sort();
-    expect(ru).toEqual(en);
+  // Both locales come from one catalogue, so they can't drift apart — but the
+  // catalogue is spread together from the domain modules, and a key defined in
+  // two of them would silently lose one of its translations.
+  test("no key is defined by two domain modules", () => {
+    const owner = new Map<string, string>();
+    const clashes: string[] = [];
+    for (const [domain, messages] of Object.entries(DOMAIN_MESSAGES)) {
+      for (const key of Object.keys(messages)) {
+        const first = owner.get(key);
+        if (first !== undefined) clashes.push(`${key}: ${first} + ${domain}`);
+        else owner.set(key, domain);
+      }
+    }
+    expect(clashes).toEqual([]);
+    expect(owner.size).toBe(Object.keys(MESSAGES.en).length);
   });
 
   test("interpolations match argument shape across locales", () => {
