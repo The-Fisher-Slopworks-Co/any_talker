@@ -4,11 +4,7 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import type {
-  Settings,
-  WhitelistEntry,
-  WhitelistKind,
-} from "../../../../shared/types";
+import type { Settings, WhitelistEntry } from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
@@ -20,13 +16,17 @@ import { EmptyState, LoadingState } from "../../components/states";
 import { ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 import { useLoadable } from "../../lib/use-loadable";
 
-function WhitelistList({
-  kind,
+// One allow/block list section. The two lists differ only in their header and
+// footer copy and in which API call removes an entry.
+function EntryList({
+  header,
+  footer,
   entries,
   onOpen,
   onRemove,
 }: {
-  kind: WhitelistKind;
+  header: string;
+  footer: string;
   entries: WhitelistEntry[];
   onOpen: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
@@ -34,11 +34,7 @@ function WhitelistList({
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>
-        {kind === "users"
-          ? s.ui_whitelist_allowed_users
-          : s.ui_whitelist_allowed_chats}
-      </SectionHeader>
+      <SectionHeader>{header}</SectionHeader>
       <Card>
         {entries.length === 0 ? (
           <EmptyState>{s.ui_whitelist_no_entries}</EmptyState>
@@ -68,68 +64,7 @@ function WhitelistList({
           ))
         )}
       </Card>
-      <SectionFooter>
-        {kind === "users"
-          ? s.ui_whitelist_footer_users
-          : s.ui_whitelist_footer_chats}
-      </SectionFooter>
-    </>
-  );
-}
-
-function BlacklistList({
-  kind,
-  entries,
-  onOpen,
-  onRemove,
-}: {
-  kind: WhitelistKind;
-  entries: WhitelistEntry[];
-  onOpen: (id: string) => void;
-  onRemove: (id: string) => Promise<void>;
-}) {
-  const { t: s } = useI18n();
-  return (
-    <>
-      <SectionHeader>
-        {kind === "users"
-          ? s.ui_blacklist_blocked_users
-          : s.ui_blacklist_blocked_chats}
-      </SectionHeader>
-      <Card>
-        {entries.length === 0 ? (
-          <EmptyState>{s.ui_whitelist_no_entries}</EmptyState>
-        ) : (
-          entries.map((e) => (
-            <div
-              key={e.id}
-              className={`${ROW_CLS} cursor-pointer active:bg-[var(--tg-separator)]`}
-              onClick={() => onOpen(e.id)}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="truncate">{e.label || `id:${e.id}`}</div>
-                <div className="text-[13px] text-tg-hint truncate">
-                  id {e.id}
-                </div>
-              </div>
-              <button
-                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  onRemove(e.id);
-                }}
-              >
-                {s.ui_remove}
-              </button>
-            </div>
-          ))
-        )}
-      </Card>
-      <SectionFooter>
-        {kind === "users"
-          ? s.ui_blacklist_footer_users
-          : s.ui_blacklist_footer_chats}
-      </SectionFooter>
+      <SectionFooter>{footer}</SectionFooter>
     </>
   );
 }
@@ -187,8 +122,9 @@ export function WhitelistTab({
         <LoadingState />
       ) : (
         <>
-          <WhitelistList
-            kind="users"
+          <EntryList
+            header={s.ui_whitelist_allowed_users}
+            footer={s.ui_whitelist_footer_users}
             entries={data.users}
             onOpen={onOpenUser}
             onRemove={async (id) => {
@@ -196,8 +132,9 @@ export function WhitelistTab({
               setData((prev) => (prev ? { ...prev, users } : prev));
             }}
           />
-          <WhitelistList
-            kind="chats"
+          <EntryList
+            header={s.ui_whitelist_allowed_chats}
+            footer={s.ui_whitelist_footer_chats}
             entries={data.chats}
             onOpen={onOpenChat}
             onRemove={async (id) => {
@@ -212,8 +149,9 @@ export function WhitelistTab({
         <LoadingState />
       ) : (
         <>
-          <BlacklistList
-            kind="users"
+          <EntryList
+            header={s.ui_blacklist_blocked_users}
+            footer={s.ui_blacklist_footer_users}
             entries={blacklist.users}
             onOpen={onOpenUser}
             onRemove={async (id) => {
@@ -221,8 +159,9 @@ export function WhitelistTab({
               setBlacklist((prev) => (prev ? { ...prev, users } : prev));
             }}
           />
-          <BlacklistList
-            kind="chats"
+          <EntryList
+            header={s.ui_blacklist_blocked_chats}
+            footer={s.ui_blacklist_footer_chats}
             entries={blacklist.chats}
             onOpen={onOpenChat}
             onRemove={async (id) => {

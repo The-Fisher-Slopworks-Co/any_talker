@@ -26,11 +26,7 @@ import { USAGE_RETENTION_SECONDS } from "../ratelimit/window";
 import { isValidLang, type Lang } from "../shared/i18n";
 import { isValidDateFormat, type DateFormat } from "../shared/date-format";
 import type { Reminder } from "../reminders/types";
-import {
-  parseStoredReminder,
-  ReminderParseError,
-  type ReminderParseFailureReason,
-} from "../reminders/parse";
+import { parseStoredReminder, ReminderParseError } from "../reminders/parse";
 import type { RecurringCheck } from "../checks/types";
 import type { ManagedBot } from "../managed-bots/types";
 import { photoCacheErrorsTotal, remindersParseFailuresTotal } from "../metrics";
@@ -784,6 +780,46 @@ export class KeyDBStorage implements Storage {
     );
   }
 
+  // MGET + parse a batch of reminder ids. Corrupted payloads are counted and
+  // logged either way; `onCorrupt` only picks the wording and tells the caller
+  // whether it is expected to evict them (the returned `corrupted`/`missing`
+  // ids are what the due path needs to GC).
+  private async loadReminders(
+    ids: string[],
+    onCorrupt: "quarantine" | "skip",
+  ): Promise<{
+    reminders: Reminder[];
+    missing: string[];
+    corrupted: string[];
+  }> {
+    const keys = ids.map((id) => this.sk(`reminder:${id}`));
+    const raws = await this.client.mget(...keys);
+    const reminders: Reminder[] = [];
+    const missing: string[] = [];
+    const corrupted: string[] = [];
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]!;
+      const raw = raws[i];
+      if (raw === null || raw === undefined) {
+        missing.push(id);
+        continue;
+      }
+      try {
+        reminders.push(parseStoredReminder(raw));
+      } catch (err) {
+        if (!(err instanceof ReminderParseError)) throw err;
+        remindersParseFailuresTotal.inc({ reason: err.reason });
+        const verb = onCorrupt === "quarantine" ? "quarantining" : "skipping";
+        console.error(
+          `[reminders] ${verb} corrupted reminder id=${id} reason=${err.reason}:`,
+          err.cause,
+        );
+        corrupted.push(id);
+      }
+    }
+    return { reminders, missing, corrupted };
+  }
+
   async fetchDueReminders(nowMs: number): Promise<Reminder[]> {
     // Cap per-tick batch so a backlog after an outage drains over multiple
     // ticks instead of fanning out into one thundering Telegram-API herd.
@@ -796,38 +832,16 @@ export class KeyDBStorage implements Storage {
       FETCH_DUE_LIMIT,
     );
     if (ids.length === 0) return [];
-    const keys = ids.map((id) => this.sk(`reminder:${id}`));
-    const raws = await this.client.mget(...keys);
-    const out: Reminder[] = [];
-    const orphans: string[] = [];
-    const corrupted: Array<{ id: string; reason: ReminderParseFailureReason }> =
-      [];
-    for (let i = 0; i < ids.length; i++) {
-      const raw = raws[i];
-      if (raw === null || raw === undefined) {
-        orphans.push(ids[i]!);
-        continue;
-      }
-      try {
-        out.push(parseStoredReminder(raw));
-      } catch (err) {
-        if (err instanceof ReminderParseError) {
-          corrupted.push({ id: ids[i]!, reason: err.reason });
-          console.error(
-            `[reminders] quarantining corrupted reminder id=${ids[i]} reason=${err.reason}:`,
-            err.cause,
-          );
-        } else {
-          throw err;
-        }
-      }
-    }
+    const { reminders, missing, corrupted } = await this.loadReminders(
+      ids,
+      "quarantine",
+    );
     // Quarantine corrupted records on the due path: deleting the payload +
     // zrem from the due set prevents the next tick from picking them up and
     // looping forever. user_reminders may briefly hold a dangling id;
     // listRemindersForUser tolerates that (MGET nulls are skipped).
-    for (const { id, reason } of corrupted) {
-      remindersParseFailuresTotal.inc({ reason });
+    const orphans = [...missing];
+    for (const id of corrupted) {
       await this.client
         .del(this.sk(`reminder:${id}`))
         .catch((err) => console.error("quarantine del payload failed:", err));
@@ -838,59 +852,21 @@ export class KeyDBStorage implements Storage {
         .zrem(this.sk("reminders:due"), orphans[0]!, ...orphans.slice(1))
         .catch((err) => console.error("zrem orphan reminders failed:", err));
     }
-    return out;
+    return reminders;
   }
 
   async listRemindersForUser(userId: string): Promise<Reminder[]> {
     const ids = await this.client.smembers(this.sk(`user_reminders:${userId}`));
     if (ids.length === 0) return [];
-    const keys = ids.map((id) => this.sk(`reminder:${id}`));
-    const raws = await this.client.mget(...keys);
-    const out: Reminder[] = [];
-    for (let i = 0; i < ids.length; i++) {
-      const raw = raws[i];
-      if (raw === null || raw === undefined) continue;
-      try {
-        out.push(parseStoredReminder(raw));
-      } catch (err) {
-        if (err instanceof ReminderParseError) {
-          remindersParseFailuresTotal.inc({ reason: err.reason });
-          console.error(
-            `[reminders] skipping corrupted reminder id=${ids[i]} reason=${err.reason}:`,
-            err.cause,
-          );
-          continue;
-        }
-        throw err;
-      }
-    }
-    return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
+    const { reminders } = await this.loadReminders(ids, "skip");
+    return reminders.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
   async listAllReminders(): Promise<Reminder[]> {
     const ids = await this.client.zrange(this.sk("reminders:due"), 0, -1);
     if (ids.length === 0) return [];
-    const keys = ids.map((id) => this.sk(`reminder:${id}`));
-    const raws = await this.client.mget(...keys);
-    const out: Reminder[] = [];
-    for (let i = 0; i < ids.length; i++) {
-      const raw = raws[i];
-      if (raw === null || raw === undefined) continue;
-      try {
-        out.push(parseStoredReminder(raw));
-      } catch (err) {
-        if (err instanceof ReminderParseError) {
-          remindersParseFailuresTotal.inc({ reason: err.reason });
-          console.error(
-            `[reminders] skipping corrupted reminder id=${ids[i]} reason=${err.reason}:`,
-            err.cause,
-          );
-          continue;
-        }
-        throw err;
-      }
-    }
-    return out.sort((a, b) => a.fireAtMs - b.fireAtMs);
+    const { reminders } = await this.loadReminders(ids, "skip");
+    return reminders.sort((a, b) => a.fireAtMs - b.fireAtMs);
   }
 
   async getReminder(id: string): Promise<Reminder | null> {
