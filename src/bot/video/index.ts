@@ -32,6 +32,7 @@ export {
   REPLY_VIDEO_FRAMES,
   fetchVideoParts,
   pickVideo,
+  type VideoFetchOutcome,
   type VideoParts,
 } from "./fetch";
 export { describeAlbumVideoFrames, describeVideoParts } from "./describe";
