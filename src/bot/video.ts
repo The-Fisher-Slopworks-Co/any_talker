@@ -25,6 +25,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { downloadTelegramFile } from "./photo";
+import { defaultFfmpegSpawn, runFfmpeg, type FfmpegSpawnFn } from "./ffmpeg";
 import { videoExtractionsTotal } from "../metrics";
 
 // Telegram's getFile ceiling: bots cannot download a file larger than this, so
@@ -273,54 +274,10 @@ export function splitJpegFrames(buf: Uint8Array): Uint8Array[] {
   );
 }
 
-// The slice of `Bun.spawn` this module uses, narrowed so tests can inject a
-// fake subprocess (mirrors `transcode.ts`, but reads its input from a path
-// instead of stdin).
-type SpawnedProcess = {
-  stdout: ReadableStream<Uint8Array>;
-  exited: Promise<number>;
-};
-export type VideoSpawnFn = (
-  cmd: string[],
-  opts: {
-    stdin: "ignore";
-    stdout: "pipe";
-    stderr: "ignore";
-    signal: AbortSignal;
-  },
-) => SpawnedProcess;
-
-const defaultSpawn: VideoSpawnFn = (cmd, opts) =>
-  Bun.spawn(cmd, opts) as unknown as SpawnedProcess;
-
-async function runFfmpeg(
-  cmd: string[],
-  spawn: VideoSpawnFn,
-): Promise<Uint8Array | null> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FFMPEG_TIMEOUT_MS);
-  try {
-    const proc = spawn(cmd, {
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "ignore",
-      signal: controller.signal,
-    });
-    const [bytes, code] = await Promise.all([
-      new Response(proc.stdout).arrayBuffer(),
-      proc.exited,
-    ]);
-    if (code !== 0) return null;
-    const out = new Uint8Array(bytes);
-    return out.byteLength > 0 ? out : null;
-  } catch {
-    // ffmpeg missing (ENOENT), aborted on timeout, or a stream error. Every
-    // caller treats null as "this pass produced nothing".
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
+// Both passes here read their input from a path rather than stdin, so ffmpeg
+// gets to seek (see the header note on `moov` atoms).
+const runPass = (cmd: string[], spawn: FfmpegSpawnFn) =>
+  runFfmpeg(cmd, spawn, { stdin: "ignore", timeoutMs: FFMPEG_TIMEOUT_MS });
 
 export type ExtractedVideo = {
   frames: Uint8Array[];
@@ -336,20 +293,18 @@ export async function extractVideoMedia(args: {
   durationSec: number;
   maxFrames: number;
   withAudio: boolean;
-  spawn?: VideoSpawnFn | undefined;
+  spawn?: FfmpegSpawnFn | undefined;
 }): Promise<ExtractedVideo> {
-  const spawn = args.spawn ?? defaultSpawn;
+  const spawn = args.spawn ?? defaultFfmpegSpawn;
   const path = join(tmpdir(), `any-talker-video-${randomUUID()}`);
   try {
     await Bun.write(path, args.bytes);
-    const raw = await runFfmpeg(
+    const raw = await runPass(
       frameArgs(path, args.durationSec, args.maxFrames),
       spawn,
     );
     const frames = raw ? splitJpegFrames(raw).slice(0, args.maxFrames) : [];
-    const audio = args.withAudio
-      ? await runFfmpeg(audioArgs(path), spawn)
-      : null;
+    const audio = args.withAudio ? await runPass(audioArgs(path), spawn) : null;
     return { frames, audio };
   } catch (err) {
     console.error("video extraction failed:", err);
@@ -383,7 +338,7 @@ export async function fetchVideoParts(args: {
   mode: "native" | "frames";
   maxFrames: number;
   download?: (botToken: string, fileId: string) => Promise<Uint8Array>;
-  spawn?: VideoSpawnFn | undefined;
+  spawn?: FfmpegSpawnFn | undefined;
 }): Promise<VideoFetchOutcome> {
   const { video } = args;
   if (video.durationSec > MAX_VIDEO_SECONDS) {

@@ -14,8 +14,8 @@ import {
   splitJpegFrames,
   MAX_VIDEO_BYTES,
   MAX_VIDEO_SECONDS,
-  type VideoSpawnFn,
 } from "./video";
+import type { FfmpegSpawnFn } from "./ffmpeg";
 
 // A minimal JPEG: SOI ... EOI. Only the markers matter to `splitJpegFrames`.
 const jpeg = (marker: number) =>
@@ -39,7 +39,7 @@ const fakeSpawn = (opts: {
   frames?: Uint8Array | null;
   audio?: Uint8Array | null;
   calls?: string[][];
-}): VideoSpawnFn => {
+}): FfmpegSpawnFn => {
   return (cmd) => {
     opts.calls?.push(cmd);
     const isFrames = cmd.includes("image2pipe");
@@ -254,7 +254,7 @@ describe("extractVideoMedia", () => {
   });
 
   test("yields nothing when ffmpeg is missing or fails", async () => {
-    const throwing: VideoSpawnFn = () => {
+    const throwing: FfmpegSpawnFn = () => {
       throw new Error("ENOENT: ffmpeg not found");
     };
     const result = await extractVideoMedia({

@@ -3,15 +3,7 @@
 
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../../components/layout";
-import { EmptyState, LoadingState } from "../../components/states";
-import { NavRow } from "../../components/select-row";
-import { RowButton } from "../../components/controls";
+import { ListTab } from "../../components/list-tab";
 import { useLoadable } from "../../lib/use-loadable";
 
 export function ManagedBotsTab({
@@ -27,33 +19,20 @@ export function ManagedBotsTab({
     [],
   );
 
-  if (bots === null) return <LoadingState />;
-
   return (
-    <Stack>
-      <SectionHeader>{s.ui_mbots_all}</SectionHeader>
-      <Card>
-        {bots.length === 0 ? (
-          <EmptyState>{s.ui_mbots_empty}</EmptyState>
-        ) : (
-          bots.map((b) => {
-            const status = b.running ? s.ui_mbots_running : s.ui_mbots_stopped;
-            const subtitle = `@${b.username} · ${status}`;
-            return (
-              <NavRow
-                key={b.botId}
-                title={b.displayName}
-                subtitle={subtitle}
-                onClick={() => onEdit(b.botId)}
-              />
-            );
-          })
-        )}
-      </Card>
-      <SectionFooter>{s.ui_mbots_footer}</SectionFooter>
-      <Card>
-        <RowButton onClick={onCreate}>{s.ui_mbots_create}</RowButton>
-      </Card>
-    </Stack>
+    <ListTab
+      items={bots}
+      header={s.ui_mbots_all}
+      empty={s.ui_mbots_empty}
+      footer={s.ui_mbots_footer}
+      createLabel={s.ui_mbots_create}
+      onEdit={onEdit}
+      onCreate={onCreate}
+      renderRow={(b) => ({
+        id: b.botId,
+        title: b.displayName,
+        subtitle: `@${b.username} · ${b.running ? s.ui_mbots_running : s.ui_mbots_stopped}`,
+      })}
+    />
   );
 }
