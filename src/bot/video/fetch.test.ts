@@ -71,6 +71,7 @@ describe("fetchVideoParts", () => {
     const bytes = new Uint8Array([1, 2, 3]);
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video,
       mode: "native",
       maxFrames: 2,
@@ -89,6 +90,7 @@ describe("fetchVideoParts", () => {
   test("decomposes a clip into frames and audio for a model without video", async () => {
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video,
       mode: "frames",
       maxFrames: 2,
@@ -107,6 +109,7 @@ describe("fetchVideoParts", () => {
     let downloaded = false;
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video: { ...video, durationSec: MAX_VIDEO_SECONDS + 1 },
       mode: "native",
       maxFrames: 2,
@@ -123,6 +126,7 @@ describe("fetchVideoParts", () => {
   test("accepts a clip exactly at the duration cap", async () => {
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video: { ...video, durationSec: MAX_VIDEO_SECONDS },
       mode: "native",
       maxFrames: 2,
@@ -137,6 +141,7 @@ describe("fetchVideoParts", () => {
     // here — refusing on it would reject a perfectly fine clip.
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video: { ...video, durationSec: 0 },
       mode: "native",
       maxFrames: 2,
@@ -150,6 +155,7 @@ describe("fetchVideoParts", () => {
     let downloaded = false;
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video: { ...video, fileSize: MAX_VIDEO_BYTES + 1 },
       mode: "native",
       maxFrames: 2,
@@ -167,6 +173,7 @@ describe("fetchVideoParts", () => {
     // A clip that arrived without `file_size` only fails at getFile time.
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video: { ...video, fileSize: null },
       mode: "frames",
       maxFrames: 2,
@@ -181,6 +188,7 @@ describe("fetchVideoParts", () => {
   test("reports a failed download as unavailable", async () => {
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video,
       mode: "frames",
       maxFrames: 2,
@@ -195,6 +203,7 @@ describe("fetchVideoParts", () => {
   test("reports a clip it could not decode as unavailable", async () => {
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video,
       mode: "frames",
       maxFrames: 2,
@@ -208,6 +217,7 @@ describe("fetchVideoParts", () => {
     const calls: string[][] = [];
     const result = await fetchVideoParts({
       botToken: "T",
+      telegramEnv: "prod",
       video: { ...video, kind: "animation" },
       mode: "frames",
       maxFrames: 2,

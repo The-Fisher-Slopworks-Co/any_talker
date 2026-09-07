@@ -6,6 +6,7 @@
 // native bytes for a model that takes video, `decode.ts` for every other model.
 
 import { downloadTelegramFile } from "../photo";
+import type { TelegramEnv } from "../../telegram-env";
 import type { FfmpegSpawnFn } from "../ffmpeg";
 import { extractVideoMedia } from "./decode";
 import type {
@@ -84,10 +85,15 @@ export type VideoFetchOutcome =
 // modalities — native when it takes video, frames when it doesn't.
 export async function fetchVideoParts(args: {
   botToken: string;
+  telegramEnv: TelegramEnv;
   video: VideoAttachment;
   mode: "native" | "frames";
   maxFrames: number;
-  download?: (botToken: string, fileId: string) => Promise<Uint8Array>;
+  download?: (
+    botToken: string,
+    fileId: string,
+    env: TelegramEnv,
+  ) => Promise<Uint8Array>;
   spawn?: FfmpegSpawnFn | undefined;
 }): Promise<VideoFetchOutcome> {
   const { video } = args;
@@ -105,6 +111,7 @@ export async function fetchVideoParts(args: {
     bytes = await (args.download ?? downloadTelegramFile)(
       args.botToken,
       video.fileId,
+      args.telegramEnv,
     );
   } catch (err) {
     console.error("video download failed:", err);

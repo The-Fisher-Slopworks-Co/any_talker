@@ -124,7 +124,11 @@ export function registerMessageListeners(
 
     let audio: Uint8Array;
     try {
-      audio = await downloadTelegramFile(rt.deps.botToken, msg.voice.file_id);
+      audio = await downloadTelegramFile(
+        rt.deps.botToken,
+        msg.voice.file_id,
+        rt.telegramEnv,
+      );
     } catch (err) {
       console.error("voice download failed:", err);
       await ctx.reply(ctx.t.bot_voice_cant_fetch);

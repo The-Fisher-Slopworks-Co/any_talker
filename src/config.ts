@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { resolveLogFormat, type LogFormat } from "./log";
+import { resolveTelegramEnv, type TelegramEnv } from "./telegram-env";
 
 // OpenRouter's public API root. The base URL is optional precisely because
 // there is only one right answer for it; naming it explicitly is for a proxy
@@ -19,6 +20,9 @@ export type Config = {
   firecrawlApiKey: string | undefined;
   firecrawlConcurrency: number;
   botOwnerId: string;
+  // Which copy of Telegram this build talks to. "test" is the throwaway test
+  // environment the e2e suite drives; production deployments never set it.
+  telegramEnv: TelegramEnv;
   keydbUrl: string;
   port: number;
   logFormat: LogFormat;
@@ -84,6 +88,7 @@ export function loadConfig(
       2,
     ),
     botOwnerId: required("BOT_OWNER_ID"),
+    telegramEnv: resolveTelegramEnv(env),
     keydbUrl: env.KEYDB_URL ?? "redis://localhost:6379",
     port,
     logFormat: resolveLogFormat(env),

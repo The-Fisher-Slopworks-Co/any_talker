@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { TelegramEnv } from "../telegram-env";
 import type { PersonaResolver } from "../managed-bots/persona";
 import type { ReplyTarget } from "./context-builder";
 import type { BotContext } from "./middleware/lang";
@@ -45,6 +46,7 @@ export type VideoPipeline = {
 
 export function createVideoPipeline(args: {
   botToken: string;
+  telegramEnv: TelegramEnv;
   resolver: PersonaResolver;
   supportsVideoInput?: ((modelId: string) => Promise<boolean>) | undefined;
 }): VideoPipeline {
@@ -80,6 +82,7 @@ export function createVideoPipeline(args: {
   ) =>
     fetchVideoParts({
       botToken: args.botToken,
+      telegramEnv: args.telegramEnv,
       video,
       mode: forcedMode ?? (await resolveVideoMode(chatId)),
       maxFrames,

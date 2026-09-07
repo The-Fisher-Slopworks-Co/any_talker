@@ -86,6 +86,7 @@ export async function dispatchGuest(
       const raw = await downloadTelegramFile(
         rt.deps.botToken,
         msg.voice.file_id,
+        rt.telegramEnv,
       );
       // ogg → mp3, as in the voice ask flow; unusable audio is surfaced
       // like a fetch failure rather than sending raw ogg.
@@ -157,6 +158,7 @@ export async function dispatchGuest(
       const raw = await downloadTelegramFile(
         rt.deps.botToken,
         replyVoice.file_id,
+        rt.telegramEnv,
       );
       // Transcode ogg → mp3; on failure drop the reply audio (it's only
       // supplementary context, and raw ogg would crash the request).
