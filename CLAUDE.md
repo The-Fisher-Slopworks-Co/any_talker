@@ -44,8 +44,12 @@ bun test           # tests (co-located *.test.ts)
 ### Definition of done
 
 - **Never commit to main.** Every task starts on a fresh branch off `origin/main`, named `<type>/<short-task>` — `fix/`, `feat/`, `refactor/`, `chore/`.
-- **One task = one branch = one PR.** Past ~300 changed lines, split it into several PRs.
-- **PR title is the squash commit subject:** conventional commit with scope, imperative, no trailing period. The body follows `.github/pull_request_template.md`.
+- **One task = one branch = one PR.** Past ~300 changed lines, split it into several PRs. `pr-size.yml` labels every PR `size:XS`…`size:XXL` from additions + deletions minus tests, `bun.lock` and generated files; **`size:XL` or `size:XXL` means split the PR**, not "explain why it is large".
+- **PR title is the squash commit subject:** conventional commit with a scope, enforced by `.github/workflows/pr-title.yml`.
+  - Type: `feat` `fix` `refactor` `chore` `docs` `test` `ci` `perf` `revert`.
+  - Scope (required): a top-level `src/` module — `ai` `bot` `budget` `checks` `managed-bots` `metrics` `observability` `ratelimit` `reminders` `shared` `spending` `storage` `types` `webapp` — or `deps` `github` `release` `docker`. A new module means adding it to the `scopes:` list in that workflow.
+  - Subject: lowercase start, imperative, no trailing period.
+  - The body follows `.github/pull_request_template.md`.
 - **Before opening:** `bun run check` green, then `gh pr create --fill`; report the PR URL as the final step of the task.
 - **Never merge locally.** Merging happens on GitHub, squash only.
 

@@ -37,6 +37,10 @@ bun test         # unit tests
 bun run typecheck
 ```
 
+How to work in this code — layout, conventions, and the Definition of done for a
+pull request — is in `CLAUDE.md`, which `AGENTS.md` symlinks to so every coding
+agent reads the same file.
+
 ## Production deploy
 
 A ready-to-run Compose file is provided in `docker-compose.prod.yml`. It pulls

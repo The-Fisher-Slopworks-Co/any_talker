@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# Path -> area label, applied by .github/workflows/pr-labels.yml. Add a block
+# here when a new src/ module deserves its own label; the workflow creates the
+# label itself, so nothing has to be clicked in the UI first.
+
+"area:bot":
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/bot/**
+
+"area:ai":
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/ai/**
+
+"area:storage":
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/storage/**
+
+"area:webapp":
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/webapp/**
+
+"area:i18n":
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/shared/i18n.ts
+          - src/shared/i18n/**
+
+"area:ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - lefthook.yml
+
+"area:deps":
+  - changed-files:
+      - any-glob-to-any-file:
+          - package.json
+          - bun.lock
+          - .github/dependabot.yml
+
+"area:docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - AGENTS.md

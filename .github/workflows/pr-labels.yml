@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# Applies the area:* labels from the paths a pull request touches, so the PR
+# list can be filtered by subsystem without anyone labelling by hand. The
+# mapping lives in .github/labeler.yml.
+#
+# pull_request_target is what gives a fork's PR a token that can write labels;
+# nothing is checked out from the PR head and no code from it runs here.
+name: PR labels
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Two runs labelling the same PR at once would fight over sync-labels.
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  # Creating a repository label (POST /repos/{owner}/{repo}/labels) is scoped to
+  # Issues, not Pull requests — without this the first run on a fresh repo 403s.
+  issues: write
+
+jobs:
+  label:
+    name: Label by area
+    runs-on: ubuntu-latest
+    steps:
+      # The labeler creates missing labels implicitly, but with a random color.
+      # Creating them up front is what keeps the palette stable across repos
+      # and reruns; 422 means the label is already there.
+      - name: Ensure area labels exist
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const LABELS = [
+              { name: "area:bot", color: "1f6feb", description: "grammY bot, handlers, middleware" },
+              { name: "area:ai", color: "8250df", description: "OpenRouter client, model catalogue, AI tools" },
+              { name: "area:storage", color: "0e8a16", description: "Storage interface, KeyDB and memory backends" },
+              { name: "area:webapp", color: "1a7f37", description: "Admin Web App API and React UI" },
+              { name: "area:i18n", color: "bf5b17", description: "Translations in src/shared/i18n" },
+              { name: "area:ci", color: "5a5a5a", description: "GitHub Actions, hooks, repository config" },
+              { name: "area:deps", color: "795548", description: "Dependencies and the lockfile" },
+              { name: "area:docs", color: "0075ca", description: "README, CLAUDE.md and other prose" },
+            ];
+
+            for (const label of LABELS) {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, ...label });
+                core.info(`created ${label.name}`);
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+            }
+
+      - name: Apply area labels
+        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          configuration-path: .github/labeler.yml
+          # These labels are derived from paths, so a PR that stops touching
+          # src/ai should stop being labelled area:ai.
+          sync-labels: true
