@@ -21,11 +21,15 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.test.local
 .env.production.local
 .env.local
+# e2e credentials (see .env.e2e.example)
+.env.e2e
 
 # caches
 .eslintcache
 .cache
 *.tsbuildinfo
+# Telegram test-DC session string and bot token, re-created when the DC is wiped
+.e2e-cache/
 
 # IntelliJ based IDEs
 .idea
