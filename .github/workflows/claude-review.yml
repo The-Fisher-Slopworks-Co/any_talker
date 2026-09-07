@@ -1,0 +1,115 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# A first pass over every pull request before a human opens it: conventions
+# from CLAUDE.md, obvious bugs, missing tests. It comments and nothing more —
+# it never approves and never requests changes, so it cannot gate a merge.
+#
+# `pull_request` (not `pull_request_target`) on purpose: a fork's PR then gets
+# no secrets, the token check below skips the job, and untrusted code never runs
+# next to the credential.
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+# A second `@claude review` while the first is still thinking should replace
+# it, not queue behind it.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    name: Review with Claude
+    # A head branch that lives in this repository can only have been pushed by
+    # someone with write access, dependabot included — which is a claim
+    # `author_association` cannot make: the webhook payload reports CONTRIBUTOR
+    # for a member whose organisation membership is private, even though the
+    # REST API answers MEMBER for the same person. Drafts are excluded;
+    # `ready_for_review` picks them up later.
+    #
+    # The comment trigger needs no such check: claude-code-action refuses to run
+    # for anyone without write access on the repository.
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      ) || (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '@claude review')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      # The secrets context is not available in an `if:` expression, so the
+      # check has to happen in a step. A repository without the token gets a
+      # notice on the run, not a red cross on the pull request.
+      - name: Check for CLAUDE_CODE_OAUTH_TOKEN
+        id: key
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::notice title=Claude review skipped::CLAUDE_CODE_OAUTH_TOKEN is not set on this repository."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.key.outputs.present == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Review
+        if: steps.key.outputs.present == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          # A subscription token from `claude setup-token`, not an API key —
+          # reviews are billed to the Claude plan, not to API usage. Swapping to
+          # an API key means this line and the check step above.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Without this, a dependabot pull request is ignored as a bot.
+          allowed_bots: "dependabot[bot]"
+          # One comment that gets rewritten, rather than one per push.
+          use_sticky_comment: "true"
+          # Read-only: the verdict is the comment this action posts, so Claude
+          # itself has no way to approve or request changes.
+          claude_args: >-
+            --allowed-tools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*)"
+          prompt: |
+            Review this pull request the way a maintainer of this repository
+            would. Read CLAUDE.md first; it is the contract.
+
+            Look for, in this order:
+
+            1. Convention breaks from CLAUDE.md: a new source file without the
+               SPDX header; a user-facing string hardcoded in a handler instead
+               of a key in src/shared/i18n; a handler that sends a reply itself
+               instead of returning a tagged outcome object; a dependency
+               imported at module scope instead of arriving through `deps`.
+            2. Bugs you can point at: a wrong condition, an unawaited promise,
+               a value that can be undefined at that line, a resource never
+               released, an error swallowed.
+            3. Missing tests: a new handler or AI tool with no co-located
+               *.test.ts.
+
+            How to answer:
+
+            - At most 10 bullet points, fewer if there is less. If there is
+              nothing worth raising, say so in one line and stop.
+            - Every bullet: `path:line`, what is wrong, what to do instead.
+            - Do not summarise or restate the diff. Findings only.
+            - Do not approve the pull request and do not request changes.
+              Leave a comment; a human decides.
