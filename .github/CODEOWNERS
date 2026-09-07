@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# Everything has one owner. GitHub requests their review on every pull request
+# they did not open themselves — which is why there is no auto-assign workflow
+# alongside this file: a PR's author can never be its reviewer.
+* @txssu
