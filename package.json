@@ -22,9 +22,9 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/turndown": "^5.0.6",
-    "knip": "^6.32.2",
-    "lefthook": "^2.1.10",
-    "oxlint": "^1.80.0",
+    "knip": "^6.34.0",
+    "lefthook": "^2.1.12",
+    "oxlint": "^1.81.0",
     "prettier": "^3.9.6"
   },
   "peerDependencies": {
@@ -33,7 +33,7 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@openrouter/agent": "0.11.0",
-    "@openrouter/sdk": "0.13.67",
+    "@openrouter/sdk": "1.2.103",
     "bun-plugin-tailwind": "^0.1.2",
     "grammy": "^1.46.0",
     "linkedom": "^0.18.13",
@@ -41,6 +41,6 @@
     "react-dom": "latest",
     "tailwindcss": "^4.3.3",
     "turndown": "^7.2.4",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   }
 }
