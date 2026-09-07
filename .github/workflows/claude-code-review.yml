@@ -38,9 +38,12 @@ jobs:
     # so without the check every fork's pull request would reach the action with
     # no secret available and fail red.
     #
-    # `author_association` cannot make that claim: the webhook payload reports
-    # CONTRIBUTOR for a member whose organisation membership is private, even
-    # though the REST API answers MEMBER for the same person.
+    # `github.event.pull_request.author_association` cannot stand in for it: on
+    # this event it reports CONTRIBUTOR for a member whose organisation
+    # membership is private, even though the REST API answers MEMBER for the
+    # same person. That is specific to the `pull_request` payload —
+    # `comment.author_association` on `issue_comment` does report MEMBER, which
+    # is why the same idiom in pr-deploy.yml has always worked.
     if: |
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository
