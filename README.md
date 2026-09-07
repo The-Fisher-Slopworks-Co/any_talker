@@ -35,6 +35,7 @@ bun run dev      # long polling mode with hot reload
 bun run start    # production mode (long polling)
 bun test         # unit tests
 bun run typecheck
+bun run check    # typecheck + lint + format + knip + tests, the pre-commit gate
 ```
 
 How to work in this code — layout, conventions, and the Definition of done for a
