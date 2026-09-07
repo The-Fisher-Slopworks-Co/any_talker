@@ -1,0 +1,133 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# Labels every pull request with how much there actually is to read: additions
+# plus deletions, minus the files nobody reviews line by line (tests, the
+# lockfile, generated output). The Definition of done asks to split past ~300
+# lines, so XL and XXL also get a one-time nudge.
+#
+# pull_request_target is what gives a fork's PR a token that can write labels.
+# That token is privileged, so this workflow checks out nothing from the PR
+# head and runs no code from it — it only calls the API.
+name: PR size
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A rerun after a push would otherwise race the previous one and could leave
+# two size labels behind.
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  # Creating a repository label (POST /repos/{owner}/{repo}/labels) is scoped to
+  # Issues, not Pull requests — without this the first run on a fresh repo 403s.
+  issues: write
+
+jobs:
+  size:
+    name: Label by effective size
+    runs-on: ubuntu-latest
+    steps:
+      - name: Measure and label
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+
+            // Ascending by `max`; the first bucket the count fits in wins, so
+            // the last one is the catch-all. Colors run green to red.
+            const BUCKETS = [
+              { name: "size:XS", max: 10, color: "3fb950", description: "Under 10 effective lines changed" },
+              { name: "size:S", max: 30, color: "9bcc3f", description: "Under 30 effective lines changed" },
+              { name: "size:M", max: 100, color: "d4a72c", description: "Under 100 effective lines changed" },
+              { name: "size:L", max: 300, color: "e8843c", description: "Under 300 effective lines changed" },
+              { name: "size:XL", max: 1000, color: "e5534b", description: "Under 1000 effective lines changed — split it" },
+              { name: "size:XXL", max: Infinity, color: "a32e29", description: "1000+ effective lines changed — split it" },
+            ];
+
+            // Files that inflate the diff without adding anything to read.
+            const EXCLUDED = [
+              /\.test\.ts$/,
+              /(^|\/)bun\.lock$/,
+              /(^|\/)(dist|build|vendor|node_modules|generated)\//,
+              /\.min\.(js|css)$/,
+              /\.(snap|lock)$/,
+            ];
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: issue_number,
+              per_page: 100,
+            });
+
+            let effective = 0;
+            for (const file of files) {
+              if (EXCLUDED.some((pattern) => pattern.test(file.filename))) continue;
+              effective += file.additions + file.deletions;
+            }
+
+            const bucket = BUCKETS.find((candidate) => effective < candidate.max);
+            core.info(`${files.length} changed file(s), ${effective} effective line(s) -> ${bucket.name}`);
+
+            // createLabel is the only idempotent-ish way in: 422 means it is
+            // already there, which is exactly what we want.
+            try {
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: bucket.name,
+                color: bucket.color,
+                description: bucket.description,
+              });
+            } catch (error) {
+              if (error.status !== 422) throw error;
+            }
+
+            const present = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            for (const label of present) {
+              if (!label.name.startsWith("size:") || label.name === bucket.name) continue;
+              await github.rest.issues.removeLabel({ owner, repo, issue_number, name: label.name });
+            }
+
+            if (!present.some((label) => label.name === bucket.name)) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [bucket.name] });
+            }
+
+            if (bucket.name !== "size:XL" && bucket.name !== "size:XXL") return;
+
+            // Every push re-runs this job, so the marker is what keeps the
+            // reminder from turning into a wall of identical comments.
+            const MARKER = "<!-- pr-size-reminder -->";
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            if (comments.some((comment) => (comment.body ?? "").includes(MARKER))) return;
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: [
+                MARKER,
+                `This pull request changes **${effective} effective lines** (tests, \`bun.lock\` and generated files already excluded).`,
+                "",
+                "The Definition of done in `CLAUDE.md` asks to split anything past ~300 lines into several pull requests — a reviewer reads a small one properly and skims a large one.",
+              ].join("\n"),
+            });
