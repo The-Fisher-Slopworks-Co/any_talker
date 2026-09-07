@@ -7,13 +7,14 @@
   "scripts": {
     "dev": "bun --hot ./src/main.ts",
     "start": "bun ./src/main.ts",
-    "test": "bun test",
+    "test": "bun test src",
+    "e2e": "bun test --env-file=.env.e2e e2e",
     "typecheck": "bunx tsc --noEmit",
     "lint": "oxlint",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "format": "prettier --write \"{src,e2e}/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"{src,e2e}/**/*.{ts,tsx,css}\"",
     "knip": "knip",
-    "check": "bun run typecheck && bun run lint && bun run format:check && bun run knip && bun test",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run knip && bun run test",
     "prepare": "lefthook install"
   },
   "devDependencies": {

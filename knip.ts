@@ -13,8 +13,11 @@ const config: KnipConfig = {
     // Co-located tests are roots of their own: an export that only a test
     // reaches is still reached.
     "src/**/*.test.{ts,tsx}",
+    // The e2e suite is its own run (`bun run e2e`); its specs are the only
+    // thing that reaches the harness modules around them.
+    "e2e/**/*.test.ts",
   ],
-  project: ["src/**/*.{ts,tsx,css}"],
+  project: ["src/**/*.{ts,tsx,css}", "e2e/**/*.ts"],
   // Consumed by Bun from `bunfig.toml`'s `[serve.static]` plugin list, which
   // knip has no reason to read.
   ignoreDependencies: ["bun-plugin-tailwind"],
