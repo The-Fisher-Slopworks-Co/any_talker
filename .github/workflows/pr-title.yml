@@ -59,6 +59,7 @@ jobs:
             types
             webapp
             deps
+            e2e
             github
             release
             docker

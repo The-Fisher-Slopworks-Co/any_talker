@@ -45,6 +45,7 @@ jobs:
               { name: "area:storage", color: "0e8a16", description: "Storage interface, KeyDB and memory backends" },
               { name: "area:webapp", color: "1a7f37", description: "Admin Web App API and React UI" },
               { name: "area:i18n", color: "bf5b17", description: "Translations in src/shared/i18n" },
+              { name: "area:e2e", color: "d93f0b", description: "End-to-end suite against the Telegram test DCs" },
               { name: "area:ci", color: "5a5a5a", description: "GitHub Actions, hooks, repository config" },
               { name: "area:deps", color: "795548", description: "Dependencies and the lockfile" },
               { name: "area:docs", color: "0075ca", description: "README, CLAUDE.md and other prose" },
