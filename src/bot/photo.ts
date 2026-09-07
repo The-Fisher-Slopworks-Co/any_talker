@@ -4,6 +4,11 @@
 import { fetchWithTimeout } from "../ai/tools/http";
 import { photoCacheErrorsTotal } from "../metrics";
 import type { Storage } from "../storage/types";
+import {
+  telegramApiUrl,
+  telegramFileUrl,
+  type TelegramEnv,
+} from "../telegram-env";
 
 const TELEGRAM_TIMEOUT_MS = 10_000;
 
@@ -34,9 +39,10 @@ export function pickPhotoSize<T extends PhotoSizeLike>(
 export async function downloadTelegramFile(
   botToken: string,
   fileId: string,
+  env: TelegramEnv = "prod",
 ): Promise<Uint8Array> {
   const fileRes = await fetchWithTimeout(
-    `https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`,
+    `${telegramApiUrl(botToken, "getFile", env)}?file_id=${encodeURIComponent(fileId)}`,
     {},
     TELEGRAM_TIMEOUT_MS,
     "Telegram getFile",
@@ -50,7 +56,7 @@ export async function downloadTelegramFile(
     throw new Error(`getFile failed: ${fileJson.description ?? "unknown"}`);
   }
   const dlRes = await fetchWithTimeout(
-    `https://api.telegram.org/file/bot${botToken}/${fileJson.result.file_path}`,
+    telegramFileUrl(botToken, fileJson.result.file_path, env),
     {},
     TELEGRAM_TIMEOUT_MS,
     "Telegram file download",
@@ -65,6 +71,7 @@ export async function fetchTelegramPhoto(args: {
   storage: Storage;
   botToken: string;
   fileId: string;
+  env?: TelegramEnv | undefined;
 }): Promise<Uint8Array> {
   const cached = await args.storage.photos
     .getBytes(args.fileId)
@@ -74,7 +81,11 @@ export async function fetchTelegramPhoto(args: {
       return null;
     });
   if (cached) return cached;
-  const bytes = await downloadTelegramFile(args.botToken, args.fileId);
+  const bytes = await downloadTelegramFile(
+    args.botToken,
+    args.fileId,
+    args.env,
+  );
   args.storage.photos.saveBytes(args.fileId, bytes).catch((err) => {
     console.error("photo cache write failed:", err);
     photoCacheErrorsTotal.inc({ op: "write" });

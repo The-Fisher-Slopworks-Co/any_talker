@@ -100,6 +100,7 @@ export async function dispatchAsk(
       const raw = await downloadTelegramFile(
         rt.deps.botToken,
         replyVoice.file_id,
+        rt.telegramEnv,
       );
       // Transcode ogg → mp3; on failure drop the reply audio (it's only
       // supplementary context, and raw ogg would crash the request).
