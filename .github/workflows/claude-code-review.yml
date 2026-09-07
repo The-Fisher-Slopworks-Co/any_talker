@@ -34,9 +34,9 @@ jobs:
   claude-review:
     name: Review with Claude
     # A head branch that lives in this repository can only have been pushed by
-    # someone with write access, dependabot included. This repository is public,
-    # so without the check every fork's pull request would reach the action with
-    # no secret available and fail red.
+    # someone with write access. This repository is public, so without the check
+    # every fork's pull request would reach the action with no secret available
+    # and fail red.
     #
     # `github.event.pull_request.author_association` cannot stand in for it: on
     # this event it reports CONTRIBUTOR for a member whose organisation

@@ -42,7 +42,6 @@
       - any-glob-to-any-file:
           - package.json
           - bun.lock
-          - .github/dependabot.yml
 
 "area:docs":
   - changed-files:
