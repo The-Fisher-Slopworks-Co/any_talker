@@ -1,45 +1,80 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
+# A first pass over every pull request before a human opens it, run by the
+# `code-review` plugin rather than a prompt of our own — it reads CLAUDE.md as
+# project memory, so the conventions are covered without restating them here.
+# It leaves inline comments and nothing else: it cannot approve or request
+# changes, so it never gates a merge.
+#
+# Note: claude-code-action refuses to run when this file differs from the copy
+# on the default branch (a pull request must not be able to rewrite the
+# workflow that holds the token). A pull request that edits this file therefore
+# gets no review — expected, and the job still goes green.
 name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    # Deliberately not `synchronize`: a full review on every push burns the
+    # subscription quota and buries the one review worth reading.
+    types: [opened, ready_for_review]
+
+# A draft toggled ready twice in a row should not leave two reviews racing.
+concurrency:
+  group: claude-code-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  id-token: write
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
+    name: Review with Claude
+    # A head branch that lives in this repository can only have been pushed by
+    # someone with write access, dependabot included. This repository is public,
+    # so without the check every fork's pull request would reach the action with
+    # no secret available and fail red.
+    #
+    # `author_association` cannot make that claim: the webhook payload reports
+    # CONTRIBUTOR for a member whose organisation membership is private, even
+    # though the REST API answers MEMBER for the same person.
+    if: |
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-      issues: read
-      id-token: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # The secrets context is not available in an `if:` expression, so the
+      # check has to happen in a step. A repository without the token gets a
+      # notice on the run, not a red cross on the pull request.
+      - name: Check for CLAUDE_CODE_OAUTH_TOKEN
+        id: token
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::notice title=Claude review skipped::CLAUDE_CODE_OAUTH_TOKEN is not set on this repository."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - name: Run Claude Code Review
-        id: claude-review
+        if: steps.token.outputs.present == 'true'
         uses: anthropics/claude-code-action@v1
         with:
+          # A subscription token from `claude setup-token`, not an API key —
+          # reviews are billed to the Claude plan, not to API usage.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-
