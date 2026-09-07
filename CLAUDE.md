@@ -41,6 +41,14 @@ bun test           # tests (co-located *.test.ts)
 - **Adding an AI tool:** define a `Tool` (Zod `parameters` — must be a `z.object(...)`, `execute(input, ctx)`), then `registerTool(withLogging(tool))` in `main.ts`. See `src/ai/tools/registry.ts`.
 - **Tests:** `bun test`, co-located as `*.test.ts`; use `MemoryStorage` instead of KeyDB.
 
+### Definition of done
+
+- **Never commit to main.** Every task starts on a fresh branch off `origin/main`, named `<type>/<short-task>` — `fix/`, `feat/`, `refactor/`, `chore/`.
+- **One task = one branch = one PR.** Past ~300 changed lines, split it into several PRs.
+- **PR title is the squash commit subject:** conventional commit with scope, imperative, no trailing period. The body follows `.github/pull_request_template.md`.
+- **Before opening:** `bun run check` green, then `gh pr create --fill`; report the PR URL as the final step of the task.
+- **Never merge locally.** Merging happens on GitHub, squash only.
+
 ## Bun
 
 Default to using Bun instead of Node.js.
