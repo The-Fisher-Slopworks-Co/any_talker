@@ -22,6 +22,16 @@ test("loadConfig returns required fields when all env vars present", () => {
   expect(cfg.logFormat).toBe("pretty");
   expect(cfg.logIncomingUpdates).toBe(true);
   expect(cfg.logDebug).toBe(false);
+  expect(cfg.telegramEnv).toBe("prod");
+});
+
+test("loadConfig reads TELEGRAM_ENV", () => {
+  expect(loadConfig({ ...baseEnv, TELEGRAM_ENV: "test" }).telegramEnv).toBe(
+    "test",
+  );
+  expect(() => loadConfig({ ...baseEnv, TELEGRAM_ENV: "staging" })).toThrow(
+    /TELEGRAM_ENV/,
+  );
 });
 
 test("loadConfig reads optional app attribution", () => {

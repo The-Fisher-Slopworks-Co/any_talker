@@ -7,6 +7,7 @@ import type { RateLimiter } from "../ratelimit/types";
 import type { BudgetGuard } from "../budget/types";
 import type { AIClient } from "../ai/types";
 import type { LogFormat } from "../log";
+import type { TelegramEnv } from "../telegram-env";
 import type { BotContext } from "../bot/middleware/lang";
 import type { ManagedBot } from "./types";
 
@@ -32,6 +33,9 @@ export type BotManagerDeps = {
   // takes video input (decides whole clip vs sampled frames).
   supportsVideoInput?: (modelId: string) => Promise<boolean>;
   ownerId: string;
+  // Passed through to every character bot, and to the getMe probe below: a
+  // managed bot's token belongs to the same copy of Telegram as the main one.
+  telegramEnv?: TelegramEnv | undefined;
   // The main bot's api — used to broker managed bot tokens (getManagedBotToken).
   mainApi: Api;
   // The main bot's user id. A managed bot treats it as a sibling when deciding
