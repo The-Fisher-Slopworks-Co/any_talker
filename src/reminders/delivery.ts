@@ -16,7 +16,12 @@ import { composeFullName } from "../shared/types";
 import { readValidDisplayName } from "../shared/display-name";
 import { t } from "../shared/i18n";
 
-export type DeliveryOutcome = "delivered" | "permanent" | "transient";
+// "unreachable" is a permanent failure with nowhere left to talk to: the chat
+// is gone or the bot may not write in it. The scheduler drops the reminder
+// exactly as it does for "permanent", but skips the failure notice — sending
+// it would only produce the same error a second time.
+export type DeliveryOutcome =
+  "delivered" | "permanent" | "unreachable" | "transient";
 
 type ReminderReplyParameters = {
   message_id: number;
@@ -74,6 +79,23 @@ export type DeliveryDeps = {
 };
 
 const PERMANENT_CODES = new Set([400, 403, 404]);
+
+// 400 descriptions that mean the chat itself is unusable rather than the one
+// message being bad. 403 (blocked/kicked/no write rights) and 404 are always
+// unreachable, so only 400 needs the text.
+const UNREACHABLE_400 = [
+  "chat not found",
+  "peer_id_invalid",
+  "user is deactivated",
+  "chat_write_forbidden",
+  "bot was blocked by the user",
+  "bot is not a member",
+  "have no rights to send a message",
+];
+
+// How much of the note the failure notice quotes back. Long enough to identify
+// the reminder, short enough that the apology does not become a wall of text.
+const NOTICE_NOTE_LIMIT = 200;
 
 export async function deliverReminder(
   deps: DeliveryDeps,
@@ -150,9 +172,47 @@ export async function deliverReminder(
 
 function classifySendError(err: unknown): DeliveryOutcome {
   if (err instanceof GrammyError && PERMANENT_CODES.has(err.error_code)) {
-    return "permanent";
+    return isUnreachable(err) ? "unreachable" : "permanent";
   }
   return "transient";
+}
+
+function isUnreachable(err: GrammyError): boolean {
+  if (err.error_code === 403 || err.error_code === 404) return true;
+  const description = err.description.toLowerCase();
+  return UNREACHABLE_400.some((needle) => description.includes(needle));
+}
+
+// Tell the user their reminder is not coming. Deliberately a plain send: the
+// AI re-run is what may have failed, and no parse mode means an arbitrary note
+// cannot break the message. Called once per reminder — the scheduler only
+// reaches it on a terminal outcome, after which the record is gone, so a
+// transient retry loop cannot fan this out into repeated apologies.
+export async function notifyDeliveryFailure(
+  api: ReminderApi,
+  reminder: Reminder,
+): Promise<void> {
+  const note =
+    reminder.text.length > NOTICE_NOTE_LIMIT
+      ? `${reminder.text.slice(0, NOTICE_NOTE_LIMIT).trimEnd()}…`
+      : reminder.text;
+  const chatId =
+    reminder.target.kind === "ask_reply"
+      ? reminder.target.chatId
+      : reminder.target.userId;
+  try {
+    await api.sendMessage(
+      chatId,
+      t(reminder.lang).reminders_delivery_failed(note),
+    );
+  } catch (err) {
+    // Best effort by construction: the delivery it apologises for has already
+    // failed, so this send failing too changes nothing for the scheduler.
+    console.error(
+      `[reminders] failure notice not delivered id=${reminder.id}:`,
+      err,
+    );
+  }
 }
 
 async function composeReminderMessage(
