@@ -159,6 +159,23 @@ describe("buildEffectsTopBlock", () => {
     );
   });
 
+  test("a recurring reminder_scheduled effect names the series", () => {
+    const effects: ToolEffect[] = [
+      {
+        type: "reminder_scheduled",
+        fireAtMs: may7at10MoscowMs,
+        timezone: "Europe/Moscow",
+        occurrences: 4,
+      },
+    ];
+    expect(buildEffectsTopBlock(effects, "en")).toBe(
+      "<blockquote>Recurring reminder set, first on 2026-05-07 at 10:00 (Europe/Moscow), 4 times in total</blockquote>\n",
+    );
+    expect(buildEffectsTopBlock(effects, "ru")).toBe(
+      "<blockquote>Было создано повторяющееся напоминание, первое — 07.05.2026 в 10:00 (Europe/Moscow), всего 4 раз(а)</blockquote>\n",
+    );
+  });
+
   test("formats a reminder_updated effect in English and Russian", () => {
     const effects: ToolEffect[] = [
       {

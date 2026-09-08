@@ -294,6 +294,14 @@ export const botMessages = {
       return `Было создано напоминание на ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;
     },
   }),
+  bot_reminder_recurring_scheduled: m({
+    en: (p: ReminderTimeParts, occurrences: number) => {
+      return `Recurring reminder set, first on ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone}), ${occurrences} times in total`;
+    },
+    ru: (p: ReminderTimeParts, occurrences: number) => {
+      return `Было создано повторяющееся напоминание, первое — ${pad2(p.day)}.${pad2(p.month)}.${p.year} в ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone}), всего ${occurrences} раз(а)`;
+    },
+  }),
   bot_reminder_updated: m({
     en: (p: ReminderTimeParts) => {
       return `Reminder updated for ${p.year}-${pad2(p.month)}-${pad2(p.day)} at ${pad2(p.hour)}:${pad2(p.minute)} (${p.timezone})`;

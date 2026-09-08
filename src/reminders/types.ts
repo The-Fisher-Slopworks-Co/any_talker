@@ -51,3 +51,12 @@ export type Recurrence = {
 };
 
 export const MIN_LEAD_MS = 60_000;
+
+// Nothing repeats faster than this. Every fire re-runs the LLM, so a
+// one-minute series is a money pump rather than a feature.
+export const MIN_RECURRENCE_INTERVAL_MS = 5 * 60_000;
+
+// How many times a recurring reminder fires before it is removed. One named
+// constant on purpose: a paid tier raises this, and a literal scattered
+// through the scheduler and the tools could not follow.
+export const MAX_REMINDER_OCCURRENCES = 4;

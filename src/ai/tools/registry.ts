@@ -15,7 +15,14 @@ import type { AIMessage } from "../types";
 export type ToolCallSource = "ask" | "guest" | "reminder_delivery";
 
 export type ToolEffect =
-  | { type: "reminder_scheduled"; fireAtMs: number; timezone: string }
+  // `occurrences` is present only for a recurring reminder, and then names how
+  // many times the series fires in total; `fireAtMs` is its first occurrence.
+  | {
+      type: "reminder_scheduled";
+      fireAtMs: number;
+      timezone: string;
+      occurrences?: number;
+    }
   | { type: "reminder_updated"; fireAtMs: number; timezone: string }
   | { type: "reminder_cancelled"; fireAtMs: number; timezone: string }
   // One or more of the user's self-service settings (name/timezone/gender/
