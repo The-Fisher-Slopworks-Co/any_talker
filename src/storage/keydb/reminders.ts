@@ -2,13 +2,50 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { RedisClient } from "bun";
-import type { RemindersStore } from "../types/reminders";
+import type { QuarantinedReminder, RemindersStore } from "../types/reminders";
 import type { Reminder } from "../../reminders/types";
-import { parseStoredReminder, ReminderParseError } from "../../reminders/parse";
+import {
+  parseStoredReminder,
+  ReminderParseError,
+  type ReminderParseFailureReason,
+} from "../../reminders/parse";
 import { remindersParseFailuresTotal } from "../../metrics";
 import type { ScopedKey, ScopedKeyFor } from "./shared";
 
 const FETCH_DUE_LIMIT = 100;
+
+// How long a quarantined payload is kept before KeyDB expires it. Long enough
+// to notice the parse-failure metric, ship a parser fix and replay the record;
+// bounded so a parser bug that trips on every reminder cannot fill the store.
+const QUARANTINE_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+// The envelope written next to a quarantined payload. Read back defensively:
+// it is our own JSON, but a malformed one must not take the listing down —
+// and, above all, must never be deleted in response.
+export function parseQuarantineEnvelope(
+  id: string,
+  raw: string,
+): QuarantinedReminder | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const rec = parsed as Record<string, unknown>;
+  if (typeof rec.raw !== "string") return null;
+  if (rec.reason !== "invalid_json" && rec.reason !== "schema_violation") {
+    return null;
+  }
+  if (typeof rec.quarantinedAtMs !== "number") return null;
+  return {
+    id,
+    raw: rec.raw,
+    reason: rec.reason,
+    quarantinedAtMs: rec.quarantinedAtMs,
+  };
+}
 
 // Atomic create-under-cap: sum the per-user index of every scope in the bot
 // family (KEYS[4..]) and only write when the total is below the cap. Runs
@@ -41,6 +78,12 @@ export function parseSaveReminderReply(
   throw new Error(
     `Unexpected EVAL reply for reminders.saveIfUnderCap: ${JSON.stringify(reply)}`,
   );
+}
+
+interface CorruptedRecord {
+  id: string;
+  raw: string;
+  reason: ReminderParseFailureReason;
 }
 
 export class KeyDBRemindersStore implements RemindersStore {
@@ -78,13 +121,13 @@ export class KeyDBRemindersStore implements RemindersStore {
   ): Promise<{
     reminders: Reminder[];
     missing: string[];
-    corrupted: string[];
+    corrupted: CorruptedRecord[];
   }> {
     const keys = ids.map((id) => this.sk(`reminder:${id}`));
     const raws = await this.client.mget(...keys);
     const reminders: Reminder[] = [];
     const missing: string[] = [];
-    const corrupted: string[] = [];
+    const corrupted: CorruptedRecord[] = [];
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i]!;
       const raw = raws[i];
@@ -102,7 +145,7 @@ export class KeyDBRemindersStore implements RemindersStore {
           `[reminders] ${verb} corrupted reminder id=${id} reason=${err.reason}:`,
           err.cause,
         );
-        corrupted.push(id);
+        corrupted.push({ id, raw, reason: err.reason });
       }
     }
     return { reminders, missing, corrupted };
@@ -124,23 +167,92 @@ export class KeyDBRemindersStore implements RemindersStore {
       ids,
       "quarantine",
     );
-    // Quarantine corrupted records on the due path: deleting the payload +
-    // zrem from the due set prevents the next tick from picking them up and
-    // looping forever. user_reminders may briefly hold a dangling id;
-    // listForUser tolerates that (MGET nulls are skipped).
+    // Quarantine corrupted records on the due path: the payload is copied
+    // aside and the live key dropped, and the zrem below keeps the next tick
+    // from picking them up and looping forever. user_reminders may briefly
+    // hold a dangling id; listForUser tolerates that (MGET nulls are skipped).
     const orphans = [...missing];
-    for (const id of corrupted) {
-      await this.client
-        .del(this.sk(`reminder:${id}`))
-        .catch((err) => console.error("quarantine del payload failed:", err));
-      orphans.push(id);
+    for (const record of corrupted) {
+      await this.quarantine(record, nowMs);
+      orphans.push(record.id);
     }
+    if (corrupted.length > 0) await this.pruneQuarantine(nowMs);
     if (orphans.length > 0) {
       await this.client
         .zrem(this.sk("reminders:due"), orphans[0]!, ...orphans.slice(1))
         .catch((err) => console.error("zrem orphan reminders failed:", err));
     }
     return reminders;
+  }
+
+  private quarantineKey(id: string): string {
+    return this.sk(`reminder:quarantined:${id}`);
+  }
+
+  // Copy first, delete second: a crash in between leaves two copies of the
+  // record, never zero. If the copy cannot be written the original is kept as
+  // well — the record still leaves the due set, so the tick does not loop, but
+  // nothing the parser rejected is destroyed on the way out.
+  private async quarantine(
+    record: CorruptedRecord,
+    nowMs: number,
+  ): Promise<void> {
+    const envelope = JSON.stringify({
+      raw: record.raw,
+      reason: record.reason,
+      quarantinedAtMs: nowMs,
+    });
+    try {
+      await this.client.set(
+        this.quarantineKey(record.id),
+        envelope,
+        "EX",
+        QUARANTINE_TTL_SECONDS,
+      );
+      await this.client.zadd(
+        this.sk("reminders:quarantined"),
+        nowMs,
+        record.id,
+      );
+    } catch (err) {
+      console.error("quarantine copy failed, keeping payload:", err);
+      return;
+    }
+    await this.client
+      .del(this.sk(`reminder:${record.id}`))
+      .catch((err) => console.error("quarantine del payload failed:", err));
+  }
+
+  // The payload keys expire on their own; the index would not, so drop the
+  // entries whose payload can no longer exist.
+  private async pruneQuarantine(nowMs: number): Promise<void> {
+    await this.client
+      .zremrangebyscore(
+        this.sk("reminders:quarantined"),
+        0,
+        nowMs - QUARANTINE_TTL_SECONDS * 1000,
+      )
+      .catch((err) => console.error("prune quarantine index failed:", err));
+  }
+
+  async listQuarantined(): Promise<QuarantinedReminder[]> {
+    const ids = await this.client.zrange(
+      this.sk("reminders:quarantined"),
+      0,
+      -1,
+    );
+    if (ids.length === 0) return [];
+    const raws = await this.client.mget(
+      ...ids.map((id) => this.quarantineKey(id)),
+    );
+    const out: QuarantinedReminder[] = [];
+    for (let i = 0; i < ids.length; i++) {
+      const raw = raws[i];
+      if (raw === null || raw === undefined) continue;
+      const entry = parseQuarantineEnvelope(ids[i]!, raw);
+      if (entry) out.push(entry);
+    }
+    return out.sort((a, b) => b.quarantinedAtMs - a.quarantinedAtMs);
   }
 
   async listForUser(userId: string): Promise<Reminder[]> {
