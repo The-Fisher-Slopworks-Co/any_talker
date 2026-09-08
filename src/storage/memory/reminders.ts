@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Reminder } from "../../reminders/types";
-import type { RemindersStore } from "../types/reminders";
+import type { QuarantinedReminder, RemindersStore } from "../types/reminders";
 import type { Backing, Scope } from "../memory";
 
 export class MemoryRemindersStore implements RemindersStore {
@@ -68,5 +68,11 @@ export class MemoryRemindersStore implements RemindersStore {
 
   async delete(id: string, _userId: string): Promise<void> {
     this.b.reminders.delete(this.scope.sk(id));
+  }
+
+  // Nothing to quarantine: this backend holds parsed `Reminder` objects, not
+  // serialized blobs, so no read of it can fail validation.
+  async listQuarantined(): Promise<QuarantinedReminder[]> {
+    return [];
   }
 }

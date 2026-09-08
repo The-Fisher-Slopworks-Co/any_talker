@@ -2,6 +2,18 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Reminder } from "../../reminders/types";
+import type { ReminderParseFailureReason } from "../../reminders/parse";
+
+// A stored reminder the parser rejected. The `raw` payload is kept verbatim —
+// the user's reminder text and its conversation snapshot — so a validation bug
+// is an outage, not a data loss: the record can be inspected and replayed once
+// the parser is fixed.
+export interface QuarantinedReminder {
+  id: string;
+  raw: string;
+  reason: ReminderParseFailureReason;
+  quarantinedAtMs: number;
+}
 
 // Reminders. Scoped by `forBot`: each character keeps its own reminders.
 export interface RemindersStore {
@@ -27,4 +39,7 @@ export interface RemindersStore {
     countBotIds: readonly (string | null)[],
   ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }>;
   delete(id: string, userId: string): Promise<void>;
+  // Records the due path could not parse, newest first. Backends that hold
+  // parsed objects rather than blobs cannot produce any and return [].
+  listQuarantined(): Promise<QuarantinedReminder[]>;
 }
