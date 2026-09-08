@@ -62,45 +62,44 @@ export async function persistReminder(
   }
 
   // Per-user reminder cap, shared across the whole bot family: reminders are
-  // stored per character scope, so the cap sums the scoped counts of the main
-  // bot and every managed bot (plus the current turn's scope, normally already
-  // among them). This is a check-then-save guardrail, not an atomic invariant:
-  // concurrent creations within one tool step could overshoot by a few, which
-  // is harmless for a quota bound.
+  // stored per character scope, so the cap counts the main bot's scope and
+  // every managed bot's (plus the current turn's, normally already among
+  // them). The store counts and writes atomically — the model routinely emits
+  // a whole series of schedule calls in one round and the agent runtime runs
+  // them in parallel, so a check-then-save pair here would let every one of
+  // them see the same pre-write count and sail past the cap together.
   const { maxRemindersPerUser } = await getOrInitSettings(storage);
   const managedBots = await storage.managedBots.list();
-  const scopeIds = new Set<string | null>([
+  const scopeIds: (string | null)[] = [
     null,
     ctx.botId ?? null,
     ...managedBots.map((bot) => bot.botId),
-  ]);
-  const counts = await Promise.all(
-    [...scopeIds].map((id) =>
-      storage.forBot(id).reminders.countForUser(ctx.userId),
-    ),
+  ];
+
+  const reminderId = crypto.randomUUID();
+  const saved = await scoped.reminders.saveIfUnderCap(
+    {
+      id: reminderId,
+      userId: ctx.userId,
+      chatId: ctx.chatId,
+      lang: ctx.lang,
+      fireAtMs,
+      text,
+      target: buildDeliveryTarget(ctx),
+      createdAtMs: ctx.now,
+      contextMessages: ctx.contextMessages
+        ? serializeMessages(ctx.contextMessages)
+        : [],
+    },
+    maxRemindersPerUser,
+    scopeIds,
   );
-  const count = counts.reduce((sum, n) => sum + n, 0);
-  if (count >= maxRemindersPerUser) {
+  if (!saved.ok) {
     return {
       ok: false,
       reason: `limit_reached: the user already has the maximum of ${maxRemindersPerUser} active reminders across all characters; ask them to cancel some before adding more`,
     };
   }
-
-  const reminderId = crypto.randomUUID();
-  await scoped.reminders.save({
-    id: reminderId,
-    userId: ctx.userId,
-    chatId: ctx.chatId,
-    lang: ctx.lang,
-    fireAtMs,
-    text,
-    target: buildDeliveryTarget(ctx),
-    createdAtMs: ctx.now,
-    contextMessages: ctx.contextMessages
-      ? serializeMessages(ctx.contextMessages)
-      : [],
-  });
 
   ctx.effects?.push({
     type: "reminder_scheduled",

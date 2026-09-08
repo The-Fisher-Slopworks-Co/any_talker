@@ -3,7 +3,12 @@
 
 import { RedisClient } from "bun";
 import type { Storage } from "./types";
-import { PREFIX, type ScopedKey } from "./keydb/shared";
+import {
+  PREFIX,
+  botPrefixFor,
+  type ScopedKey,
+  type ScopedKeyFor,
+} from "./keydb/shared";
 import { KeyDBManagedBotsStore } from "./keydb/managed-bots";
 import { KeyDBPresenceStore } from "./keydb/presence";
 import { KeyDBSettingsStore } from "./keydb/settings";
@@ -51,6 +56,8 @@ export class KeyDBStorage implements Storage {
     // `botPrefix === ""`, so a scoped key is byte-identical to the original
     // `${PREFIX}${base}` for the main bot.
     const sk: ScopedKey = (base) => `${PREFIX}${botPrefix}${base}`;
+    const skFor: ScopedKeyFor = (botId, base) =>
+      `${PREFIX}${botPrefixFor(botId)}${base}`;
 
     this.managedBots = new KeyDBManagedBotsStore(client);
     this.presence = new KeyDBPresenceStore(client);
@@ -64,7 +71,7 @@ export class KeyDBStorage implements Storage {
     this.chats = new KeyDBChatsStore(client);
     this.conversations = new KeyDBConversationsStore(client, sk);
     this.photos = new KeyDBPhotosStore(client, sk);
-    this.reminders = new KeyDBRemindersStore(client, sk);
+    this.reminders = new KeyDBRemindersStore(client, sk, skFor);
     this.privateChats = new KeyDBPrivateChatsStore(client, sk);
     this.checks = new KeyDBChecksStore(client);
     this.facts = new KeyDBFactsStore(client, sk);
@@ -77,7 +84,7 @@ export class KeyDBStorage implements Storage {
   }
 
   forBot(botId: string | null): Storage {
-    const prefix = botId ? `mbot:${botId}:` : "";
+    const prefix = botPrefixFor(botId);
     if (prefix === this.botPrefix) return this;
     return new KeyDBStorage(this.client, prefix);
   }
