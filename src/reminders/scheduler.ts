@@ -8,7 +8,11 @@ import {
   startIntervalScheduler,
   type IntervalScheduler,
 } from "../shared/interval-scheduler";
-import { deliverReminder, type ReminderApi } from "./delivery";
+import {
+  deliverReminder,
+  notifyDeliveryFailure,
+  type ReminderApi,
+} from "./delivery";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { remindersDeliveredTotal } from "../metrics";
 
@@ -121,11 +125,17 @@ async function runRuntimeTick(
           err,
         );
       }
-      if (outcome === "permanent") {
-        remindersDeliveredTotal.inc({ outcome: "permanent" });
+      if (outcome === "permanent" || outcome === "unreachable") {
+        remindersDeliveredTotal.inc({ outcome });
         console.error(
-          `[scheduler] permanent delivery failure id=${reminder.id} kind=${reminder.target.kind}, dropped`,
+          `[scheduler] ${outcome} delivery failure id=${reminder.id} kind=${reminder.target.kind}, dropped`,
         );
+        // The user asked for a message at a time and would otherwise get
+        // silence, indistinguishable from the bot having forgotten. Skipped
+        // for "unreachable": there is nowhere to send the notice to.
+        if (outcome === "permanent") {
+          await notifyDeliveryFailure(runtime.api, reminder);
+        }
       } else {
         remindersDeliveredTotal.inc({ outcome: "delivered" });
         console.log(

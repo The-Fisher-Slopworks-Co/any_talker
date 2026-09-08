@@ -6,6 +6,7 @@ import { GrammyError } from "grammy";
 import { MemoryStorage } from "../storage/memory";
 import { runReminderTick, type ReminderRuntime } from "./scheduler";
 import type { ReminderApi } from "./delivery";
+import { t } from "../shared/i18n";
 import { createMainPersonaResolver } from "../managed-bots/persona";
 import type { Reminder } from "./types";
 import type { AIClient, AIMessage, AskResult } from "../ai/types";
@@ -42,19 +43,32 @@ class FakeAI implements AIClient {
 }
 
 class FakeApi implements ReminderApi {
-  calls: { chat_id: string | number }[] = [];
+  calls: { chat_id: string | number; text: string }[] = [];
+  // `impl` sees the outgoing text so a test can fail the reminder itself while
+  // letting the failure notice that follows through.
   constructor(
-    private readonly impl: () => Promise<unknown> = async () => ({}),
+    private readonly impl: (
+      text: string,
+    ) => Promise<unknown> = async () => ({}),
   ) {}
-  async sendRichMessage(params: { chat_id: string | number }) {
-    this.calls.push({ chat_id: params.chat_id });
-    return this.impl();
+  async sendRichMessage(params: {
+    chat_id: string | number;
+    rich_message: { markdown: string };
+  }) {
+    this.calls.push({
+      chat_id: params.chat_id,
+      text: params.rich_message.markdown,
+    });
+    return this.impl(params.rich_message.markdown);
   }
-  async sendMessage(chat_id: string | number) {
-    this.calls.push({ chat_id });
-    return this.impl();
+  async sendMessage(chat_id: string | number, text: string) {
+    this.calls.push({ chat_id, text });
+    return this.impl(text);
   }
 }
+
+// The notice `reminder()` produces when its delivery is given up on.
+const noticeFor = (note = "ping") => t("ru").reminders_delivery_failed(note);
 
 const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   id: "r1",
@@ -148,10 +162,35 @@ describe("runReminderTick", () => {
     ]);
   });
 
-  test("permanent TG failure deletes reminder", async () => {
+  test("permanent TG failure deletes reminder and tells the user", async () => {
     const storage = new MemoryStorage();
     await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
-    const api = new FakeApi(async () => {
+    // A 400 that is about the message, not the chat: the reminder is lost but
+    // the chat is still reachable, so the notice must arrive.
+    const api = new FakeApi(async (text) => {
+      if (text === noticeFor()) return {};
+      throw grammyErr(400);
+    });
+    const ai = new FakeAI();
+
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
+    expect(await storage.reminders.fetchDue(1_000)).toEqual([]);
+    expect(api.calls.at(-1)).toEqual({ chat_id: "c1", text: noticeFor() });
+  });
+
+  test("unreachable chat deletes reminder without a notice", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
+    // 403 means the bot may not write here at all; a notice would only earn a
+    // second identical error.
+    const api = new FakeApi(async (text) => {
+      if (text === noticeFor()) return {};
       throw grammyErr(403);
     });
     const ai = new FakeAI();
@@ -164,6 +203,26 @@ describe("runReminderTick", () => {
       nowMs: 1_000,
     });
     expect(await storage.reminders.fetchDue(1_000)).toEqual([]);
+    expect(api.calls.map((c) => c.text)).not.toContain(noticeFor());
+  });
+
+  test("transient failure sends no notice — the retry may still succeed", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(reminder({ id: "due", fireAtMs: 100 }));
+    const api = new FakeApi(async (text) => {
+      if (text === noticeFor()) return {};
+      throw grammyErr(429);
+    });
+    const ai = new FakeAI();
+
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
+    expect(api.calls.map((c) => c.text)).not.toContain(noticeFor());
   });
 
   test("no due reminders -> no api calls", async () => {

@@ -86,4 +86,14 @@ export const remindersMessages = {
     en: (id: string) => `chat ${id}`,
     ru: (id: string) => `чат ${id}`,
   }),
+  // Sent to the chat that was supposed to receive the reminder, after the
+  // scheduler has given up on it. Says what was lost and that nothing more
+  // will happen, without naming the internal failure reason — "permanent
+  // delivery failure" is an operator's word, not the user's.
+  reminders_delivery_failed: m({
+    en: (note: string) =>
+      `⚠️ I could not deliver your reminder “${note}”. It will not fire — set it again if you still need it.`,
+    ru: (note: string) =>
+      `⚠️ Не удалось доставить напоминание «${note}». Оно не сработает — поставь его заново, если оно ещё нужно.`,
+  }),
 };

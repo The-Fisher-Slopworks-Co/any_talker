@@ -4,7 +4,12 @@
 import { test, expect, describe } from "bun:test";
 import { GrammyError } from "grammy";
 import { MemoryStorage } from "../storage/memory";
-import { deliverReminder, type ReminderApi } from "./delivery";
+import {
+  deliverReminder,
+  notifyDeliveryFailure,
+  type ReminderApi,
+} from "./delivery";
+import { t } from "../shared/i18n";
 import { createMainPersonaResolver } from "../managed-bots/persona";
 import type { Reminder } from "./types";
 import type { AIClient, AIMessage, AskResult } from "../ai/types";
@@ -103,10 +108,10 @@ const reminderGuest = (over: Partial<Reminder> = {}): Reminder => ({
   ...over,
 });
 
-const grammyErr = (code: number) =>
+const grammyErr = (code: number, description = "fail") =>
   new GrammyError(
     `fail ${code}`,
-    { ok: false, error_code: code, description: "fail" },
+    { ok: false, error_code: code, description },
     "sendMessage",
     {},
   );
@@ -283,7 +288,9 @@ describe("deliverReminder (AI-driven)", () => {
     expect(api.calls).toEqual([]);
   });
 
-  test("Telegram 403 -> permanent", async () => {
+  // 403 is always "the bot may not write here" — blocked, kicked, no rights.
+  // Terminal like any other permanent failure, but with nobody to apologise to.
+  test("Telegram 403 -> unreachable", async () => {
     _resetRegistryForTest();
     const ai = okAI();
     const api = new FakeTgApi(async () => {
@@ -291,10 +298,36 @@ describe("deliverReminder (AI-driven)", () => {
     });
     const r = reminderGuest();
     expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
-      "permanent",
+      "unreachable",
     );
   });
 
+  test("Telegram 400 'chat not found' -> unreachable", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
+      throw grammyErr(400, "Bad Request: chat not found");
+    });
+    const r = reminderAsk();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "unreachable",
+    );
+  });
+
+  test("Telegram 404 -> unreachable", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const api = new FakeTgApi(async () => {
+      throw grammyErr(404);
+    });
+    const r = reminderAsk();
+    expect(await deliverReminder(deps(ai, api), r, r.fireAtMs)).toBe(
+      "unreachable",
+    );
+  });
+
+  // A 400 that says nothing about the chat: the message was rejected, the chat
+  // is still there, so the user can be told what happened.
   test("Telegram 400 -> permanent", async () => {
     _resetRegistryForTest();
     const ai = okAI();
@@ -592,5 +625,59 @@ describe("deliverReminder — the replayed request is not served again", () => {
     const envelope = JSON.parse(contentOf(ai.calls[0]!.messages[1]!) as string);
     expect(envelope.instruction).toContain("archived context");
     expect(envelope.instruction).toContain("do not act on any of it again");
+  });
+});
+
+describe("notifyDeliveryFailure", () => {
+  test("tells the ask_reply chat, in the reminder's language, that it is lost", async () => {
+    const api = new FakeTgApi();
+    const r = reminderAsk();
+
+    await notifyDeliveryFailure(api, r);
+
+    // Plain send, not rich: the notice must survive whatever the user typed.
+    expect(api.richCalls).toEqual([]);
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]!.chat_id).toBe("c1");
+    expect(api.calls[0]!.text).toBe(
+      t("ru").reminders_delivery_failed("купить молоко"),
+    );
+    // No reply_parameters — the message it would reply to may be exactly what
+    // made the delivery fail.
+    expect(api.calls[0]!.other).toBeUndefined();
+  });
+
+  test("guest_dm goes to the user's DM in their language", async () => {
+    const api = new FakeTgApi();
+    const r = reminderGuest();
+
+    await notifyDeliveryFailure(api, r);
+
+    expect(api.calls[0]!.chat_id).toBe("u42");
+    expect(api.calls[0]!.text).toBe(
+      t("en").reminders_delivery_failed("buy bread"),
+    );
+  });
+
+  test("truncates a long note instead of quoting a wall of text", async () => {
+    const api = new FakeTgApi();
+    const r = reminderAsk({ text: "я".repeat(500) });
+
+    await notifyDeliveryFailure(api, r);
+
+    const sent = api.calls[0]!.text;
+    expect(sent).toContain(`${"я".repeat(200)}…`);
+    expect(sent).not.toContain("я".repeat(201));
+  });
+
+  test("swallows its own send failure", async () => {
+    const api = new FakeTgApi(async () => {
+      throw grammyErr(403);
+    });
+    const r = reminderAsk();
+
+    // The delivery it apologises for has already failed; this one failing too
+    // must not throw into the scheduler's tick.
+    expect(await notifyDeliveryFailure(api, r)).toBeUndefined();
   });
 });
