@@ -12,10 +12,19 @@ export interface RemindersStore {
   // Fetch a single reminder by id (O(1)); null if absent or corrupt. Lets the
   // cancel tool verify ownership and read fireAtMs without an O(n) list scan.
   get(id: string): Promise<Reminder | null>;
-  // Count a user's reminders (O(1) via SCARD) for the per-user creation cap.
-  // May over-count slightly if a corrupted reminder left a dangling id in the
-  // index (the quarantine path can't reverse-map it to a user) — that only makes
-  // the cap marginally stricter, never looser, which is fine for a soft cap.
-  countForUser(userId: string): Promise<number>;
+  // Create a reminder only while the user is under `cap`, counting their
+  // reminders in this scope plus every scope in `countBotIds` (the cap is
+  // shared across the whole bot family). The count and the write happen
+  // atomically, so the parallel tool calls of one model round cannot all read
+  // the same pre-write count and overshoot the cap together.
+  //
+  // The count may be marginally high if a corrupted reminder left a dangling id
+  // in the per-user index (the quarantine path can't reverse-map it to a user);
+  // that makes the cap stricter, never looser.
+  saveIfUnderCap(
+    reminder: Reminder,
+    cap: number,
+    countBotIds: readonly (string | null)[],
+  ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }>;
   delete(id: string, userId: string): Promise<void>;
 }

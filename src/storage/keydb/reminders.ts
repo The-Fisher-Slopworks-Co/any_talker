@@ -6,14 +6,48 @@ import type { RemindersStore } from "../types/reminders";
 import type { Reminder } from "../../reminders/types";
 import { parseStoredReminder, ReminderParseError } from "../../reminders/parse";
 import { remindersParseFailuresTotal } from "../../metrics";
-import type { ScopedKey } from "./shared";
+import type { ScopedKey, ScopedKeyFor } from "./shared";
 
 const FETCH_DUE_LIMIT = 100;
+
+// Atomic create-under-cap: sum the per-user index of every scope in the bot
+// family (KEYS[4..]) and only write when the total is below the cap. Runs
+// server-side, so the tool calls of one model round — which the agent runtime
+// executes in parallel — cannot all read the same pre-write count and each
+// conclude there is room. Writes in the same order as `save`: ZSET first, so a
+// crash leaves an orphan `fetchDue` can GC. Returns '1' when saved, '0' when
+// the cap was already reached.
+const SAVE_REMINDER_LUA = `
+local total = 0
+for i = 4, #KEYS do
+  total = total + redis.call('SCARD', KEYS[i])
+end
+if total >= tonumber(ARGV[1]) then return '0' end
+redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
+redis.call('SET', KEYS[2], ARGV[4])
+redis.call('SADD', KEYS[3], ARGV[3])
+return '1'
+`;
+
+// Any reply shape other than the two the script returns must throw rather than
+// silently masquerading as "saved" or "at the cap".
+export function parseSaveReminderReply(
+  reply: unknown,
+): { ok: true } | { ok: false; reason: "limit_reached" } {
+  if (reply === "1" || reply === 1) return { ok: true };
+  if (reply === "0" || reply === 0) {
+    return { ok: false, reason: "limit_reached" };
+  }
+  throw new Error(
+    `Unexpected EVAL reply for reminders.saveIfUnderCap: ${JSON.stringify(reply)}`,
+  );
+}
 
 export class KeyDBRemindersStore implements RemindersStore {
   constructor(
     private readonly client: RedisClient,
     private readonly sk: ScopedKey,
+    private readonly skFor: ScopedKeyFor,
   ) {}
 
   async save(reminder: Reminder): Promise<void> {
@@ -141,11 +175,34 @@ export class KeyDBRemindersStore implements RemindersStore {
     }
   }
 
-  async countForUser(userId: string): Promise<number> {
-    // SCARD is O(1). May slightly over-count if a corrupted reminder left a
-    // dangling id in the set (the quarantine path can't SREM without the
-    // userId); that only makes the cap marginally stricter, never looser.
-    return await this.client.scard(this.sk(`user_reminders:${userId}`));
+  async saveIfUnderCap(
+    reminder: Reminder,
+    cap: number,
+    countBotIds: readonly (string | null)[],
+  ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }> {
+    // Deduped so a scope named twice (the caller's own bot is normally also in
+    // the managed-bot list) is not counted twice. This view's own index is
+    // passed separately as KEYS[3] for the SADD; the count only walks KEYS[4..].
+    const countKeys = [
+      ...new Set(
+        countBotIds.map((id) =>
+          this.skFor(id, `user_reminders:${reminder.userId}`),
+        ),
+      ),
+    ];
+    const reply = await this.client.send("EVAL", [
+      SAVE_REMINDER_LUA,
+      String(3 + countKeys.length),
+      this.sk("reminders:due"),
+      this.sk(`reminder:${reminder.id}`),
+      this.sk(`user_reminders:${reminder.userId}`),
+      ...countKeys,
+      String(cap),
+      String(reminder.fireAtMs),
+      reminder.id,
+      JSON.stringify(reminder),
+    ]);
+    return parseSaveReminderReply(reply);
   }
 
   async delete(id: string, userId: string): Promise<void> {

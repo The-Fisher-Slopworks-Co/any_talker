@@ -24,7 +24,7 @@ describe("cancel_reminder", () => {
     const out = await tool.execute({ reminderId: "r1" }, ctx);
     expect(out).toEqual({ cancelled: true });
     expect(await storage.reminders.get("r1")).toBeNull();
-    expect(await storage.reminders.countForUser("u1")).toBe(0);
+    expect(await storage.reminders.listForUser("u1")).toEqual([]);
   });
 
   test("pushes a reminder_cancelled effect with the reminder's fire time", async () => {

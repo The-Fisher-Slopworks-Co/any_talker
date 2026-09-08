@@ -9,6 +9,16 @@ export const PREFIX = "at:";
 // regardless of the view build their keys from `PREFIX` directly instead.
 export type ScopedKey = (base: string) => string;
 
+// The same, for an arbitrary scope rather than the view's own — needed where a
+// query spans the whole bot family (the per-user reminder cap).
+export type ScopedKeyFor = (botId: string | null, base: string) => string;
+
+// `null` is the main bot and yields the empty prefix, so its keys stay the
+// plain `${PREFIX}${base}` they have always been.
+export function botPrefixFor(botId: string | null): string {
+  return botId ? `mbot:${botId}:` : "";
+}
+
 // User/chat rows written before `firstSeenAt` existed have no such field; treat
 // a missing value as epoch 0 so an existing entity is never mistaken for "new"
 // (which would wrongly apply the new-user budget or surface it in the digest).
