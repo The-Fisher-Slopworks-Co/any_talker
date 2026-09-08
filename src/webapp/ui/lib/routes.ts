@@ -14,6 +14,7 @@ export type AdminSection =
   | "users"
   | "chats"
   | "reminders"
+  | "quarantine"
   | "checks"
   | "bots";
 
@@ -37,6 +38,7 @@ export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "users",
   "chats",
   "reminders",
+  "quarantine",
   "checks",
   "bots",
 ];
@@ -67,6 +69,11 @@ export function adminSection(
       return {
         label: s.ui_admin_reminders,
         description: s.ui_admin_reminders_desc,
+      };
+    case "quarantine":
+      return {
+        label: s.ui_admin_quarantine,
+        description: s.ui_admin_quarantine_desc,
       };
     case "checks":
       return {

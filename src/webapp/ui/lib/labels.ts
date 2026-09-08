@@ -4,6 +4,7 @@
 import type { Strings } from "./routes";
 import { composeFullName, type Chat, type User } from "../../../shared/types";
 import type { Reminder } from "../../../reminders/types";
+import type { ReminderParseFailureReason } from "../../../reminders/parse";
 import type { Lang } from "../../../shared/i18n";
 import type { DisplayNameError } from "../../../shared/display-name";
 import type { FactBot } from "../api-client";
@@ -78,6 +79,12 @@ export const FACT_ERR_KEY = {
   "fact not found": "ui_facts_error_not_found",
   "fact key exists": "ui_facts_error_key_exists",
 } as const satisfies Record<string, keyof Strings>;
+
+// Why the due path refused a stored reminder, in the quarantine view's words.
+export const QUARANTINE_REASON_KEY = {
+  invalid_json: "ui_quarantine_reason_invalid_json",
+  schema_violation: "ui_quarantine_reason_schema_violation",
+} as const satisfies Record<ReminderParseFailureReason, keyof Strings>;
 
 export const DISPLAY_NAME_ERR_KEY = {
   too_long: "ui_main_name_err_too_long",

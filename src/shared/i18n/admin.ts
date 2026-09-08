@@ -69,6 +69,14 @@ export const adminMessages = {
     en: "Pending reminders for everyone",
     ru: "Ожидающие напоминания всех пользователей",
   }),
+  ui_admin_quarantine: m({
+    en: "Quarantine",
+    ru: "Карантин",
+  }),
+  ui_admin_quarantine_desc: m({
+    en: "Reminders the parser rejected, kept for 30 days",
+    ru: "Напоминания, отбракованные парсером, хранятся 30 дней",
+  }),
   ui_admin_checks: m({
     en: "Checks",
     ru: "Чеки",
