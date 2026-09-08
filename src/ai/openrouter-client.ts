@@ -8,6 +8,7 @@ import {
   tool as agentTool,
 } from "@openrouter/agent";
 import type {
+  PostModelCallPayload,
   RequestOptions,
   ResponsesRequest,
   SDKOptions,
@@ -238,6 +239,14 @@ export class OpenRouterClient implements AIClient {
       ),
     );
 
+    // Filled by the `PostModelCall` hook below — one entry per model call the
+    // agent's loop makes, in call order. Collected here rather than read off
+    // the finished run because nothing else exposes the per-call response ids:
+    // `getResponse()` only carries the final one, and the earlier rounds are
+    // exactly the ones a report needs to reconstruct a turn.
+    const generations: string[] = [];
+    let answeredBy: string | undefined;
+
     const start = performance.now();
     let outcome: "success" | "error" = "success";
     try {
@@ -270,6 +279,23 @@ export class OpenRouterClient implements AIClient {
           // fresh, and the SDK strips `state` from the outgoing request, so
           // this changes nothing on the wire.
           state: { load: async () => null, save: async () => {} },
+          // Observation only: the handler returns nothing, so it can neither
+          // mutate the run nor block it. A throw is logged and swallowed by the
+          // manager (`throwOnHandlerError` defaults to false), which is the
+          // right policy here — losing an id must not lose a billed answer.
+          hooks: {
+            PostModelCall: [
+              {
+                handler: (payload: PostModelCallPayload) => {
+                  generations.push(payload.responseId);
+                  // `response.model ?? ""` upstream, so an empty string means
+                  // the provider named none — leave the previous value rather
+                  // than overwriting it with nothing.
+                  if (payload.model) answeredBy = payload.model;
+                },
+              },
+            ],
+          },
         },
         this.titleHeader,
       );
@@ -312,6 +338,8 @@ export class OpenRouterClient implements AIClient {
         costUsd,
         priced,
         toolCalls,
+        generations,
+        ...(answeredBy === undefined ? {} : { answeredBy }),
       };
     } catch (err) {
       outcome = "error";
