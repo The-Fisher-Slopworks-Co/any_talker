@@ -4,6 +4,7 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
+import { REMINDER_WRITE_SOURCES } from "./shared";
 
 const Schema = z.object({
   reminderId: z.string().min(1).max(100),
@@ -25,6 +26,7 @@ export function createCancelReminderTool(deps: {
       "or { cancelled: false } if no such reminder is theirs (not an error). " +
       "To cancel several, call this once per id. There is no cancel-all.",
     parameters: Schema,
+    sources: REMINDER_WRITE_SOURCES,
     execute: async ({ reminderId }, ctx) => {
       const scoped = deps.storage.forBot(ctx.botId ?? null);
       // O(1) fetch doubles as the ownership gate: reminders.delete itself does not

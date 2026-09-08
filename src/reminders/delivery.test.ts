@@ -9,7 +9,8 @@ import { createMainPersonaResolver } from "../managed-bots/persona";
 import type { Reminder } from "./types";
 import type { AIClient, AIMessage, AskResult } from "../ai/types";
 import type { Tool, ToolCallContext } from "../ai/tools/registry";
-import { _resetRegistryForTest } from "../ai/tools/registry";
+import { _resetRegistryForTest, registerTool } from "../ai/tools/registry";
+import { createReminderTools } from "../ai/tools/reminders";
 
 // The message union now also covers replayed tool calls, which carry `output`
 // rather than `content`. These fixtures never build one, so a hit here means a
@@ -29,10 +30,12 @@ type AskArgs = {
 
 class FakeAI implements AIClient {
   calls: AskArgs[] = [];
-  constructor(private readonly impl: () => Promise<AskResult>) {}
+  // `impl` receives the call it is answering, so a test can stand in for a
+  // model that reaches for the tools it was offered.
+  constructor(private readonly impl: (opts: AskArgs) => Promise<AskResult>) {}
   async ask(opts: AskArgs): Promise<AskResult> {
     this.calls.push(opts);
-    return this.impl();
+    return this.impl(opts);
   }
 }
 
@@ -149,9 +152,10 @@ describe("deliverReminder (AI-driven)", () => {
     expect(envelope.scheduled_for).toMatch(/^2026-05-20 /);
     expect(envelope.scheduled_at).toMatch(/^2026-05-20 /);
 
-    // Tool context carries chat/user/source from the reminder
+    // Tool context carries chat/user from the reminder; the source is the
+    // delivery's own, whatever the reminder was created from.
     expect(ai.calls[0]!.toolCallContext).toMatchObject({
-      source: "ask",
+      source: "reminder_delivery",
       chatId: "c1",
       userId: "u1",
       replyToMessageId: 7,
@@ -180,7 +184,7 @@ describe("deliverReminder (AI-driven)", () => {
     expect(api.richCalls[0]!.chat_id).toBe("u42");
     expect(api.richCalls[0]!.reply_parameters).toBeUndefined();
     expect(ai.calls[0]!.toolCallContext).toMatchObject({
-      source: "guest",
+      source: "reminder_delivery",
       chatId: "u42",
       userId: "u42",
       replyToMessageId: null,
@@ -521,5 +525,72 @@ describe("deliverReminder accounting (the untracked-cost fix)", () => {
     );
     expect(deducts).toEqual([]); // owner is rate-limit-exempt by default
     expect((await storage.spend.getGlobal(r.fireAtMs)).day).toBeCloseTo(0.3);
+  });
+});
+
+// #119. A delivery replays the snapshot of the /ask that created the reminder,
+// and that snapshot was taken before the model answered: it holds "remind me
+// about every class this week" and no trace of the reminders scheduled in
+// response. Handed the scheduling tools, the model reads an unserved request
+// and serves it again — on every delivery, so N reminders become roughly N².
+describe("deliverReminder — the replayed request is not served again", () => {
+  const timetableRequest = (): Reminder =>
+    reminderAsk({
+      contextMessages: [
+        { role: "user", content: "напомни мне о каждой паре на этой неделе" },
+      ],
+    });
+
+  test("the reminder-writing tools are not offered to a delivery turn", async () => {
+    _resetRegistryForTest();
+    const storage = new MemoryStorage();
+    for (const tool of createReminderTools({ storage })) registerTool(tool);
+
+    const ai = okAI("пора на пару");
+    const r = timetableRequest();
+    await deliverReminder(deps(ai, new FakeTgApi(), storage), r, r.fireAtMs);
+
+    const offered = ai.calls[0]!.tools.map((tool) => tool.name).sort();
+    expect(offered).toEqual(["list_reminders"]);
+  });
+
+  test("a model that reaches for them schedules nothing and renders no effects", async () => {
+    _resetRegistryForTest();
+    const storage = new MemoryStorage();
+    for (const tool of createReminderTools({ storage })) registerTool(tool);
+
+    // Stands in for the model that caused the bug: it calls every scheduling
+    // tool it can see, as if the replayed request were still open.
+    const ai = new FakeAI(async (opts) => {
+      for (const tool of opts.tools) {
+        if (tool.name.startsWith("schedule_reminder")) {
+          await tool.execute(
+            { datetime: "2026-05-21T09:00", text: "пара" },
+            opts.toolCallContext,
+          );
+        }
+      }
+      return { text: "пора на пару", totalTokens: 10 };
+    });
+
+    const api = new FakeTgApi();
+    const r = timetableRequest();
+    expect(await deliverReminder(deps(ai, api, storage), r, r.fireAtMs)).toBe(
+      "delivered",
+    );
+
+    expect(await storage.forBot(null).reminders.listForUser("u1")).toEqual([]);
+    expect(ai.calls[0]!.toolCallContext.effects).toEqual([]);
+    expect(api.richCalls[0]!.markdown).not.toContain("<blockquote>");
+  });
+
+  test("the envelope tells the model the replayed context was already handled", async () => {
+    _resetRegistryForTest();
+    const ai = okAI();
+    const r = timetableRequest();
+    await deliverReminder(deps(ai, new FakeTgApi()), r, r.fireAtMs);
+    const envelope = JSON.parse(contentOf(ai.calls[0]!.messages[1]!) as string);
+    expect(envelope.instruction).toContain("archived context");
+    expect(envelope.instruction).toContain("do not act on any of it again");
   });
 });
