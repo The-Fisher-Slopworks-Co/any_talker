@@ -3,6 +3,7 @@
 
 import type { Chat, User } from "../../../shared/types";
 import type { Reminder } from "../../../reminders/types";
+import type { QuarantinedReminder } from "../../../storage/types/reminders";
 import { req } from "./http";
 
 // The admin listing carries every reminder and therefore the author lookups the
@@ -14,9 +15,21 @@ export type RemindersResponse = {
   displayNames?: Record<string, string | null>;
 };
 
+// Records the due path could not parse, newest first. No lookup tables come
+// with them: a quarantined payload has no parsed `userId` to resolve against
+// the user index — whatever can be recovered comes out of the blob itself.
+export type QuarantinedRemindersResponse = {
+  quarantined: QuarantinedReminder[];
+};
+
 // `webapp/routes/reminders.ts`
 export const remindersApi = {
   listMyReminders: () => req<RemindersResponse>("GET", "/api/me/reminders"),
   listAdminReminders: () =>
     req<RemindersResponse>("GET", "/api/admin/reminders"),
+  listQuarantinedReminders: () =>
+    req<QuarantinedRemindersResponse>(
+      "GET",
+      "/api/admin/reminders/quarantined",
+    ),
 };

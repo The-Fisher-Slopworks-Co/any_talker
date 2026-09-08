@@ -11,6 +11,7 @@ import { ChatsTab } from "./chats-tab";
 import { ChecksTab } from "./checks-tab";
 import { ManagedBotsTab } from "./managed-bots-tab";
 import { PromptTab } from "./prompt-tab";
+import { QuarantineTab } from "./quarantine-tab";
 import { RateLimitTab } from "./rate-limit-tab";
 import { BudgetTab } from "./budget-tab";
 import { SpendTab } from "./spend-tab";
@@ -46,6 +47,7 @@ export function AdminSectionView({
   }, [needsSettings]);
 
   if (section === "spend") return <SpendTab />;
+  if (section === "quarantine") return <QuarantineTab />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
   if (section === "chats") return <ChatsTab onEdit={goChat} />;
   if (section === "checks")
