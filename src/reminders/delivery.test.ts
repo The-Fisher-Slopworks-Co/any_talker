@@ -7,6 +7,7 @@ import { MemoryStorage } from "../storage/memory";
 import {
   deliverReminder,
   notifyDeliveryFailure,
+  notifyQuarantine,
   type ReminderApi,
 } from "./delivery";
 import { t } from "../shared/i18n";
@@ -679,5 +680,53 @@ describe("notifyDeliveryFailure", () => {
     // The delivery it apologises for has already failed; this one failing too
     // must not throw into the scheduler's tick.
     expect(await notifyDeliveryFailure(api, r)).toBeUndefined();
+  });
+});
+
+describe("notifyQuarantine", () => {
+  test("quotes the salvaged note in the salvaged language", async () => {
+    const api = new FakeTgApi();
+
+    await notifyQuarantine(api, "q1", {
+      chatId: "c1",
+      lang: "ru",
+      text: "купить молоко",
+    });
+
+    expect(api.richCalls).toEqual([]);
+    expect(api.calls).toEqual([
+      {
+        chat_id: "c1",
+        text: t("ru").reminders_delivery_failed("купить молоко"),
+        other: undefined,
+      },
+    ]);
+  });
+
+  test("says which reminder is lost even when the note is unreadable", async () => {
+    const api = new FakeTgApi();
+
+    await notifyQuarantine(api, "q1", {
+      chatId: "u42",
+      lang: "en",
+      text: null,
+    });
+
+    expect(api.calls[0]!.chat_id).toBe("u42");
+    expect(api.calls[0]!.text).toBe(t("en").reminders_delivery_failed_no_note);
+  });
+
+  test("swallows its own send failure", async () => {
+    const api = new FakeTgApi(async () => {
+      throw grammyErr(403);
+    });
+
+    expect(
+      await notifyQuarantine(api, "q1", {
+        chatId: "c1",
+        lang: "en",
+        text: "x",
+      }),
+    ).toBeUndefined();
   });
 });

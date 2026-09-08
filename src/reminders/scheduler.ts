@@ -11,8 +11,10 @@ import {
 import {
   deliverReminder,
   notifyDeliveryFailure,
+  notifyQuarantine,
   type ReminderApi,
 } from "./delivery";
+import { salvageQuarantinedRecipient } from "./parse";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { remindersDeliveredTotal } from "../metrics";
 
@@ -71,7 +73,22 @@ async function runRuntimeTick(
   ownerId: string,
   nowMs: number,
 ): Promise<void> {
-  const due = await runtime.storage.reminders.fetchDue(nowMs);
+  // A quarantined record will never fire; the user who set it would otherwise
+  // never learn that. The recipient is read best-effort from the rejected
+  // payload — when even that fails, the operator's log line is all there is.
+  const due = await runtime.storage.reminders.fetchDue(
+    nowMs,
+    async (record) => {
+      const recipient = salvageQuarantinedRecipient(record.raw);
+      if (recipient === null) {
+        console.error(
+          `[scheduler] quarantined id=${record.id}: no recipient to notify`,
+        );
+        return;
+      }
+      await notifyQuarantine(runtime.api, record.id, recipient);
+    },
+  );
   if (due.length === 0) return;
   await Promise.allSettled(
     due.map(async (reminder) => {
