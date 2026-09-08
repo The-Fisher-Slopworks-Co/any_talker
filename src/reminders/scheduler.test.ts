@@ -4,6 +4,7 @@
 import { test, expect, describe } from "bun:test";
 import { GrammyError } from "grammy";
 import { MemoryStorage } from "../storage/memory";
+import type { OnQuarantined } from "../storage/types/reminders";
 import { runReminderTick, type ReminderRuntime } from "./scheduler";
 import type { ReminderApi } from "./delivery";
 import { t } from "../shared/i18n";
@@ -90,6 +91,29 @@ const grammyErr = (code: number) =>
     "sendMessage",
     {},
   );
+
+// MemoryStorage holds parsed objects and can never quarantine, so the
+// storage→notice path is driven through a `fetchDue` that reports the given
+// raw payloads the way KeyDB's does after quarantining them.
+function quarantiningStorage(raws: Record<string, string>): MemoryStorage {
+  const storage = new MemoryStorage();
+  const fetchDue = storage.reminders.fetchDue.bind(storage.reminders);
+  storage.reminders.fetchDue = async (
+    nowMs: number,
+    onQuarantined?: OnQuarantined,
+  ) => {
+    for (const [id, raw] of Object.entries(raws)) {
+      await onQuarantined?.({
+        id,
+        raw,
+        reason: "schema_violation",
+        quarantinedAtMs: nowMs,
+      });
+    }
+    return fetchDue(nowMs);
+  };
+  return storage;
+}
 
 // One main-bot reminder runtime (null scope) over the given storage + api.
 const runtimes = (
@@ -223,6 +247,70 @@ describe("runReminderTick", () => {
       nowMs: 1_000,
     });
     expect(api.calls.map((c) => c.text)).not.toContain(noticeFor());
+  });
+
+  test("quarantined record: the user is told, in their language, with the note", async () => {
+    const storage = quarantiningStorage({
+      q1: JSON.stringify({
+        id: "q1",
+        userId: "u1",
+        lang: "ru",
+        text: "ping",
+        target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
+        contextMessages: "garbage",
+      }),
+    });
+    const api = new FakeApi();
+    const ai = new FakeAI();
+
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai,
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
+
+    // No LLM re-run for a record that cannot be delivered anyway.
+    expect(ai.calls).toBe(0);
+    expect(api.calls).toEqual([{ chat_id: "c1", text: noticeFor() }]);
+  });
+
+  test("quarantined record without a readable note still gets a notice", async () => {
+    const storage = quarantiningStorage({
+      q1: JSON.stringify({
+        userId: "u1",
+        target: { kind: "guest_dm", userId: "u1" },
+      }),
+    });
+    const api = new FakeApi();
+
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai: new FakeAI(),
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
+
+    expect(api.calls).toEqual([
+      { chat_id: "u1", text: t("en").reminders_delivery_failed_no_note },
+    ]);
+  });
+
+  test("quarantined record with no recipient is dropped silently", async () => {
+    const storage = quarantiningStorage({ q1: "{not json" });
+    const api = new FakeApi();
+
+    await runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai: new FakeAI(),
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs: 1_000,
+    });
+
+    expect(api.calls).toEqual([]);
   });
 
   test("no due reminders -> no api calls", async () => {

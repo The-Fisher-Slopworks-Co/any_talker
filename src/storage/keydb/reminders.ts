@@ -4,6 +4,7 @@
 import type { RedisClient } from "bun";
 import {
   QUARANTINE_TTL_MS,
+  type OnQuarantined,
   type QuarantinedReminder,
   type RemindersStore,
 } from "../types/reminders";
@@ -156,7 +157,10 @@ export class KeyDBRemindersStore implements RemindersStore {
     return { reminders, missing, corrupted };
   }
 
-  async fetchDue(nowMs: number): Promise<Reminder[]> {
+  async fetchDue(
+    nowMs: number,
+    onQuarantined?: OnQuarantined,
+  ): Promise<Reminder[]> {
     // Cap per-tick batch so a backlog after an outage drains over multiple
     // ticks instead of fanning out into one thundering Telegram-API herd.
     const ids = await this.client.zrangebyscore(
@@ -180,6 +184,18 @@ export class KeyDBRemindersStore implements RemindersStore {
     for (const record of corrupted) {
       await this.quarantine(record, nowMs);
       orphans.push(record.id);
+      // Reported after the record has left the due set, so the same id is
+      // never reported twice — including when the copy failed and the payload
+      // stayed behind: it still leaves the due set and will never fire.
+      if (onQuarantined) {
+        await onQuarantined({ ...record, quarantinedAtMs: nowMs }).catch(
+          (err) =>
+            console.error(
+              `[reminders] onQuarantined failed id=${record.id}:`,
+              err,
+            ),
+        );
+      }
     }
     if (corrupted.length > 0) await this.pruneQuarantine(nowMs);
     if (orphans.length > 0) {

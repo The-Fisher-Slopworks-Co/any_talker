@@ -3,6 +3,7 @@
 
 import { GrammyError, type Api } from "grammy";
 import type { Reminder } from "./types";
+import type { SalvagedRecipient } from "./parse";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient, AIMessage } from "../ai/types";
@@ -183,35 +184,58 @@ function isUnreachable(err: GrammyError): boolean {
   return UNREACHABLE_400.some((needle) => description.includes(needle));
 }
 
-// Tell the user their reminder is not coming. Deliberately a plain send: the
-// AI re-run is what may have failed, and no parse mode means an arbitrary note
-// cannot break the message. Called once per reminder — the scheduler only
-// reaches it on a terminal outcome, after which the record is gone, so a
-// transient retry loop cannot fan this out into repeated apologies.
+// Tell the user their reminder is not coming. Called once per reminder — the
+// scheduler only reaches it on a terminal outcome, after which the record is
+// gone, so a transient retry loop cannot fan this out into repeated apologies.
 export async function notifyDeliveryFailure(
   api: ReminderApi,
   reminder: Reminder,
 ): Promise<void> {
-  const note =
-    reminder.text.length > NOTICE_NOTE_LIMIT
-      ? `${reminder.text.slice(0, NOTICE_NOTE_LIMIT).trimEnd()}…`
-      : reminder.text;
   const chatId =
     reminder.target.kind === "ask_reply"
       ? reminder.target.chatId
       : reminder.target.userId;
+  await sendFailureNotice(api, reminder.id, {
+    chatId,
+    lang: reminder.lang,
+    text: reminder.text,
+  });
+}
+
+// The same notice for a record `fetchDue` quarantined: the parser rejected it,
+// so the recipient comes from a best-effort read of the raw payload and the
+// note may be unreadable. Once per id by construction — a record is
+// quarantined exactly once.
+export async function notifyQuarantine(
+  api: ReminderApi,
+  id: string,
+  recipient: SalvagedRecipient,
+): Promise<void> {
+  await sendFailureNotice(api, id, recipient);
+}
+
+// Deliberately a plain send: the AI re-run is what may have failed, and no
+// parse mode means an arbitrary note cannot break the message.
+async function sendFailureNotice(
+  api: ReminderApi,
+  id: string,
+  recipient: SalvagedRecipient,
+): Promise<void> {
+  const { chatId, lang, text } = recipient;
+  const message =
+    text === null
+      ? t(lang).reminders_delivery_failed_no_note
+      : t(lang).reminders_delivery_failed(
+          text.length > NOTICE_NOTE_LIMIT
+            ? `${text.slice(0, NOTICE_NOTE_LIMIT).trimEnd()}…`
+            : text,
+        );
   try {
-    await api.sendMessage(
-      chatId,
-      t(reminder.lang).reminders_delivery_failed(note),
-    );
+    await api.sendMessage(chatId, message);
   } catch (err) {
     // Best effort by construction: the delivery it apologises for has already
     // failed, so this send failing too changes nothing for the scheduler.
-    console.error(
-      `[reminders] failure notice not delivered id=${reminder.id}:`,
-      err,
-    );
+    console.error(`[reminders] failure notice not delivered id=${id}:`, err);
   }
 }
 

@@ -15,6 +15,7 @@ export class MemoryRemindersStore implements RemindersStore {
     this.b.reminders.set(this.scope.sk(reminder.id), structuredClone(reminder));
   }
 
+  // `onQuarantined` is never called: nothing here can fail to parse.
   async fetchDue(nowMs: number): Promise<Reminder[]> {
     const out: Reminder[] = [];
     for (const [key, r] of this.b.reminders.entries()) {

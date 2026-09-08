@@ -20,10 +20,15 @@ export interface QuarantinedReminder {
   quarantinedAtMs: number;
 }
 
+// Invoked once for every record `fetchDue` quarantines — never again for the
+// same id, since the record has left the due set by then. The scheduler uses
+// it to tell the user their reminder is not coming.
+export type OnQuarantined = (record: QuarantinedReminder) => Promise<void>;
+
 // Reminders. Scoped by `forBot`: each character keeps its own reminders.
 export interface RemindersStore {
   save(reminder: Reminder): Promise<void>;
-  fetchDue(nowMs: number): Promise<Reminder[]>;
+  fetchDue(nowMs: number, onQuarantined?: OnQuarantined): Promise<Reminder[]>;
   listForUser(userId: string): Promise<Reminder[]>;
   listAll(): Promise<Reminder[]>;
   // Fetch a single reminder by id (O(1)); null if absent or corrupt. Lets the
