@@ -4,6 +4,8 @@
 import { test, expect, describe } from "bun:test";
 import { parseStoredReminder, ReminderParseError } from "./parse";
 import type { Reminder } from "./types";
+import { serializeMessages, VIDEO_SNAPSHOT_MARKER } from "../ai/serialize";
+import type { AIMessage } from "../ai/types";
 
 const validRecord = {
   id: "r1",
@@ -93,6 +95,70 @@ describe("parseStoredReminder — valid records", () => {
     const { contextMessages: _drop, ...legacy } = validRecord;
     const out = parseStoredReminder(stringify(legacy));
     expect(out.contextMessages).toEqual([]);
+  });
+
+  test("round-trips a snapshot containing a replayed tool call", () => {
+    const r = {
+      ...validRecord,
+      contextMessages: [
+        { role: "user", content: "what is the weather" },
+        {
+          role: "tool",
+          callId: "call_1",
+          name: "web_search",
+          arguments: '{"query":"weather"}',
+          output: "sunny",
+        },
+        { role: "assistant", content: "it is sunny" },
+      ],
+    };
+    expect(parseStoredReminder(stringify(r))).toEqual(r as Reminder);
+  });
+
+  // The schema is handwritten, so it can drift from what the write side emits
+  // — that drift is what made every tool-carrying reminder unreadable. This
+  // walks one message of every `AIMessage` variant through the real write path
+  // and back in through the real storage boundary.
+  test("accepts everything serializeMessages can emit", () => {
+    const live: AIMessage[] = [
+      { role: "user", content: "plain string" },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "look" },
+          {
+            type: "image",
+            image: new Uint8Array([1, 2, 3]),
+            mediaType: "image/png",
+          },
+          {
+            type: "audio",
+            audio: new Uint8Array([4, 5, 6]),
+            mediaType: "audio/ogg",
+          },
+          {
+            type: "video",
+            video: new Uint8Array([7, 8, 9]),
+            mediaType: "video/mp4",
+          },
+        ],
+      },
+      { role: "assistant", content: "seen" },
+      {
+        role: "tool",
+        callId: "call_1",
+        name: "web_search",
+        arguments: '{"query":"x"}',
+        output: "y",
+      },
+    ];
+    const contextMessages = serializeMessages(live);
+    const out = parseStoredReminder(
+      stringify({ ...validRecord, contextMessages }),
+    );
+    expect(out.contextMessages).toEqual(contextMessages);
+    // The clip itself is not stored; its marker is what has to survive.
+    expect(stringify(out.contextMessages)).toContain(VIDEO_SNAPSHOT_MARKER);
   });
 });
 
@@ -222,6 +288,22 @@ describe("parseStoredReminder — schema violations", () => {
           { role: "user", content: "ok" },
           { role: "user", content: 7 },
           { role: "assistant", content: "ok" },
+        ],
+      }),
+    );
+  });
+
+  test("rejects a tool message missing one of its four strings", () => {
+    expectSchemaViolation(
+      stringify({
+        ...validRecord,
+        contextMessages: [
+          {
+            role: "tool",
+            callId: "call_1",
+            name: "web_search",
+            output: "sunny",
+          },
         ],
       }),
     );
