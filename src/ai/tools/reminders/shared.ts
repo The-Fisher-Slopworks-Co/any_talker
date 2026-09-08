@@ -8,7 +8,21 @@ import type { Storage } from "../../../storage/types";
 import { getOrInitSettings } from "../../../settings";
 import { serializeMessages } from "../../serialize";
 
+// The sources a reminder-writing tool is offered to — everything but a reminder
+// delivery. A delivery turn replays the archived context of the request that
+// created the reminder, and that snapshot ends *before* the model answered: it
+// holds "remind me about every class this week" and no trace of the reminders
+// scheduled in response. Handed the scheduling tools, the model reads an
+// unserved request and serves it again on every single delivery.
+export const REMINDER_WRITE_SOURCES = ["ask", "guest"] as const;
+
 export function buildDeliveryTarget(ctx: ToolCallContext): DeliveryTarget {
+  if (ctx.source === "reminder_delivery") {
+    // Unreachable while every writing tool declares REMINDER_WRITE_SOURCES;
+    // kept so one that forgets to fails loudly instead of filing the delivery's
+    // own chat as a guest DM.
+    throw new Error("reminder writes are not available during a delivery");
+  }
   if (ctx.source === "ask") {
     if (ctx.replyToMessageId === null) {
       throw new Error("ask context must carry replyToMessageId");

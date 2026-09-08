@@ -7,7 +7,12 @@ import type { Lang } from "../../shared/i18n";
 import type { UserSettingChange } from "../../shared/types";
 import type { AIMessage } from "../types";
 
-export type ToolCallSource = "ask" | "guest";
+// Where the turn a tool call runs inside came from. `reminder_delivery` is not
+// a user request: the turn replays the archived context of the /ask that
+// created the reminder and asks the model to word the notification. Tools that
+// would act on that replayed request a second time (scheduling above all) are
+// kept out of it — see `Tool.sources`.
+export type ToolCallSource = "ask" | "guest" | "reminder_delivery";
 
 export type ToolEffect =
   | { type: "reminder_scheduled"; fireAtMs: number; timezone: string }
@@ -51,6 +56,11 @@ export type Tool<TInput = unknown, TOutput = unknown> = {
   description: string;
   parameters: ToolParameters<TInput>;
   execute: (input: TInput, ctx: ToolCallContext) => Promise<TOutput> | TOutput;
+  // Sources this tool is offered to; omitted means all of them. A tool opts out
+  // of a source when running it there would be wrong regardless of what the
+  // model decides — the reminder-writing tools list `ask` and `guest` so a
+  // delivery turn cannot re-create the reminders its replayed context asked for.
+  sources?: readonly ToolCallSource[];
 };
 
 const registry = new Map<string, Tool>();
@@ -59,8 +69,10 @@ export function registerTool<TIn, TOut>(tool: Tool<TIn, TOut>): void {
   registry.set(tool.name, tool as Tool);
 }
 
-export function getAllTools(): Tool[] {
-  return [...registry.values()];
+export function getAllTools(source: ToolCallSource): Tool[] {
+  return [...registry.values()].filter(
+    (tool) => tool.sources === undefined || tool.sources.includes(source),
+  );
 }
 
 export function _resetRegistryForTest(): void {

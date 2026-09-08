@@ -118,6 +118,38 @@ describe("runAiTurn — request assembly", () => {
     expect(ai.calls[0]!.tools.map((t) => t.name)).toEqual(["dummy"]);
   });
 
+  // A tool that declares `sources` is offered only there — the mechanism that
+  // keeps reminder writes out of a delivery turn (#119).
+  test("withholds a tool from a source it does not declare", async () => {
+    _resetRegistryForTest();
+    registerTool({
+      name: "everywhere",
+      description: "d",
+      parameters: z.object({}),
+      execute: async () => "ok",
+    });
+    registerTool({
+      name: "ask_only",
+      description: "d",
+      parameters: z.object({}),
+      execute: async () => "ok",
+      sources: ["ask"],
+    });
+
+    const asked = new FakeAI();
+    await runAiTurn(baseInput({ ai: asked, source: "ask" }));
+    expect(asked.calls[0]!.tools.map((t) => t.name)).toEqual([
+      "everywhere",
+      "ask_only",
+    ]);
+
+    const delivered = new FakeAI();
+    await runAiTurn(baseInput({ ai: delivered, source: "reminder_delivery" }));
+    expect(delivered.calls[0]!.tools.map((t) => t.name)).toEqual([
+      "everywhere",
+    ]);
+  });
+
   test("builds the system prompt from the persona + composes the context fields (ask source)", async () => {
     const ai = new FakeAI();
     const messages: AIMessage[] = [{ role: "user", content: "q" }];

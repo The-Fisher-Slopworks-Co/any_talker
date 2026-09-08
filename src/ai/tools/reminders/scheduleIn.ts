@@ -4,7 +4,12 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
-import { durationToMs, persistReminder, type PersistResult } from "./shared";
+import {
+  durationToMs,
+  persistReminder,
+  REMINDER_WRITE_SOURCES,
+  type PersistResult,
+} from "./shared";
 
 const Schema = z.object({
   amount: z.number().int().positive().max(100_000),
@@ -24,6 +29,7 @@ export function createScheduleReminderInTool(deps: {
       "Use when the user names a delay rather than a specific clock time. " +
       "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then.",
     parameters: Schema,
+    sources: REMINDER_WRITE_SOURCES,
     execute: async ({ amount, unit, text }, ctx) => {
       return persistReminder(
         deps.storage,

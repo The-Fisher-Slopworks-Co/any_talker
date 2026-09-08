@@ -188,8 +188,6 @@ async function composeReminderMessage(
   const prior = deserializeMessages(reminder.contextMessages);
   const messages: AIMessage[] = [...prior, { role: "user", content: envelope }];
 
-  const toolSource: "ask" | "guest" =
-    reminder.target.kind === "ask_reply" ? "ask" : "guest";
   // Re-run the LLM and account for it (charge tokens to the user's budget +
   // record spend across the ledgers, exactly as an /ask would) in the shared
   // turn runner. `bestEffortDeduct` swallows a deduction failure: a throw would
@@ -212,7 +210,10 @@ async function composeReminderMessage(
     ownerId: deps.ownerId,
     chatId: reminder.chatId,
     botId: deps.botId,
-    source: toolSource,
+    // Its own source, not the `ask`/`guest` the reminder was born from: this
+    // turn only words a notification, and the registry uses the label to keep
+    // the reminder-writing tools away from it (see `tools/reminders/shared.ts`).
+    source: "reminder_delivery",
     replyToMessageId:
       reminder.target.kind === "ask_reply"
         ? reminder.target.replyToMessageId
@@ -249,6 +250,14 @@ type EnvelopeArgs = {
 function buildReminderEnvelope(args: EnvelopeArgs): string {
   const obj: Record<string, string> = {
     system_event: "reminder_fired",
+    // Everything before this envelope is the archived context of the request
+    // that created the reminder — a snapshot taken before the model answered,
+    // so it shows the request and nothing about it having been served. Say so,
+    // or the model reads the last user message as still open and acts on it
+    // again on every delivery. The registry already withholds the scheduling
+    // tools here; this keeps the rest of the replayed request from being redone.
+    instruction:
+      "The conversation above is archived context from when this reminder was created. It was already handled — do not act on any of it again. Your only job now is to write the message that tells the user about `note`.",
     // The system prompt no longer states the current moment (it would break the
     // prompt cache — see `ai/instruction.ts`), so this event carries its own
     // `time` the way a user message does. It is not the same as

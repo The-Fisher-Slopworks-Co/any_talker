@@ -6,7 +6,7 @@ import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
 import { MIN_LEAD_MS } from "../../../reminders/types";
 import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
-import { durationToMs } from "./shared";
+import { durationToMs, REMINDER_WRITE_SOURCES } from "./shared";
 
 const Schema = z
   .object({
@@ -60,6 +60,7 @@ export function createEditReminderTool(deps: {
       "the original conversation context is preserved, and when the reminder fires you'll compose the user-facing message then. " +
       "Returns { ok: true, fireAt } on success, or { ok: false, reason } if the reminder isn't theirs or the new time is invalid.",
     parameters: Schema,
+    sources: REMINDER_WRITE_SOURCES,
     execute: async ({ reminderId, text, newTime }, ctx) => {
       const scoped = deps.storage.forBot(ctx.botId ?? null);
       // O(1) fetch doubles as the ownership gate, exactly as cancel_reminder:
