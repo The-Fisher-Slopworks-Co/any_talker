@@ -43,6 +43,7 @@ bun test           # tests (co-located *.test.ts)
 
 ### Definition of done
 
+- **Issues and pull requests are written in English** — title and body, whatever language the task was discussed in.
 - **Never commit to main.** Every task starts on a fresh branch off `origin/main`, named `<type>/<short-task>` — `fix/`, `feat/`, `refactor/`, `chore/`.
 - **One task = one branch = one PR.** Past ~300 changed lines, split it into several PRs. `pr-size.yml` labels every PR `size:XS`…`size:XXL` from additions + deletions minus tests, `bun.lock` and generated files; **`size:XL` or `size:XXL` means split the PR**, not "explain why it is large".
 - **PR title is the squash commit subject:** conventional commit with a scope, enforced by `.github/workflows/pr-title.yml`.
