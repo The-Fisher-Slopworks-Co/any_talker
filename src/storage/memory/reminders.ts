@@ -46,12 +46,24 @@ export class MemoryRemindersStore implements RemindersStore {
     return r ? structuredClone(r) : null;
   }
 
-  async countForUser(userId: string): Promise<number> {
+  async saveIfUnderCap(
+    reminder: Reminder,
+    cap: number,
+    countBotIds: readonly (string | null)[],
+  ): Promise<{ ok: true } | { ok: false; reason: "limit_reached" }> {
+    // No await between the count and the write, so this is as atomic as the
+    // KeyDB Lua script it mirrors: concurrent callers cannot interleave here.
+    const prefixes = [
+      ...new Set(countBotIds.map((id) => this.scope.prefixFor(id))),
+    ];
     let n = 0;
     for (const [key, r] of this.b.reminders.entries()) {
-      if (this.scope.inScope(key) && r.userId === userId) n++;
+      if (r.userId !== reminder.userId) continue;
+      if (prefixes.some((p) => key.startsWith(p))) n++;
     }
-    return n;
+    if (n >= cap) return { ok: false, reason: "limit_reached" };
+    this.b.reminders.set(this.scope.sk(reminder.id), structuredClone(reminder));
+    return { ok: true };
   }
 
   async delete(id: string, _userId: string): Promise<void> {

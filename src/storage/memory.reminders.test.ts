@@ -95,16 +95,52 @@ describe("MemoryStorage reminders", () => {
     expect(await s.reminders.get("missing")).toBeNull();
   });
 
-  test("reminders.countForUser counts only that user's reminders", async () => {
+  test("reminders.saveIfUnderCap counts only that user's reminders", async () => {
     const s = new MemoryStorage();
     await s.reminders.save(reminder({ id: "a", userId: "u1" }));
     await s.reminders.save(reminder({ id: "b", userId: "u1" }));
-    await s.reminders.save(reminder({ id: "c", userId: "u2" }));
-    expect(await s.reminders.countForUser("u1")).toBe(2);
-    expect(await s.reminders.countForUser("u2")).toBe(1);
-    expect(await s.reminders.countForUser("u3")).toBe(0);
+    expect(
+      await s.reminders.saveIfUnderCap(reminder({ id: "c", userId: "u1" }), 2, [
+        null,
+      ]),
+    ).toEqual({ ok: false, reason: "limit_reached" });
+    // u2 has their own allowance, and the rejected reminder was not stored.
+    expect(
+      await s.reminders.saveIfUnderCap(reminder({ id: "d", userId: "u2" }), 2, [
+        null,
+      ]),
+    ).toEqual({ ok: true });
+    expect(await s.reminders.get("c")).toBeNull();
+    expect(await s.reminders.get("d")).not.toBeNull();
+    // Freeing a slot lets the next one through.
     await s.reminders.delete("a", "u1");
-    expect(await s.reminders.countForUser("u1")).toBe(1);
+    expect(
+      await s.reminders.saveIfUnderCap(reminder({ id: "c", userId: "u1" }), 2, [
+        null,
+      ]),
+    ).toEqual({ ok: true });
+  });
+
+  test("reminders.saveIfUnderCap counts every scope it is given, once each", async () => {
+    const s = new MemoryStorage();
+    await s.forBot("bot9").reminders.save(reminder({ id: "a", userId: "u1" }));
+    // The main bot's scope is empty, but bot9's reminder fills the family cap.
+    expect(
+      await s.reminders.saveIfUnderCap(reminder({ id: "b", userId: "u1" }), 1, [
+        null,
+        "bot9",
+      ]),
+    ).toEqual({ ok: false, reason: "limit_reached" });
+    // A repeated scope is not double-counted: one reminder against a cap of 2.
+    expect(
+      await s
+        .forBot("bot9")
+        .reminders.saveIfUnderCap(reminder({ id: "c", userId: "u1" }), 2, [
+          "bot9",
+          "bot9",
+          null,
+        ]),
+    ).toEqual({ ok: true });
   });
 });
 

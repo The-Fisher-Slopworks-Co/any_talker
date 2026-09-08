@@ -258,7 +258,7 @@ describe("persistReminder per-user cap", () => {
       reason: expect.stringContaining("limit_reached"),
     });
     // The rejected reminder was not saved.
-    expect(await storage.reminders.countForUser("u1")).toBe(2);
+    expect(await storage.reminders.listForUser("u1")).toHaveLength(2);
   });
 
   test("does not record an effect when rejected by the cap", async () => {
@@ -301,6 +301,26 @@ describe("persistReminder per-user cap", () => {
       ok: false,
       reason: expect.stringContaining("limit_reached"),
     });
+  });
+
+  test("parallel calls in one tool round cannot overshoot the cap", async () => {
+    const storage = new MemoryStorage();
+    await withCap(storage, 5);
+    // The agent runtime runs every tool call of one round concurrently, so the
+    // whole batch starts before any of them has written anything.
+    const outs = await Promise.all(
+      Array.from({ length: 9 }, (_, i) =>
+        persistReminder(storage, baseCtx, future(i), `r${i}`),
+      ),
+    );
+    expect(outs.filter((o) => o.ok)).toHaveLength(5);
+    expect(await storage.reminders.listForUser("u1")).toHaveLength(5);
+    for (const out of outs.filter((o) => !o.ok)) {
+      expect(out).toEqual({
+        ok: false,
+        reason: expect.stringContaining("limit_reached"),
+      });
+    }
   });
 
   test("reminders held by a managed bot count against the main bot's cap", async () => {

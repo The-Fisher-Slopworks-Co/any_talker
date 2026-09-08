@@ -155,6 +155,9 @@ const SCOPE_SEP = "\x00";
 export type Scope = {
   sk(base: string): string;
   inScope(key: string): boolean;
+  // The prefix of an arbitrary scope, for a query that spans the whole bot
+  // family rather than this view alone (the per-user reminder cap).
+  prefixFor(botId: string | null): string;
 };
 
 export class MemoryStorage implements Storage {
@@ -190,6 +193,7 @@ export class MemoryStorage implements Storage {
     const s: Scope = {
       sk: (base) => `${prefix}${base}`,
       inScope: (key) => key.startsWith(prefix),
+      prefixFor: (botId) => `${botId ?? ""}${SCOPE_SEP}`,
     };
 
     this.managedBots = new MemoryManagedBotsStore(b);
