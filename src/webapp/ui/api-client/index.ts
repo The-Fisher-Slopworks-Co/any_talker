@@ -28,6 +28,8 @@ export type { UserSettingsResponse } from "./admin-users";
 /** @public */
 export type { ChatSettingsResponse } from "./admin-chats";
 export type { RemindersResponse } from "./reminders";
+/** @public */
+export type { QuarantinedRemindersResponse } from "./reminders";
 export type { ManagedBotDetail } from "./admin-managed-bots";
 /** @public */
 export type { ManagedBotRow, ManagedBotNewInfo } from "./admin-managed-bots";

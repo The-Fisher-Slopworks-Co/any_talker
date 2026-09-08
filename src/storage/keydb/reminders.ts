@@ -3,6 +3,7 @@
 
 import type { RedisClient } from "bun";
 import type { QuarantinedReminder, RemindersStore } from "../types/reminders";
+import { QUARANTINE_TTL_MS } from "../types/reminders";
 import type { Reminder } from "../../reminders/types";
 import {
   parseStoredReminder,
@@ -14,10 +15,11 @@ import type { ScopedKey, ScopedKeyFor } from "./shared";
 
 const FETCH_DUE_LIMIT = 100;
 
-// How long a quarantined payload is kept before KeyDB expires it. Long enough
-// to notice the parse-failure metric, ship a parser fix and replay the record;
-// bounded so a parser bug that trips on every reminder cannot fill the store.
-const QUARANTINE_TTL_SECONDS = 30 * 24 * 60 * 60;
+// The TTL is declared with the quarantine type — a reader needs it as much as
+// this writer does. Long enough to notice the parse-failure metric, ship a
+// parser fix and replay the record; bounded so a parser bug that trips on
+// every reminder cannot fill the store.
+const QUARANTINE_TTL_SECONDS = QUARANTINE_TTL_MS / 1000;
 
 // The envelope written next to a quarantined payload. Read back defensively:
 // it is our own JSON, but a malformed one must not take the listing down —
