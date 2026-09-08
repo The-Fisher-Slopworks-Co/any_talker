@@ -4,15 +4,15 @@
 import type { Reminder } from "../../reminders/types";
 import type { ReminderParseFailureReason } from "../../reminders/parse";
 
-// A stored reminder the parser rejected. The `raw` payload is kept verbatim —
-// the user's reminder text and its conversation snapshot — so a validation bug
-// is an outage, not a data loss: the record can be inspected and replayed once
-// the parser is fixed.
 // How long a quarantined payload is kept before the backend expires it.
 // Declared with the type rather than inside the KeyDB store: a reader has to
 // know it too, to tell how much of the window is left to act in.
 export const QUARANTINE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+// A stored reminder the parser rejected. The `raw` payload is kept verbatim —
+// the user's reminder text and its conversation snapshot — so a validation bug
+// is an outage, not a data loss: the record can be inspected and replayed once
+// the parser is fixed.
 export interface QuarantinedReminder {
   id: string;
   raw: string;

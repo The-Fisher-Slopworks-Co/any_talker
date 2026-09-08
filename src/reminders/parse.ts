@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import type { Reminder } from "./types";
+import type { SerializedAIMessage } from "../ai/types";
 import { DEFAULT_LANG, isValidLang, type Lang } from "../shared/i18n";
 
 // Strict schema for the per-message envelope replayed to the LLM. A bad
@@ -32,7 +33,33 @@ const SerializedAIMessageSchema = z.discriminatedUnion("role", [
     role: z.literal("assistant"),
     content: z.string(),
   }),
+  // A replayed tool call, stored as the four plain strings of
+  // `ToolCallRecord`. Snapshots taken after the model had already called a
+  // tool carry these; before this variant existed they failed the
+  // discriminator and the whole reminder was quarantined.
+  z.object({
+    role: z.literal("tool"),
+    callId: z.string(),
+    name: z.string(),
+    arguments: z.string(),
+    output: z.string(),
+  }),
 ]);
+
+// The schema is handwritten, so nothing but this assertion keeps it in step
+// with the type it guards — which is exactly how the "tool" variant went
+// missing. Both directions are checked: a variant added to the type without a
+// schema branch (records rejected) and a branch the type does not have
+// (records accepted that `deserializeMessages` cannot handle) are both errors.
+type SchemaMatchesType = [z.infer<typeof SerializedAIMessageSchema>] extends [
+  SerializedAIMessage,
+]
+  ? [SerializedAIMessage] extends [z.infer<typeof SerializedAIMessageSchema>]
+    ? true
+    : never
+  : never;
+const _schemaMatchesType: SchemaMatchesType = true;
+void _schemaMatchesType;
 
 const DeliveryTargetSchema = z.discriminatedUnion("kind", [
   z.object({

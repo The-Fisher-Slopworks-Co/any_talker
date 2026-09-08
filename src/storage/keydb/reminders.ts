@@ -2,8 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { RedisClient } from "bun";
-import type { QuarantinedReminder, RemindersStore } from "../types/reminders";
-import { QUARANTINE_TTL_MS } from "../types/reminders";
+import {
+  QUARANTINE_TTL_MS,
+  type QuarantinedReminder,
+  type RemindersStore,
+} from "../types/reminders";
 import type { Reminder } from "../../reminders/types";
 import {
   parseStoredReminder,

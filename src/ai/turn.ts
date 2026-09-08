@@ -118,7 +118,9 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
       facts: input.facts,
     }),
     messages: input.messages,
-    tools: getAllTools(),
+    // The registry is filtered by source, not handed over whole: a reminder
+    // delivery must not be offered the tools that write reminders.
+    tools: getAllTools(input.source),
     routing: input.routing,
     reasoningEffort: input.detailLevel
       ? detailLevelReasoningEffort(input.detailLevel)

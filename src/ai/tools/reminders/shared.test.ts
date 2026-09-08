@@ -45,6 +45,14 @@ describe("buildDeliveryTarget", () => {
     ).toEqual({ kind: "guest_dm", userId: "u1" });
   });
 
+  // The registry keeps the writing tools out of a delivery turn (#119); this is
+  // the backstop for a future one that forgets to declare its sources.
+  test("reminder_delivery -> throws instead of guessing a target", () => {
+    expect(() =>
+      buildDeliveryTarget({ ...baseCtx, source: "reminder_delivery" }),
+    ).toThrow("not available during a delivery");
+  });
+
   test("ask without replyToMessageId throws", () => {
     expect(() =>
       buildDeliveryTarget({ ...baseCtx, replyToMessageId: null }),
