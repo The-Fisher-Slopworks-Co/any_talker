@@ -391,3 +391,141 @@ describe("runReminderTick", () => {
     expect(await storage.reminders.fetchDue(10_000)).toEqual([]);
   });
 });
+
+describe("runReminderTick: recurring reminders", () => {
+  const every10min = { kind: "interval", everyMs: 10 * 60_000 } as const;
+
+  // Drives one tick at `nowMs` over the given storage; returns the api so a
+  // caller can count deliveries.
+  const tick = async (storage: MemoryStorage, api: FakeApi, nowMs: number) =>
+    runReminderTick({
+      runtimes: runtimes(storage, api),
+      ai: new FakeAI(),
+      rateLimiter: testRateLimiter,
+      ownerId: "owner",
+      nowMs,
+    });
+
+  test("a delivered occurrence re-schedules instead of deleting", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(
+      reminder({
+        id: "rec",
+        fireAtMs: 1_000,
+        recurrence: {
+          spec: every10min,
+          occurrencesLeft: 4,
+          occurrencesTotal: 4,
+        },
+      }),
+    );
+    const api = new FakeApi();
+
+    await tick(storage, api, 1_000);
+
+    expect(api.calls).toHaveLength(1);
+    const stored = await storage.reminders.get("rec");
+    expect(stored).toMatchObject({
+      fireAtMs: 1_000 + 10 * 60_000,
+      recurrence: { occurrencesLeft: 3, occurrencesTotal: 4 },
+    });
+  });
+
+  test("fires exactly the allowed number of times, then is removed", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(
+      reminder({
+        id: "rec",
+        fireAtMs: 1_000,
+        recurrence: {
+          spec: every10min,
+          occurrencesLeft: 4,
+          occurrencesTotal: 4,
+        },
+      }),
+    );
+    const api = new FakeApi();
+
+    // One tick per occurrence, each at the moment that occurrence is due.
+    for (let i = 0; i < 6; i++) {
+      await tick(storage, api, 1_000 + i * 10 * 60_000);
+    }
+
+    expect(api.calls).toHaveLength(4);
+    expect(await storage.reminders.get("rec")).toBeNull();
+  });
+
+  test("occupies one slot of the per-user cap while it runs", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(
+      reminder({
+        id: "rec",
+        fireAtMs: 1_000,
+        recurrence: {
+          spec: every10min,
+          occurrencesLeft: 4,
+          occurrencesTotal: 4,
+        },
+      }),
+    );
+    const api = new FakeApi();
+
+    await tick(storage, api, 1_000);
+
+    // Same id, same user index entry: the series never grows into a second
+    // reminder as it advances.
+    expect(
+      (await storage.reminders.listForUser("u1")).map((r) => r.id),
+    ).toEqual(["rec"]);
+  });
+
+  test("a permanent delivery failure ends the series", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(
+      reminder({
+        id: "rec",
+        fireAtMs: 1_000,
+        recurrence: {
+          spec: every10min,
+          occurrencesLeft: 4,
+          occurrencesTotal: 4,
+        },
+      }),
+    );
+    // Fail the reminder itself but let the failure notice through, as the
+    // one-shot tests do.
+    const api = new FakeApi(async (text) => {
+      if (text === noticeFor()) return {};
+      throw grammyErr(400);
+    });
+
+    await tick(storage, api, 1_000);
+
+    expect(await storage.reminders.get("rec")).toBeNull();
+  });
+
+  test("a transient failure retries the same occurrence", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(
+      reminder({
+        id: "rec",
+        fireAtMs: 1_000,
+        recurrence: {
+          spec: every10min,
+          occurrencesLeft: 4,
+          occurrencesTotal: 4,
+        },
+      }),
+    );
+    const api = new FakeApi(async () => {
+      throw grammyErr(500);
+    });
+
+    await tick(storage, api, 1_000);
+
+    expect(await storage.reminders.get("rec")).toMatchObject({
+      fireAtMs: 1_000,
+      recurrence: { occurrencesLeft: 4 },
+    });
+  });
+});
