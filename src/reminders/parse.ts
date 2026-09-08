@@ -129,3 +129,47 @@ export function parseStoredReminder(raw: string): Reminder {
     contextMessages: stored.contextMessages ?? [],
   };
 }
+
+// What the failure notice for a quarantined record needs, read best-effort
+// from the raw payload. The schema as a whole was rejected, but the fields
+// that identify the recipient are usually intact — a malformed context
+// snapshot or a missing `createdAtMs` says nothing about `userId`.
+export type SalvagedRecipient = {
+  chatId: string;
+  lang: Lang;
+  text: string | null;
+};
+
+// Returns null when there is no one to tell: the payload is not JSON, or no
+// string field names a chat. Each field is read on its own, so one bad field
+// does not cost the others.
+export function salvageQuarantinedRecipient(
+  raw: string,
+): SalvagedRecipient | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const rec = parsed as Record<string, unknown>;
+  const target =
+    typeof rec.target === "object" && rec.target !== null
+      ? (rec.target as Record<string, unknown>)
+      : {};
+  // Same precedence as delivery: the chat the reminder was meant for, then
+  // the record's chat, then the user's DM.
+  const chatId = [
+    target.kind === "ask_reply" ? target.chatId : undefined,
+    target.kind === "guest_dm" ? target.userId : undefined,
+    rec.chatId,
+    rec.userId,
+  ].find((v): v is string => typeof v === "string" && v.length > 0);
+  if (chatId === undefined) return null;
+  return {
+    chatId,
+    lang: isValidLang(rec.lang) ? rec.lang : DEFAULT_LANG,
+    text: typeof rec.text === "string" ? rec.text : null,
+  };
+}

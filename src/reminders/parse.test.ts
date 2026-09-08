@@ -2,7 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { parseStoredReminder, ReminderParseError } from "./parse";
+import {
+  parseStoredReminder,
+  ReminderParseError,
+  salvageQuarantinedRecipient,
+} from "./parse";
 import type { Reminder } from "./types";
 import { serializeMessages, VIDEO_SNAPSHOT_MARKER } from "../ai/serialize";
 import type { AIMessage } from "../ai/types";
@@ -317,5 +321,61 @@ describe("parseStoredReminder — schema violations", () => {
 
   test("rejects top-level non-object payload", () => {
     expectSchemaViolation(stringify("just a string"));
+  });
+});
+
+describe("salvageQuarantinedRecipient", () => {
+  test("reads chat, language and note out of a record the schema rejects", () => {
+    // No `createdAtMs`: quarantined, but everything the notice needs is there.
+    const { createdAtMs: _dropped, ...rest } = validRecord;
+    expect(
+      salvageQuarantinedRecipient(stringify({ ...rest, lang: "ru" })),
+    ).toEqual({ chatId: "c1", lang: "ru", text: "ping" });
+  });
+
+  test("guest_dm target addresses the user's DM", () => {
+    expect(
+      salvageQuarantinedRecipient(
+        stringify({
+          userId: "u42",
+          target: { kind: "guest_dm", userId: "u42" },
+        }),
+      ),
+    ).toEqual({ chatId: "u42", lang: "en", text: null });
+  });
+
+  test("falls back through chatId and userId when the target is unusable", () => {
+    expect(
+      salvageQuarantinedRecipient(
+        stringify({ userId: "u1", chatId: "c9", target: "garbage" }),
+      ),
+    ).toEqual({ chatId: "c9", lang: "en", text: null });
+    expect(
+      salvageQuarantinedRecipient(stringify({ userId: "u1", chatId: 5 })),
+    ).toEqual({ chatId: "u1", lang: "en", text: null });
+  });
+
+  test("a note that is not a string is reported as absent, not stringified", () => {
+    expect(
+      salvageQuarantinedRecipient(stringify({ userId: "u1", text: 42 })),
+    ).toEqual({ chatId: "u1", lang: "en", text: null });
+  });
+
+  test("an unknown language falls back to the default", () => {
+    expect(
+      salvageQuarantinedRecipient(stringify({ userId: "u1", lang: "xx" })),
+    ).toEqual({ chatId: "u1", lang: "en", text: null });
+  });
+
+  test("returns null when there is no one to tell", () => {
+    for (const raw of [
+      "{not json",
+      stringify("just a string"),
+      stringify(null),
+      stringify({ text: "ping" }),
+      stringify({ userId: "", chatId: "" }),
+    ]) {
+      expect(salvageQuarantinedRecipient(raw)).toBeNull();
+    }
   });
 });

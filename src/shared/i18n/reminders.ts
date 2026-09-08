@@ -96,4 +96,10 @@ export const remindersMessages = {
     ru: (note: string) =>
       `⚠️ Не удалось доставить напоминание «${note}». Оно не сработает — поставь его заново, если оно ещё нужно.`,
   }),
+  // The same notice for a quarantined record whose note could not be read
+  // back from the stored payload: there is nothing to quote.
+  reminders_delivery_failed_no_note: m({
+    en: "⚠️ I could not deliver one of your reminders. It will not fire — set it again if you still need it.",
+    ru: "⚠️ Не удалось доставить одно из твоих напоминаний. Оно не сработает — поставь его заново, если оно ещё нужно.",
+  }),
 };

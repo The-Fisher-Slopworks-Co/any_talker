@@ -165,6 +165,36 @@ describe("KeyDBRemindersStore quarantine", () => {
     ]);
   });
 
+  test("reports each quarantined record to the caller once", async () => {
+    const { redis, store } = makeStore();
+    const raw = await seedCorrupted(redis, "r1");
+    const seen: unknown[] = [];
+    const onQuarantined = async (record: unknown) => {
+      seen.push(record);
+    };
+
+    await store.fetchDue(2_000, onQuarantined);
+    // Second tick: the record has left the due set, so no second report.
+    await store.fetchDue(3_000, onQuarantined);
+
+    expect(seen).toEqual([
+      { id: "r1", raw, reason: "schema_violation", quarantinedAtMs: 2_000 },
+    ]);
+  });
+
+  test("a throwing onQuarantined does not break the tick", async () => {
+    const { redis, store } = makeStore();
+    await seedCorrupted(redis, "r1");
+
+    await store.fetchDue(2_000, async () => {
+      throw new Error("notice failed");
+    });
+
+    expect(redis.strings.has("at:reminder:r1")).toBe(false);
+    expect(await redis.zrange("at:reminders:due", 0, -1)).toEqual([]);
+    expect((await store.listQuarantined()).map((q) => q.id)).toEqual(["r1"]);
+  });
+
   test("keeps the original when the quarantine copy cannot be written", async () => {
     const { redis, store } = makeStore();
     redis.failSetFor = "at:reminder:quarantined:r1";
