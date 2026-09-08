@@ -1,0 +1,90 @@
+---
+name: issue
+description: "Take a GitHub issue by number all the way to a pull request: a worktree branched off origin/main, the implementation, bun run check, one commit, push, and a PR that closes the issue. Runs only when the user invokes it explicitly."
+argument-hint: "<issue number> [implementation hint]"
+disable-model-invocation: true
+allowed-tools: EnterWorktree, ExitWorktree, Bash(git fetch:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git switch:*), Bash(git worktree list:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(gh issue view:*), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr create:*), Bash(bun install), Bash(bun run:*), Bash(bun test:*)
+---
+
+## Context
+
+- Issue: !`gh issue view "$(printf '%s' "$ARGUMENTS" | grep -oE '[0-9]+' | head -1)" --json number,title,state,url,labels,body,comments --jq '"#\(.number) \(.title)\nstate: \(.state)  labels: \([.labels[].name] | join(", "))\n\(.url)\n\n\(.body)\n" + (if (.comments|length)>0 then "\n--- comments ---\n" + ([.comments[] | "[\(.author.login)] \(.body)"] | join("\n\n")) else "" end)' 2>&1`
+- Open PRs mentioning this number: !`gh pr list --state open --search "$(printf '%s' "$ARGUMENTS" | grep -oE '[0-9]+' | head -1) in:title,body" --json number,title,url,headRefName 2>&1`
+- Cwd: !`pwd`
+- Current branch: !`git branch --show-current`
+- Worktrees: !`git worktree list`
+- Allowed PR scopes (`.github/workflows/pr-title.yml`): !`sed -n '/scopes: |/,/requireScope/p' .github/workflows/pr-title.yml | grep -vE 'scopes|requireScope' | tr -d ' ' | paste -sd ' '`
+- Arguments: $ARGUMENTS
+
+## Your task
+
+Take the issue in Context to an open pull request. Follow the steps **strictly
+in order** — each one depends on the result of the previous one.
+
+0. **Preflight.** Stop and report, without creating anything, if: no number
+   could be parsed or the issue was not found; the issue is closed; one of the
+   open PRs in Context already resolves this issue (return its URL). If the
+   issue text allows several readings that lead to materially different work,
+   ask. Otherwise pick the reading a careful colleague would and record the
+   assumption in the PR body.
+
+1. **Worktree.**
+   - If cwd is already inside `.claude/worktrees/` (the session stayed in the
+     worktree of a previous run), call `ExitWorktree(action: "keep")` first.
+   - `git fetch origin` — EnterWorktree branches off `origin/main`, so the ref
+     has to be fresh.
+   - `EnterWorktree(name: "issue-<N>")`. Everything from here on happens inside
+     it; do not go back to the main checkout.
+   - Rename the branch to the repository convention: `git branch -m <type>/<slug>`.
+     `type` comes from step 4; `slug` is 2–4 kebab-case words describing the
+     issue.
+   - `bun install` — a fresh worktree has no `node_modules`; without it both
+     `bun run check` and the pre-commit hook fail. There is no `.env` either,
+     and none is needed: tests run against `MemoryStorage`.
+
+2. **Implement.** Read the code the issue points at, and its tests, before
+   writing anything. Conventions live in CLAUDE.md: SPDX header on new files,
+   user-facing strings via `ctx.t` and `src/shared/i18n.ts`, dependency
+   injection, tagged outcomes, co-located `*.test.ts`. A test that reproduces
+   the issue is a mandatory part of the fix. Scope: only what the issue needs,
+   no drive-by refactors. Size: if the complete fix is clearly above ~300
+   effective lines, ship the first self-contained slice, write `Refs #N`
+   instead of `Closes #N` in the PR, and list the remaining slices in the
+   report.
+
+3. **Check.** `bun run check` must be green. Red — fix and rerun. Do not bypass
+   the hook with `LEFTHOOK=0`. A failure unrelated to your change (broken
+   before you, flaky) is not fixed silently: describe it in the PR body.
+
+4. **Commit.** One commit; its subject becomes the PR title and the squash
+   commit subject: `<type>(<scope>): <subject>`.
+   - `type`: label `bug` → `fix`, `enhancement` → `feat`, `documentation` →
+     `docs`; otherwise by the nature of the change (`refactor`, `chore`,
+     `test`, `ci`, `perf`).
+   - `scope`: from the Allowed PR scopes in Context — the `src/` module the
+     change touches most. `area:*` labels are a hint (`area:ci` → `github`,
+     `area:i18n` → `shared`), not a rule.
+   - subject: lowercase start, imperative, no trailing period; match the style
+     of `git log --oneline` in this repository.
+   - Trailers: as CLAUDE.md requires.
+
+5. **Push and PR.** `git push -u origin HEAD`. If the branch already has an
+   open PR, do not create a second one. Otherwise:
+   `gh pr create --base main --head <branch> --title "<commit subject>" --body-file <file in the scratchpad>`.
+   The body follows `.github/pull_request_template.md` and is **in English**
+   whatever language the conversation is in: What changed; Why — including the
+   line `Closes #N` (or `Refs #N`); UI changes — delete unless the change is
+   in the webapp; Checklist — tick only what is actually true.
+
+6. **Report.** Briefly: worktree path, branch, PR URL, assumptions made and
+   deviations from the issue, what is left (if the PR is a first slice). The
+   session stays in the worktree — that is where CI fixes and review replies
+   happen; `ExitWorktree` only when the user says so.
+
+Constraints:
+
+- Never edit the main checkout, never commit to `main`. No `--force`, no
+  rewriting of published history.
+- Everything that goes to GitHub — PR title and body — is in English.
+- `$ARGUMENTS`: the first number is the issue (`122`, `#122` or a URL); the
+  rest is a hint for the implementation, not a replacement for the issue text.
