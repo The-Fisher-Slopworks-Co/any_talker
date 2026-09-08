@@ -95,4 +95,14 @@ export const adminReminderRoutes: Route[] = [
         await deps.storage.reminders.listAll(),
       ),
   },
+  // Reminders the due path could not parse. Raw payloads, deliberately: the
+  // point is to inspect what the parser rejected and replay it once fixed.
+  {
+    method: "GET",
+    path: "/api/admin/reminders/quarantined",
+    handle: async ({ deps }) => ({
+      status: 200,
+      body: { quarantined: await deps.storage.reminders.listQuarantined() },
+    }),
+  },
 ];
