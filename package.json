@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@grammyjs/types": "5.0.0",
+    "@mtcute/bun": "^0.32.1",
     "@types/bun": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
