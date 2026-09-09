@@ -15,6 +15,7 @@ import {
   type ReminderApi,
 } from "./delivery";
 import { salvageQuarantinedRecipient } from "./parse";
+import { advanceRecurrence } from "./recurrence";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { remindersDeliveredTotal } from "../metrics";
 
@@ -133,6 +134,32 @@ async function runRuntimeTick(
           `[scheduler] transient delivery failure id=${reminder.id}, retrying next tick`,
         );
         return;
+      }
+      // A recurring reminder that has fires left is re-indexed instead of
+      // deleted: same id, same per-user cap slot, next instant. Only a
+      // delivered occurrence advances the series — a permanent failure ends it
+      // below, exactly as it retires a one-shot.
+      if (outcome === "delivered") {
+        const next = advanceRecurrence(reminder, nowMs);
+        if (next !== null) {
+          try {
+            await runtime.storage.reminders.save(next);
+            remindersDeliveredTotal.inc({ outcome: "delivered" });
+            console.log(
+              `[scheduler] delivered id=${reminder.id} kind=${reminder.target.kind}, next at ${new Date(next.fireAtMs).toISOString()} (${next.recurrence?.occurrencesLeft} left)`,
+            );
+            return;
+          } catch (err) {
+            // The record still holds the occurrence just delivered, so the
+            // next tick re-delivers it rather than losing the series. Noisy
+            // beats silently dropped.
+            console.error(
+              `[scheduler] re-scheduling failed id=${reminder.id}:`,
+              err,
+            );
+            return;
+          }
+        }
       }
       try {
         await runtime.storage.reminders.delete(reminder.id, reminder.userId);

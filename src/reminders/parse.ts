@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { z } from "zod";
-import type { Reminder } from "./types";
+import type { Recurrence, Reminder } from "./types";
 import type { SerializedAIMessage } from "../ai/types";
 import { DEFAULT_LANG, isValidLang, type Lang } from "../shared/i18n";
 
@@ -61,6 +61,34 @@ type SchemaMatchesType = [z.infer<typeof SerializedAIMessageSchema>] extends [
 const _schemaMatchesType: SchemaMatchesType = true;
 void _schemaMatchesType;
 
+const RecurrenceSchema = z.object({
+  spec: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("interval"), everyMs: z.number() }),
+    z.object({
+      kind: z.literal("calendar"),
+      everyDays: z.number(),
+      hour: z.number(),
+      minute: z.number(),
+      timezone: z.string(),
+    }),
+  ]),
+  occurrencesLeft: z.number(),
+  occurrencesTotal: z.number(),
+});
+
+// Same drift guard as the message schema above, for the same reason: the
+// schema is handwritten, so a variant added to `RecurrenceSpec` without a
+// branch here would quarantine every reminder using it.
+type RecurrenceSchemaMatchesType = [z.infer<typeof RecurrenceSchema>] extends [
+  Recurrence,
+]
+  ? [Recurrence] extends [z.infer<typeof RecurrenceSchema>]
+    ? true
+    : never
+  : never;
+const _recurrenceSchemaMatchesType: RecurrenceSchemaMatchesType = true;
+void _recurrenceSchemaMatchesType;
+
 const DeliveryTargetSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("ask_reply"),
@@ -85,6 +113,9 @@ const StoredReminderSchema = z.object({
   target: DeliveryTargetSchema,
   createdAtMs: z.number(),
   contextMessages: z.array(SerializedAIMessageSchema).optional(),
+  // Optional for the same reason as the fields above, and permanently so: a
+  // one-shot reminder never carries one.
+  recurrence: RecurrenceSchema.optional(),
 });
 
 export type ReminderParseFailureReason = "invalid_json" | "schema_violation";
@@ -127,6 +158,9 @@ export function parseStoredReminder(raw: string): Reminder {
     target: stored.target,
     createdAtMs: stored.createdAtMs,
     contextMessages: stored.contextMessages ?? [],
+    // Spread rather than assigned: `recurrence` must be absent on a one-shot,
+    // not present-and-undefined.
+    ...(stored.recurrence ? { recurrence: stored.recurrence } : {}),
   };
 }
 

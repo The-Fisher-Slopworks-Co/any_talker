@@ -41,6 +41,52 @@ describe("parseStoredReminder — valid records", () => {
     expect(out).toEqual(validRecord as Reminder);
   });
 
+  test("round-trips an interval recurrence", () => {
+    const r = {
+      ...validRecord,
+      recurrence: {
+        spec: { kind: "interval", everyMs: 1_200_000 },
+        occurrencesLeft: 3,
+        occurrencesTotal: 4,
+      },
+    };
+    expect(parseStoredReminder(stringify(r))).toEqual(r as Reminder);
+  });
+
+  test("round-trips a calendar recurrence", () => {
+    const r = {
+      ...validRecord,
+      recurrence: {
+        spec: {
+          kind: "calendar",
+          everyDays: 14,
+          hour: 18,
+          minute: 30,
+          timezone: "Europe/Moscow",
+        },
+        occurrencesLeft: 4,
+        occurrencesTotal: 4,
+      },
+    };
+    expect(parseStoredReminder(stringify(r))).toEqual(r as Reminder);
+  });
+
+  test("a record without recurrence stays a one-shot", () => {
+    // Every reminder written before recurrence existed looks like this, and
+    // must load rather than be quarantined — with the key absent, not
+    // present-and-undefined.
+    const out = parseStoredReminder(stringify(validRecord));
+    expect("recurrence" in out).toBe(false);
+  });
+
+  test("a malformed recurrence is a schema violation", () => {
+    const r = {
+      ...validRecord,
+      recurrence: { spec: { kind: "weekdays" }, occurrencesLeft: 3 },
+    };
+    expect(() => parseStoredReminder(stringify(r))).toThrow(ReminderParseError);
+  });
+
   test("round-trips a record with an audio content part", () => {
     const r = {
       ...validRecord,
