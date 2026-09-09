@@ -105,7 +105,9 @@ function renderReminderBlockquote(
   const parts = { ...local, timezone: effect.timezone };
   const line =
     effect.type === "reminder_scheduled"
-      ? t(lang).bot_reminder_scheduled(parts)
+      ? effect.occurrences === undefined
+        ? t(lang).bot_reminder_scheduled(parts)
+        : t(lang).bot_reminder_recurring_scheduled(parts, effect.occurrences)
       : effect.type === "reminder_updated"
         ? t(lang).bot_reminder_updated(parts)
         : t(lang).bot_reminder_cancelled(parts);

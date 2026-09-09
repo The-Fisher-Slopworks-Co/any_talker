@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { ToolCallContext } from "../registry";
-import type { DeliveryTarget } from "../../../reminders/types";
+import type { DeliveryTarget, Recurrence } from "../../../reminders/types";
 import { MIN_LEAD_MS } from "../../../reminders/types";
 import type { Storage } from "../../../storage/types";
 import { getOrInitSettings } from "../../../settings";
@@ -51,6 +51,9 @@ export async function persistReminder(
   ctx: ToolCallContext,
   fireAtMs: number,
   text: string,
+  // Omitted for a one-shot. A recurring reminder is one record with one id and
+  // one slot of the per-user cap, so everything below is shared verbatim.
+  recurrence?: Recurrence,
 ): Promise<PersistResult> {
   if (fireAtMs - ctx.now < MIN_LEAD_MS) {
     return {
@@ -104,6 +107,7 @@ export async function persistReminder(
       contextMessages: ctx.contextMessages
         ? serializeMessages(ctx.contextMessages)
         : [],
+      ...(recurrence ? { recurrence } : {}),
     },
     maxRemindersPerUser,
     scopeIds,
@@ -119,6 +123,7 @@ export async function persistReminder(
     type: "reminder_scheduled",
     fireAtMs,
     timezone: ctx.timezone,
+    ...(recurrence ? { occurrences: recurrence.occurrencesTotal } : {}),
   });
 
   return {
