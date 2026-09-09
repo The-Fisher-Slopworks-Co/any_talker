@@ -30,6 +30,18 @@ export const remindersMessages = {
     en: "Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure.",
     ru: "Ожидающие напоминания всех пользователей. Доставки с временными ошибками остаются до успешной или окончательной ошибки.",
   }),
+  ui_reminders_cap_header: m({
+    en: "Per-User Limit",
+    ru: "Лимит на пользователя",
+  }),
+  ui_reminders_cap_label: m({
+    en: "Max reminders",
+    ru: "Максимум напоминаний",
+  }),
+  ui_reminders_cap_footer: m({
+    en: "How many reminders one user may hold at once, counted across every character. Creation past the limit is rejected — nothing is evicted, so lowering it leaves reminders already scheduled in place.",
+    ru: "Сколько напоминаний может держать один пользователь одновременно, считая по всем персонажам. Создание сверх лимита отклоняется — ничего не вытесняется, поэтому понижение не трогает уже запланированные напоминания.",
+  }),
   ui_quarantine_header: m({
     en: "Quarantined",
     ru: "Карантин",
