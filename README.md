@@ -155,6 +155,13 @@ are supported as `host:port`).
   `schedule_reminder_*` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
   is capped at `maxRemindersPerUser` reminders shared across the main bot and all character bots
   (default 5; configurable via `PUT /api/settings`).
+- Recurring reminders — "every day at 18:30", "every 20 minutes", "every two weeks starting
+  18 September": `schedule_recurring_reminder` repeats a reminder on a fixed interval of minutes,
+  hours, days or weeks. Only fixed intervals are supported — calendar rules ("every weekday", "the
+  first Monday of the month", cron) are declined with an explanation and the nearest supported
+  interval. The interval floor is 5 minutes, a series fires 4 times before it ends, and the whole
+  series counts as a single reminder against `maxRemindersPerUser`. Daily and weekly series repeat
+  on the user's wall clock, so a DST shift moves the spacing rather than the time of day.
 - Personal settings via chat — ask the bot to read or change your own name, timezone, gender, or
   language in plain language ("call me Vasya", "I'm in Moscow time", "switch to Russian"); the AI
   drives this via the `get_user_settings` / `update_user_settings` tools (the same four fields the
