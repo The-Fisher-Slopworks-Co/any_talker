@@ -2,17 +2,16 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { useEffect, useState } from "react";
-import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type { Settings } from "../../../../shared/types";
 import { LoadingState } from "../../components/states";
-import { RemindersList } from "../reminders-list";
 import { ChatsTab } from "./chats-tab";
 import { ChecksTab } from "./checks-tab";
 import { ManagedBotsTab } from "./managed-bots-tab";
 import { PromptTab } from "./prompt-tab";
 import { QuarantineTab } from "./quarantine-tab";
 import { RateLimitTab } from "./rate-limit-tab";
+import { RemindersTab } from "./reminders-tab";
 import { BudgetTab } from "./budget-tab";
 import { SpendTab } from "./spend-tab";
 import { UsersTab } from "./users-tab";
@@ -32,12 +31,12 @@ export function AdminSectionView({
   onEditCheck: (id: string | null) => void;
   onEditManagedBot: (id: string | null) => void;
 }) {
-  const { t: s } = useI18n();
   const [settings, setSettings] = useState<Settings | null>(null);
   const needsSettings =
     section === "prompt" ||
     section === "ratelimit" ||
     section === "budget" ||
+    section === "reminders" ||
     section === "whitelist";
   const goUser = (id: string) => onEditUser(id, section);
   const goChat = (id: string) => onEditChat(id, section);
@@ -64,18 +63,15 @@ export function AdminSectionView({
         onCreate={() => onEditManagedBot(null)}
       />
     );
+  if (!settings) return <LoadingState />;
   if (section === "reminders")
     return (
-      <RemindersList
-        fetchReminders={api.listAdminReminders}
-        header={s.ui_reminders_admin_header}
-        emptyText={s.ui_reminders_admin_empty}
-        footer={s.ui_reminders_admin_footer}
-        showUserId={true}
+      <RemindersTab
+        settings={settings}
+        onSaved={setSettings}
         onUserClick={goUser}
       />
     );
-  if (!settings) return <LoadingState />;
   if (section === "whitelist")
     return (
       <WhitelistTab

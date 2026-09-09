@@ -154,7 +154,7 @@ are supported as `host:port`).
   reminder's note or time, or cancel them by description; the AI drives this via the
   `schedule_reminder_*` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
   is capped at `maxRemindersPerUser` reminders shared across the main bot and all character bots
-  (default 5; configurable via `PUT /api/settings`).
+  (default 5; editable in the admin Mini App under Reminders, or via `PUT /api/settings`).
 - Recurring reminders — "every day at 18:30", "every 20 minutes", "every two weeks starting
   18 September": `schedule_recurring_reminder` repeats a reminder on a fixed interval of minutes,
   hours, days or weeks. Only fixed intervals are supported — calendar rules ("every weekday", "the
