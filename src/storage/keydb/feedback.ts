@@ -13,6 +13,7 @@ import {
   type FeedbackStore,
 } from "../types/feedback";
 import { PREFIX } from "./shared";
+import { utcDateKey } from "../../spending/window";
 
 // Listed, not derived from the record, so `save` and `delete` can settle every
 // status index without first reading what the old status was.
@@ -33,6 +34,10 @@ function statusIndex(status: FeedbackStatus): string {
 function entryKey(id: string): string {
   return `${PREFIX}feedback:${id}`;
 }
+
+// The date in the anti-spam key bounds its window; this only cleans up behind
+// it, and outlasts a counter first written at 23:59 UTC.
+const RATE_KEY_TTL_SECONDS = 2 * 24 * 60 * 60;
 
 // Our own JSON, but one unreadable payload must not take the listing down.
 function parseEntry(id: string, raw?: string | null): FeedbackEntry | null {
@@ -100,6 +105,16 @@ export class KeyDBFeedbackStore implements FeedbackStore {
     const nextCursor =
       ids.length > limit ? await this.client.zscore(key, last) : null;
     return { entries, nextCursor };
+  }
+
+  // One key per reporter per UTC day. `INCR` creates it at 1, and `EXPIRE` is
+  // re-armed on every hit: conditional would cost a round trip to learn what
+  // the key's own date already says.
+  async bumpDailyCount(userId: string, nowMs: number): Promise<number> {
+    const key = `${PREFIX}feedback:rl:${userId}:${utcDateKey(nowMs)}`;
+    const count = await this.client.incr(key);
+    await this.client.expire(key, RATE_KEY_TTL_SECONDS);
+    return count;
   }
 
   async delete(id: string): Promise<void> {

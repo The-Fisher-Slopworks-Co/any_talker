@@ -2,8 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { DetailLevel } from "../../ai/instruction";
+import { getBuildInfo } from "../../build-info";
 import { digestCommandHandler } from "../handlers/digest";
+import { feedbackHandler } from "../handlers/feedback";
 import { usageCommandHandler } from "../handlers/usage";
+import { resolveSenderIdentity } from "../identity";
 import type { BotContext } from "../middleware/lang";
 import type { BotRuntime } from "../runtime";
 import { dispatchAsk } from "./ask";
@@ -99,4 +102,91 @@ export async function dispatchUsageCommand(
   });
   if (outcome.kind === "ignored") return;
   await ctx.reply(outcome.text);
+}
+
+// The reporter alone in a group, everyone in a DM where nobody is hidden from.
+// The ephemeral parameter is unverified on the test DCs, so a rejection falls
+// back to a plain reply, the shape `dispatchAsk` wraps `sendRichMessage` in.
+// The returned `Message` is dropped: an ephemeral send answers with
+// `message_id` 0 and a reusable `ephemeral_message_id`.
+async function replyToReporter(
+  ctx: BotContext,
+  text: string,
+  receiverUserId: number,
+): Promise<void> {
+  if (ctx.chat?.type === "private") {
+    await ctx.reply(text);
+    return;
+  }
+  try {
+    await ctx.reply(text, {
+      ephemeral_message_parameters: { receiver_user_id: receiverUserId },
+    });
+  } catch (err) {
+    console.error("ephemeral reply failed, sending plain:", err);
+    await ctx.reply(text);
+  }
+}
+
+// `/feedback <text>` — handled inline alongside `/digest` and `/usage` for the
+// same reason: this listener owns `message:text` and does not call `next()`.
+export async function dispatchFeedbackCommand(
+  rt: BotRuntime,
+  ctx: BotContext,
+  text: string,
+): Promise<void> {
+  const msg = ctx.message;
+  const chat = ctx.chat;
+  if (!msg || !chat) return;
+  // Never `ctx.from.id` directly: a message sent as a chat carries a
+  // Telegram-wide pseudo-account there (`bot/identity.ts`), and both the record
+  // and the daily cap key on the sender.
+  const identity = resolveSenderIdentity({
+    from: ctx.from,
+    sender_chat: ctx.senderChat,
+  });
+  if (!identity) return;
+  const reply = msg.reply_to_message;
+  const outcome = await feedbackHandler({
+    storage: rt.deps.storage,
+    resolver: rt.deps.resolver,
+    ownerId: rt.deps.ownerId,
+    botId: rt.botId,
+    userId: identity.userId,
+    chatId: String(chat.id),
+    chatType: chat.type,
+    senderChatId: identity.senderChatId,
+    lang: ctx.lang,
+    text,
+    // Any bot's message is a valid pointer — a group's graph is family-wide.
+    pointedAt:
+      reply?.from?.is_bot === true
+        ? { chatId: String(chat.id), botMsgId: reply.message_id }
+        : undefined,
+    now: Date.now(),
+    build: (await getBuildInfo()).commit,
+  });
+
+  // Silent toward the chat, as `/ask` is: the gate's answer is a log line.
+  if (outcome.kind === "denied") {
+    rt.logAccessDenied({
+      chat_id: chat.id,
+      user_id: identity.userId,
+      reason: outcome.reason,
+      source: "feedback",
+    });
+    return;
+  }
+  // Addressed to the human who typed it even when the record is filed under the
+  // chat they spoke as: an ephemeral message names a user id, which a chat has
+  // none of. No `from` means nobody to answer; the record still stands.
+  const receiver = ctx.from?.id;
+  if (receiver === undefined) return;
+  const answer =
+    outcome.kind === "empty"
+      ? ctx.t.bot_feedback_usage
+      : outcome.kind === "rateLimited"
+        ? ctx.t.bot_feedback_limited(outcome.perDay)
+        : ctx.t.bot_feedback_recorded;
+  await replyToReporter(ctx, answer, receiver);
 }

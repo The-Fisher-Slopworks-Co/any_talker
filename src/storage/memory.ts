@@ -105,6 +105,8 @@ export type Backing = {
   checks: Map<string, RecurringCheck>;
   // `/feedback` submissions, keyed by id (global — not affected by `forBot`).
   feedback: Map<string, FeedbackEntry>;
+  // `/feedback`'s daily anti-spam counter: UTC date -> (userId -> count).
+  feedbackRate: Map<string, Map<string, number>>;
   photoCache: Map<string, Uint8Array>;
   albums: Map<string, Map<number, string>>;
   userFacts: Map<string, Map<string, string>>;
@@ -145,6 +147,7 @@ function createBacking(): Backing {
     privateChats: new Set(),
     checks: new Map(),
     feedback: new Map(),
+    feedbackRate: new Map(),
     photoCache: new Map(),
     albums: new Map(),
     userFacts: new Map(),

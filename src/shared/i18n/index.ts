@@ -5,6 +5,7 @@ import { botMessages } from "./bot";
 import { checksMessages } from "./checks";
 import { managedBotsMessages } from "./managed-bots";
 import { factsMessages } from "./facts";
+import { feedbackMessages } from "./feedback";
 import { remindersMessages } from "./reminders";
 import { chatsMessages } from "./chats";
 import { usersMessages } from "./users";
@@ -46,6 +47,7 @@ export const DOMAIN_MESSAGES = {
   checks: checksMessages,
   managedBots: managedBotsMessages,
   facts: factsMessages,
+  feedback: feedbackMessages,
   reminders: remindersMessages,
   chats: chatsMessages,
   users: usersMessages,
@@ -63,6 +65,7 @@ const catalog = {
   ...DOMAIN_MESSAGES.checks,
   ...DOMAIN_MESSAGES.managedBots,
   ...DOMAIN_MESSAGES.facts,
+  ...DOMAIN_MESSAGES.feedback,
   ...DOMAIN_MESSAGES.reminders,
   ...DOMAIN_MESSAGES.chats,
   ...DOMAIN_MESSAGES.users,

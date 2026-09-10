@@ -6,10 +6,12 @@ import type { BotRuntime } from "../runtime";
 import type { BotContext } from "../middleware/lang";
 import { matchAsk } from "../routing";
 import { matchDigestCommand } from "../handlers/digest";
+import { matchFeedbackCommand } from "../handlers/feedback";
 import { matchUsageCommand } from "../handlers/usage";
 import {
   dispatchTextCommand,
   dispatchDigestCommand,
+  dispatchFeedbackCommand,
   dispatchUsageCommand,
 } from "../dispatch/commands";
 import { dispatchAsk } from "../dispatch/ask";
@@ -31,6 +33,11 @@ export function registerMessageListeners(
     }
     if (matchUsageCommand(ctx.message.text, ctx.me.username)) {
       await dispatchUsageCommand(rt, ctx);
+      return;
+    }
+    const feedback = matchFeedbackCommand(ctx.message.text, ctx.me.username);
+    if (feedback) {
+      await dispatchFeedbackCommand(rt, ctx, feedback.text);
       return;
     }
     const match = matchAsk(ctx.message.text, ctx.me.username);

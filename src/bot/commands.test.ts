@@ -20,6 +20,11 @@ describe("command lists", () => {
     expect(BOT_COMMANDS_EN).toEqual([
       { command: "ask", description: "Ask (short answer)" },
       { command: "askwise", description: "Ask (detailed answer)" },
+      {
+        command: "feedback",
+        description: "Report a problem",
+        is_ephemeral: true,
+      },
     ]);
   });
 
@@ -27,7 +32,28 @@ describe("command lists", () => {
     expect(BOT_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
       { command: "askwise", description: "Спросить (подробно)" },
+      {
+        command: "feedback",
+        description: "Сообщить о проблеме",
+        is_ephemeral: true,
+      },
     ]);
+  });
+
+  // The flag is what gives the entry its icon in the bot menu, and it must
+  // survive every scope's list — `/feedback` is ephemeral wherever it is shown.
+  test("/feedback is marked ephemeral in every list", () => {
+    for (const list of [
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_RU,
+      PRIVATE_COMMANDS_EN,
+      PRIVATE_COMMANDS_RU,
+      OWNER_COMMANDS_EN,
+      OWNER_COMMANDS_RU,
+    ]) {
+      const entry = list.find((c) => c.command === "feedback");
+      expect(entry?.is_ephemeral).toBe(true);
+    }
   });
 
   test("private lists extend the public ones with /usage", () => {
