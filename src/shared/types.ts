@@ -42,10 +42,12 @@ export type {
   TurnRun,
   ConversationNode,
   GuestThreadNode,
+  UserThreadRef,
 } from "./types/conversations";
 export {
   MAX_REPLY_CHAIN_DEPTH,
   CONVERSATION_TTL_SECONDS,
+  USER_THREAD_INDEX_MAX,
 } from "./types/conversations";
 export { PHOTO_CACHE_TTL_SECONDS } from "./types/photos";
 export { isValidTimezone, canonicalizeTimezone } from "./types/timezone";

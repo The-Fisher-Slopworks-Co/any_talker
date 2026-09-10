@@ -88,6 +88,42 @@ export type GuestThreadNode = {
   ts: number;
 };
 
+// One thread a user recently took part in, as the per-user index records it: a
+// pointer back into the conversation graph, never a copy of anything in it.
+//
+// Tagged because the two graphs are keyed differently — a reply chain by
+// `(chatId, botMsgId)`, a guest thread by chat alone — so a reader knows which
+// lookup to make without probing both.
+export type UserThreadRef =
+  | {
+      kind: "chain";
+      chatId: string;
+      // The storage scope the thread's nodes live in, as `forBot` takes it —
+      // NOT necessarily the bot that answered. A group chat's graph is shared
+      // family-wide under the main bot's scope (`bot/context-builder.ts`), so
+      // an entry written for a managed bot's answer in a group says `null`.
+      // Resolving the thread is `storage.forBot(botId).conversations`.
+      botId: string | null;
+      // The thread's head: the bot message id of its most recent indexed turn.
+      // A follow-up advances it, which is what keeps one thread one entry.
+      botMsgId: number;
+      // Epoch ms of the head turn.
+      ts: number;
+    }
+  | {
+      kind: "guest";
+      chatId: string;
+      // As above, but a guest thread is always stored in the answering bot's
+      // own scope — guest chats are business DMs, never group chats.
+      botId: string | null;
+      ts: number;
+    };
+
+// How many threads the per-user index keeps. Small on purpose: it exists to
+// answer "what was this user just doing", and a feedback snapshot copies every
+// entry in full, so the cap is also the snapshot's own thread budget.
+export const USER_THREAD_INDEX_MAX = 5;
+
 // Cap on how far back the conversation graph is walked when building LLM
 // context. Longer chains burn tokens disproportionately and yield diminishing
 // returns; 20 turns is enough to cover virtually all real reply threads.
