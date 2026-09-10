@@ -7,9 +7,13 @@ import type { ModelCatalog } from "../../ai/model-catalog";
 import type { FetchProviderEndpoints } from "../openrouter-proxy";
 
 export type ApiRequest = {
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   body: unknown;
+  // The URL's query string, flattened (a repeated key keeps its last value).
+  // `path` is the pathname alone, so this is the only place a filter or a
+  // pagination cursor arrives. Absent means "no query string".
+  query?: Record<string, string>;
 };
 
 export type ApiResponse = { status: number; body: unknown };
@@ -53,7 +57,7 @@ type RouteContext = {
 
 // Every verb, for a route whose path-level checks answer before the verb is
 // looked at (see `Route.handle`).
-export const ANY_METHOD = ["GET", "POST", "PUT", "DELETE"] as const;
+export const ANY_METHOD = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
 // A route matches on method *and* path; a mismatch on either falls through to
 // the next route — a path hit with the wrong method is not a 405, it keeps
