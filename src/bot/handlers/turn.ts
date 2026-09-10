@@ -9,6 +9,7 @@ import type {
   BudgetDenyReason,
   Settings,
   ToolCallRecord,
+  TurnRun,
   WindowKind,
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
@@ -55,14 +56,23 @@ export type GatedTurnResult =
   | { kind: "rateLimited"; limitedBy: WindowKind; msUntilReset: number }
   // `toolCalls` is empty when `runAiTurn` threw (nothing ran to completion) and
   // filled on the empty-answer path, so a caller that owns a conversation
-  // history can still persist what the tools returned.
-  | { kind: "error"; message: string; toolCalls: ToolCallRecord[] }
+  // history can still persist what the tools returned. `run` is null on the same
+  // throw — a call that never came back reported no generation either — and
+  // carries the run on the empty-answer path, which is one of the bug classes a
+  // report most needs to point at.
+  | {
+      kind: "error";
+      message: string;
+      toolCalls: ToolCallRecord[];
+      run: TurnRun | null;
+    }
   | {
       kind: "answered";
       text: string;
       totalTokens: number;
       effects: ToolEffect[];
       toolCalls: ToolCallRecord[];
+      run: TurnRun;
     };
 
 export async function runGatedAiTurn(
@@ -149,6 +159,7 @@ export async function runGatedAiTurn(
       kind: "error",
       message: err instanceof Error ? err.message : String(err),
       toolCalls: [],
+      run: null,
     };
   }
 
@@ -160,6 +171,7 @@ export async function runGatedAiTurn(
       kind: "error",
       message: "AI returned an empty answer",
       toolCalls: result.toolCalls,
+      run: result.run,
     };
   }
 
@@ -169,5 +181,6 @@ export async function runGatedAiTurn(
     totalTokens: result.totalTokens,
     effects: result.effects,
     toolCalls: result.toolCalls,
+    run: result.run,
   };
 }
