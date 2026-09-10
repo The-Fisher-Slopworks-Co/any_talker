@@ -17,6 +17,7 @@ import type { RemindersStore } from "./types/reminders";
 import type { PrivateChatsStore } from "./types/private-chats";
 import type { ChecksStore } from "./types/checks";
 import type { FactsStore } from "./types/facts";
+import type { FeedbackStore } from "./types/feedback";
 
 // Re-exported so a consumer can depend on one namespace instead of all of
 // `Storage` — e.g. a helper that only reads profile fields takes a `ProfileStore`.
@@ -37,6 +38,7 @@ export type {
   PrivateChatsStore,
   ChecksStore,
   FactsStore,
+  FeedbackStore,
 };
 
 export interface Storage {
@@ -48,7 +50,7 @@ export interface Storage {
   // sites are unaffected. A managed bot's id namespaces those entities under an
   // `mbot:{botId}:` segment; every *other* namespace (`settings`, `access`,
   // `usage`, `users`/`chats`, `spend`, `profile`, the photo-bytes cache inside
-  // `photos`, `checks`, `observability`, `presence`, the `managedBots` registry)
+  // `photos`, `checks`, `feedback`, `observability`, `presence`, `managedBots`)
   // is shared across all scopes regardless of which view it is called on.
   forBot(botId: string | null): Storage;
 
@@ -68,6 +70,7 @@ export interface Storage {
   readonly privateChats: PrivateChatsStore;
   readonly checks: ChecksStore;
   readonly facts: FactsStore;
+  readonly feedback: FeedbackStore;
 }
 
 export const USER_FACTS_MAX_PER_USER = 50;
