@@ -186,6 +186,7 @@ function responsePayload(opts: {
   output?: unknown[];
   cost?: number | undefined;
   model?: string;
+  id?: string;
   toolCall?: { name: string; args: unknown; callId?: string };
 }) {
   const output =
@@ -211,7 +212,7 @@ function responsePayload(opts: {
           },
         ]);
   return {
-    id: "resp_1",
+    id: opts.id ?? "resp_1",
     object: "response",
     created_at: 1,
     completed_at: 2,
@@ -1018,6 +1019,142 @@ describe("OpenRouterClient — replayed calls on the wire", () => {
       },
       { role: "assistant", content: "A1" },
       { role: "user", content: "Q2" },
+    ]);
+  });
+});
+
+// Nothing used to survive an ask that could say which OpenRouter generations
+// produced it: correlating a stored turn with the dashboard meant matching
+// timestamps by hand. Every model call the loop makes reports its id here, so
+// a turn can name its own generations instead.
+describe("OpenRouterClient — the generations it reports", () => {
+  test("a tool-free ask reports the single call's id and the answering model", async () => {
+    const { client } = capturingClient({
+      reply: () =>
+        new Response(
+          JSON.stringify(
+            responsePayload({
+              cost: 0,
+              id: "resp_only",
+              model: "anthropic/claude-opus-5",
+            }),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts());
+    expect(result.generations).toEqual(["resp_only"]);
+    expect(result.answeredBy).toBe("anthropic/claude-opus-5");
+  });
+
+  // The intermediate rounds are the point: a tool that misfired is only
+  // reachable through the id of the call that made it, not the final answer's.
+  test("every round of a tool loop contributes an id, in call order", async () => {
+    const { client, calls } = capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn === 1
+                ? {
+                    cost: 0.001,
+                    id: "resp_round1",
+                    toolCall: { name: "echo", args: { value: "x" } },
+                  }
+                : { cost: 0.001, id: "resp_final" },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts({ tools: [echoTool] }));
+    expect(calls).toHaveLength(2);
+    expect(result.generations).toEqual(["resp_round1", "resp_final"]);
+  });
+
+  // `modelId` is the head of the requested chain, which is what spend is
+  // attributed to; `answeredBy` is who the provider says actually served the
+  // last call. A fallback makes them differ, and a report needs the latter.
+  test("the answering model is the last call's, not the requested one", async () => {
+    const { client } = capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn === 1
+                ? {
+                    cost: 0.001,
+                    model: "a/primary",
+                    toolCall: { name: "echo", args: { value: "x" } },
+                  }
+                : { cost: 0.001, model: "b/fallback" },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(
+      askOpts({ models: ["a/primary", "b/fallback"], tools: [echoTool] }),
+    );
+    expect(result.modelId).toBe("a/primary");
+    expect(result.answeredBy).toBe("b/fallback");
+  });
+
+  // The provider sends `""` when it names no model. Overwriting a real value
+  // with that would lose the only record of who answered, so it is ignored.
+  test("a call that names no model leaves the previous one standing", async () => {
+    const { client } = capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn === 1
+                ? {
+                    cost: 0.001,
+                    model: "a/primary",
+                    toolCall: { name: "echo", args: { value: "x" } },
+                  }
+                : { cost: 0.001, model: "" },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts({ tools: [echoTool] }));
+    expect(result.answeredBy).toBe("a/primary");
+  });
+
+  // The retry of an empty final turn is a billed model call of its own, so it
+  // reports an id like any other.
+  test("the empty-final retry reports its own id", async () => {
+    const { client, calls } = capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn === 1
+                ? {
+                    cost: 0.001,
+                    id: "resp_round1",
+                    toolCall: { name: "echo", args: { value: "x" } },
+                  }
+                : { cost: 0.001, id: `resp_final${turn}`, output: [] },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts({ tools: [echoTool] }));
+    expect(calls).toHaveLength(3);
+    expect(result.generations).toEqual([
+      "resp_round1",
+      "resp_final2",
+      "resp_final3",
     ]);
   });
 });

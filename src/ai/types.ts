@@ -66,6 +66,19 @@ export type AskResult = {
   // floor of $0 and spend is under-counted. Surfaced to the owner so the blind
   // spot is visible. Optional (absent ⇒ treat as priced) for fixtures.
   priced?: boolean;
+  // The OpenRouter response id of every model call this run made, in call
+  // order: one per tool-loop round plus the final answer. They are the only
+  // handle back to what actually ran — `GET /api/v1/generation?id=` returns
+  // the provider, routing, per-call usage, cost and latency behind each one —
+  // so none of that has to be copied out and stored per turn. Optional so
+  // fixtures that don't care still type; an empty array is a run that reported
+  // none, which is what a client recording nothing looks like too.
+  generations?: string[];
+  // The model that actually served the last model call, as the provider named
+  // it. NOT `modelId`, which is the head of the requested chain: the two differ
+  // whenever OpenRouter falls back down it. Absent when no model call reported
+  // one.
+  answeredBy?: string;
   // The tool calls this run made — NOT the ones it replayed from earlier turns
   // — in execution order, capped by `TOOL_CALLS_MAX_PER_TURN`. Callers persist
   // them with the turn so the next one can replay them. Optional so fixtures
