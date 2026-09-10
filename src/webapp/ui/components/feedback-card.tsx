@@ -15,12 +15,15 @@ const PREVIEW_MAX_CHARS = 400;
 export function FeedbackCard({
   entries,
   busy,
+  onOpen,
   onDelete,
   emptyText,
 }: {
   entries: FeedbackSummary[];
   // A request is in flight, so the deletes stay out of reach until it settles.
   busy: boolean;
+  // Opens the detail view: the full text, the thread snapshots, the status.
+  onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   emptyText: string;
 }) {
@@ -55,14 +58,26 @@ export function FeedbackCard({
             <div className="text-[13px] text-tg-hint break-all">
               {`id ${e.userId} · ${s.ui_feedback_counts(e.threadCount, e.turnCount)}`}
             </div>
-            <button
-              type="button"
-              className="self-start bg-transparent border-0 p-0 text-left text-[13px] text-tg-destructive cursor-pointer disabled:opacity-50"
-              disabled={busy}
-              onClick={() => onDelete(e.id)}
-            >
-              {s.ui_remove}
-            </button>
+            {/* Two taps side by side rather than a clickable row: the row
+                already carries the delete, and a button inside a button is not
+                a thing. */}
+            <div className="flex gap-4">
+              <button
+                type="button"
+                className="bg-transparent border-0 p-0 text-left text-[13px] text-tg-link cursor-pointer"
+                onClick={() => onOpen(e.id)}
+              >
+                {s.ui_feedback_open}
+              </button>
+              <button
+                type="button"
+                className="bg-transparent border-0 p-0 text-left text-[13px] text-tg-destructive cursor-pointer disabled:opacity-50"
+                disabled={busy}
+                onClick={() => onDelete(e.id)}
+              >
+                {s.ui_remove}
+              </button>
+            </div>
           </div>
         ))
       )}

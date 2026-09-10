@@ -40,6 +40,7 @@ function render(entries: FeedbackSummary[], lang: "en" | "ru" = "en"): string {
         <FeedbackCard
           entries={entries}
           busy={false}
+          onOpen={() => {}}
           onDelete={() => {}}
           emptyText="No reports."
         />

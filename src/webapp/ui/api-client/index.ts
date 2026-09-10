@@ -43,9 +43,8 @@ export type { BuildInfoResponse } from "./build-info";
 
 // Pass-throughs, so a view types a response without reaching into the server
 // tree for it.
-export type { FeedbackStatus } from "../../../shared/types/feedback";
-/** @public */
 export type {
+  FeedbackStatus,
   FeedbackEntry,
   ThreadSnapshot,
   ThreadSnapshotTurn,

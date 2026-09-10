@@ -22,6 +22,7 @@ import { UserEditView } from "./views/admin/user-edit-view";
 import { ChatEditView } from "./views/admin/chat-edit-view";
 import { CheckEditView } from "./views/admin/check-edit-view";
 import { ManagedBotEditView } from "./views/admin/managed-bot-edit-view";
+import { FeedbackView } from "./views/admin/feedback-view";
 
 function AppShell({
   me,
@@ -61,6 +62,8 @@ function AppShell({
             return { kind: "admin-section", section: "checks" };
           case "managed-bot-edit":
             return { kind: "admin-section", section: "bots" };
+          case "feedback-view":
+            return { kind: "admin-section", section: "feedback" };
           case "admin-section":
             return { kind: "admin" };
           case "admin":
@@ -99,6 +102,8 @@ function AppShell({
         return route.botId === null
           ? s.ui_route_bot_create
           : s.ui_route_bot_edit;
+      case "feedback-view":
+        return s.ui_route_feedback;
       case "my-reminders":
         return s.ui_route_my_reminders;
       case "my-facts":
@@ -141,6 +146,9 @@ function AppShell({
             onEditManagedBot={(id) =>
               setRoute({ kind: "managed-bot-edit", botId: id })
             }
+            onOpenFeedback={(id) =>
+              setRoute({ kind: "feedback-view", feedbackId: id })
+            }
           />
         );
       case "user-edit":
@@ -163,6 +171,8 @@ function AppShell({
             onClose={() => setRoute({ kind: "admin-section", section: "bots" })}
           />
         );
+      case "feedback-view":
+        return <FeedbackView feedbackId={route.feedbackId} />;
       case "my-reminders":
         return (
           <RemindersList
