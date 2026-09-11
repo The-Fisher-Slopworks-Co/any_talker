@@ -49,5 +49,6 @@ export {
   CONVERSATION_TTL_SECONDS,
   USER_THREAD_INDEX_MAX,
 } from "./types/conversations";
+export type { ThreadSnapshotTurn, ThreadSnapshot } from "./types/feedback";
 export { PHOTO_CACHE_TTL_SECONDS } from "./types/photos";
 export { isValidTimezone, canonicalizeTimezone } from "./types/timezone";
