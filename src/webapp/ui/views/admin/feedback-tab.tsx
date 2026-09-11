@@ -66,8 +66,8 @@ export function FeedbackTab() {
         value={filter}
         options={[
           { value: "all", label: s.ui_feedback_filter_all },
-          { value: "new", label: s.ui_feedback_status_new },
-          { value: "closed", label: s.ui_feedback_status_closed },
+          { value: "new", label: s.ui_feedback_filter_new },
+          { value: "closed", label: s.ui_feedback_filter_closed },
         ]}
         onChange={setFilter}
       />

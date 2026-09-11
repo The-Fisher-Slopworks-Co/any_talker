@@ -41,11 +41,23 @@ export const feedbackMessages = {
     en: "What users sent with /feedback, newest first. Each report carries a snapshot of the reporter's recent threads, taken when it was sent; deleting the report drops that snapshot with it.",
     ru: "То, что пользователи отправили через /feedback, сначала новые. В каждом отчёте — снимок последних диалогов автора, сделанный в момент отправки; удаление отчёта уносит снимок вместе с ним.",
   }),
-  // Both the status filter and the per-row badge.
+  // The filter names sets of reports, so Russian puts its options in the
+  // plural — next to "Все" a singular option reads as a different kind of
+  // control.
   ui_feedback_filter_all: m({
     en: "All",
     ru: "Все",
   }),
+  ui_feedback_filter_new: m({
+    en: "New",
+    ru: "Новые",
+  }),
+  ui_feedback_filter_closed: m({
+    en: "Closed",
+    ru: "Закрытые",
+  }),
+  // The badge on a row, which stands for the one report it sits on, and so
+  // stays singular where the filter above does not.
   ui_feedback_status_new: m({
     en: "New",
     ru: "Новый",
