@@ -7,6 +7,7 @@ import { digestCommandHandler } from "../handlers/digest";
 import { feedbackHandler } from "../handlers/feedback";
 import { usageCommandHandler } from "../handlers/usage";
 import { resolveSenderIdentity } from "../identity";
+import { replyEphemeral } from "../ephemeral";
 import type { BotContext } from "../middleware/lang";
 import type { BotRuntime } from "../runtime";
 import { dispatchAsk } from "./ask";
@@ -104,30 +105,6 @@ export async function dispatchUsageCommand(
   await ctx.reply(outcome.text);
 }
 
-// The reporter alone in a group, everyone in a DM where nobody is hidden from.
-// The ephemeral parameter is unverified on the test DCs, so a rejection falls
-// back to a plain reply, the shape `dispatchAsk` wraps `sendRichMessage` in.
-// The returned `Message` is dropped: an ephemeral send answers with
-// `message_id` 0 and a reusable `ephemeral_message_id`.
-async function replyToReporter(
-  ctx: BotContext,
-  text: string,
-  receiverUserId: number,
-): Promise<void> {
-  if (ctx.chat?.type === "private") {
-    await ctx.reply(text);
-    return;
-  }
-  try {
-    await ctx.reply(text, {
-      ephemeral_message_parameters: { receiver_user_id: receiverUserId },
-    });
-  } catch (err) {
-    console.error("ephemeral reply failed, sending plain:", err);
-    await ctx.reply(text);
-  }
-}
-
 // `/feedback <text>` — handled inline alongside `/digest` and `/usage` for the
 // same reason: this listener owns `message:text` and does not call `next()`.
 export async function dispatchFeedbackCommand(
@@ -188,5 +165,5 @@ export async function dispatchFeedbackCommand(
       : outcome.kind === "rateLimited"
         ? ctx.t.bot_feedback_limited
         : ctx.t.bot_feedback_recorded;
-  await replyToReporter(ctx, answer, receiver);
+  await replyEphemeral(ctx, answer, receiver);
 }
