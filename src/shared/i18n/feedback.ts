@@ -13,8 +13,8 @@ export const feedbackMessages = {
   }),
   // The report is only stored, so the line stops at that: nothing forwards it.
   bot_feedback_recorded: m({
-    en: "Thanks — your report is saved.",
-    ru: "Спасибо — отчёт сохранён.",
+    en: "Your report is saved.",
+    ru: "Отчёт сохранён.",
   }),
   bot_feedback_limited: m({
     en: "Too many reports. Send the rest tomorrow.",
