@@ -40,29 +40,41 @@ describe("command lists", () => {
     ]);
   });
 
-  // The flag is what gives the entry its icon in the bot menu, and it must
-  // survive every scope's list — `/feedback` is ephemeral wherever it is shown.
-  test("/feedback is marked ephemeral in every list", () => {
+  // The flag is what gives the entry its icon in the group menu, where the
+  // reply really is ephemeral.
+  test("/feedback is marked ephemeral in the group lists", () => {
+    for (const list of [BOT_COMMANDS_EN, BOT_COMMANDS_RU]) {
+      const entry = list.find((c) => c.command === "feedback");
+      expect(entry?.is_ephemeral).toBe(true);
+    }
+  });
+
+  // A DM has nobody to hide the reply from, and an entry that claims otherwise
+  // is what keeps `/feedback` out of a private chat.
+  test("/feedback is listed without the flag in every DM list", () => {
     for (const list of [
-      BOT_COMMANDS_EN,
-      BOT_COMMANDS_RU,
       PRIVATE_COMMANDS_EN,
       PRIVATE_COMMANDS_RU,
       OWNER_COMMANDS_EN,
       OWNER_COMMANDS_RU,
     ]) {
       const entry = list.find((c) => c.command === "feedback");
-      expect(entry?.is_ephemeral).toBe(true);
+      expect(entry).toBeDefined();
+      expect(entry?.is_ephemeral).toBeUndefined();
     }
   });
 
   test("private lists extend the public ones with /usage", () => {
     expect(PRIVATE_COMMANDS_EN).toEqual([
-      ...BOT_COMMANDS_EN,
+      { command: "ask", description: "Ask (short answer)" },
+      { command: "askwise", description: "Ask (detailed answer)" },
+      { command: "feedback", description: "Report a problem" },
       { command: "usage", description: "Your limits, in percent" },
     ]);
     expect(PRIVATE_COMMANDS_RU).toEqual([
-      ...BOT_COMMANDS_RU,
+      { command: "ask", description: "Спросить (коротко)" },
+      { command: "askwise", description: "Спросить (подробно)" },
+      { command: "feedback", description: "Сообщить о проблеме" },
       { command: "usage", description: "Твои лимиты, в процентах" },
     ]);
   });

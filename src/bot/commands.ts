@@ -11,7 +11,9 @@ export type SyncCommandsApi = {
 };
 
 // `is_ephemeral` earns `/feedback` its icon in the bot menu: outside a DM the
-// reply is visible only to whoever sent it, and the menu says so up front.
+// reply is visible only to whoever sent it, and the menu says so up front. The
+// group lists are the ones that carry it — see `withPlainFeedback` for why the
+// DM lists must not.
 export const BOT_COMMANDS_EN: readonly BotCommand[] = [
   { command: "ask", description: "Ask (short answer)" },
   { command: "askwise", description: "Ask (detailed answer)" },
@@ -28,16 +30,31 @@ export const BOT_COMMANDS_RU: readonly BotCommand[] = [
   },
 ];
 
+// An ephemeral message is one only its receiver sees inside a chat of several,
+// which a DM is not: there `dispatchFeedbackCommand` answers with a plain
+// reply. A menu entry promising the other thing is the reason `/feedback` does
+// not reach a private chat at all, so every DM list drops the flag — the
+// command itself is unchanged.
+function withPlainFeedback(
+  commands: readonly BotCommand[],
+): readonly BotCommand[] {
+  return commands.map((cmd) =>
+    cmd.command === "feedback"
+      ? { command: cmd.command, description: cmd.description }
+      : cmd,
+  );
+}
+
 // Private chats additionally list `/usage`. It is DM-only (the handler ignores
 // it in groups — how close you are to your limit is nobody else's business), so
 // listing it in the group menus would advertise an entry that does nothing.
 export const PRIVATE_COMMANDS_EN: readonly BotCommand[] = [
-  ...BOT_COMMANDS_EN,
+  ...withPlainFeedback(BOT_COMMANDS_EN),
   { command: "usage", description: "Your limits, in percent" },
 ];
 
 export const PRIVATE_COMMANDS_RU: readonly BotCommand[] = [
-  ...BOT_COMMANDS_RU,
+  ...withPlainFeedback(BOT_COMMANDS_RU),
   { command: "usage", description: "Твои лимиты, в процентах" },
 ];
 
