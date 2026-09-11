@@ -19,6 +19,7 @@ import { adminSpendRoutes } from "./routes/admin-spend";
 import { rateLimitRoutes } from "./routes/ratelimit";
 import { adminChatRoutes } from "./routes/admin-chats";
 import { adminCheckRoutes } from "./routes/admin-checks";
+import { adminFeedbackRoutes } from "./routes/admin-feedback";
 import { adminManagedBotRoutes } from "./routes/admin-managed-bots";
 
 export type {
@@ -39,8 +40,9 @@ const PUBLIC_ROUTES: Route[] = [...meReminderRoutes, ...meRoutes];
 // above a narrower one would shadow it — `/api/admin/managed-bots/:id` reading
 // "new" as a bot id is the classic one. Every group whose patterns can overlap
 // is kept whole inside a single module's array (`admin-users`, `admin-chats`,
-// `admin-checks`, `admin-managed-bots`, `access`), ordered and commented there,
-// so the guarantee is local to one file instead of spread over this list.
+// `admin-checks`, `admin-feedback`, `admin-managed-bots`, `access`), ordered
+// and commented there, so the guarantee is local to one file instead of spread
+// over this list.
 // Between the groups below the URL prefixes are disjoint, which makes the order
 // of these spreads presentational.
 const ADMIN_ROUTES: Route[] = [
@@ -53,6 +55,7 @@ const ADMIN_ROUTES: Route[] = [
   ...rateLimitRoutes,
   ...adminChatRoutes,
   ...adminCheckRoutes,
+  ...adminFeedbackRoutes,
   ...adminManagedBotRoutes,
 ];
 

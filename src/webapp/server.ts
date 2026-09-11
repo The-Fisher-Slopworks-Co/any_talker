@@ -86,6 +86,7 @@ export function startServer(deps: ServerDeps) {
         method: req.method as ApiRequest["method"],
         path: url.pathname,
         body,
+        query: Object.fromEntries(url.searchParams),
       };
       const res = await handleApi(apiReq, apiDeps, actor);
       return Response.json(res.body, { status: res.status });

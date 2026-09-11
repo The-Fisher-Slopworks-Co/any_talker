@@ -8,6 +8,7 @@
 import { accessApi } from "./access";
 import { adminChatsApi } from "./admin-chats";
 import { adminChecksApi } from "./admin-checks";
+import { adminFeedbackApi } from "./admin-feedback";
 import { adminManagedBotsApi } from "./admin-managed-bots";
 import { adminSpendApi } from "./admin-spend";
 import { adminUsersApi } from "./admin-users";
@@ -30,6 +31,11 @@ export type { ChatSettingsResponse } from "./admin-chats";
 export type { RemindersResponse } from "./reminders";
 /** @public */
 export type { QuarantinedRemindersResponse } from "./reminders";
+/** @public */
+export type {
+  FeedbackListParams,
+  FeedbackListResponse,
+} from "./admin-feedback";
 export type { ManagedBotDetail } from "./admin-managed-bots";
 /** @public */
 export type { ManagedBotRow, ManagedBotNewInfo } from "./admin-managed-bots";
@@ -37,6 +43,15 @@ export type { BuildInfoResponse } from "./build-info";
 
 // Pass-throughs, so a view types a response without reaching into the server
 // tree for it.
+/** @public */
+export type {
+  FeedbackEntry,
+  FeedbackStatus,
+  ThreadSnapshot,
+  ThreadSnapshotTurn,
+} from "../../../shared/types/feedback";
+/** @public */
+export type { FeedbackSummary } from "../../routes/admin-feedback";
 export type { SpendSummary } from "../../../spending/window";
 export type { UsageStatus } from "../../../ratelimit/window";
 export type { UsageShare } from "../../../ratelimit/share";
@@ -53,6 +68,7 @@ export const api = {
   ...adminChatsApi,
   ...adminSpendApi,
   ...adminChecksApi,
+  ...adminFeedbackApi,
   ...adminManagedBotsApi,
   ...buildInfoApi,
 };
