@@ -53,7 +53,7 @@ jobs:
 
             // Files that inflate the diff without adding anything to read.
             const EXCLUDED = [
-              /\.test\.ts$/,
+              /\.test\.tsx?$/,
               /(^|\/)bun\.lock$/,
               /(^|\/)(dist|build|vendor|node_modules|generated)\//,
               /\.min\.(js|css)$/,
