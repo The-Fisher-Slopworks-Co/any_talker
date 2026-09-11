@@ -16,7 +16,8 @@ export type AdminSection =
   | "reminders"
   | "quarantine"
   | "checks"
-  | "bots";
+  | "bots"
+  | "feedback";
 
 export type Route =
   | { kind: "main" }
@@ -41,6 +42,7 @@ export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "quarantine",
   "checks",
   "bots",
+  "feedback",
 ];
 
 export function adminSection(
@@ -84,6 +86,11 @@ export function adminSection(
       return {
         label: s.ui_admin_bots,
         description: s.ui_admin_bots_desc,
+      };
+    case "feedback":
+      return {
+        label: s.ui_admin_feedback,
+        description: s.ui_admin_feedback_desc,
       };
   }
 }

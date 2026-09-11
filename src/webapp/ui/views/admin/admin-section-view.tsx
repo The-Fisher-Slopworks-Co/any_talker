@@ -7,6 +7,7 @@ import type { Settings } from "../../../../shared/types";
 import { LoadingState } from "../../components/states";
 import { ChatsTab } from "./chats-tab";
 import { ChecksTab } from "./checks-tab";
+import { FeedbackTab } from "./feedback-tab";
 import { ManagedBotsTab } from "./managed-bots-tab";
 import { PromptTab } from "./prompt-tab";
 import { QuarantineTab } from "./quarantine-tab";
@@ -47,6 +48,7 @@ export function AdminSectionView({
 
   if (section === "spend") return <SpendTab />;
   if (section === "quarantine") return <QuarantineTab />;
+  if (section === "feedback") return <FeedbackTab />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
   if (section === "chats") return <ChatsTab onEdit={goChat} />;
   if (section === "checks")

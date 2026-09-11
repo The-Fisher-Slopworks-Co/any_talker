@@ -7,7 +7,7 @@ import type { Reminder } from "../../../reminders/types";
 import type { ReminderParseFailureReason } from "../../../reminders/parse";
 import type { Lang } from "../../../shared/i18n";
 import type { DisplayNameError } from "../../../shared/display-name";
-import type { FactBot } from "../api-client";
+import type { FactBot, FeedbackStatus } from "../api-client";
 
 // USD spend can range from fractions of a cent per request to dollars over a
 // month, so allow up to 4 decimals while always showing at least 2.
@@ -94,3 +94,9 @@ export const DISPLAY_NAME_ERR_KEY = {
   blocked_token: "ui_main_name_err_blocked_token",
   no_letter: "ui_main_name_err_no_letter",
 } as const satisfies Record<DisplayNameError, keyof Strings>;
+
+// Where a report stands, in the feedback tab's words.
+export const FEEDBACK_STATUS_KEY = {
+  new: "ui_feedback_status_new",
+  closed: "ui_feedback_status_closed",
+} as const satisfies Record<FeedbackStatus, keyof Strings>;
