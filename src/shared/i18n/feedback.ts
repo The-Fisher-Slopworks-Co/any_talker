@@ -95,8 +95,8 @@ export const feedbackMessages = {
     ru: "Отчёт",
   }),
   ui_feedback_not_found: m({
-    en: "Report not found",
-    ru: "Отчёт не найден",
+    en: "Report not found.",
+    ru: "Отчёт не найден.",
   }),
   ui_feedback_record_header: m({
     en: "Report",
