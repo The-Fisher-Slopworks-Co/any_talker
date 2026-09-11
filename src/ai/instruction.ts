@@ -178,3 +178,17 @@ export function buildInstruction(
   }
   return sections.join("\n\n");
 }
+
+// How much of the digest is kept. 64 bits is plenty to answer the only question
+// asked of it — "is this the same prompt?" — and keeps the value short enough to
+// sit on every stored turn.
+const INSTRUCTION_HASH_CHARS = 16;
+
+// Fingerprint of a rendered system prompt, stored with the turn it ran
+// (`TurnRun.instr`) so a report read weeks later can tell whether the prompt
+// behind it is still the one the bot uses. A truncated SHA-256 rather than a
+// fast non-cryptographic hash: the comparison has to keep holding across Bun
+// upgrades, which `Bun.hash` does not promise.
+export function instructionHash(instruction: string): string {
+  return Bun.SHA256.hash(instruction, "hex").slice(0, INSTRUCTION_HASH_CHARS);
+}

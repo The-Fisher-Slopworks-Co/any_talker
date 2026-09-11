@@ -3,7 +3,7 @@
 
 import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
-import type { ToolCallRecord } from "../../shared/types";
+import type { ToolCallRecord, TurnRun } from "../../shared/types";
 import type { BudgetGuard } from "../../budget/types";
 import type { AIClient } from "../../ai/types";
 import { runGatedAiTurn } from "./turn";
@@ -169,6 +169,10 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   // the same reason: `persistTurn` is built before the ask so the error and
   // rate-limit paths can persist a turn too.
   let turnToolCalls: ToolCallRecord[] = [];
+  // What the model run did, filled on the same two paths and for the same
+  // reason. Stays null on the gated outcomes (rate limit, budget denial), whose
+  // turns never reach the model and so have no run to record.
+  let turnRun: TurnRun | null = null;
 
   // Persist this turn into the conversation graph under BOTH the bot's reply
   // message id and the user's ask message id (unique within a chat, so no
@@ -202,6 +206,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       // neither may be persisted as an explicit undefined.
       ...(allImageFileIds.length > 0 && { userImageFileIds: allImageFileIds }),
       ...(turnToolCalls.length > 0 && { toolCalls: turnToolCalls }),
+      ...(turnRun !== null && { run: turnRun }),
     };
     await Promise.all([
       convStorage.conversations.save(input.chatId, botMsgId, node),
@@ -263,6 +268,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       // and the next turn picks up from the material instead of re-fetching
       // it. A turn that threw inside the model call has nothing to record.
       turnToolCalls = turn.toolCalls;
+      turnRun = turn.run;
       return {
         kind: "error",
         message: turn.message,
@@ -270,6 +276,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       };
     case "answered": {
       turnToolCalls = turn.toolCalls;
+      turnRun = turn.run;
       // The AI now emits Rich Markdown sent verbatim via sendRichMessage;
       // Telegram parses it server-side (only supported tags/schemes are
       // honored), so there is no HTML sanitization step. The same text is

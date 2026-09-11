@@ -181,6 +181,43 @@ describe("MemoryStorage conversation", () => {
     const again = await s.conversations.get("c1", 10);
     expect(again?.userImageFileIds).toEqual(["a", "b"]);
   });
+
+  test("round-trips the turn's run", async () => {
+    const s = new MemoryStorage();
+    const run = {
+      gen: ["gen-1789064867-b8Jgaf"],
+      model: "anthropic/claude-sonnet-4.5",
+      detail: "wise" as const,
+      instr: "d1e181d3faa2c130",
+    };
+    await s.conversations.save("c1", 10, {
+      userQuestion: "Q",
+      botAnswer: "A",
+      parentBotMsgId: null,
+      ts: 1,
+      run,
+    });
+    expect((await s.conversations.get("c1", 10))?.run).toEqual(run);
+  });
+
+  // As with userImageFileIds: KeyDB round-trips through JSON, so the in-memory
+  // store has to copy what KeyDB copies for free.
+  test("returned run.gen array is independent of the stored copy", async () => {
+    const s = new MemoryStorage();
+    const gen = ["gen-a"];
+    await s.conversations.save("c1", 10, {
+      userQuestion: "Q",
+      botAnswer: "A",
+      parentBotMsgId: null,
+      ts: 1,
+      run: { gen, instr: "d1e181d3faa2c130" },
+    });
+    gen.push("gen-b");
+    const got = await s.conversations.get("c1", 10);
+    expect(got?.run?.gen).toEqual(["gen-a"]);
+    got!.run!.gen.push("gen-c");
+    expect((await s.conversations.get("c1", 10))?.run?.gen).toEqual(["gen-a"]);
+  });
 });
 
 describe("MemoryStorage photo cache", () => {

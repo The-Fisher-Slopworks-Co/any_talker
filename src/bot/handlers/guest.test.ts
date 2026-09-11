@@ -236,6 +236,9 @@ describe("guestAskHandler", () => {
             text: "hello",
           }),
           botAnswer: "the answer",
+          // Guest turns carry no detail level, so the run records only the ids
+          // (none, from FakeAI) and the prompt hash.
+          run: { gen: [], instr: expect.any(String) },
         },
       ],
       ts: 1000,
@@ -415,6 +418,7 @@ describe("guestAskHandler", () => {
           text: "hello",
         }),
         botAnswer: "fresh answer",
+        run: { gen: [], instr: expect.any(String) },
       },
     ]);
   });
@@ -765,6 +769,7 @@ describe("guestAskHandler", () => {
           text: "hello",
         }),
         botAnswer: "second answer",
+        run: { gen: [], instr: expect.any(String) },
       },
     ]);
     expect(stored?.ts).toBe(2000);
@@ -981,5 +986,66 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
     expect(JSON.stringify(sent)).toContain("Carol 107");
     // Question, transcript, answer, then the new question.
     expect(sent).toHaveLength(4);
+  });
+});
+
+// As on a conversation node (issue #116) — a guest turn is just as reportable,
+// and its thread is the only record of it.
+describe("guestAskHandler — the run on the stored turn", () => {
+  test("persistThread keeps the ids and the answering model, and no detail level", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI({
+      text: "the answer",
+      totalTokens: 1,
+      generations: ["gen-1789064870-zJbTnX"],
+      answeredBy: "anthropic/claude-sonnet-4.5",
+    });
+
+    const out = await guestAskHandler(baseInput({ storage, ai }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistThread();
+
+    const turn = (await storage.conversations.getGuest("c1"))!.turns[0]!;
+    // Guest queries are always single-turn asks with no detail level, so the
+    // key is absent rather than set to the "short"-equivalent path it takes.
+    expect(turn.run).toEqual({
+      gen: ["gen-1789064870-zJbTnX"],
+      model: "anthropic/claude-sonnet-4.5",
+      instr: expect.any(String),
+    });
+  });
+
+  test("a replayed thread ignores the stored run", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        priorThread: {
+          chatId: "c1",
+          turns: [
+            {
+              userQuestion: "Q1",
+              botAnswer: "A1",
+              run: {
+                gen: ["gen-1789064867-b8Jgaf"],
+                instr: "d1e181d3faa2c130",
+              },
+            },
+          ],
+          ts: 500,
+        },
+      }),
+    );
+
+    const sent = (ai.calls[0] as { messages: unknown[] }).messages;
+    expect(sent.slice(0, 2)).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+    ]);
+    expect(JSON.stringify(sent)).not.toContain("gen-");
   });
 });

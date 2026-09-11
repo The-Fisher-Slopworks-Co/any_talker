@@ -9,6 +9,7 @@ import { currentWindowStarts } from "../../ratelimit/window";
 import type { AIClient, AskResult } from "../../ai/types";
 import { askHandler, type AskInput, type AskOutcome } from "./ask";
 import { createMainPersonaResolver } from "../../managed-bots/persona";
+import { instructionHash } from "../../ai/instruction";
 import { DEFAULT_SETTINGS } from "../../shared/types";
 
 // Exhausts a user's 5-hour budget at `now` (fills both windows to the default
@@ -380,6 +381,9 @@ describe("askHandler", () => {
         botAnswer: "hi back",
         parentBotMsgId: null,
         ts: 1000,
+        // The run behind the answer. FakeAI reports no generation ids and no
+        // answering model, so only what this side knows is filled in.
+        run: { gen: [], detail: "short", instr: expect.any(String) },
       });
       // The turn is also keyed by the user's ask message id, so replying to
       // one's own question resolves the chain too.
@@ -1301,5 +1305,146 @@ describe("askHandler — tool calls on the persisted turn", () => {
 
     const sent = (ai.calls[0] as Parameters<AIClient["ask"]>[0]).messages;
     expect(JSON.stringify(sent)).toContain("Carol 107");
+  });
+});
+
+// The run is the only handle back to what actually produced an answer: without
+// it, matching a stored turn to its OpenRouter generations is a timestamp and a
+// guess (issue #116).
+describe("askHandler — the run on the persisted turn", () => {
+  const ANSWERED = {
+    text: "hi back",
+    totalTokens: 10,
+    generations: ["gen-1789064867-b8Jgaf", "gen-1789064870-zJbTnX"],
+    answeredBy: "anthropic/claude-sonnet-4.5",
+  };
+
+  test("answered: the ids, the answering model and the detail level are stored with the turn", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+
+    const out = await askHandler(
+      baseInput({ storage, ai: new FakeAI(ANSWERED), detailLevel: "wise" }),
+    );
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(999);
+
+    const node = await storage.conversations.get("c1", 999);
+    expect(node!.run).toEqual({
+      gen: ["gen-1789064867-b8Jgaf", "gen-1789064870-zJbTnX"],
+      model: "anthropic/claude-sonnet-4.5",
+      detail: "wise",
+      instr: expect.any(String),
+    });
+    // Both keys of the turn carry it, as with every other node field.
+    expect((await storage.conversations.get("c1", 1))!.run).toEqual(node!.run);
+  });
+
+  // The prompt is rebuilt from settings on every turn, so the hash is what later
+  // says whether the turn ran under the prompt the bot still uses.
+  test("instr is the hash of the system prompt the turn was sent", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const ai = new FakeAI();
+
+    const out = await askHandler(baseInput({ storage, ai }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(999);
+
+    const sent = (ai.calls[0] as Parameters<AIClient["ask"]>[0]).system;
+    const node = await storage.conversations.get("c1", 999);
+    expect(node!.run!.instr).toBe(instructionHash(sent));
+  });
+
+  // A gated turn still writes a node so the chain survives — but it made no
+  // model call, so claiming a run for it would be a lie.
+  test("a rate-limited turn stores no run at all", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const rlStorage = new MemoryStorage();
+    await exhaustUsage(rlStorage, "42", 1000);
+
+    const out = await askHandler(
+      baseInput({ storage, rateLimiter: new DualWindowLimiter(rlStorage) }),
+    );
+    if (out.kind !== "rateLimited") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(4, "You are rate-limited");
+
+    expect((await storage.conversations.get("c1", 4))!.run).toBeUndefined();
+  });
+
+  test("a provider call that threw stores no run either", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    class ThrowingAI implements AIClient {
+      async ask(): Promise<AskResult> {
+        throw new Error("provider down");
+      }
+    }
+
+    const out = await askHandler(baseInput({ storage, ai: new ThrowingAI() }));
+    if (out.kind !== "error") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(4, "AI error");
+
+    expect((await storage.conversations.get("c1", 4))!.run).toBeUndefined();
+  });
+
+  // "The bot answered nothing" is exactly the bug class a report is filed about,
+  // so the run behind the empty answer is the part worth keeping.
+  test("an empty answer still records the run that produced it", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+
+    const out = await askHandler(
+      baseInput({ storage, ai: new FakeAI({ ...ANSWERED, text: "  " }) }),
+    );
+    if (out.kind !== "error") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(4, "AI error");
+
+    expect((await storage.conversations.get("c1", 4))!.run!.gen).toEqual(
+      ANSWERED.generations,
+    );
+  });
+
+  // The field is metadata about a turn, not part of it: a chain that replays the
+  // turn must send exactly what it sent before the field existed.
+  test("a replayed chain ignores the stored run", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.conversations.save("c1", 100, {
+      userQuestion: "Q1",
+      botAnswer: "A1",
+      parentBotMsgId: null,
+      ts: 1,
+      run: {
+        gen: ["gen-1789064867-b8Jgaf"],
+        model: "anthropic/claude-sonnet-4.5",
+        detail: "short",
+        instr: "d1e181d3faa2c130",
+      },
+    });
+
+    const ai = new FakeAI();
+    await askHandler(
+      baseInput({
+        storage,
+        ai,
+        askMessageId: 2,
+        userText: "follow-up",
+        replyTarget: {
+          messageId: 100,
+          text: "A1",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+
+    const sent = (ai.calls[0] as Parameters<AIClient["ask"]>[0]).messages;
+    expect(sent.slice(0, 2)).toEqual([
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+    ]);
+    expect(JSON.stringify(sent)).not.toContain("gen-");
   });
 });

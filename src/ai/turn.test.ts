@@ -9,6 +9,7 @@ import { DualWindowLimiter } from "../ratelimit/dual-window";
 import type { AIClient, AIMessage, AskResult } from "./types";
 import type { RateLimiter } from "../ratelimit/types";
 import { runAiTurn, type RunAiTurnInput } from "./turn";
+import { instructionHash } from "./instruction";
 import { conversationSessionId } from "./session";
 import {
   registerTool,
@@ -434,5 +435,52 @@ describe("runAiTurn — effects passthrough & result", () => {
     );
     expect(res.text).toBe("hello");
     expect(res.totalTokens).toBe(77);
+  });
+});
+
+describe("runAiTurn — the run behind the turn", () => {
+  test("carries the response ids and the answering model the client reported", async () => {
+    const ai = new FakeAI({
+      text: "answered",
+      totalTokens: 10,
+      generations: ["gen-1-aaa", "gen-2-bbb"],
+      answeredBy: "anthropic/claude-sonnet-4.5",
+    });
+    const res = await runAiTurn(baseInput({ ai, detailLevel: "wise" }));
+    expect(res.run.gen).toEqual(["gen-1-aaa", "gen-2-bbb"]);
+    expect(res.run.model).toBe("anthropic/claude-sonnet-4.5");
+    expect(res.run.detail).toBe("wise");
+  });
+
+  // Both are optional on `AskResult`, and a client that records neither must not
+  // turn into a run claiming an empty model.
+  test("a client that reports no ids and no model leaves gen empty and model absent", async () => {
+    const res = await runAiTurn(
+      baseInput({ ai: new FakeAI({ text: "answered", totalTokens: 10 }) }),
+    );
+    expect(res.run.gen).toEqual([]);
+    expect("model" in res.run).toBe(false);
+  });
+
+  // Guest mode and reminder delivery pass none, and an explicit `undefined`
+  // would still be a key on the stored node.
+  test("no detail level means no detail key", async () => {
+    const res = await runAiTurn(baseInput());
+    expect("detail" in res.run).toBe(false);
+  });
+
+  // The hash has to fingerprint the prompt the model was actually handed, not a
+  // second build of it.
+  test("instr hashes the system prompt the model was sent", async () => {
+    const ai = new FakeAI();
+    const res = await runAiTurn(baseInput({ ai, detailLevel: "short" }));
+    const sent = (ai.calls[0] as { system: string }).system;
+    expect(res.run.instr).toBe(instructionHash(sent));
+  });
+
+  test("a changed persona changes instr", async () => {
+    const first = await runAiTurn(baseInput({ systemPrompt: "Be helpful." }));
+    const second = await runAiTurn(baseInput({ systemPrompt: "Be terse." }));
+    expect(second.run.instr).not.toBe(first.run.instr);
   });
 });
