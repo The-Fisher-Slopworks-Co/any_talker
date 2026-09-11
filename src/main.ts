@@ -131,6 +131,7 @@ async function main() {
   // Resolve the main bot's id up front (deterministic, no startup race): managed
   // bots treat it as a sibling for the bare-`/ask` alone-check.
   const mainMe = await bot.api.getMe();
+  const mainBotId = String(mainMe.id);
   botManager = new BotManager({
     storage,
     rateLimiter,
@@ -140,7 +141,7 @@ async function main() {
     ownerId: config.botOwnerId,
     telegramEnv: config.telegramEnv,
     mainApi: bot.api,
-    mainBotId: String(mainMe.id),
+    mainBotId,
     logFormat: config.logFormat,
     logIncomingUpdates: config.logIncomingUpdates,
     logDebug: config.logDebug,
@@ -173,7 +174,14 @@ async function main() {
   });
 
   await bot.api.deleteWebhook();
-  await syncBotCommands(bot.api, config.botOwnerId).catch((err) => {
+  // The family is still just the main bot here — the character bots start in
+  // `loadAndStartAll` below, and each of those starts re-syncs the whole family
+  // (which is what hands the shared commands to the smallest id).
+  await syncBotCommands(bot.api, {
+    ownerId: config.botOwnerId,
+    selfBotId: mainBotId,
+    familyBotIds: [mainBotId],
+  }).catch((err) => {
     console.error("syncBotCommands failed:", err);
   });
   // The main bot is the family hub (token brokering, owner notifications), so

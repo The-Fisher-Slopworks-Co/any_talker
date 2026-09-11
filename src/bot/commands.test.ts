@@ -9,11 +9,26 @@ import {
   BOT_COMMANDS_RU,
   OWNER_COMMANDS_EN,
   OWNER_COMMANDS_RU,
+  ownsSharedCommands,
   PRIVATE_COMMANDS_EN,
   PRIVATE_COMMANDS_RU,
   syncBotCommands,
+  type FamilyCommand,
   type SyncCommandsApi,
 } from "./commands";
+
+// What Telegram actually receives: the family-level `shared` flag is ours and
+// is stripped before the upload.
+function plain(list: readonly FamilyCommand[]): BotCommand[] {
+  return list.map(({ shared, ...cmd }) => {
+    void shared;
+    return cmd;
+  });
+}
+
+function withoutShared(list: readonly FamilyCommand[]): BotCommand[] {
+  return plain(list.filter((c) => !c.shared));
+}
 
 describe("command lists", () => {
   test("English list matches the expected shape", () => {
@@ -24,6 +39,7 @@ describe("command lists", () => {
         command: "feedback",
         description: "Report a problem",
         is_ephemeral: true,
+        shared: true,
       },
     ]);
   });
@@ -36,6 +52,7 @@ describe("command lists", () => {
         command: "feedback",
         description: "Сообщить о проблеме",
         is_ephemeral: true,
+        shared: true,
       },
     ]);
   });
@@ -64,17 +81,34 @@ describe("command lists", () => {
     }
   });
 
+  // `/feedback` behaves the same whichever family bot answers it; `/ask` and
+  // `/askwise` address one specific character, so they are per-bot.
+  test("only /feedback is marked shared", () => {
+    for (const list of [
+      BOT_COMMANDS_EN,
+      BOT_COMMANDS_RU,
+      PRIVATE_COMMANDS_EN,
+      PRIVATE_COMMANDS_RU,
+      OWNER_COMMANDS_EN,
+      OWNER_COMMANDS_RU,
+    ]) {
+      expect(list.filter((c) => c.shared).map((c) => c.command)).toEqual([
+        "feedback",
+      ]);
+    }
+  });
+
   test("private lists extend the public ones with /usage", () => {
     expect(PRIVATE_COMMANDS_EN).toEqual([
       { command: "ask", description: "Ask (short answer)" },
       { command: "askwise", description: "Ask (detailed answer)" },
-      { command: "feedback", description: "Report a problem" },
+      { command: "feedback", description: "Report a problem", shared: true },
       { command: "usage", description: "Your limits, in percent" },
     ]);
     expect(PRIVATE_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
       { command: "askwise", description: "Спросить (подробно)" },
-      { command: "feedback", description: "Сообщить о проблеме" },
+      { command: "feedback", description: "Сообщить о проблеме", shared: true },
       { command: "usage", description: "Твои лимиты, в процентах" },
     ]);
   });
@@ -123,37 +157,72 @@ describe("BOT_COMMAND_SCOPES", () => {
   });
 });
 
+describe("ownsSharedCommands", () => {
+  test("the smallest id in the family owns them", () => {
+    expect(ownsSharedCommands("100", ["100", "200", "300"])).toBe(true);
+    expect(ownsSharedCommands("200", ["100", "200", "300"])).toBe(false);
+    expect(ownsSharedCommands("300", ["100", "200", "300"])).toBe(false);
+  });
+
+  test("ids are compared as numbers, not as strings", () => {
+    // Lexicographically "10000" < "9999"; numerically it is the other way round.
+    expect(ownsSharedCommands("9999", ["9999", "10000"])).toBe(true);
+    expect(ownsSharedCommands("10000", ["9999", "10000"])).toBe(false);
+  });
+
+  test("a lone bot owns them", () => {
+    expect(ownsSharedCommands("777", ["777"])).toBe(true);
+    expect(ownsSharedCommands("777", [])).toBe(true);
+    expect(ownsSharedCommands("777", undefined)).toBe(true);
+  });
+
+  // Dropping the entry on a bot whose id we could not learn would lose the
+  // feature outright; a duplicate is the lesser evil.
+  test("an unknown or unparsable id keeps them", () => {
+    expect(ownsSharedCommands(undefined, ["100"])).toBe(true);
+    expect(ownsSharedCommands("nope", ["100"])).toBe(true);
+    expect(ownsSharedCommands("200", ["nope", "300"])).toBe(true);
+  });
+});
+
 type SetMyCommandsCall = {
   commands: readonly BotCommand[];
   other?: { language_code?: string; scope?: BotCommandScope } | undefined;
 };
 
-describe("syncBotCommands", () => {
-  test("uploads default + en + ru, and repeats each combo under every scope", async () => {
-    const calls: SetMyCommandsCall[] = [];
-    const api: SyncCommandsApi = {
+function recordingApi(): { api: SyncCommandsApi; calls: SetMyCommandsCall[] } {
+  const calls: SetMyCommandsCall[] = [];
+  return {
+    calls,
+    api: {
       async setMyCommands(commands, other) {
         calls.push({ commands, other });
       },
-    };
+    },
+  };
+}
+
+describe("syncBotCommands", () => {
+  test("uploads default + en + ru, and repeats each combo under every scope", async () => {
+    const { api, calls } = recordingApi();
 
     await syncBotCommands(api);
 
     expect(calls).toHaveLength(3 + BOT_COMMAND_SCOPES.length * 3);
 
-    expect(calls[0]!.commands).toEqual(BOT_COMMANDS_EN);
+    expect(calls[0]!.commands).toEqual(plain(BOT_COMMANDS_EN));
     expect(calls[0]!.other).toBeUndefined();
-    expect(calls[1]!.commands).toEqual(BOT_COMMANDS_EN);
+    expect(calls[1]!.commands).toEqual(plain(BOT_COMMANDS_EN));
     expect(calls[1]!.other).toEqual({ language_code: "en" });
-    expect(calls[2]!.commands).toEqual(BOT_COMMANDS_RU);
+    expect(calls[2]!.commands).toEqual(plain(BOT_COMMANDS_RU));
     expect(calls[2]!.other).toEqual({ language_code: "ru" });
 
     let i = 3;
     for (const scope of BOT_COMMAND_SCOPES) {
       // Private chats get the DM-only `/usage` on top of the public list.
       const isPrivate = scope.type === "all_private_chats";
-      const en = isPrivate ? PRIVATE_COMMANDS_EN : BOT_COMMANDS_EN;
-      const ru = isPrivate ? PRIVATE_COMMANDS_RU : BOT_COMMANDS_RU;
+      const en = plain(isPrivate ? PRIVATE_COMMANDS_EN : BOT_COMMANDS_EN);
+      const ru = plain(isPrivate ? PRIVATE_COMMANDS_RU : BOT_COMMANDS_RU);
       expect(calls[i]!.commands).toEqual(en);
       expect(calls[i]!.other).toEqual({ scope });
       i++;
@@ -166,13 +235,20 @@ describe("syncBotCommands", () => {
     }
   });
 
+  test("never uploads the internal `shared` flag to Telegram", async () => {
+    const { api, calls } = recordingApi();
+
+    await syncBotCommands(api, { ownerId: "12345" });
+
+    for (const call of calls) {
+      for (const cmd of call.commands) {
+        expect(Object.keys(cmd)).not.toContain("shared");
+      }
+    }
+  });
+
   test("registers commands under BotCommandScopeAllPrivateChats", async () => {
-    const calls: SetMyCommandsCall[] = [];
-    const api: SyncCommandsApi = {
-      async setMyCommands(commands, other) {
-        calls.push({ commands, other });
-      },
-    };
+    const { api, calls } = recordingApi();
 
     await syncBotCommands(api);
 
@@ -181,19 +257,14 @@ describe("syncBotCommands", () => {
     );
     expect(privateScopeCalls).toHaveLength(3);
     expect(privateScopeCalls.map((c) => c.commands)).toEqual([
-      PRIVATE_COMMANDS_EN,
-      PRIVATE_COMMANDS_EN,
-      PRIVATE_COMMANDS_RU,
+      plain(PRIVATE_COMMANDS_EN),
+      plain(PRIVATE_COMMANDS_EN),
+      plain(PRIVATE_COMMANDS_RU),
     ]);
   });
 
   test("registers commands under BotCommandScopeAllGroupChats", async () => {
-    const calls: SetMyCommandsCall[] = [];
-    const api: SyncCommandsApi = {
-      async setMyCommands(commands, other) {
-        calls.push({ commands, other });
-      },
-    };
+    const { api, calls } = recordingApi();
 
     await syncBotCommands(api);
 
@@ -206,19 +277,14 @@ describe("syncBotCommands", () => {
       expect(c.commands.map((cmd) => cmd.command)).not.toContain("usage");
     }
     expect(groupScopeCalls.map((c) => c.commands)).toEqual([
-      BOT_COMMANDS_EN,
-      BOT_COMMANDS_EN,
-      BOT_COMMANDS_RU,
+      plain(BOT_COMMANDS_EN),
+      plain(BOT_COMMANDS_EN),
+      plain(BOT_COMMANDS_RU),
     ]);
   });
 
   test("registers commands under BotCommandScopeAllChatAdministrators", async () => {
-    const calls: SetMyCommandsCall[] = [];
-    const api: SyncCommandsApi = {
-      async setMyCommands(commands, other) {
-        calls.push({ commands, other });
-      },
-    };
+    const { api, calls } = recordingApi();
 
     await syncBotCommands(api);
 
@@ -227,9 +293,9 @@ describe("syncBotCommands", () => {
     );
     expect(adminScopeCalls).toHaveLength(3);
     expect(adminScopeCalls.map((c) => c.commands)).toEqual([
-      BOT_COMMANDS_EN,
-      BOT_COMMANDS_EN,
-      BOT_COMMANDS_RU,
+      plain(BOT_COMMANDS_EN),
+      plain(BOT_COMMANDS_EN),
+      plain(BOT_COMMANDS_RU),
     ]);
   });
 
@@ -243,14 +309,9 @@ describe("syncBotCommands", () => {
   });
 
   test("adds /digest under a chat scope for the owner only", async () => {
-    const calls: SetMyCommandsCall[] = [];
-    const api: SyncCommandsApi = {
-      async setMyCommands(commands, other) {
-        calls.push({ commands, other });
-      },
-    };
+    const { api, calls } = recordingApi();
 
-    await syncBotCommands(api, "12345");
+    await syncBotCommands(api, { ownerId: "12345" });
 
     const ownerCalls = calls.filter((c) => c.other?.scope?.type === "chat");
     expect(ownerCalls).toHaveLength(3);
@@ -258,9 +319,9 @@ describe("syncBotCommands", () => {
       expect(c.other?.scope).toEqual({ type: "chat", chat_id: "12345" });
     }
     expect(ownerCalls.map((c) => c.commands)).toEqual([
-      OWNER_COMMANDS_EN,
-      OWNER_COMMANDS_EN,
-      OWNER_COMMANDS_RU,
+      plain(OWNER_COMMANDS_EN),
+      plain(OWNER_COMMANDS_EN),
+      plain(OWNER_COMMANDS_RU),
     ]);
     // Every other scope keeps the public list — /digest is owner-only.
     for (const c of calls.filter((x) => x.other?.scope?.type !== "chat")) {
@@ -277,6 +338,77 @@ describe("syncBotCommands", () => {
     ]);
     for (const list of [OWNER_COMMANDS_EN, OWNER_COMMANDS_RU]) {
       expect(list.map((c) => c.command)).toContain("digest");
+    }
+  });
+});
+
+// The bug this guards: a group holding two family bots showed `/feedback`
+// twice, once per bot. Only the smallest id lists it there now.
+describe("syncBotCommands with a family", () => {
+  test("the smallest id keeps the shared commands everywhere", async () => {
+    const { api, calls } = recordingApi();
+
+    await syncBotCommands(api, {
+      ownerId: "1",
+      selfBotId: "100",
+      familyBotIds: ["100", "200"],
+    });
+
+    for (const c of calls) {
+      expect(c.commands.map((cmd) => cmd.command)).toContain("feedback");
+    }
+  });
+
+  test("a bigger id drops them from the group-facing scopes only", async () => {
+    const { api, calls } = recordingApi();
+
+    await syncBotCommands(api, {
+      ownerId: "1",
+      selfBotId: "200",
+      familyBotIds: ["100", "200"],
+    });
+
+    const groupish = calls.filter(
+      (c) =>
+        c.other?.scope === undefined ||
+        c.other.scope.type === "all_group_chats" ||
+        c.other.scope.type === "all_chat_administrators",
+    );
+    expect(groupish).toHaveLength(3 + 6);
+    for (const c of groupish) {
+      expect(c.commands.map((cmd) => cmd.command)).not.toContain("feedback");
+    }
+    expect(groupish.map((c) => c.commands)).toEqual([
+      withoutShared(BOT_COMMANDS_EN),
+      withoutShared(BOT_COMMANDS_EN),
+      withoutShared(BOT_COMMANDS_RU),
+      withoutShared(BOT_COMMANDS_EN),
+      withoutShared(BOT_COMMANDS_EN),
+      withoutShared(BOT_COMMANDS_RU),
+      withoutShared(BOT_COMMANDS_EN),
+      withoutShared(BOT_COMMANDS_EN),
+      withoutShared(BOT_COMMANDS_RU),
+    ]);
+  });
+
+  // A DM is one-on-one: there is no second bot in it to duplicate the entry.
+  test("a bigger id keeps them in every private scope", async () => {
+    const { api, calls } = recordingApi();
+
+    await syncBotCommands(api, {
+      ownerId: "12345",
+      selfBotId: "200",
+      familyBotIds: ["100", "200"],
+    });
+
+    const dmCalls = calls.filter(
+      (c) =>
+        c.other?.scope?.type === "all_private_chats" ||
+        c.other?.scope?.type === "chat",
+    );
+    expect(dmCalls).toHaveLength(6);
+    for (const c of dmCalls) {
+      expect(c.commands.map((cmd) => cmd.command)).toContain("feedback");
     }
   });
 });
