@@ -11,6 +11,7 @@ import { checkAccess, type AccessDenyReason } from "../access";
 import {
   buildContext,
   buildUserEnvelope,
+  conversationBotId,
   conversationStorage,
   type ReplyTarget,
   type Sender,
@@ -101,6 +102,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
   const storage = input.storage.forBot(input.botId ?? null);
   // The conversation graph is family-shared in group chats so a reply across
   // bots carries context, and per-character in DMs (see `conversationStorage`).
+  const convBotId = conversationBotId(input.botId ?? null, input.chatId);
   const convStorage = conversationStorage(
     input.storage,
     input.botId ?? null,
@@ -212,6 +214,23 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       convStorage.conversations.save(input.chatId, botMsgId, node),
       convStorage.conversations.save(input.chatId, input.askMessageId, node),
     ]);
+    // Indexed only once the nodes it points at exist: an entry whose head
+    // cannot be read back is worse than no entry. The head is `botMsgId`, not
+    // `askMessageId` — both keys hold this turn, but only one of them can be
+    // the entry a follow-up advances, and replying to the bot's own message is
+    // how a thread ordinarily continues.
+    //
+    // `convBotId` rather than the answering bot: what the entry has to name is
+    // the scope these nodes were written in, which in a group is the
+    // family-shared one whichever bot replied.
+    await convStorage.conversations.indexUserThread(input.userId, {
+      kind: "chain",
+      chatId: input.chatId,
+      botId: convBotId,
+      botMsgId,
+      parentBotMsgId,
+      ts: input.now,
+    });
   };
 
   const turn = await runGatedAiTurn({

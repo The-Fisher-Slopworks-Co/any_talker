@@ -1448,3 +1448,105 @@ describe("askHandler — the run on the persisted turn", () => {
     expect(JSON.stringify(sent)).not.toContain("gen-");
   });
 });
+
+// Issue #116: the per-user index that lets a bug report find the threads its
+// reporter was just in — the conversation graph has no per-user entry point.
+describe("askHandler — the user's thread index", () => {
+  test("an answered turn indexes the thread at the bot's message id", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const out = await askHandler(baseInput({ storage }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(999);
+    expect(await storage.conversations.listUserThreads("42")).toEqual([
+      { kind: "chain", chatId: "c1", botId: null, botMsgId: 999, ts: 1000 },
+    ]);
+  });
+
+  test("a follow-up advances the entry instead of opening a second thread", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const first = await askHandler(baseInput({ storage, askMessageId: 1 }));
+    if (first.kind !== "answered") throw new Error(`unexpected ${first.kind}`);
+    await first.persistConversation(2);
+
+    const second = await askHandler(
+      baseInput({
+        storage,
+        askMessageId: 3,
+        now: 2_000,
+        userText: "and then?",
+        replyTarget: {
+          messageId: 2,
+          text: "mock reply",
+          authorFirstName: "Bot",
+          images: [],
+        },
+      }),
+    );
+    if (second.kind !== "answered")
+      throw new Error(`unexpected ${second.kind}`);
+    await second.persistConversation(4);
+
+    expect(await storage.conversations.listUserThreads("42")).toEqual([
+      { kind: "chain", chatId: "c1", botId: null, botMsgId: 4, ts: 2000 },
+    ]);
+  });
+
+  // The entry has to name the scope the NODES went into, not the bot that
+  // answered — otherwise a snapshot resolves it against an empty namespace.
+  test("in a group the entry names the family-shared scope, in a DM the bot's own", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+
+    const group = await askHandler(
+      baseInput({ storage, botId: "cat-bot", chatId: "-100" }),
+    );
+    if (group.kind !== "answered") throw new Error(`unexpected ${group.kind}`);
+    await group.persistConversation(999);
+
+    const dm = await askHandler(
+      baseInput({ storage, botId: "cat-bot", chatId: "c1", now: 2_000 }),
+    );
+    if (dm.kind !== "answered") throw new Error(`unexpected ${dm.kind}`);
+    await dm.persistConversation(888);
+
+    expect(await storage.conversations.listUserThreads("42")).toEqual([
+      {
+        kind: "chain",
+        chatId: "c1",
+        botId: "cat-bot",
+        botMsgId: 888,
+        ts: 2000,
+      },
+      { kind: "chain", chatId: "-100", botId: null, botMsgId: 999, ts: 1000 },
+    ]);
+    // And each entry resolves through the scope it names.
+    expect(
+      await storage.forBot("cat-bot").conversations.get("c1", 888),
+    ).not.toBeNull();
+    expect(
+      await storage.forBot(null).conversations.get("-100", 999),
+    ).not.toBeNull();
+  });
+
+  test("a rate-limited turn indexes the thread it persisted", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const rlStorage = new MemoryStorage();
+    await exhaustUsage(rlStorage, "42", 1000);
+    const out = await askHandler(
+      baseInput({
+        storage,
+        rateLimiter: new DualWindowLimiter(rlStorage),
+        askMessageId: 3,
+      }),
+    );
+    if (out.kind !== "rateLimited") throw new Error(`unexpected ${out.kind}`);
+    await out.persistConversation(4, "You are rate-limited");
+    // A node was written, so the thread is reachable and belongs in the index.
+    expect(await storage.conversations.listUserThreads("42")).toEqual([
+      { kind: "chain", chatId: "c1", botId: null, botMsgId: 4, ts: 1000 },
+    ]);
+  });
+});

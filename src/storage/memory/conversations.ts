@@ -1,8 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import type { ConversationNode, GuestThreadNode } from "../../shared/types";
-import type { ConversationsStore } from "../types/conversations";
+import type {
+  ConversationNode,
+  GuestThreadNode,
+  UserThreadRef,
+} from "../../shared/types";
+import { USER_THREAD_INDEX_MAX } from "../../shared/types";
+import {
+  continuesThread,
+  userThreadRef,
+  type ConversationsStore,
+  type UserThreadWrite,
+} from "../types/conversations";
 import type { Backing, Scope } from "../memory";
 
 export class MemoryConversationsStore implements ConversationsStore {
@@ -53,5 +63,25 @@ export class MemoryConversationsStore implements ConversationsStore {
 
   async saveGuest(chatId: string, thread: GuestThreadNode): Promise<void> {
     this.b.guestThreads.set(this.scope.sk(chatId), structuredClone(thread));
+  }
+
+  // Keyed by the bare user id: the index is global, so every `forBot` view of
+  // the shared backing reads and writes the same list.
+  async indexUserThread(userId: string, write: UserThreadWrite): Promise<void> {
+    const current = this.b.userThreads.get(userId) ?? [];
+    // The thread this turn continues leaves at its old head and comes back at
+    // the new one; everything else keeps its place.
+    const kept = current.filter((ref) => !continuesThread(ref, write));
+    const next = [userThreadRef(write), ...kept]
+      // Newest first, as the KeyDB index reads its ZSET back. The sort is
+      // stable, so a turn sharing a millisecond with an indexed thread still
+      // lands ahead of it — the order this write already put it in.
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, USER_THREAD_INDEX_MAX);
+    this.b.userThreads.set(userId, next);
+  }
+
+  async listUserThreads(userId: string): Promise<UserThreadRef[]> {
+    return (this.b.userThreads.get(userId) ?? []).map((ref) => ({ ...ref }));
   }
 }
