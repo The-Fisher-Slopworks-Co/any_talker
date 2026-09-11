@@ -58,7 +58,7 @@ export type FeedbackInput = {
 export type FeedbackOutcome =
   | { kind: "recorded"; id: string }
   | { kind: "empty" }
-  | { kind: "rateLimited"; perDay: number }
+  | { kind: "rateLimited" }
   | { kind: "denied"; reason: AccessDenyReason };
 
 // Stores one report, outside the budget and rate-limit gates: it costs no
@@ -88,7 +88,7 @@ export async function feedbackHandler(
   // first pay for reading the conversation graph.
   const count = await storage.feedback.bumpDailyCount(userId, now);
   if (count > FEEDBACK_DAILY_MAX) {
-    return { kind: "rateLimited", perDay: FEEDBACK_DAILY_MAX };
+    return { kind: "rateLimited" };
   }
   const [userTimezone, facts, threads] = await Promise.all([
     scoped.profile.getTimezone(userId),

@@ -186,7 +186,7 @@ export async function dispatchFeedbackCommand(
     outcome.kind === "empty"
       ? ctx.t.bot_feedback_usage
       : outcome.kind === "rateLimited"
-        ? ctx.t.bot_feedback_limited(outcome.perDay)
+        ? ctx.t.bot_feedback_limited
         : ctx.t.bot_feedback_recorded;
   await replyToReporter(ctx, answer, receiver);
 }

@@ -143,7 +143,7 @@ describe("feedbackHandler", () => {
       expect((await run(storage)).kind).toBe("recorded");
     }
     const over = await run(storage);
-    expect(over).toEqual({ kind: "rateLimited", perDay: FEEDBACK_DAILY_MAX });
+    expect(over).toEqual({ kind: "rateLimited" });
     expect((await storage.feedback.list()).entries).toHaveLength(
       FEEDBACK_DAILY_MAX,
     );
