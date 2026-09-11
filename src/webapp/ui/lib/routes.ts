@@ -27,6 +27,8 @@ export type Route =
   | { kind: "chat-edit"; chatId: string; from: AdminSection }
   | { kind: "check-edit"; checkId: string | null }
   | { kind: "managed-bot-edit"; botId: string | null }
+  // Read-only apart from the status, so it is a view rather than an `-edit`.
+  | { kind: "feedback-view"; feedbackId: string }
   | { kind: "my-reminders" }
   | { kind: "my-facts" };
 

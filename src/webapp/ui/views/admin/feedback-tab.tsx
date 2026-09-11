@@ -13,7 +13,7 @@ import { useLoadable } from "../../lib/use-loadable";
 
 type Filter = FeedbackStatus | "all";
 
-export function FeedbackTab() {
+export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
   const { t: s } = useI18n();
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
@@ -78,6 +78,7 @@ export function FeedbackTab() {
           <FeedbackCard
             entries={data.entries}
             busy={busy}
+            onOpen={onOpen}
             onDelete={remove}
             emptyText={s.ui_feedback_empty}
           />

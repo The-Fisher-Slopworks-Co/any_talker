@@ -25,12 +25,14 @@ export function AdminSectionView({
   onEditChat,
   onEditCheck,
   onEditManagedBot,
+  onOpenFeedback,
 }: {
   section: AdminSection;
   onEditUser: (id: string, from: AdminSection) => void;
   onEditChat: (id: string, from: AdminSection) => void;
   onEditCheck: (id: string | null) => void;
   onEditManagedBot: (id: string | null) => void;
+  onOpenFeedback: (id: string) => void;
 }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const needsSettings =
@@ -48,7 +50,7 @@ export function AdminSectionView({
 
   if (section === "spend") return <SpendTab />;
   if (section === "quarantine") return <QuarantineTab />;
-  if (section === "feedback") return <FeedbackTab />;
+  if (section === "feedback") return <FeedbackTab onOpen={onOpenFeedback} />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
   if (section === "chats") return <ChatsTab onEdit={goChat} />;
   if (section === "checks")
