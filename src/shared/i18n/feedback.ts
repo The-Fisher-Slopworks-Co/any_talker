@@ -95,8 +95,8 @@ export const feedbackMessages = {
     ru: "Отчёт",
   }),
   ui_feedback_not_found: m({
-    en: "No such report — it may have been deleted since the list was loaded.",
-    ru: "Такого отчёта нет — возможно, его удалили после того, как список загрузился.",
+    en: "Report not found",
+    ru: "Отчёт не найден",
   }),
   ui_feedback_record_header: m({
     en: "Report",
