@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { m } from "./message";
+import { pluralEn, pluralRu } from "./plural";
 
 // `/feedback` — everything the command says back, and the admin tab that reads
 // what it stored. In a group each of the command's lines is sent ephemerally, so
@@ -53,10 +54,13 @@ export const feedbackMessages = {
     en: "Closed",
     ru: "Закрыт",
   }),
-  // Counted, not declined: a plural form would say no more than the numbers do.
+  // How much of a snapshot came with the report, declined: a row reads as a
+  // phrase rather than two labels, and Russian gets all three of its forms.
   ui_feedback_counts: m({
-    en: (n: number, turns: number) => `threads: ${n} · turns: ${turns}`,
-    ru: (n: number, turns: number) => `диалогов: ${n} · ходов: ${turns}`,
+    en: (n: number, turns: number) =>
+      `${pluralEn(n, "thread", "threads")} · ${pluralEn(turns, "turn", "turns")}`,
+    ru: (n: number, turns: number) =>
+      `${pluralRu(n, "диалог", "диалога", "диалогов")} · ${pluralRu(turns, "ход", "хода", "ходов")}`,
   }),
   ui_feedback_load_more: m({
     en: "Load more",

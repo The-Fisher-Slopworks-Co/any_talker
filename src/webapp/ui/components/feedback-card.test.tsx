@@ -53,7 +53,7 @@ describe("FeedbackCard", () => {
     const html = render([entry()]);
     expect(html).toContain("the bot answered in the wrong language");
     expect(html).toContain("id u42");
-    expect(html).toContain("threads: 2 · turns: 7");
+    expect(html).toContain("2 threads · 7 turns");
     expect(html).toContain("New");
     expect(html).toContain("2026-01-02");
   });
@@ -65,15 +65,25 @@ describe("FeedbackCard", () => {
     expect(long).toContain("…");
     expect(long).not.toContain("x".repeat(500));
     expect(render([entry({ threadCount: 0, turnCount: 0 })])).toContain(
-      "threads: 0 · turns: 0",
+      "0 threads · 0 turns",
     );
     expect(render([])).toContain("No reports.");
   });
 
   test("takes its labels from the catalogue, not from English literals", () => {
     const html = render([entry({ status: "closed" })], "ru");
-    expect(html).toContain("диалогов: 2 · ходов: 7");
+    expect(html).toContain("2 диалога · 7 ходов");
     expect(html).toContain("Закрыт");
     expect(html).toContain("Удалить");
+  });
+
+  // The counts are declined, and Russian spends three forms on them: the row
+  // must not settle for the one that happens to fit the fixture.
+  test("declines both counts, in either locale", () => {
+    const one = entry({ threadCount: 1, turnCount: 1 });
+    expect(render([one])).toContain("1 thread · 1 turn");
+    expect(render([one], "ru")).toContain("1 диалог · 1 ход");
+    const teens = entry({ threadCount: 11, turnCount: 21 });
+    expect(render([teens], "ru")).toContain("11 диалогов · 21 ход");
   });
 });
