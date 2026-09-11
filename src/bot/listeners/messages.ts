@@ -16,6 +16,7 @@ import {
 } from "../dispatch/commands";
 import { dispatchAsk } from "../dispatch/ask";
 import type { MediaGroupDispatcher } from "../dispatch/media-group";
+import { replyEphemeral } from "../ephemeral";
 import { pickPhotoSize, downloadTelegramFile } from "../photo";
 import { transcodeOggToMp3 } from "../transcode";
 import { pickVideo, MAX_VIDEO_FRAMES } from "../video";
@@ -91,7 +92,7 @@ export function registerMessageListeners(
         imageFileId = picked.file_id;
       } catch (err) {
         console.error("photo download failed:", err);
-        await ctx.reply(ctx.t.bot_photo_cant_fetch);
+        await replyEphemeral(ctx, ctx.t.bot_photo_cant_fetch, ctx.from?.id);
         return;
       }
     }
@@ -138,7 +139,7 @@ export function registerMessageListeners(
       );
     } catch (err) {
       console.error("voice download failed:", err);
-      await ctx.reply(ctx.t.bot_voice_cant_fetch);
+      await replyEphemeral(ctx, ctx.t.bot_voice_cant_fetch, ctx.from?.id);
       return;
     }
 
@@ -148,7 +149,7 @@ export function registerMessageListeners(
     const mp3 = await transcodeOggToMp3(audio);
     if (!mp3) {
       console.error("voice transcode failed");
-      await ctx.reply(ctx.t.bot_voice_cant_fetch);
+      await replyEphemeral(ctx, ctx.t.bot_voice_cant_fetch, ctx.from?.id);
       return;
     }
 
@@ -213,7 +214,11 @@ export function registerMessageListeners(
       MAX_VIDEO_FRAMES,
     );
     if (!parts.ok) {
-      await ctx.reply(videoErrorText(ctx, parts.reason));
+      await replyEphemeral(
+        ctx,
+        videoErrorText(ctx, parts.reason),
+        ctx.from?.id,
+      );
       return;
     }
     const media = rt.video.media(video, parts);

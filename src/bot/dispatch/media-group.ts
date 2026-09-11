@@ -6,6 +6,7 @@ import type { BotRuntime } from "../runtime";
 import type { BotContext } from "../middleware/lang";
 import { createMediaGroupBuffer } from "../media-group-buffer";
 import { matchAsk } from "../routing";
+import { replyEphemeral } from "../ephemeral";
 import { pickPhotoSize } from "../photo";
 import {
   pickVideo,
@@ -86,7 +87,11 @@ export function createMediaGroupDispatcher(
             fileIds.push(picked.file_id);
           } catch (err) {
             console.error("media group photo download failed:", err);
-            await ctx.reply(ctx.t.bot_photo_cant_fetch).catch(() => {});
+            await replyEphemeral(
+              ctx,
+              ctx.t.bot_photo_cant_fetch,
+              ctx.from?.id,
+            ).catch(() => {});
             return;
           }
           continue;
@@ -100,7 +105,11 @@ export function createMediaGroupDispatcher(
           albumMode,
         );
         if (!parts.ok) {
-          await ctx.reply(videoErrorText(ctx, parts.reason)).catch(() => {});
+          await replyEphemeral(
+            ctx,
+            videoErrorText(ctx, parts.reason),
+            ctx.from?.id,
+          ).catch(() => {});
           return;
         }
         if (parts.mode === "native") {

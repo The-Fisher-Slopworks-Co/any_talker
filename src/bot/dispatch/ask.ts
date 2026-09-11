@@ -8,6 +8,7 @@ import { downloadTelegramFile } from "../photo";
 import { transcodeOggToMp3 } from "../transcode";
 import { pickVideo, type VideoClip } from "../video";
 import { resolveSenderIdentity } from "../identity";
+import { replyEphemeral } from "../ephemeral";
 import { resolveReplyImages } from "../reply-images";
 import { extractReplyTarget } from "../reply";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
@@ -213,16 +214,19 @@ export async function dispatchAsk(
         });
         return;
       case "usage":
-        await ctx.reply(ctx.t.bot_ask_usage);
+        await replyEphemeral(ctx, ctx.t.bot_ask_usage, ctx.from?.id);
         return;
       // Failure notices are still part of the conversation: persist the turn
       // (question + the notice actually sent) so a later reply to either the
-      // notice or the user's own ask message carries the full chain.
+      // notice or the user's own ask message carries the full chain. An
+      // ephemeral notice has no message id to reply to, so there the chain
+      // hangs off the ask message alone — already one of the two keys every
+      // turn is stored under.
       case "budgetLimited": {
         void rt.alerts.globalCapBreach(ctx.api, outcome.reason);
         const text = ctx.t.bot_budget_limited;
-        const sent = await ctx.reply(text);
-        await outcome.persistConversation(sent.message_id, text);
+        const { botMsgId } = await replyEphemeral(ctx, text, ctx.from?.id);
+        await outcome.persistConversation(botMsgId ?? args.askMessageId, text);
         return;
       }
       case "rateLimited": {
@@ -230,14 +234,15 @@ export async function dispatchAsk(
           outcome.limitedBy,
           outcome.msUntilReset,
         );
-        const sent = await ctx.reply(text);
-        await outcome.persistConversation(sent.message_id, text);
+        const { botMsgId } = await replyEphemeral(ctx, text, ctx.from?.id);
+        await outcome.persistConversation(botMsgId ?? args.askMessageId, text);
         return;
       }
       case "error": {
         console.error("ask error:", outcome.message);
-        const sent = await ctx.reply(ctx.t.bot_ai_error);
-        await outcome.persistConversation(sent.message_id, ctx.t.bot_ai_error);
+        const text = ctx.t.bot_ai_error;
+        const { botMsgId } = await replyEphemeral(ctx, text, ctx.from?.id);
+        await outcome.persistConversation(botMsgId ?? args.askMessageId, text);
         return;
       }
       case "answered": {
