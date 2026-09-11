@@ -4,7 +4,7 @@
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient, AIMessage, RoutingOptions } from "./types";
-import type { RateLimitConfig, ToolCallRecord } from "../shared/types";
+import type { RateLimitConfig, ToolCallRecord, TurnRun } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import { recordSpend } from "../spending/record";
 import { conversationSessionId } from "./session";
@@ -17,6 +17,7 @@ import {
   buildInstruction,
   detailLevelMultiplier,
   detailLevelReasoningEffort,
+  instructionHash,
   type DetailLevel,
 } from "./instruction";
 
@@ -104,19 +105,31 @@ export type AiTurnResult = {
   // next one can replay it (`bot/handlers/ask.ts`, `bot/handlers/guest.ts`).
   // Empty when no tool ran, or when the client does not record them.
   toolCalls: ToolCallRecord[];
+  // What this run did, in the shape a conversation node stores it: the response
+  // id of every model call, who answered, the detail level and the hash of the
+  // system prompt. Assembled here because this is where all four are known at
+  // once. Callers that own a conversation history persist it with the turn
+  // (`bot/handlers/ask.ts`, `bot/handlers/guest.ts`); reminder delivery, which
+  // writes no node, ignores it.
+  run: TurnRun;
 };
 
 export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
   const effects: ToolEffect[] = [];
 
+  // Built into a const rather than inline: the same string is hashed below, and
+  // hashing a second build would risk fingerprinting a prompt the model never
+  // saw.
+  const instruction = buildInstruction(input.systemPrompt, {
+    timezone: input.timezone,
+    lang: input.lang,
+    detailLevel: input.detailLevel,
+    facts: input.facts,
+  });
+
   const result = await input.ai.ask({
     models: input.models,
-    system: buildInstruction(input.systemPrompt, {
-      timezone: input.timezone,
-      lang: input.lang,
-      detailLevel: input.detailLevel,
-      facts: input.facts,
-    }),
+    system: instruction,
     messages: input.messages,
     // The registry is filtered by source, not handed over whole: a reminder
     // delivery must not be offered the tools that write reminders.
@@ -186,5 +199,13 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
     priced,
     effects,
     toolCalls: result.toolCalls ?? [],
+    run: {
+      gen: result.generations ?? [],
+      // Spread, never assigned: the stored form uses key presence to tell "the
+      // provider named none" from "predates the field".
+      ...(result.answeredBy !== undefined && { model: result.answeredBy }),
+      ...(input.detailLevel && { detail: input.detailLevel }),
+      instr: instructionHash(instruction),
+    },
   };
 }

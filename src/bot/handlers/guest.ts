@@ -300,6 +300,10 @@ export async function guestAskHandler(
                 userImageFileIds: allImageFileIds,
               }),
               ...(turn.toolCalls.length > 0 && { toolCalls: turn.toolCalls }),
+              // Unconditional, unlike the two above: this path only exists for
+              // a turn that reached the model, so there is always a run behind
+              // it to record.
+              run: turn.run,
             },
           ].slice(-MAX_REPLY_CHAIN_DEPTH);
           await storage.conversations.saveGuest(input.chatId, {

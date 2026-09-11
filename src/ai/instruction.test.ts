@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { buildInstruction } from "./instruction";
+import { buildInstruction, instructionHash } from "./instruction";
 
 describe("buildInstruction", () => {
   test("includes the message format section with our envelope keys", () => {
@@ -186,5 +186,30 @@ describe("buildInstruction", () => {
     expect(out).toContain("Отвечай подробно");
     expect(out).toContain("глубина важнее объёма");
     expect(out).not.toContain("исчерпывающе");
+  });
+});
+
+describe("instructionHash", () => {
+  test("is 16 lowercase hex characters", () => {
+    expect(instructionHash(buildInstruction("Be helpful."))).toMatch(
+      /^[0-9a-f]{16}$/,
+    );
+  });
+
+  // The whole point of storing it: the same prompt on two turns weeks apart has
+  // to hash the same, a changed one must not.
+  test("is stable for the same prompt and differs for a changed one", () => {
+    const before = buildInstruction("Be helpful.");
+    expect(instructionHash(before)).toBe(instructionHash(before));
+    expect(instructionHash(buildInstruction("Be terse."))).not.toBe(
+      instructionHash(before),
+    );
+  });
+
+  // Pinned, not computed: this value travels in stored turns, so a change to
+  // the digest or the truncation would silently stop matching every node
+  // written before it.
+  test("is the leading 16 hex of the prompt's SHA-256", () => {
+    expect(instructionHash("hello")).toBe("2cf24dba5fb0a30e");
   });
 });

@@ -25,6 +25,7 @@ export class MemoryConversationsStore implements ConversationsStore {
       ...v,
       ...(v.userImageFileIds && { userImageFileIds: [...v.userImageFileIds] }),
       ...(v.toolCalls && { toolCalls: v.toolCalls.map((r) => ({ ...r })) }),
+      ...(v.run && { run: { ...v.run, gen: [...v.run.gen] } }),
     };
   }
 
@@ -41,6 +42,7 @@ export class MemoryConversationsStore implements ConversationsStore {
       ...(node.toolCalls && {
         toolCalls: node.toolCalls.map((r) => ({ ...r })),
       }),
+      ...(node.run && { run: { ...node.run, gen: [...node.run.gen] } }),
     });
   }
 

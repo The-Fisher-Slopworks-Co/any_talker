@@ -39,6 +39,7 @@ export {
 } from "./types/settings";
 export type {
   ToolCallRecord,
+  TurnRun,
   ConversationNode,
   GuestThreadNode,
 } from "./types/conversations";

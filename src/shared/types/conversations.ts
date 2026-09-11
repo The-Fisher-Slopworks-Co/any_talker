@@ -22,6 +22,38 @@ export type ToolCallRecord = {
   output: string;
 };
 
+// What the model run behind a turn actually did, kept with the turn so a bug
+// report can point at that run instead of at a timestamp and a guess.
+//
+// Deliberately small: everything else a generation carries — provider, resolved
+// model version, per-call usage, cost, latency, finish reason — is retrievable
+// from OpenRouter by id (`GET /api/v1/generation?id=`), and copying all of it
+// into every node of every user would be paying storage for a second copy.
+export type TurnRun = {
+  // The OpenRouter response id of every model call the turn made, in call order
+  // (see `AskResult.generations`): one per tool-loop round plus the final
+  // answer. Empty when the client reported none — which is also what a turn run
+  // by a client that records nothing looks like.
+  gen: string[];
+  // The slug of the model that served the last call, as the provider named it.
+  // NOT necessarily the head of the requested chain — OpenRouter falls back
+  // down it — and not the exact version either, which only the generation id
+  // gives back. Absent when no call reported one.
+  model?: string;
+  // The detail level the turn ran at. Ours, not OpenRouter's, so no generation
+  // can give it back. Absent on turns that have none (guest mode, reminder
+  // delivery). Mirrors `DetailLevel` (`ai/instruction.ts`), which `shared/` must
+  // not import; widening it there surfaces here as a type error at the write
+  // site.
+  detail?: "short" | "wise";
+  // `instructionHash` of the system prompt this turn was actually sent. The
+  // prompt is rebuilt from settings on every turn (`ai/instruction.ts`) and may
+  // have changed by the time anyone reads the report, so the hash is what says
+  // "not that prompt anymore". Keeping the prompt itself on every node would
+  // cost kilobytes a turn; a report stores it once instead.
+  instr?: string;
+};
+
 export type ConversationNode = {
   userQuestion: string;
   botAnswer: string;
@@ -32,6 +64,10 @@ export type ConversationNode = {
   // and on every node written before tool transcripts existed, which is why it
   // is optional rather than an empty array.
   toolCalls?: ToolCallRecord[];
+  // What the model run behind this turn did. Absent on a turn that never
+  // reached the model — a rate-limited or budget-denied turn still writes a node
+  // so the chain survives — and on every node written before the field existed.
+  run?: TurnRun;
 };
 
 type GuestThreadTurn = {
@@ -42,6 +78,8 @@ type GuestThreadTurn = {
   userImageFileIds?: string[];
   // As in ConversationNode: the tools this turn ran, replayed on follow-ups.
   toolCalls?: ToolCallRecord[];
+  // As in ConversationNode: what the model run behind this turn did.
+  run?: TurnRun;
 };
 
 export type GuestThreadNode = {
