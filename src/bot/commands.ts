@@ -10,14 +10,22 @@ export type SyncCommandsApi = {
   ): Promise<unknown>;
 };
 
+// `is_ephemeral` earns `/feedback` its icon in the bot menu: outside a DM the
+// reply is visible only to whoever sent it, and the menu says so up front.
 export const BOT_COMMANDS_EN: readonly BotCommand[] = [
   { command: "ask", description: "Ask (short answer)" },
   { command: "askwise", description: "Ask (detailed answer)" },
+  { command: "feedback", description: "Report a problem", is_ephemeral: true },
 ];
 
 export const BOT_COMMANDS_RU: readonly BotCommand[] = [
   { command: "ask", description: "Спросить (коротко)" },
   { command: "askwise", description: "Спросить (подробно)" },
+  {
+    command: "feedback",
+    description: "Сообщить о проблеме",
+    is_ephemeral: true,
+  },
 ];
 
 // Private chats additionally list `/usage`. It is DM-only (the handler ignores

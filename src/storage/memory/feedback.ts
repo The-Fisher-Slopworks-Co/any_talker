@@ -9,6 +9,8 @@ import {
   type FeedbackStore,
 } from "../types/feedback";
 import type { Backing } from "../memory";
+import { utcDateKey } from "../../spending/window";
+import { pruneDateKeyed } from "./date-buckets";
 
 export class MemoryFeedbackStore implements FeedbackStore {
   constructor(private readonly b: Backing) {}
@@ -38,6 +40,18 @@ export class MemoryFeedbackStore implements FeedbackStore {
       entries: page.map((e) => structuredClone(e)),
       nextCursor: more ? (page[page.length - 1]?.createdAt ?? null) : null,
     };
+  }
+
+  // Date-bucketed like the denial ranking, so the pruning rule is the same one;
+  // KeyDB gets the same expiry from its key's TTL.
+  async bumpDailyCount(userId: string, nowMs: number): Promise<number> {
+    const day = utcDateKey(nowMs);
+    const byUser = this.b.feedbackRate.get(day) ?? new Map<string, number>();
+    this.b.feedbackRate.set(day, byUser);
+    const count = (byUser.get(userId) ?? 0) + 1;
+    byUser.set(userId, count);
+    pruneDateKeyed(this.b.feedbackRate, nowMs, 2);
+    return count;
   }
 
   async delete(id: string): Promise<void> {

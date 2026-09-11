@@ -44,4 +44,10 @@ export interface FeedbackStore {
   get(id: string): Promise<FeedbackEntry | null>;
   list(query?: FeedbackListQuery): Promise<FeedbackPage>;
   delete(id: string): Promise<void>;
+
+  // Anti-spam: counts one submission against the reporter's UTC day, returning
+  // the new count for the caller to compare with its own cap. Not the token
+  // rate limiter (feedback costs no tokens), and not in memory (a counter a
+  // restart resets is not a daily cap).
+  bumpDailyCount(userId: string, nowMs: number): Promise<number>;
 }
