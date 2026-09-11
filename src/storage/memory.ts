@@ -28,6 +28,7 @@ import type {
   UserUsage,
   ConversationNode,
   GuestThreadNode,
+  UserThreadRef,
   User,
   Chat,
   ChatSettings,
@@ -70,6 +71,9 @@ export type Backing = {
   usage: Map<string, UserUsage>;
   conversations: Map<string, ConversationNode>;
   guestThreads: Map<string, GuestThreadNode>;
+  // userId -> that user's recent threads, newest first (global — not affected
+  // by `forBot`; each entry names the scope its own thread lives in).
+  userThreads: Map<string, UserThreadRef[]>;
   userNames: Map<string, string>;
   userTimezones: Map<string, string>;
   userGenders: Map<string, Gender>;
@@ -118,6 +122,7 @@ function createBacking(): Backing {
     usage: new Map(),
     conversations: new Map(),
     guestThreads: new Map(),
+    userThreads: new Map(),
     userNames: new Map(),
     userTimezones: new Map(),
     userGenders: new Map(),

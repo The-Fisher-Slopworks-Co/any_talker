@@ -311,6 +311,16 @@ export async function guestAskHandler(
             turns,
             ts: input.now,
           });
+          // A guest thread is keyed by chat alone, so it has no head to
+          // advance: every turn refreshes the one entry rather than adding a
+          // second. `botId` is this bot's own — a guest chat is a business DM,
+          // never the family-shared group namespace.
+          await storage.conversations.indexUserThread(input.userId, {
+            kind: "guest",
+            chatId: input.chatId,
+            botId: input.botId ?? null,
+            ts: input.now,
+          });
         },
       };
     }

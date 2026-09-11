@@ -1049,3 +1049,46 @@ describe("guestAskHandler — the run on the stored turn", () => {
     expect(JSON.stringify(sent)).not.toContain("gen-");
   });
 });
+
+// Issue #116: a guest thread is as reportable as a chain, so it goes into the
+// same per-user index — tagged, because it is keyed by chat alone.
+describe("guestAskHandler — the user's thread index", () => {
+  test("persistThread indexes the guest thread in the answering bot's scope", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const out = await guestAskHandler(baseInput({ storage, botId: "cat-bot" }));
+    if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+    await out.persistThread();
+    expect(await storage.conversations.listUserThreads("42")).toEqual([
+      { kind: "guest", chatId: "c1", botId: "cat-bot", ts: 1000 },
+    ]);
+    // The scope the entry names is the one holding the thread.
+    expect(
+      await storage.forBot("cat-bot").conversations.getGuest("c1"),
+    ).not.toBeNull();
+  });
+
+  test("a second turn refreshes the one entry rather than adding another", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const first = await guestAskHandler(baseInput({ storage }));
+    if (first.kind !== "answered") throw new Error(`unexpected ${first.kind}`);
+    await first.persistThread();
+
+    const second = await guestAskHandler(
+      baseInput({
+        storage,
+        now: 2_000,
+        userText: "and then?",
+        priorThread: await storage.conversations.getGuest("c1"),
+      }),
+    );
+    if (second.kind !== "answered")
+      throw new Error(`unexpected ${second.kind}`);
+    await second.persistThread();
+
+    expect(await storage.conversations.listUserThreads("42")).toEqual([
+      { kind: "guest", chatId: "c1", botId: null, ts: 2000 },
+    ]);
+  });
+});

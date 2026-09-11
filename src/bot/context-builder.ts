@@ -40,13 +40,24 @@ export type ReplyTarget = {
 //
 // Telegram group/supergroup/channel ids are negative; a private chat id is the
 // (positive) user id — which is what distinguishes the two cases here.
+//
+// `conversationBotId` is the scope on its own, for the caller that stores it
+// rather than a view of it: an entry in the per-user thread index names the
+// scope its nodes live in, and is resolved later through `storage.forBot`.
+export function conversationBotId(
+  botId: string | null,
+  chatId: string,
+): string | null {
+  const isGroupChat = chatId.startsWith("-");
+  return isGroupChat ? null : botId;
+}
+
 export function conversationStorage(
   base: Storage,
   botId: string | null,
   chatId: string,
 ): Storage {
-  const isGroupChat = chatId.startsWith("-");
-  return base.forBot(isGroupChat ? null : botId);
+  return base.forBot(conversationBotId(botId, chatId));
 }
 
 // Telegram voice notes are ogg/opus; they're transcoded to mp3 at the download
