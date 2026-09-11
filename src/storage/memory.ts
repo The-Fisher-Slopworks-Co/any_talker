@@ -19,6 +19,7 @@ import type {
   PrivateChatsStore,
   ChecksStore,
   FactsStore,
+  FeedbackStore,
 } from "./types";
 import type {
   Settings,
@@ -36,6 +37,7 @@ import type { Lang } from "../shared/i18n";
 import type { DateFormat } from "../shared/date-format";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
+import type { FeedbackEntry } from "../shared/types/feedback";
 import type { ManagedBot } from "../managed-bots/types";
 import { MemoryManagedBotsStore } from "./memory/managed-bots";
 import { MemoryPresenceStore } from "./memory/presence";
@@ -53,6 +55,7 @@ import { MemoryRemindersStore } from "./memory/reminders";
 import { MemoryPrivateChatsStore } from "./memory/private-chats";
 import { MemoryChecksStore } from "./memory/checks";
 import { MemoryFactsStore } from "./memory/facts";
+import { MemoryFeedbackStore } from "./memory/feedback";
 
 // All mutable state lives in one object shared by reference across every
 // `forBot` view, so a managed bot's storage and the main bot's storage see the
@@ -96,6 +99,8 @@ export type Backing = {
   reminders: Map<string, Reminder>;
   privateChats: Set<string>;
   checks: Map<string, RecurringCheck>;
+  // `/feedback` submissions, keyed by id (global — not affected by `forBot`).
+  feedback: Map<string, FeedbackEntry>;
   photoCache: Map<string, Uint8Array>;
   albums: Map<string, Map<number, string>>;
   userFacts: Map<string, Map<string, string>>;
@@ -134,6 +139,7 @@ function createBacking(): Backing {
     reminders: new Map(),
     privateChats: new Set(),
     checks: new Map(),
+    feedback: new Map(),
     photoCache: new Map(),
     albums: new Map(),
     userFacts: new Map(),
@@ -181,6 +187,7 @@ export class MemoryStorage implements Storage {
   readonly privateChats: PrivateChatsStore;
   readonly checks: ChecksStore;
   readonly facts: FactsStore;
+  readonly feedback: FeedbackStore;
 
   constructor(backing?: Backing, scope = "") {
     const b = backing ?? createBacking();
@@ -212,6 +219,7 @@ export class MemoryStorage implements Storage {
     this.privateChats = new MemoryPrivateChatsStore(b, s);
     this.checks = new MemoryChecksStore(b);
     this.facts = new MemoryFactsStore(b, s);
+    this.feedback = new MemoryFeedbackStore(b);
   }
 
   // The new view shares this instance's backing object by reference: it is a
