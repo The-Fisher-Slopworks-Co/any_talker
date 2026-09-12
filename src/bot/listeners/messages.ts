@@ -37,7 +37,10 @@ export function registerMessageListeners(
     }
     const feedback = matchFeedbackCommand(ctx.message.text, ctx.me.username);
     if (feedback) {
-      await dispatchFeedbackCommand(rt, ctx, feedback.text);
+      // Every family bot in the chat matched this one identically; only the one
+      // that owns the shared commands here files the report.
+      if (await rt.shouldHandleSharedCommand(ctx, feedback.explicit))
+        await dispatchFeedbackCommand(rt, ctx, feedback.text);
       return;
     }
     const match = matchAsk(ctx.message.text, ctx.me.username);

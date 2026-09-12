@@ -21,17 +21,22 @@ export const FEEDBACK_DAILY_MAX = 5;
 
 // Addressed to this bot: bare, or `@`-suffixed with its own username, as
 // `/usage` and `/digest` match theirs. Otherwise the report, empty when bare.
+// `explicit` says which of the two it was — `/feedback` is a shared command, so
+// only a bare one needs the who-acts-on-it gate (`handlesSharedCommand`).
 export function matchFeedbackCommand(
   text: string,
   selfUsername: string | undefined,
-): { text: string } | null {
+): { text: string; explicit: boolean } | null {
   const m = COMMAND_RE.exec(text.trim());
   if (!m) return null;
   const addressed = m[1]?.toLowerCase();
   if (addressed !== undefined && addressed !== selfUsername?.toLowerCase()) {
     return null;
   }
-  return { text: (m[2] ?? "").trim().slice(0, FEEDBACK_TEXT_MAX) };
+  return {
+    text: (m[2] ?? "").trim().slice(0, FEEDBACK_TEXT_MAX),
+    explicit: addressed !== undefined,
+  };
 }
 
 export type FeedbackInput = {
