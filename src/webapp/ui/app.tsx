@@ -12,7 +12,7 @@ import { DateFmtProvider } from "./datetime-context";
 import { LoadingState } from "./components/states";
 import { BuildInfoFooter } from "./components/build-info-footer";
 import { UsageHeader } from "./components/usage-header";
-import { adminSection, type Route } from "./lib/routes";
+import { adminSection, showsUsageHeader, type Route } from "./lib/routes";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
@@ -35,9 +35,10 @@ function AppShell({
   const [route, setRoute] = useState<Route>({ kind: "main" });
   const [usage, setUsage] = useState<UsageShare | null>(null);
 
-  // The header is route-independent, so it is fetched once here rather than by
-  // each view. A failure leaves it null and the header simply doesn't render —
-  // never a reason to block the settings the user actually opened.
+  // The header is fetched once here rather than by the main view, so it does
+  // not reload every time the user comes back to the home screen. A failure
+  // leaves it null and the header simply doesn't render — never a reason to
+  // block the settings the user actually opened.
   useEffect(() => {
     api
       .getMyUsageShare()
@@ -190,7 +191,7 @@ function AppShell({
 
   return (
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
-      <UsageHeader usage={usage} />
+      {showsUsageHeader(route) && <UsageHeader usage={usage} />}
       <div className="px-1 pb-4 text-xl font-semibold">{title}</div>
       {renderRoute()}
       <BuildInfoFooter />
