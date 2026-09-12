@@ -17,10 +17,6 @@ export const profileMessages = {
     en: "Your name",
     ru: "Ваше имя",
   }),
-  ui_main_name_footer: m({
-    en: "Name shown to the AI.",
-    ru: "Имя, которое видит ИИ.",
-  }),
   ui_main_name_err_too_long: m({
     en: "Too long (max 32 characters).",
     ru: "Слишком длинное (макс. 32 символа).",
@@ -82,12 +78,8 @@ export const profileMessages = {
     ru: "Формат времени",
   }),
   ui_main_time_format_auto: m({
-    en: "Auto (as on your device)",
-    ru: "Авто (как на устройстве)",
-  }),
-  ui_main_time_format_footer: m({
-    en: "How dates and times are shown in this app. Auto follows your device's format.",
-    ru: "Как отображаются дата и время в этом приложении. Авто — по настройкам устройства.",
+    en: "Auto",
+    ru: "Авто",
   }),
   ui_main_language: m({
     en: "Language",
@@ -104,6 +96,10 @@ export const profileMessages = {
   ui_main_lang_russian: m({
     en: "Russian",
     ru: "Русский",
+  }),
+  ui_main_settings_footer: m({
+    en: "The AI sees your name, gender and timezone. Changes are saved automatically.",
+    ru: "Имя, пол и часовой пояс видит ИИ. Изменения сохраняются сразу.",
   }),
   ui_main_save_failed: m({
     en: "Couldn't save. Try again.",
