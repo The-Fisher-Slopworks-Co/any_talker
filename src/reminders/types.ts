@@ -52,7 +52,12 @@ export type Recurrence = {
 
 export const MIN_LEAD_MS = 60_000;
 
-// Longest note a reminder may carry, as the scheduling tools accept it.
+// Longest note a reminder may carry. The note is mostly the model's brief for
+// the delivery turn, but it also reaches Telegram verbatim — as the fallback
+// body of an empty delivery and quoted in the failure notice — so it stays well
+// under the 4096-char message limit with room for the text around it. Shared
+// by the scheduling tools and the admin edit, so neither can store a note the
+// other would reject.
 export const REMINDER_TEXT_MAX_LEN = 2000;
 
 // Nothing repeats faster than this. Every fire re-runs the LLM, so a
