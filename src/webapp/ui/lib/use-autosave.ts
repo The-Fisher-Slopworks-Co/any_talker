@@ -5,8 +5,9 @@ import { useEffect, useRef, useState } from "react";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 
-// How long "Saved" stays up before the footer falls back to its hint.
-const SAVED_FLASH_MS = 2000;
+// How long the outcome of a burst stays on screen before the toast hides; a
+// failure lingers longer, since the change it reports did not stick.
+const OUTCOME_SHOWN_MS = { saved: 2000, failed: 5000 };
 
 // Sends every change as its own patch, one request at a time in the order the
 // changes were made, so an older response can never land after a newer one and
@@ -66,8 +67,8 @@ export function useAutosave<P, R>(handlers: {
   );
 
   useEffect(() => {
-    if (status !== "saved") return;
-    const timer = setTimeout(() => setStatus("idle"), SAVED_FLASH_MS);
+    if (status !== "saved" && status !== "failed") return;
+    const timer = setTimeout(() => setStatus("idle"), OUTCOME_SHOWN_MS[status]);
     return () => clearTimeout(timer);
   }, [status]);
 
