@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { syncFamilyCommands } from "./commands";
 import { createManagedPersonaResolver } from "./persona";
 import {
   createRuntime,
@@ -123,10 +122,10 @@ export class BotManager {
     await this.stopBot(botId);
     await this.runtime.deps.storage.managedBots.delete(botId);
     await this.runtime.deps.storage.managedBots.setToken(botId, null);
-    // The family shrank: if the deleted bot was the one listing the shared
-    // commands in groups, they have to move to the next-smallest id — without
-    // this re-sync `/feedback` would vanish from every group menu.
-    await syncFamilyCommands(this.runtime);
+    // The family shrank, and the shared commands it may have been listing in a
+    // group move to the next-smallest bot present there. Nothing to do here: the
+    // deleted bot drops out of `siblingBotIds`, so the next update in each of
+    // those chats re-resolves the menu (`bot/chat-commands.ts`).
   }
 
   async syncProfileName(botId: string): Promise<void> {
