@@ -5,6 +5,7 @@ import type { Bot } from "grammy";
 import { CHECK_CALLBACK_RE } from "../../checks/callback-data";
 import { checksProcessedTotal } from "../../metrics";
 import { migrateChatData } from "../../storage/migrate-chat";
+import { dropChatMenu } from "../chat-commands";
 import { handleCheckCallback } from "../handlers/check-callback";
 import { contactHandler } from "../handlers/contact";
 import type { BotContext } from "../middleware/lang";
@@ -31,10 +32,30 @@ export function registerChatEventListeners(
       (member.status === "restricted" && member.is_member);
     const chatId = String(upd.chat.id);
     const selfId = String(ctx.me.id);
+    const now = Date.now();
     try {
-      if (present)
-        await rt.deps.storage.presence.record(chatId, selfId, Date.now());
-      else await rt.deps.storage.presence.remove(chatId, selfId);
+      if (present) {
+        await rt.deps.storage.presence.record(chatId, selfId, now);
+        // The family in this chat just changed and this bot is the one that
+        // learned it: re-resolve which of the bots present lists the shared
+        // commands here, instead of waiting for the first message.
+        await rt.syncChatMenu({
+          api: ctx.api,
+          chatId,
+          selfBotId: selfId,
+          nowMs: now,
+        });
+      } else {
+        await rt.deps.storage.presence.remove(chatId, selfId);
+        // Gone from the chat: hand back the chat-scoped menu this bot holds
+        // there, so it cannot outlive the membership it was resolved for.
+        await dropChatMenu({
+          api: ctx.api,
+          storage: rt.deps.storage,
+          chatId,
+          selfBotId: selfId,
+        });
+      }
     } catch (err) {
       console.error("my_chat_member presence update failed:", err);
     }
