@@ -52,14 +52,24 @@ async function onlyEntry(storage: MemoryStorage) {
 }
 
 describe("matchFeedbackCommand", () => {
+  // `explicit` is what the shared-command gate reads: a bare command reached
+  // every family bot in the chat, an `@self` one only this bot.
   test("matches the bare command and this bot's mention", () => {
-    expect(matchFeedbackCommand("/feedback", "mybot")).toEqual({ text: "" });
+    expect(matchFeedbackCommand("/feedback", "mybot")).toEqual({
+      text: "",
+      explicit: false,
+    });
     expect(matchFeedbackCommand("  /FEEDBACK  ", "mybot")).toEqual({
       text: "",
+      explicit: false,
     });
     expect(matchFeedbackCommand("/feedback@mybot broke", "mybot")).toEqual({
       text: "broke",
+      explicit: true,
     });
+    expect(
+      matchFeedbackCommand("/feedback@MyBot broke", "mybot")?.explicit,
+    ).toBe(true);
   });
 
   test("ignores another bot's mention and unrelated text", () => {
@@ -71,7 +81,7 @@ describe("matchFeedbackCommand", () => {
   test("keeps a multi-line report whole and caps it at Telegram's limit", () => {
     expect(
       matchFeedbackCommand("/feedback line one\nline two", "mybot"),
-    ).toEqual({ text: "line one\nline two" });
+    ).toEqual({ text: "line one\nline two", explicit: false });
     const long = matchFeedbackCommand(`/feedback ${"x".repeat(5000)}`, "mybot");
     expect(long?.text).toHaveLength(FEEDBACK_TEXT_MAX);
   });
