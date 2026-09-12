@@ -46,8 +46,9 @@ function WindowBar({ label, share }: { label: string; share: WindowShare }) {
   );
 }
 
-// The Web App's top header: how much of the viewer's own 5-hour and weekly
-// budget is left, as two progress bars. Percentage-only by construction — it is
+// The settings home's top header (see `showsUsageHeader` in `lib/routes.ts`):
+// how much of the viewer's own 5-hour and weekly budget is left, as two
+// progress bars. Percentage-only by construction — it is
 // handed a `UsageShare`, which carries no token counts at all (see
 // `ratelimit/share.ts`), so the same rule the `/usage` command follows holds
 // here. Renders nothing until the fetch lands, so the layout below it doesn't
