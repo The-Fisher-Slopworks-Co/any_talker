@@ -105,6 +105,10 @@ export const profileMessages = {
     en: "Russian",
     ru: "Русский",
   }),
+  ui_main_save_failed: m({
+    en: "Couldn't save. Try again.",
+    ru: "Не удалось сохранить. Попробуйте ещё раз.",
+  }),
   ui_main_reminders: m({
     en: "Reminders",
     ru: "Напоминания",
