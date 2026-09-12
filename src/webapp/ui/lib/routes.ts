@@ -32,6 +32,13 @@ export type Route =
   | { kind: "my-reminders" }
   | { kind: "my-facts" };
 
+// The usage header (the viewer's own 5-hour / weekly bars) belongs to the
+// settings home only: on every other screen it is a repeated, unrelated card
+// above the content the user actually opened.
+export function showsUsageHeader(route: Route): boolean {
+  return route.kind === "main";
+}
+
 export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "prompt",
   "ratelimit",
