@@ -14,10 +14,13 @@ export type {
 } from "./types/budget";
 export type {
   ReasoningEffort,
+  ReasoningEffortConfig,
   ProviderSort,
   ServiceTier,
 } from "./types/models";
 export {
+  REASONING_EFFORTS,
+  isValidReasoningEffort,
   isValidProviderSort,
   isValidServiceTier,
   isValidProviderSlug,

@@ -140,6 +140,7 @@ export async function runGatedAiTurn(
         provider: input.settings.provider,
         serviceTier: input.settings.serviceTier,
       },
+      reasoningEffort: input.settings.reasoningEffort,
       userId: input.userId,
       ownerId: input.ownerId,
       chatId: input.chatId,

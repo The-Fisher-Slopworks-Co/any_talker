@@ -55,6 +55,8 @@ describe("applyChatOverrides", () => {
       providerSort: DEFAULT_SETTINGS.providerSort,
       provider: DEFAULT_SETTINGS.provider,
       serviceTier: DEFAULT_SETTINGS.serviceTier,
+      // Reasoning effort is global policy — never overridden per chat.
+      reasoningEffort: DEFAULT_SETTINGS.reasoningEffort,
       // Access-gate policy is global — chat settings never override it.
       whitelistEnabled: DEFAULT_SETTINGS.whitelistEnabled,
       // Rate limit is per-user and global — chat settings never override it.
@@ -228,6 +230,36 @@ describe("applyChatOverrides", () => {
     expect(s.providerSort).toBeNull();
     expect(s.provider).toBeNull();
     expect(s.serviceTier).toBeNull();
+  });
+
+  test("normalize preserves a stored reasoning effort, including a cleared level", async () => {
+    const storage = new MemoryStorage();
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      reasoningEffort: { short: null, wise: "medium" },
+    });
+    const s = await getOrInitSettings(storage);
+    expect(s.reasoningEffort).toEqual({ short: null, wise: "medium" });
+  });
+
+  test("normalize falls back per level for a missing or invalid reasoning effort", async () => {
+    const storage = new MemoryStorage();
+    const legacy = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
+    delete legacy.reasoningEffort;
+    await storage.settings.save(legacy as never);
+    expect((await getOrInitSettings(storage)).reasoningEffort).toEqual({
+      short: "low",
+      wise: "high",
+    });
+
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      reasoningEffort: { short: "extreme", wise: "medium" },
+    } as never);
+    expect((await getOrInitSettings(storage)).reasoningEffort).toEqual({
+      short: "low",
+      wise: "medium",
+    });
   });
 
   test("normalize backfills the dual-window config from a legacy token-bucket shape", async () => {

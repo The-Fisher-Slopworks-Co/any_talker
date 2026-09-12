@@ -8,11 +8,13 @@ import type {
   RateLimitConfig,
   BudgetConfig,
   AnomalyConfig,
+  ReasoningEffortConfig,
 } from "./shared/types";
 import {
   DEFAULT_SETTINGS,
   isValidProviderSlug,
   isValidProviderSort,
+  isValidReasoningEffort,
   isValidServiceTier,
 } from "./shared/types";
 
@@ -31,6 +33,22 @@ function posInt(v: unknown, def: number): number {
   return typeof v === "number" && Number.isFinite(v) && v >= 1
     ? Math.floor(v)
     : def;
+}
+
+// Reads the per-detail-level reasoning effort. A missing object (rows that
+// predate the field) keeps the historical mapping via the defaults; an explicit
+// `null` per level is preserved (send no effort); anything else that is not a
+// known effort falls back to the default for that level.
+function normalizeReasoningEffort(v: unknown): ReasoningEffortConfig {
+  const raw = (v ?? {}) as Partial<
+    Record<keyof ReasoningEffortConfig, unknown>
+  >;
+  const level = (key: keyof ReasoningEffortConfig) => {
+    const x = raw[key];
+    if (x === null || isValidReasoningEffort(x)) return x;
+    return DEFAULT_SETTINGS.reasoningEffort[key];
+  };
+  return { short: level("short"), wise: level("wise") };
 }
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
@@ -161,6 +179,7 @@ function normalize(s: Settings): Settings {
     : null;
   const provider = isValidProviderSlug(s.provider) ? s.provider : null;
   const serviceTier = isValidServiceTier(s.serviceTier) ? s.serviceTier : null;
+  const reasoningEffort = normalizeReasoningEffort(s.reasoningEffort);
   // Field-by-field return (no `...s` spread) so keys no longer in the schema are
   // dropped on read and never re-persisted — schema-on-read, no migration.
   return {
@@ -172,6 +191,7 @@ function normalize(s: Settings): Settings {
     providerSort,
     provider,
     serviceTier,
+    reasoningEffort,
     whitelistEnabled,
     rateLimit,
     budget,
@@ -197,6 +217,8 @@ export function applyChatOverrides(
     provider: chat.provider !== undefined ? chat.provider : global.provider,
     serviceTier:
       chat.serviceTier !== undefined ? chat.serviceTier : global.serviceTier,
+    // Reasoning effort is global policy, like the rate limit; no per-chat override.
+    reasoningEffort: global.reasoningEffort,
     // Access-gate policy is global, like the rate limit; no per-chat override.
     whitelistEnabled: global.whitelistEnabled,
     // Rate limit is per-user and global; there is no per-chat override.

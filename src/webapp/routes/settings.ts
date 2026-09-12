@@ -6,11 +6,13 @@ import type {
   RateLimitConfig,
   BudgetConfig,
   AnomalyConfig,
+  ReasoningEffortConfig,
 } from "../../shared/types";
 import {
   isValidTimezone,
   isValidProviderSlug,
   isValidProviderSort,
+  isValidReasoningEffort,
   isValidServiceTier,
 } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
@@ -36,6 +38,14 @@ const BAD_PROVIDER: ApiResponse = {
 const BAD_SERVICE_TIER: ApiResponse = {
   status: 400,
   body: { error: "invalid serviceTier" },
+};
+
+const BAD_REASONING_EFFORT: ApiResponse = {
+  status: 400,
+  body: {
+    error:
+      "reasoningEffort levels must be null or one of none, minimal, low, medium, high, xhigh, max",
+  },
 };
 
 const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
@@ -117,6 +127,15 @@ function validateAnomalyPatch(a: Partial<AnomalyConfig>): boolean {
   );
 }
 
+function validateReasoningEffortPatch(v: unknown): boolean {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
+  const r = v as Partial<Record<keyof ReasoningEffortConfig, unknown>>;
+  return (
+    nullOrValid(r.short, isValidReasoningEffort) &&
+    nullOrValid(r.wise, isValidReasoningEffort)
+  );
+}
+
 function isValidModelsList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
@@ -156,6 +175,12 @@ export const settingsRoutes: Route[] = [
       }
       if (!nullOrValid(patch.serviceTier, isValidServiceTier)) {
         return BAD_SERVICE_TIER;
+      }
+      if (
+        patch.reasoningEffort !== undefined &&
+        !validateReasoningEffortPatch(patch.reasoningEffort)
+      ) {
+        return BAD_REASONING_EFFORT;
       }
       if (patch.models !== undefined) {
         const bad = await unknownModelsError(deps.modelCatalog, patch.models);
@@ -222,6 +247,10 @@ export const settingsRoutes: Route[] = [
         ...current,
         ...patch,
         rateLimit: { ...current.rateLimit, ...patch.rateLimit },
+        reasoningEffort: {
+          ...current.reasoningEffort,
+          ...patch.reasoningEffort,
+        },
         budget: { ...current.budget, ...patch.budget },
         anomaly: { ...current.anomaly, ...patch.anomaly },
       };
