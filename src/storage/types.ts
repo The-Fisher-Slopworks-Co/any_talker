@@ -3,6 +3,7 @@
 
 import type { ManagedBotsStore } from "./types/managed-bots";
 import type { PresenceStore } from "./types/presence";
+import type { CommandMenusStore } from "./types/command-menus";
 import type { SettingsStore } from "./types/settings";
 import type { AccessStore } from "./types/access";
 import type { UsageStore } from "./types/usage";
@@ -24,6 +25,7 @@ import type { FeedbackStore } from "./types/feedback";
 export type {
   ManagedBotsStore,
   PresenceStore,
+  CommandMenusStore,
   SettingsStore,
   AccessStore,
   UsageStore,
@@ -50,12 +52,14 @@ export interface Storage {
   // sites are unaffected. A managed bot's id namespaces those entities under an
   // `mbot:{botId}:` segment; every *other* namespace (`settings`, `access`,
   // `usage`, `users`/`chats`, `spend`, `profile`, the photo-bytes cache inside
-  // `photos`, `checks`, `feedback`, `observability`, `presence`, `managedBots`)
-  // is shared across all scopes regardless of which view it is called on.
+  // `photos`, `checks`, `feedback`, `observability`, `presence`, `commandMenus`,
+  // `managedBots`) is shared across all scopes regardless of which view it is
+  // called on.
   forBot(botId: string | null): Storage;
 
   readonly managedBots: ManagedBotsStore;
   readonly presence: PresenceStore;
+  readonly commandMenus: CommandMenusStore;
   readonly settings: SettingsStore;
   readonly access: AccessStore;
   readonly usage: UsageStore;

@@ -242,6 +242,28 @@ describe("migrateChatData", () => {
     expect(await storage.presence.get(OLD)).toEqual({});
   });
 
+  // Not moved: the retired chat id can no longer be addressed, so its
+  // chat-scoped command menus are dropped and the supergroup resolves its own.
+  test("drops the chat-scoped command menus of the old id", async () => {
+    const storage = new MemoryStorage();
+    await storage.commandMenus.record({
+      chatId: OLD,
+      botId: "222",
+      atMs: 5000,
+    });
+    await storage.commandMenus.record({
+      chatId: "other",
+      botId: "222",
+      atMs: 6000,
+    });
+
+    await migrateChatData(storage, OLD, NEW, NOW);
+
+    expect(await storage.commandMenus.list()).toEqual([
+      { chatId: "other", botId: "222", atMs: 6000 },
+    ]);
+  });
+
   test("moves spend history and never doubles it on a re-run", async () => {
     const storage = new MemoryStorage();
     await storage.spend.addChat(OLD, 0.5, NOW - 86_400_000);

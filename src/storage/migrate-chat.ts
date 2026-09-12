@@ -27,7 +27,8 @@ import type { Chat } from "../shared/types";
 //     and the records expire with their 30-day TTL anyway;
 //   - guest threads — guest chats are business DMs; their ids never migrate;
 //   - user-keyed data (facts, attributes, usage, user spend) — unaffected by a
-//     chat id change.
+//     chat id change;
+//   - chat-scoped command menus — dropped instead of moved (`dropCommandMenus`).
 export async function migrateChatData(
   storage: Storage,
   oldChatId: string,
@@ -44,6 +45,7 @@ export async function migrateChatData(
     ["checks", () => migrateChecks(storage, oldChatId, newChatId)],
     ["reminders", () => migrateReminders(storage, oldChatId, newChatId)],
     ["presence", () => migratePresence(storage, oldChatId, newChatId)],
+    ["command_menus", () => dropCommandMenus(storage, oldChatId)],
     ["spend", () => storage.spend.moveChat(oldChatId, newChatId, nowMs)],
   ];
   for (const [name, run] of steps) {
@@ -55,6 +57,20 @@ export async function migrateChatData(
         err,
       );
     }
+  }
+}
+
+// Chat-scoped command menus are NOT carried over: the retired chat id cannot be
+// addressed any more, so its Telegram-side overrides die with it and the rows
+// would only linger in the rollback registry. The supergroup resolves its own
+// menus on the first update after the upgrade (`bot/chat-commands.ts`).
+async function dropCommandMenus(
+  storage: Storage,
+  oldChatId: string,
+): Promise<void> {
+  for (const menu of await storage.commandMenus.list()) {
+    if (menu.chatId !== oldChatId) continue;
+    await storage.commandMenus.forget(oldChatId, menu.botId);
   }
 }
 

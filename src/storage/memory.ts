@@ -5,6 +5,7 @@ import type {
   Storage,
   ManagedBotsStore,
   PresenceStore,
+  CommandMenusStore,
   SettingsStore,
   AccessStore,
   UsageStore,
@@ -42,6 +43,7 @@ import type { FeedbackEntry } from "../shared/types/feedback";
 import type { ManagedBot } from "../managed-bots/types";
 import { MemoryManagedBotsStore } from "./memory/managed-bots";
 import { MemoryPresenceStore } from "./memory/presence";
+import { MemoryCommandMenusStore } from "./memory/command-menus";
 import { MemorySettingsStore } from "./memory/settings";
 import { MemoryAccessStore } from "./memory/access";
 import { MemoryUsageStore } from "./memory/usage";
@@ -114,6 +116,9 @@ export type Backing = {
   managedBotTokens: Map<string, string>;
   // chatId -> (botId -> last-seen epoch ms). Shared across all `forBot` views.
   botPresence: Map<string, Map<string, number>>;
+  // chatId -> (botId -> epoch ms a chat-scoped command menu was applied).
+  // Shared across all `forBot` views.
+  chatCommandMenus: Map<string, Map<string, number>>;
 };
 
 function createBacking(): Backing {
@@ -154,6 +159,7 @@ function createBacking(): Backing {
     managedBots: new Map(),
     managedBotTokens: new Map(),
     botPresence: new Map(),
+    chatCommandMenus: new Map(),
   };
 }
 
@@ -181,6 +187,7 @@ export class MemoryStorage implements Storage {
 
   readonly managedBots: ManagedBotsStore;
   readonly presence: PresenceStore;
+  readonly commandMenus: CommandMenusStore;
   readonly settings: SettingsStore;
   readonly access: AccessStore;
   readonly usage: UsageStore;
@@ -213,6 +220,7 @@ export class MemoryStorage implements Storage {
 
     this.managedBots = new MemoryManagedBotsStore(b);
     this.presence = new MemoryPresenceStore(b);
+    this.commandMenus = new MemoryCommandMenusStore(b);
     this.settings = new MemorySettingsStore(b);
     this.access = new MemoryAccessStore(b);
     this.usage = new MemoryUsageStore(b);

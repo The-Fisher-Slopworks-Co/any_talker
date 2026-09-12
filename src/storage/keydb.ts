@@ -11,6 +11,7 @@ import {
 } from "./keydb/shared";
 import { KeyDBManagedBotsStore } from "./keydb/managed-bots";
 import { KeyDBPresenceStore } from "./keydb/presence";
+import { KeyDBCommandMenusStore } from "./keydb/command-menus";
 import { KeyDBSettingsStore } from "./keydb/settings";
 import { KeyDBAccessStore } from "./keydb/access";
 import { KeyDBUsageStore } from "./keydb/usage";
@@ -30,6 +31,7 @@ import { KeyDBFeedbackStore } from "./keydb/feedback";
 export class KeyDBStorage implements Storage {
   readonly managedBots: KeyDBManagedBotsStore;
   readonly presence: KeyDBPresenceStore;
+  readonly commandMenus: KeyDBCommandMenusStore;
   readonly settings: KeyDBSettingsStore;
   readonly access: KeyDBAccessStore;
   readonly usage: KeyDBUsageStore;
@@ -63,6 +65,7 @@ export class KeyDBStorage implements Storage {
 
     this.managedBots = new KeyDBManagedBotsStore(client);
     this.presence = new KeyDBPresenceStore(client);
+    this.commandMenus = new KeyDBCommandMenusStore(client);
     this.settings = new KeyDBSettingsStore(client);
     this.access = new KeyDBAccessStore(client);
     this.usage = new KeyDBUsageStore(client);
