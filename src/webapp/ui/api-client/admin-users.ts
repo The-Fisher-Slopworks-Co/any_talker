@@ -4,8 +4,12 @@
 import type { Gender, User } from "../../../shared/types";
 import type { Lang } from "../../../shared/i18n";
 import type { SpendSummary } from "../../../spending/window";
-import type { FactsResponse, SpendingResponse } from "./me";
+import type { FactsResponse } from "./me";
 import { req } from "./http";
+
+export type SpendingResponse = {
+  spending: SpendSummary;
+};
 
 export type UserSettingsResponse = {
   user: User;
