@@ -31,14 +31,17 @@ export function registerMessageListeners(
       await dispatchDigestCommand(rt, ctx);
       return;
     }
-    if (matchUsageCommand(ctx.message.text, ctx.me.username)) {
-      await dispatchUsageCommand(rt, ctx);
+    // `/usage` and `/feedback` are shared commands: every family bot in the
+    // chat matched them identically, and only the one that owns the shared
+    // commands here answers (or files the report).
+    const usage = matchUsageCommand(ctx.message.text, ctx.me.username);
+    if (usage) {
+      if (await rt.shouldHandleSharedCommand(ctx, usage.explicit))
+        await dispatchUsageCommand(rt, ctx);
       return;
     }
     const feedback = matchFeedbackCommand(ctx.message.text, ctx.me.username);
     if (feedback) {
-      // Every family bot in the chat matched this one identically; only the one
-      // that owns the shared commands here files the report.
       if (await rt.shouldHandleSharedCommand(ctx, feedback.explicit))
         await dispatchFeedbackCommand(rt, ctx, feedback.text);
       return;

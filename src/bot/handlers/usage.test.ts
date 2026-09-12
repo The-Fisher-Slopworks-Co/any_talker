@@ -17,7 +17,6 @@ const run = (
   usageCommandHandler({
     storage,
     ownerId: "owner",
-    isPrivateChat: true,
     fromUserId: USER,
     lang: "en",
     nowMs: NOW,
@@ -45,26 +44,36 @@ async function withLimits(five: number, weekly: number) {
 
 describe("matchUsageCommand", () => {
   test("matches the bare command and this bot's mention", () => {
-    expect(matchUsageCommand("/usage", "mybot")).toBe(true);
-    expect(matchUsageCommand("  /usage  ", "mybot")).toBe(true);
-    expect(matchUsageCommand("/USAGE", "mybot")).toBe(true);
-    expect(matchUsageCommand("/usage@mybot", "mybot")).toBe(true);
+    expect(matchUsageCommand("/usage", "mybot")).toEqual({ explicit: false });
+    expect(matchUsageCommand("  /usage  ", "mybot")).toEqual({
+      explicit: false,
+    });
+    expect(matchUsageCommand("/USAGE", "mybot")).toEqual({ explicit: false });
+    expect(matchUsageCommand("/usage@mybot", "mybot")).toEqual({
+      explicit: true,
+    });
+    expect(matchUsageCommand("/usage@MyBot", "mybot")).toEqual({
+      explicit: true,
+    });
   });
 
   test("ignores another bot's command and anything with arguments", () => {
-    expect(matchUsageCommand("/usage@otherbot", "mybot")).toBe(false);
-    expect(matchUsageCommand("/usage please", "mybot")).toBe(false);
-    expect(matchUsageCommand("/usages", "mybot")).toBe(false);
-    expect(matchUsageCommand("show me /usage", "mybot")).toBe(false);
+    expect(matchUsageCommand("/usage@otherbot", "mybot")).toBeNull();
+    expect(matchUsageCommand("/usage please", "mybot")).toBeNull();
+    expect(matchUsageCommand("/usages", "mybot")).toBeNull();
+    expect(matchUsageCommand("show me /usage", "mybot")).toBeNull();
   });
 });
 
 describe("usageCommandHandler", () => {
-  test("ignores group chats", async () => {
-    const storage = new MemoryStorage();
-    expect(await run(storage, { isPrivateChat: false })).toEqual({
-      kind: "ignored",
-    });
+  // The handler does not know where it was asked: a group gets the same
+  // report as a DM, delivered ephemerally by the dispatcher.
+  test("reports in a group as it does in a DM", async () => {
+    const storage = await withLimits(1000, 10_000);
+    await spend(storage, USER, 250);
+    const outcome = await run(storage);
+    expect(outcome.kind).toBe("usage");
+    expect(outcome.text).toContain("5 hours: 25%");
   });
 
   test("reports 0% for a user who has never spent anything", async () => {

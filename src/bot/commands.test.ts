@@ -42,6 +42,12 @@ describe("command lists", () => {
         is_ephemeral: true,
         shared: true,
       },
+      {
+        command: "usage",
+        description: "Your limits, in percent",
+        is_ephemeral: true,
+        shared: true,
+      },
     ]);
   });
 
@@ -55,36 +61,47 @@ describe("command lists", () => {
         is_ephemeral: true,
         shared: true,
       },
+      {
+        command: "usage",
+        description: "Твои лимиты, в процентах",
+        is_ephemeral: true,
+        shared: true,
+      },
     ]);
   });
 
   // The flag is what gives the entry its icon in the group menu, where the
   // reply really is ephemeral.
-  test("/feedback is marked ephemeral in the group lists", () => {
+  test("/feedback and /usage are marked ephemeral in the group lists", () => {
     for (const list of [BOT_COMMANDS_EN, BOT_COMMANDS_RU]) {
-      const entry = list.find((c) => c.command === "feedback");
-      expect(entry?.is_ephemeral).toBe(true);
+      for (const name of ["feedback", "usage"]) {
+        const entry = list.find((c) => c.command === name);
+        expect(entry?.is_ephemeral).toBe(true);
+      }
     }
   });
 
   // A DM has nobody to hide the reply from, and an entry that claims otherwise
-  // is what keeps `/feedback` out of a private chat.
-  test("/feedback is listed without the flag in every DM list", () => {
+  // is what keeps a flagged command out of a private chat.
+  test("every DM list carries the commands without the flag", () => {
     for (const list of [
       PRIVATE_COMMANDS_EN,
       PRIVATE_COMMANDS_RU,
       OWNER_COMMANDS_EN,
       OWNER_COMMANDS_RU,
     ]) {
-      const entry = list.find((c) => c.command === "feedback");
-      expect(entry).toBeDefined();
-      expect(entry?.is_ephemeral).toBeUndefined();
+      for (const name of ["feedback", "usage"]) {
+        const entry = list.find((c) => c.command === name);
+        expect(entry).toBeDefined();
+        expect(entry?.is_ephemeral).toBeUndefined();
+      }
     }
   });
 
-  // `/feedback` behaves the same whichever family bot answers it; `/ask` and
-  // `/askwise` address one specific character, so they are per-bot.
-  test("only /feedback is marked shared", () => {
+  // `/feedback` and `/usage` behave the same whichever family bot answers
+  // them; `/ask` and `/askwise` address one specific character, so they are
+  // per-bot.
+  test("only /feedback and /usage are marked shared", () => {
     for (const list of [
       BOT_COMMANDS_EN,
       BOT_COMMANDS_RU,
@@ -95,22 +112,31 @@ describe("command lists", () => {
     ]) {
       expect(list.filter((c) => c.shared).map((c) => c.command)).toEqual([
         "feedback",
+        "usage",
       ]);
     }
   });
 
-  test("private lists extend the public ones with /usage", () => {
+  test("private lists are the public ones minus the ephemeral flag", () => {
     expect(PRIVATE_COMMANDS_EN).toEqual([
       { command: "ask", description: "Ask (short answer)" },
       { command: "askwise", description: "Ask (detailed answer)" },
       { command: "feedback", description: "Report a problem", shared: true },
-      { command: "usage", description: "Your limits, in percent" },
+      {
+        command: "usage",
+        description: "Your limits, in percent",
+        shared: true,
+      },
     ]);
     expect(PRIVATE_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
       { command: "askwise", description: "Спросить (подробно)" },
       { command: "feedback", description: "Сообщить о проблеме", shared: true },
-      { command: "usage", description: "Твои лимиты, в процентах" },
+      {
+        command: "usage",
+        description: "Твои лимиты, в процентах",
+        shared: true,
+      },
     ]);
   });
 
@@ -220,7 +246,7 @@ describe("syncBotCommands", () => {
 
     let i = 3;
     for (const scope of BOT_COMMAND_SCOPES) {
-      // Private chats get the DM-only `/usage` on top of the public list.
+      // Private chats get the same commands, none flagged ephemeral.
       const isPrivate = scope.type === "all_private_chats";
       const en = plain(isPrivate ? PRIVATE_COMMANDS_EN : BOT_COMMANDS_EN);
       const ru = plain(isPrivate ? PRIVATE_COMMANDS_RU : BOT_COMMANDS_RU);
@@ -273,9 +299,9 @@ describe("syncBotCommands", () => {
       (c) => c.other?.scope?.type === "all_group_chats",
     );
     expect(groupScopeCalls).toHaveLength(3);
-    // `/usage` is DM-only — it must not appear in a group menu.
+    // `/usage` answers ephemerally in a group, so the group menu lists it.
     for (const c of groupScopeCalls) {
-      expect(c.commands.map((cmd) => cmd.command)).not.toContain("usage");
+      expect(c.commands.map((cmd) => cmd.command)).toContain("usage");
     }
     expect(groupScopeCalls.map((c) => c.commands)).toEqual([
       plain(BOT_COMMANDS_EN),
@@ -356,6 +382,7 @@ describe("shared commands in the global scopes", () => {
 
     for (const c of calls) {
       expect(c.commands.map((cmd) => cmd.command)).toContain("feedback");
+      expect(c.commands.map((cmd) => cmd.command)).toContain("usage");
     }
   });
 
@@ -369,6 +396,7 @@ describe("shared commands in the global scopes", () => {
     for (const lang of ["en", "ru"] as const) {
       const names = groupCommandsWithoutShared(lang).map((c) => c.command);
       expect(names).not.toContain("feedback");
+      expect(names).not.toContain("usage");
       // Only the shared ones go: the per-character commands stay on every bot.
       expect(names).toContain("ask");
     }

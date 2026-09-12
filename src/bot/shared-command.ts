@@ -6,8 +6,8 @@ import { ownsSharedCommands } from "./commands";
 import { isPresenceFresh, BOT_PRESENCE_TTL_MS } from "./routing";
 import type { BotContext } from "./middleware/lang";
 
-// A *shared* command (`FamilyCommand` in `commands.ts` — `/feedback` is the
-// only one) does the same thing whichever bot of the family runs it, and a
+// A *shared* command (`FamilyCommand` in `commands.ts` — `/feedback` and
+// `/usage`) does the same thing whichever bot of the family runs it, and a
 // group may hold several of them. Telegram delivers a slash command to every
 // bot in the chat, so a bare `/feedback broke` matched all of them: N identical
 // reports filed, N ephemeral confirmations sent, N times the reporter's daily

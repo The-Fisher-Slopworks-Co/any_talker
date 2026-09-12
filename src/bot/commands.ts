@@ -13,8 +13,8 @@ export type SyncCommandsApi = {
 // A menu entry plus one family-level flag of our own. `shared: true` marks a
 // command whose behaviour does not depend on which bot of the family answers
 // it — `/feedback` files the same report from the main bot and from every
-// character bot — so a group holding several of them would otherwise show the
-// same entry once per bot. Exactly one bot lists them per group chat; which one
+// character bot, `/usage` reads the same family-wide windows — so a group
+// holding several of them would otherwise show the same entry once per bot. Exactly one bot lists them per group chat; which one
 // is resolved chat by chat in `bot/chat-commands.ts`.
 export type FamilyCommand = BotCommand & { readonly shared?: true };
 
@@ -23,16 +23,22 @@ function toBotCommands(list: readonly FamilyCommand[]): BotCommand[] {
   return list.map(({ shared: _shared, ...cmd }) => cmd);
 }
 
-// `is_ephemeral` earns `/feedback` its icon in the bot menu: outside a DM the
-// reply is visible only to whoever sent it, and the menu says so up front. The
-// group lists are the ones that carry it — see `withPlainFeedback` for why the
-// DM lists must not.
+// `is_ephemeral` earns `/feedback` and `/usage` their icon in the bot menu:
+// outside a DM the reply is visible only to whoever sent it, and the menu says
+// so up front. The group lists are the ones that carry it — see
+// `withPlainReplies` for why the DM lists must not.
 export const BOT_COMMANDS_EN: readonly FamilyCommand[] = [
   { command: "ask", description: "Ask (short answer)" },
   { command: "askwise", description: "Ask (detailed answer)" },
   {
     command: "feedback",
     description: "Report a problem",
+    is_ephemeral: true,
+    shared: true,
+  },
+  {
+    command: "usage",
+    description: "Your limits, in percent",
     is_ephemeral: true,
     shared: true,
   },
@@ -47,35 +53,31 @@ export const BOT_COMMANDS_RU: readonly FamilyCommand[] = [
     is_ephemeral: true,
     shared: true,
   },
+  {
+    command: "usage",
+    description: "Твои лимиты, в процентах",
+    is_ephemeral: true,
+    shared: true,
+  },
 ];
 
 // An ephemeral message is one only its receiver sees inside a chat of several,
-// which a DM is not: there `dispatchFeedbackCommand` answers with a plain
-// reply. A menu entry promising the other thing is the reason `/feedback` does
-// not reach a private chat at all, so every DM list drops the flag — the
-// command itself is unchanged.
-function withPlainFeedback(
+// which a DM is not: there `replyEphemeral` answers with a plain reply. A menu
+// entry promising the other thing is the reason a flagged command does not
+// reach a private chat at all, so every DM list drops the flag — the commands
+// themselves are unchanged.
+function withPlainReplies(
   commands: readonly FamilyCommand[],
 ): readonly FamilyCommand[] {
-  return commands.map((cmd) => {
-    if (cmd.command !== "feedback") return cmd;
-    const { is_ephemeral: _ephemeral, ...plain } = cmd;
-    return plain;
-  });
+  return commands.map(({ is_ephemeral: _ephemeral, ...plain }) => plain);
 }
 
-// Private chats additionally list `/usage`. It is DM-only (the handler ignores
-// it in groups — how close you are to your limit is nobody else's business), so
-// listing it in the group menus would advertise an entry that does nothing.
-export const PRIVATE_COMMANDS_EN: readonly FamilyCommand[] = [
-  ...withPlainFeedback(BOT_COMMANDS_EN),
-  { command: "usage", description: "Your limits, in percent" },
-];
+// Private chats list the same commands, none of them flagged ephemeral.
+export const PRIVATE_COMMANDS_EN: readonly FamilyCommand[] =
+  withPlainReplies(BOT_COMMANDS_EN);
 
-export const PRIVATE_COMMANDS_RU: readonly FamilyCommand[] = [
-  ...withPlainFeedback(BOT_COMMANDS_RU),
-  { command: "usage", description: "Твои лимиты, в процентах" },
-];
+export const PRIVATE_COMMANDS_RU: readonly FamilyCommand[] =
+  withPlainReplies(BOT_COMMANDS_RU);
 
 // The owner's own DM additionally lists `/digest`. Kept out of every other
 // scope because the handler ignores non-owners anyway, and a menu entry that
