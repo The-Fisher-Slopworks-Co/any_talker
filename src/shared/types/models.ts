@@ -3,14 +3,19 @@
 
 // Reasoning effort passed through to the model per request, sent as
 // OpenRouter's unified `reasoning: { effort }` field (honored by reasoning
-// models, ignored by others).
-export type ReasoningEffort = "minimal" | "low" | "medium" | "high";
+// models, ignored by others). The full documented ladder, lowest first:
+// https://openrouter.ai/docs/guides/best-practices/reasoning-tokens#reasoning-effort-level
+export type ReasoningEffort =
+  "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
-const REASONING_EFFORTS: readonly ReasoningEffort[] = [
+export const REASONING_EFFORTS: readonly ReasoningEffort[] = [
+  "none",
   "minimal",
   "low",
   "medium",
   "high",
+  "xhigh",
+  "max",
 ];
 
 // The effort each detail level asks for: `short` is /ask, `wise` is /askwise.

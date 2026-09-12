@@ -19,6 +19,7 @@ export type {
   ServiceTier,
 } from "./types/models";
 export {
+  REASONING_EFFORTS,
   isValidReasoningEffort,
   isValidProviderSort,
   isValidServiceTier,

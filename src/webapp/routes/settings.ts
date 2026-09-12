@@ -44,7 +44,7 @@ const BAD_REASONING_EFFORT: ApiResponse = {
   status: 400,
   body: {
     error:
-      "reasoningEffort levels must be null or one of minimal, low, medium, high",
+      "reasoningEffort levels must be null or one of none, minimal, low, medium, high, xhigh, max",
   },
 };
 

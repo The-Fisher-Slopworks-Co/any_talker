@@ -361,29 +361,29 @@ describe("PUT /api/settings", () => {
       {
         method: "PUT",
         path: "/api/settings",
-        body: { reasoningEffort: { short: "minimal", wise: null } },
+        body: { reasoningEffort: { short: "none", wise: null } },
       },
       d,
       owner,
     );
     expect(res.status).toBe(200);
     expect((await d.storage.settings.get())?.reasoningEffort).toEqual({
-      short: "minimal",
+      short: "none",
       wise: null,
     });
     res = await handleApi(
       {
         method: "PUT",
         path: "/api/settings",
-        body: { reasoningEffort: { wise: "medium" } },
+        body: { reasoningEffort: { wise: "max" } },
       },
       d,
       owner,
     );
     expect(res.status).toBe(200);
     expect((await d.storage.settings.get())?.reasoningEffort).toEqual({
-      short: "minimal",
-      wise: "medium",
+      short: "none",
+      wise: "max",
     });
   });
 
