@@ -4,7 +4,25 @@
 // Reasoning effort passed through to the model per request, sent as
 // OpenRouter's unified `reasoning: { effort }` field (honored by reasoning
 // models, ignored by others).
-export type ReasoningEffort = "low" | "high";
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high";
+
+const REASONING_EFFORTS: readonly ReasoningEffort[] = [
+  "minimal",
+  "low",
+  "medium",
+  "high",
+];
+
+// The effort each detail level asks for: `short` is /ask, `wise` is /askwise.
+// `null` sends no effort at all, leaving the choice to the model.
+export type ReasoningEffortConfig = {
+  short: ReasoningEffort | null;
+  wise: ReasoningEffort | null;
+};
+
+export function isValidReasoningEffort(v: unknown): v is ReasoningEffort {
+  return (REASONING_EFFORTS as readonly unknown[]).includes(v);
+}
 
 // How OpenRouter should pick among the upstreams serving one model.
 export type ProviderSort = "price" | "throughput" | "latency";

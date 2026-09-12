@@ -355,6 +355,58 @@ describe("PUT /api/settings", () => {
     }
   });
 
+  test("saves the reasoning effort per level and merges a partial patch", async () => {
+    const d = deps();
+    let res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { reasoningEffort: { short: "minimal", wise: null } },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.settings.get())?.reasoningEffort).toEqual({
+      short: "minimal",
+      wise: null,
+    });
+    res = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { reasoningEffort: { wise: "medium" } },
+      },
+      d,
+      owner,
+    );
+    expect(res.status).toBe(200);
+    expect((await d.storage.settings.get())?.reasoningEffort).toEqual({
+      short: "minimal",
+      wise: "medium",
+    });
+  });
+
+  test("rejects an unknown reasoning effort with 400 and leaves the stored value alone", async () => {
+    for (const reasoningEffort of [
+      { short: "extreme" },
+      { wise: 3 },
+      "high",
+      null,
+    ]) {
+      const d = deps();
+      const res = await handleApi(
+        { method: "PUT", path: "/api/settings", body: { reasoningEffort } },
+        d,
+        owner,
+      );
+      expect(res.status).toBe(400);
+      expect((await d.storage.settings.get())?.reasoningEffort).toEqual(
+        DEFAULT_SETTINGS.reasoningEffort,
+      );
+    }
+  });
+
   test("rejects an empty models array with 400", async () => {
     const d = deps();
     const res = await handleApi(
