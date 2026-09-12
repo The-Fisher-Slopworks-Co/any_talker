@@ -32,4 +32,11 @@ export const remindersApi = {
       "GET",
       "/api/admin/reminders/quarantined",
     ),
+  updateAdminReminder: (
+    id: string,
+    patch: { text?: string; fireAtMs?: number },
+  ) =>
+    req<{ reminder: Reminder }>("PATCH", `/api/admin/reminders/${id}`, patch),
+  deleteAdminReminder: (id: string) =>
+    req<{ ok: true }>("DELETE", `/api/admin/reminders/${id}`),
 };

@@ -4,6 +4,7 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
+import { REMINDER_TEXT_MAX_LEN } from "../../../reminders/types";
 import {
   durationToMs,
   persistReminder,
@@ -14,7 +15,7 @@ import {
 const Schema = z.object({
   amount: z.number().int().positive().max(100_000),
   unit: z.enum(["minutes", "hours", "days"]),
-  text: z.string().min(1).max(2000),
+  text: z.string().min(1).max(REMINDER_TEXT_MAX_LEN),
 });
 
 type Input = z.infer<typeof Schema>;

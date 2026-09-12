@@ -2506,6 +2506,124 @@ describe("/api/admin/reminders", () => {
   });
 });
 
+describe("PATCH/DELETE /api/admin/reminders/:id", () => {
+  const HOUR = 60 * 60 * 1000;
+
+  async function seeded() {
+    const d = deps();
+    await d.storage.reminders.save({
+      id: "r1",
+      userId: "42",
+      chatId: "c1",
+      lang: "en",
+      fireAtMs: Date.now() + HOUR,
+      text: "buy milk",
+      target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
+      createdAtMs: 0,
+      contextMessages: [],
+    });
+    return d;
+  }
+
+  const patch = (body: unknown) => ({
+    method: "PATCH" as const,
+    path: "/api/admin/reminders/r1",
+    body,
+  });
+
+  test("owner edits another user's note and time, keeping the rest", async () => {
+    const d = await seeded();
+    const fireAtMs = Date.now() + 2 * HOUR;
+    const r = await handleApi(
+      patch({ text: "  buy oat milk ", fireAtMs }),
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const stored = await d.storage.reminders.get("r1");
+    expect(stored).toMatchObject({
+      userId: "42",
+      text: "buy oat milk",
+      fireAtMs,
+      target: { kind: "ask_reply", chatId: "c1", replyToMessageId: 7 },
+    });
+    expect(r.body).toEqual({ reminder: stored });
+  });
+
+  test("a note-only edit keeps the time", async () => {
+    const d = await seeded();
+    const before = (await d.storage.reminders.get("r1"))!.fireAtMs;
+    const r = await handleApi(patch({ text: "x" }), d, owner);
+    expect(r.status).toBe(200);
+    expect((await d.storage.reminders.get("r1"))?.fireAtMs).toBe(before);
+  });
+
+  test("rejects a time less than a minute away", async () => {
+    const d = await seeded();
+    const r = await handleApi(patch({ fireAtMs: Date.now() + 1000 }), d, owner);
+    expect(r).toEqual({ status: 400, body: { error: "fire_at_too_soon" } });
+    expect((await d.storage.reminders.get("r1"))?.text).toBe("buy milk");
+  });
+
+  test.each([
+    [{}, "nothing_to_change"],
+    [null, "invalid_body"],
+    [{ text: "   " }, "invalid_text"],
+    [{ text: "x".repeat(2001) }, "invalid_text"],
+    [{ fireAtMs: "tomorrow" }, "invalid_fire_at"],
+  ])("rejects %p with %s", async (body, error) => {
+    const r = await handleApi(patch(body), await seeded(), owner);
+    expect(r).toEqual({ status: 400, body: { error } });
+  });
+
+  test("404 for an unknown reminder", async () => {
+    const r = await handleApi(
+      {
+        method: "PATCH",
+        path: "/api/admin/reminders/nope",
+        body: { text: "x" },
+      },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  test("owner deletes another user's reminder", async () => {
+    const d = await seeded();
+    const r = await handleApi(
+      { method: "DELETE", path: "/api/admin/reminders/r1", body: null },
+      d,
+      owner,
+    );
+    expect(r).toEqual({ status: 200, body: { ok: true } });
+    expect(await d.storage.reminders.get("r1")).toBeNull();
+    expect(await d.storage.reminders.listForUser("42")).toEqual([]);
+  });
+
+  test("404 when deleting an unknown reminder", async () => {
+    const r = await handleApi(
+      { method: "DELETE", path: "/api/admin/reminders/nope", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  test("non-owner can neither edit nor delete", async () => {
+    const d = await seeded();
+    const edit = await handleApi(patch({ text: "x" }), d, guest("42"));
+    const del = await handleApi(
+      { method: "DELETE", path: "/api/admin/reminders/r1", body: null },
+      d,
+      guest("42"),
+    );
+    expect(edit.status).toBe(403);
+    expect(del.status).toBe(403);
+    expect((await d.storage.reminders.get("r1"))?.text).toBe("buy milk");
+  });
+});
+
 describe("/api/admin/checks", () => {
   const validCheckBody = {
     title: "Sport for Nikita",

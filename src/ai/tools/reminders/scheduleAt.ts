@@ -4,6 +4,7 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
+import { REMINDER_TEXT_MAX_LEN } from "../../../reminders/types";
 import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import {
   persistReminder,
@@ -17,7 +18,7 @@ const Schema = z.object({
     .describe(
       "Wall-clock datetime in the user's timezone, formatted as YYYY-MM-DDTHH:MM (24h, no seconds, no offset).",
     ),
-  text: z.string().min(1).max(2000),
+  text: z.string().min(1).max(REMINDER_TEXT_MAX_LEN),
 });
 
 type Input = z.infer<typeof Schema>;

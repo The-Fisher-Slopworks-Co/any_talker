@@ -60,6 +60,7 @@ export function RemindersTab({
         footer={s.ui_reminders_admin_footer}
         showUserId={true}
         onUserClick={onUserClick}
+        editable={true}
       />
     </Stack>
   );

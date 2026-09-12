@@ -4,7 +4,7 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
-import { MIN_LEAD_MS } from "../../../reminders/types";
+import { MIN_LEAD_MS, REMINDER_TEXT_MAX_LEN } from "../../../reminders/types";
 import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import { durationToMs, REMINDER_WRITE_SOURCES } from "./shared";
 
@@ -12,7 +12,7 @@ const Schema = z
   .object({
     reminderId: z.string().min(1).max(100),
     // New private note; omit to keep the existing one.
-    text: z.string().min(1).max(2000).optional(),
+    text: z.string().min(1).max(REMINDER_TEXT_MAX_LEN).optional(),
     // New fire time; omit to keep the existing one. Two mutually exclusive
     // modes mirror the create tools: relative ("in 2 hours") or absolute
     // wall-clock datetime ("at 2026-08-01 09:00", in the user's timezone).

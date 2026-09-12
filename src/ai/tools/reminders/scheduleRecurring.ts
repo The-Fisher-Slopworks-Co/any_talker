@@ -8,6 +8,7 @@ import type { RecurrenceSpec } from "../../../reminders/types";
 import {
   MAX_REMINDER_OCCURRENCES,
   MIN_RECURRENCE_INTERVAL_MS,
+  REMINDER_TEXT_MAX_LEN,
 } from "../../../reminders/types";
 import { formatLocalParts, parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import { isValidTimezone } from "../../../shared/types";
@@ -26,7 +27,7 @@ const Schema = z.object({
     .describe(
       "First occurrence as a wall-clock datetime in the user's timezone, YYYY-MM-DDTHH:MM (24h, no seconds, no offset). Omit to start one interval from now.",
     ),
-  text: z.string().min(1).max(2000),
+  text: z.string().min(1).max(REMINDER_TEXT_MAX_LEN),
 });
 
 type Input = z.infer<typeof Schema>;
