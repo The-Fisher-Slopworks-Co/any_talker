@@ -1,6 +1,6 @@
 ---
 name: issue
-description: "Take a GitHub issue by number all the way to a pull request: a worktree branched off origin/main, the implementation, bun run check, one commit, push, and a PR that closes the issue. Runs only when the user invokes it explicitly."
+description: "Take a GitHub issue by number all the way to a pull request: a one-line restatement of the issue, a worktree branched off origin/main, the implementation, bun run check, one commit, push, and a PR that closes the issue. Runs only when the user invokes it explicitly."
 argument-hint: "<issue number> [implementation hint]"
 disable-model-invocation: true
 allowed-tools: EnterWorktree, ExitWorktree, Bash(git fetch:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git switch:*), Bash(git worktree list:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(gh issue view:*), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr create:*), Bash(bun install), Bash(bun run:*), Bash(bun test:*)
@@ -28,7 +28,18 @@ in order** — each one depends on the result of the previous one.
    ask. Otherwise pick the reading a careful colleague would and record the
    assumption in the PR body.
 
-1. **Worktree.**
+1. **Restate.** Before touching anything, tell the user in one or two
+   sentences how you understood the issue: what changes and where, in the
+   language of the conversation and in the author's own terms — no file
+   names, no implementation details. Take the narrowest reading that
+   satisfies the issue and say so explicitly: "remove the element from this
+   screen" means that one page, not the element everywhere in the system,
+   unless the issue says otherwise. Do not wait for an answer — go on to the
+   next step; the point is that the user can stop you early if the reading
+   is wrong. The same restatement, in English, goes into the "Why" of the PR
+   body (step 6) next to `Closes #N`.
+
+2. **Worktree.**
    - If cwd is already inside `.claude/worktrees/` (the session stayed in the
      worktree of a previous run), call `ExitWorktree(action: "keep")` first.
    - `git fetch origin` — EnterWorktree branches off `origin/main`, so the ref
@@ -36,13 +47,13 @@ in order** — each one depends on the result of the previous one.
    - `EnterWorktree(name: "issue-<N>")`. Everything from here on happens inside
      it; do not go back to the main checkout.
    - Rename the branch to the repository convention: `git branch -m <type>/<slug>`.
-     `type` comes from step 4; `slug` is 2–4 kebab-case words describing the
+     `type` comes from step 5; `slug` is 2–4 kebab-case words describing the
      issue.
    - `bun install` — a fresh worktree has no `node_modules`; without it both
      `bun run check` and the pre-commit hook fail. There is no `.env` either,
      and none is needed: tests run against `MemoryStorage`.
 
-2. **Implement.** Read the code the issue points at, and its tests, before
+3. **Implement.** Read the code the issue points at, and its tests, before
    writing anything. Conventions live in CLAUDE.md: SPDX header on new files,
    user-facing strings via `ctx.t` and `src/shared/i18n.ts`, dependency
    injection, tagged outcomes, co-located `*.test.ts`. A test that reproduces
@@ -52,11 +63,11 @@ in order** — each one depends on the result of the previous one.
    instead of `Closes #N` in the PR, and list the remaining slices in the
    report.
 
-3. **Check.** `bun run check` must be green. Red — fix and rerun. Do not bypass
+4. **Check.** `bun run check` must be green. Red — fix and rerun. Do not bypass
    the hook with `LEFTHOOK=0`. A failure unrelated to your change (broken
    before you, flaky) is not fixed silently: describe it in the PR body.
 
-4. **Commit.** One commit; its subject becomes the PR title and the squash
+5. **Commit.** One commit; its subject becomes the PR title and the squash
    commit subject: `<type>(<scope>): <subject>`.
    - `type`: label `bug` → `fix`, `enhancement` → `feat`, `documentation` →
      `docs`; otherwise by the nature of the change (`refactor`, `chore`,
@@ -68,7 +79,7 @@ in order** — each one depends on the result of the previous one.
      of `git log --oneline` in this repository.
    - Trailers: as CLAUDE.md requires.
 
-5. **Push and PR.** `git push -u origin HEAD`. If the branch already has an
+6. **Push and PR.** `git push -u origin HEAD`. If the branch already has an
    open PR, do not create a second one. Otherwise:
    `gh pr create --base main --head <branch> --title "<commit subject>" --body-file <file in the scratchpad>`.
    The body follows `.github/pull_request_template.md` and is **in English**
@@ -76,7 +87,7 @@ in order** — each one depends on the result of the previous one.
    line `Closes #N` (or `Refs #N`); UI changes — delete unless the change is
    in the webapp; Checklist — tick only what is actually true.
 
-6. **Report.** Briefly: worktree path, branch, PR URL, assumptions made and
+7. **Report.** Briefly: worktree path, branch, PR URL, assumptions made and
    deviations from the issue, what is left (if the PR is a first slice). The
    session stays in the worktree — that is where CI fixes and review replies
    happen; `ExitWorktree` only when the user says so.
