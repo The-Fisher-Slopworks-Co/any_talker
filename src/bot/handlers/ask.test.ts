@@ -677,6 +677,21 @@ describe("askHandler", () => {
     expect(call.reasoningEffort).toBe("high");
   });
 
+  test("the stored reasoning effort overrides the per-level default", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      reasoningEffort: { short: null, wise: "medium" },
+    });
+    const ai = new FakeAI();
+    await askHandler(baseInput({ storage, ai, detailLevel: "short" }));
+    await askHandler(baseInput({ storage, ai, detailLevel: "wise" }));
+    const calls = ai.calls as { reasoningEffort: unknown }[];
+    expect(calls[0]!.reasoningEffort).toBeUndefined();
+    expect(calls[1]!.reasoningEffort).toBe("medium");
+  });
+
   test("timezone resolution: user > chat > global", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });

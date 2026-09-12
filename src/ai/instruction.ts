@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { languageSection, type Lang } from "../shared/i18n";
-import type { RateLimitConfig, ReasoningEffort } from "../shared/types";
+import type { RateLimitConfig } from "../shared/types";
 
 export type DetailLevel = "short" | "wise";
 
@@ -15,17 +15,6 @@ export function detailLevelMultiplier(
       return 1;
     case "wise":
       return rl.wiseMultiplier;
-  }
-}
-
-export function detailLevelReasoningEffort(
-  level: DetailLevel,
-): ReasoningEffort {
-  switch (level) {
-    case "short":
-      return "low";
-    case "wise":
-      return "high";
   }
 }
 

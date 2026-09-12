@@ -2,7 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { AnomalyConfig, BudgetConfig } from "./budget";
-import type { ProviderSort, ServiceTier } from "./models";
+import type {
+  ProviderSort,
+  ReasoningEffortConfig,
+  ServiceTier,
+} from "./models";
 import type { RateLimitConfig } from "./ratelimit";
 
 export type Settings = {
@@ -17,6 +21,9 @@ export type Settings = {
   // no fallback.
   provider: string | null;
   serviceTier: ServiceTier | null;
+  // Reasoning effort per detail level (`short` = /ask, `wise` = /askwise).
+  // Global policy like `rateLimit` — no per-chat override.
+  reasoningEffort: ReasoningEffortConfig;
   // Whether the user/chat whitelist is enforced as an access gate. When false,
   // anyone may invoke the bot and the USD budget guard + rate limit are the only
   // protection (the whitelist entries are preserved, just not consulted). The
@@ -50,6 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   providerSort: null,
   provider: null,
   serviceTier: null,
+  reasoningEffort: { short: "low", wise: "high" },
   whitelistEnabled: true,
   rateLimit: {
     fiveHourTokens: 30000,

@@ -4,7 +4,12 @@
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient, AIMessage, RoutingOptions } from "./types";
-import type { RateLimitConfig, ToolCallRecord, TurnRun } from "../shared/types";
+import type {
+  RateLimitConfig,
+  ReasoningEffortConfig,
+  ToolCallRecord,
+  TurnRun,
+} from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import { recordSpend } from "../spending/record";
 import { conversationSessionId } from "./session";
@@ -16,7 +21,6 @@ import {
 import {
   buildInstruction,
   detailLevelMultiplier,
-  detailLevelReasoningEffort,
   instructionHash,
   type DetailLevel,
 } from "./instruction";
@@ -51,6 +55,9 @@ export type RunAiTurnInput = {
   // Provider routing / service tier from the effective settings, forwarded
   // untouched; OpenRouter honours all of them.
   routing?: RoutingOptions;
+  // Reasoning effort per detail level from the effective settings. Consulted
+  // only when `detailLevel` is set; absent means no effort is sent.
+  reasoningEffort?: ReasoningEffortConfig;
 
   // Identity / addressing. `botId` + `chatId` also derive the provider session
   // key (see `ai/session.ts`) — the three call sites get one consistent rule
@@ -73,10 +80,10 @@ export type RunAiTurnInput = {
   messages: AIMessage[];
 
   // Optional: when set, adds the detail-level section to the system prompt,
-  // selects the reasoning effort, and scales the token deduction by the
-  // configured `wiseMultiplier`. Absent (guest, reminder delivery) means the
-  // "short"-equivalent path with no detail section, no reasoning effort, and a
-  // multiplier of 1.
+  // selects the configured reasoning effort for that level, and scales the
+  // token deduction by the configured `wiseMultiplier`. Absent (guest, reminder
+  // delivery) means the "short"-equivalent path with no detail section, no
+  // reasoning effort, and a multiplier of 1.
   detailLevel?: DetailLevel;
   // Optional user facts surfaced in the system prompt.
   facts?: Array<{ key: string; value: string }>;
@@ -136,7 +143,7 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
     tools: getAllTools(input.source),
     routing: input.routing,
     reasoningEffort: input.detailLevel
-      ? detailLevelReasoningEffort(input.detailLevel)
+      ? (input.reasoningEffort?.[input.detailLevel] ?? undefined)
       : undefined,
     sessionId: conversationSessionId(input.botId, input.chatId),
     toolCallContext: {

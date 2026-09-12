@@ -6,6 +6,7 @@ import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type {
   ProviderSort,
+  ReasoningEffortConfig,
   ServiceTier,
   Settings,
 } from "../../../../shared/types";
@@ -20,6 +21,7 @@ import { ModelsCard } from "../../components/models-card";
 import { ProviderSortField } from "../../components/provider-sort-field";
 import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
+import { ReasoningEffortField } from "../../components/reasoning-effort-field";
 import { TimezoneSelect } from "../../components/timezone-select";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 
@@ -41,6 +43,9 @@ export function PromptTab({
   const [provider, setProvider] = useState<string | null>(settings.provider);
   const [serviceTier, setServiceTier] = useState<ServiceTier | null>(
     settings.serviceTier,
+  );
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortConfig>(
+    settings.reasoningEffort,
   );
   const [thresholdInput, setThresholdInput] = useState(
     String(settings.expandableBlockquoteThreshold),
@@ -67,6 +72,8 @@ export function PromptTab({
     providerSort !== settings.providerSort ||
     provider !== settings.provider ||
     serviceTier !== settings.serviceTier ||
+    reasoningEffort.short !== settings.reasoningEffort.short ||
+    reasoningEffort.wise !== settings.reasoningEffort.wise ||
     thresholdDirty;
   const canSave = dirty && trimmed.length > 0 && thresholdValid && modelsValid;
 
@@ -80,6 +87,7 @@ export function PromptTab({
         providerSort,
         provider,
         serviceTier,
+        reasoningEffort,
         expandableBlockquoteThreshold: parsedThreshold,
       });
       onSaved(next);
@@ -88,6 +96,7 @@ export function PromptTab({
       setProviderSort(next.providerSort);
       setProvider(next.provider);
       setServiceTier(next.serviceTier);
+      setReasoningEffort(next.reasoningEffort);
       setThresholdInput(String(next.expandableBlockquoteThreshold));
     } finally {
       setSaving(false);
@@ -121,6 +130,23 @@ export function PromptTab({
       <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>
       <ServiceTierField value={serviceTier} onChange={setServiceTier} />
       <SectionFooter>{s.ui_prompt_service_tier_footer}</SectionFooter>
+
+      <SectionHeader>{s.ui_prompt_reasoning_effort}</SectionHeader>
+      <Card>
+        <ReasoningEffortField
+          label={s.ui_effort_short}
+          value={reasoningEffort.short}
+          onChange={(short) =>
+            setReasoningEffort({ ...reasoningEffort, short })
+          }
+        />
+        <ReasoningEffortField
+          label={s.ui_effort_wise}
+          value={reasoningEffort.wise}
+          onChange={(wise) => setReasoningEffort({ ...reasoningEffort, wise })}
+        />
+      </Card>
+      <SectionFooter>{s.ui_prompt_reasoning_effort_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_system_prompt}</SectionHeader>
       <Card>

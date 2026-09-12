@@ -43,6 +43,7 @@ const baseInput = (overrides: Partial<RunAiTurnInput> = {}): RunAiTurnInput => {
     models: DEFAULT_SETTINGS.models,
     systemPrompt: "Test persona.",
     rateLimit: DEFAULT_SETTINGS.rateLimit,
+    reasoningEffort: DEFAULT_SETTINGS.reasoningEffort,
     userId: "42",
     ownerId: "1",
     chatId: "c1",
@@ -197,6 +198,15 @@ describe("runAiTurn — request assembly", () => {
     const ai = new FakeAI();
     await runAiTurn(baseInput({ ai, detailLevel: "wise" }));
     expect(ai.calls[0]!.reasoningEffort).toBe("high");
+  });
+
+  test("the configured effort per detail level is what reaches the client", async () => {
+    const ai = new FakeAI();
+    const reasoningEffort = { short: "medium", wise: null } as const;
+    await runAiTurn(baseInput({ ai, detailLevel: "short", reasoningEffort }));
+    await runAiTurn(baseInput({ ai, detailLevel: "wise", reasoningEffort }));
+    expect(ai.calls[0]!.reasoningEffort).toBe("medium");
+    expect(ai.calls[1]!.reasoningEffort).toBeUndefined();
   });
 
   test("no detailLevel: no detail section and no reasoning effort (guest/delivery path)", async () => {

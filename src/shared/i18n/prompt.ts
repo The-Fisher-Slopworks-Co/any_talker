@@ -106,6 +106,54 @@ export const promptMessages = {
     en: "Loading providers…",
     ru: "Загрузка провайдеров…",
   }),
+  ui_prompt_reasoning_effort: m({
+    en: "Thinking Level",
+    ru: "Уровень размышлений",
+  }),
+  ui_prompt_reasoning_effort_footer: m({
+    en: "How much reasoning the model spends before answering /ask and /askwise. Default sends no level and leaves it to the model; None disables reasoning; higher levels think longer and cost more. Not every model supports every level — the gateway may reject an unsupported one.",
+    ru: "Сколько модель размышляет перед ответом на /ask и /askwise. «По умолчанию» не задаёт уровень — выбор за моделью; «Нет» выключает размышления; чем выше уровень, тем дольше и дороже. Не каждая модель поддерживает все уровни — шлюз может отклонить неподдерживаемый.",
+  }),
+  ui_effort_default: m({
+    en: "Default",
+    ru: "По умолчанию",
+  }),
+  ui_effort_none: m({
+    en: "None (off)",
+    ru: "Нет (выключено)",
+  }),
+  ui_effort_minimal: m({
+    en: "Minimal",
+    ru: "Минимальный",
+  }),
+  ui_effort_low: m({
+    en: "Low",
+    ru: "Низкий",
+  }),
+  ui_effort_medium: m({
+    en: "Medium",
+    ru: "Средний",
+  }),
+  ui_effort_high: m({
+    en: "High",
+    ru: "Высокий",
+  }),
+  ui_effort_xhigh: m({
+    en: "Extra high",
+    ru: "Очень высокий",
+  }),
+  ui_effort_max: m({
+    en: "Max",
+    ru: "Максимальный",
+  }),
+  ui_effort_short: m({
+    en: "/ask (short)",
+    ru: "/ask (коротко)",
+  }),
+  ui_effort_wise: m({
+    en: "/askwise (detailed)",
+    ru: "/askwise (подробно)",
+  }),
   ui_tier_default: m({
     en: "Default",
     ru: "По умолчанию",
