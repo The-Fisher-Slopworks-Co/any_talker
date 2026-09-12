@@ -4,9 +4,6 @@
 import { USER_FACTS_MAX_PER_USER } from "../../storage/types";
 import { normalizeFactKey, normalizeFactValue } from "../../shared/user-facts";
 import { readValidDisplayName } from "../../shared/display-name";
-import { getOrInitSettings } from "../../settings";
-import { summarizeUsage } from "../../ratelimit/window";
-import { usageShare } from "../../ratelimit/share";
 import { ANY_METHOD, type ApiResponse, type Route } from "./types";
 import { applyUserFieldUpdates } from "./profile-fields";
 import {
@@ -109,28 +106,6 @@ export const meRoutes: Route[] = [
         Date.now(),
       );
       return { status: 200, body: { spending } };
-    },
-  },
-  // The viewer's own rate-limit standing, for the Web App header. Percentage
-  // only: unlike the owner-gated `/api/ratelimit/*` routes, this one is
-  // reachable by every authenticated user, so it must not carry the raw token
-  // counts (`UsageStatus`) — `usageShare` collapses them to a share of budget
-  // before the response body is built.
-  {
-    method: "GET",
-    path: "/api/me/usage",
-    handle: async ({ deps, actor }) => {
-      const settings = await getOrInitSettings(deps.storage);
-      const now = Date.now();
-      const stored = await deps.storage.usage.get(actor.userId);
-      const status = summarizeUsage(
-        actor.userId,
-        settings.rateLimit,
-        stored,
-        now,
-      );
-      const exempt = actor.isOwner && settings.rateLimit.ownerExempt;
-      return { status: 200, body: { usage: usageShare(status, exempt) } };
     },
   },
   // Memory vault: the family roster for the character switcher. A narrow DTO

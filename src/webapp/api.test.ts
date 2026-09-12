@@ -962,87 +962,15 @@ describe("ratelimit endpoints", () => {
 });
 
 describe("GET /api/me/usage", () => {
-  // Percentages of the caller's OWN budget, reachable without owner rights.
-  const setLimits = async (d: ReturnType<typeof deps>) => {
-    await d.storage.settings.save({
-      ...DEFAULT_SETTINGS,
-      rateLimit: {
-        ...DEFAULT_SETTINGS.rateLimit,
-        fiveHourTokens: 1000,
-        weeklyTokens: 10_000,
-      },
-    });
-  };
-  const get = (
-    d: ReturnType<typeof deps>,
-    actor: { userId: string; isOwner: boolean },
-  ) =>
-    handleApi({ method: "GET", path: "/api/me/usage", body: null }, d, actor);
-
-  test("a non-owner gets their own percentages", async () => {
+  // The Web App used to draw the viewer's own limits from this route; the
+  // header is gone, and so is the route — nothing else consumed it. An unknown
+  // path is 404 for the owner and 403 for everyone else (see `handleApi`).
+  test("is no longer served", async () => {
     const d = deps();
-    await setLimits(d);
-    const starts = currentWindowStarts("42", Date.now());
-    await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
-
-    const r = await get(d, guest("42"));
-    expect(r.status).toBe(200);
-    const { usage } = r.body as {
-      usage: {
-        fiveHour: { usedPercent: number; remainingPercent: number };
-        weekly: { usedPercent: number };
-        exempt: boolean;
-      };
-    };
-    expect(usage.fiveHour.usedPercent).toBe(25);
-    expect(usage.fiveHour.remainingPercent).toBe(75);
-    expect(usage.weekly.usedPercent).toBe(3);
-    expect(usage.exempt).toBe(false);
-  });
-
-  test("carries no token counts — percentages and reset times only", async () => {
-    const d = deps();
-    await setLimits(d);
-    const starts = currentWindowStarts("42", Date.now());
-    await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
-
-    const r = await get(d, guest("42"));
-    const json = JSON.stringify(r.body);
-    for (const key of ['used"', "limit", 'remaining"', "windowStart"]) {
-      expect(json).not.toContain(key);
-    }
-    expect(json).not.toContain("250");
-    expect(json).not.toContain("10000");
-  });
-
-  test("is scoped to the actor — another user's spend is invisible", async () => {
-    const d = deps();
-    await setLimits(d);
-    const starts = currentWindowStarts("99", Date.now());
-    await d.storage.usage.add("99", 1000, starts.fiveHour, starts.weekly);
-
-    const r = await get(d, guest("42"));
-    const { usage } = r.body as {
-      usage: { fiveHour: { usedPercent: number } };
-    };
-    expect(usage.fiveHour.usedPercent).toBe(0);
-  });
-
-  test("an exempt owner is flagged rather than shown a 0% bar", async () => {
-    const d = deps();
-    await setLimits(d);
-    const r = await get(d, owner);
-    expect((r.body as { usage: { exempt: boolean } }).usage.exempt).toBe(true);
-  });
-
-  test("the owner is not flagged exempt when exemption is off", async () => {
-    const d = deps();
-    await d.storage.settings.save({
-      ...DEFAULT_SETTINGS,
-      rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
-    });
-    const r = await get(d, owner);
-    expect((r.body as { usage: { exempt: boolean } }).usage.exempt).toBe(false);
+    const get = (actor: { userId: string; isOwner: boolean }) =>
+      handleApi({ method: "GET", path: "/api/me/usage", body: null }, d, actor);
+    expect((await get(owner)).status).toBe(404);
+    expect((await get(guest("42"))).status).toBe(403);
   });
 });
 

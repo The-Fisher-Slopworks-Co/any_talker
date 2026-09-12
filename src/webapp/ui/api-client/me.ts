@@ -5,7 +5,6 @@ import type { Gender } from "../../../shared/types";
 import type { Lang } from "../../../shared/i18n";
 import type { DateFormat } from "../../../shared/date-format";
 import type { SpendSummary } from "../../../spending/window";
-import type { UsageShare } from "../../../ratelimit/share";
 import { req } from "./http";
 
 export type MeResponse = {
@@ -39,10 +38,6 @@ export const meApi = {
     language?: Lang | null;
     dateFormat?: DateFormat | null;
   }) => req<MeResponse>("PUT", "/api/me", patch),
-  // Percentage-only view of the caller's own limits (the header bars). Distinct
-  // from `getMyUsage` in `./ratelimit`, which is the owner-gated admin route
-  // carrying raw token counts.
-  getMyUsageShare: () => req<{ usage: UsageShare }>("GET", "/api/me/usage"),
   getMySpending: () => req<SpendingResponse>("GET", "/api/me/spending"),
   listMyBots: () => req<{ bots: FactBot[] }>("GET", "/api/me/bots"),
   listMyFacts: (scope: string) =>

@@ -3,9 +3,8 @@
 
 // Percentage view of the dual-window rate limit — the ONLY shape a non-owner is
 // ever shown. `UsageStatus` carries raw token counts (used/limit); those are
-// operational detail the bot deliberately keeps to itself, so both user-facing
-// surfaces (`/usage` in a DM and the Web App header) render from this type and
-// never see a token number. Pure math, no I/O: `summarizeUsage` resolves the
+// operational detail the bot deliberately keeps to itself, so the user-facing
+// `/usage` command renders from this type and never sees a token number. Pure math, no I/O: `summarizeUsage` resolves the
 // windows, this collapses them to a share of budget.
 
 import type { UsageStatus, WindowStatus } from "./window";

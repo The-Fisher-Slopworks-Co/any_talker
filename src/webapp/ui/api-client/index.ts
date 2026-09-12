@@ -52,7 +52,6 @@ export type {
 export type { FeedbackSummary } from "../../routes/admin-feedback";
 export type { SpendSummary } from "../../../spending/window";
 export type { UsageStatus } from "../../../ratelimit/window";
-export type { UsageShare } from "../../../ratelimit/share";
 /** @public */
 export type { SpendOverview } from "../../../spending/overview";
 

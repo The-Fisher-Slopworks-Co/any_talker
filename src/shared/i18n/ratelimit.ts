@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { etaEn, etaRu } from "./eta";
 import { m } from "./message";
 
-// Rate-limit settings and the viewer's own usage bars.
+// Rate-limit settings.
 export const rateLimitMessages = {
   ui_ratelimit_limits: m({
     en: "Limits",
@@ -49,31 +48,5 @@ export const rateLimitMessages = {
   ui_ratelimit_reset: m({
     en: "Reset usage",
     ru: "Сбросить использование",
-  }),
-  // Web App header (`components/usage-header.tsx`): the viewer's own budget as
-  // two progress bars. Percentage-only, exactly like the `/usage` command.
-  ui_usage_header_title: m({
-    en: "Your limits",
-    ru: "Твои лимиты",
-  }),
-  ui_usage_header_5h: m({
-    en: "5 h",
-    ru: "5 ч",
-  }),
-  ui_usage_header_weekly: m({
-    en: "7 d",
-    ru: "7 дн",
-  }),
-  ui_usage_header_left: m({
-    en: (left: number) => `${left}% left`,
-    ru: (left: number) => `осталось ${left}%`,
-  }),
-  ui_usage_header_resets: m({
-    en: (ms: number) => `~${etaEn(ms)} until reset`,
-    ru: (ms: number) => `~${etaRu(ms)} до сброса`,
-  }),
-  ui_usage_header_exempt: m({
-    en: "No limits apply to you.",
-    ru: "На тебя лимиты не распространяются.",
   }),
 };
