@@ -65,6 +65,18 @@ export function makeDirectoryMiddleware(
       void rt.deps.storage.presence
         .record(String(ctx.chat.id), String(ctx.me.id), now)
         .catch((err) => console.error("presence.record failed:", err));
+      // Hung on the same trigger, because that activity is also what tells this
+      // bot who else is in the chat: keep its chat-scoped command menu in step
+      // with the family actually present there, so a shared command is listed
+      // by exactly one of them. A no-op read unless the resolution changed.
+      void rt
+        .syncChatMenu({
+          api: ctx.api,
+          chatId: String(ctx.chat.id),
+          selfBotId: String(ctx.me.id),
+          nowMs: now,
+        })
+        .catch((err) => console.error("syncChatMenu failed:", err));
     }
     await next();
   };

@@ -13,6 +13,7 @@ import { formatLog, type LogFields, type LogFormat } from "../log";
 import type { TelegramEnv } from "../telegram-env";
 import { fetchTelegramPhoto } from "./photo";
 import { makeShouldAnswer } from "./routing";
+import { makeChatMenuSync, type ChatMenuSync } from "./chat-commands";
 import type { AskMatch } from "./routing";
 import { makeShouldHandleSharedCommand } from "./shared-command";
 import { createAlerts } from "./alerts";
@@ -78,6 +79,10 @@ export type BotRuntime = {
   // Deliberately not debug-gated: it must be answerable from prod logs.
   logAccessDenied: (fields: LogFields) => void;
   fetchPhoto: (fileId: string) => Promise<Uint8Array>;
+  // Reconciles this bot's chat-scoped command menu in one group chat, so a
+  // shared command (`/feedback`) is listed by exactly one of the family bots
+  // that are actually there (see `chat-commands.ts`).
+  syncChatMenu: ChatMenuSync;
   // Whether a matched ask is addressed to THIS bot (see `routing.ts`).
   shouldAnswer: (
     ctx: BotContext,
@@ -127,6 +132,10 @@ export function createRuntime(deps: BotDeps): BotRuntime {
         fileId,
         env: telegramEnv,
       }),
+    syncChatMenu: makeChatMenuSync({
+      storage: deps.storage,
+      siblingBotIds: deps.siblingBotIds,
+    }),
     shouldAnswer: makeShouldAnswer({
       storage: deps.storage,
       // Managed bots respond only to `/ask@self` (require an explicit
