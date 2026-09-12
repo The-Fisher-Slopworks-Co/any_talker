@@ -14,6 +14,7 @@ import type { TelegramEnv } from "../telegram-env";
 import { fetchTelegramPhoto } from "./photo";
 import { makeShouldAnswer } from "./routing";
 import type { AskMatch } from "./routing";
+import { makeShouldHandleSharedCommand } from "./shared-command";
 import { createAlerts } from "./alerts";
 import { createVideoPipeline, type VideoPipeline } from "./video-pipeline";
 import type { BotContext } from "./middleware/lang";
@@ -83,6 +84,12 @@ export type BotRuntime = {
     match: AskMatch,
     replyToMessage: Message | undefined,
   ) => Promise<boolean>;
+  // Whether THIS bot acts on a matched shared command — one that every family
+  // bot in the chat matched identically (see `shared-command.ts`).
+  shouldHandleSharedCommand: (
+    ctx: BotContext,
+    explicit: boolean,
+  ) => Promise<boolean>;
   alerts: {
     globalCapBreach: (api: Api, reason: BudgetDenyReason) => Promise<void>;
     newGroup: (
@@ -125,6 +132,11 @@ export function createRuntime(deps: BotDeps): BotRuntime {
       // Managed bots respond only to `/ask@self` (require an explicit
       // mention); the main bot also answers a bare `/ask`.
       requireMention: deps.persona !== undefined,
+      siblingBotIds: deps.siblingBotIds,
+    }),
+    shouldHandleSharedCommand: makeShouldHandleSharedCommand({
+      // Presence is global, not per-character: `deps.storage`, not the scoped one.
+      storage: deps.storage,
       siblingBotIds: deps.siblingBotIds,
     }),
     alerts: createAlerts({
