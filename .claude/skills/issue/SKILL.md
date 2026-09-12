@@ -34,9 +34,11 @@ in order** — each one depends on the result of the previous one.
    names, no implementation details. Take the narrowest reading that
    satisfies the issue and say so explicitly: "remove the element from this
    screen" means that one page, not the element everywhere in the system,
-   unless the issue says otherwise. Do not wait for an answer — go on to the
-   next step; the point is that the user can stop you early if the reading
-   is wrong. The same restatement, in English, goes into the "Why" of the PR
+   unless the issue says otherwise. Then **stop and wait** for the user's
+   explicit confirmation — end the turn, do not create the worktree, do not
+   read code. Only a clear "yes" continues; a correction replaces your
+   reading — restate the corrected version and wait again. Silence is not
+   consent. The same restatement, in English, goes into the "Why" of the PR
    body (step 6) next to `Closes #N`.
 
 2. **Worktree.**
