@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import { syncFamilyCommands } from "./commands";
 import { createManagedPersonaResolver } from "./persona";
 import {
   createRuntime,
@@ -122,6 +123,10 @@ export class BotManager {
     await this.stopBot(botId);
     await this.runtime.deps.storage.managedBots.delete(botId);
     await this.runtime.deps.storage.managedBots.setToken(botId, null);
+    // The family shrank: if the deleted bot was the one listing the shared
+    // commands in groups, they have to move to the next-smallest id — without
+    // this re-sync `/feedback` would vanish from every group menu.
+    await syncFamilyCommands(this.runtime);
   }
 
   async syncProfileName(botId: string): Promise<void> {

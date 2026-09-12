@@ -22,6 +22,8 @@ function makeManager(storage: MemoryStorage) {
       return `token-${userId}`;
     },
     getMe: async () => ({ username: "Manager", can_manage_bots: true }),
+    // `deleteBot` re-syncs the whole family's command menus through it.
+    setMyCommands: async () => true,
   } as unknown as Api;
 
   const deps: BotManagerDeps = {

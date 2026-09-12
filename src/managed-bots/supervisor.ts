@@ -4,7 +4,7 @@
 import { Bot, GrammyError } from "grammy";
 import { proxiedFetch } from "../proxy";
 import { createBot, type BotDeps } from "../bot";
-import { syncBotCommands } from "../bot/commands";
+import { syncCommandsAfterStart } from "./commands";
 import { ALLOWED_UPDATES } from "../bot/allowed-updates";
 import { createManagedPersonaResolver } from "./persona";
 import { rebrokerRevokedToken } from "./tokens";
@@ -80,11 +80,6 @@ async function startBotInner(
   await bot.api
     .setMyName(record.displayName)
     .catch((err) => console.error(`[managed-bots] setMyName failed:`, err));
-  // Register the `/ask` command menu for this bot too (best-effort), so a
-  // managed bot exposes the same commands as the main bot in its own DMs.
-  await syncBotCommands(bot.api, runtime.deps.ownerId).catch((err) =>
-    console.error(`[managed-bots] syncBotCommands failed:`, err),
-  );
   // grammY rethrows a fatal getUpdates error (401 unauthorized / 409
   // conflict) out of the polling loop. Left uncaught it would be an unhandled
   // rejection and take down the whole process — main bot included — so a dead
@@ -108,6 +103,10 @@ async function startBotInner(
       );
     });
   runtime.running.set(record.botId, { record, bot });
+  // Register the command menu for this bot too (best-effort), so a managed bot
+  // exposes the same commands as the main bot in its own DMs. Done once the bot
+  // is in `running`, so the family it is weighed against includes itself.
+  await syncCommandsAfterStart(runtime, record.botId);
   console.log(`[managed-bots] started ${record.botId} (@${username})`);
 }
 
