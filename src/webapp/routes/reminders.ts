@@ -4,8 +4,57 @@
 import type { Storage } from "../../storage/types";
 import type { Chat, User } from "../../shared/types";
 import { readValidDisplayName } from "../../shared/display-name";
-import type { Reminder } from "../../reminders/types";
+import {
+  MIN_LEAD_MS,
+  REMINDER_TEXT_MAX_LEN,
+  type Reminder,
+} from "../../reminders/types";
 import type { ApiResponse, Route } from "./types";
+
+const REMINDER_NOT_FOUND: ApiResponse = {
+  status: 404,
+  body: { error: "reminder not found" },
+};
+
+// The admin edit: the note and/or the fire time, nothing else. Everything the
+// delivery needs (target, lang, context snapshot, recurrence) stays as stored.
+// As in `edit_reminder`, the lead time is only enforced when the time actually
+// moves, so fixing the note of a reminder about to fire is not rejected.
+function applyReminderPatch(
+  body: unknown,
+  existing: Reminder,
+  nowMs: number,
+): { ok: true; reminder: Reminder } | { ok: false; error: string } {
+  if (typeof body !== "object" || body === null) {
+    return { ok: false, error: "invalid_body" };
+  }
+  const { text, fireAtMs } = body as Record<string, unknown>;
+  if (text === undefined && fireAtMs === undefined) {
+    return { ok: false, error: "nothing_to_change" };
+  }
+  let nextText = existing.text;
+  if (text !== undefined) {
+    if (typeof text !== "string") return { ok: false, error: "invalid_text" };
+    nextText = text.trim();
+    if (nextText === "" || nextText.length > REMINDER_TEXT_MAX_LEN) {
+      return { ok: false, error: "invalid_text" };
+    }
+  }
+  let nextFireAtMs = existing.fireAtMs;
+  if (fireAtMs !== undefined && fireAtMs !== existing.fireAtMs) {
+    if (typeof fireAtMs !== "number" || !Number.isSafeInteger(fireAtMs)) {
+      return { ok: false, error: "invalid_fire_at" };
+    }
+    if (fireAtMs - nowMs < MIN_LEAD_MS) {
+      return { ok: false, error: "fire_at_too_soon" };
+    }
+    nextFireAtMs = fireAtMs;
+  }
+  return {
+    ok: true,
+    reminder: { ...existing, text: nextText, fireAtMs: nextFireAtMs },
+  };
+}
 
 async function collectReminderChats(
   storage: Storage,
@@ -104,5 +153,30 @@ export const adminReminderRoutes: Route[] = [
       status: 200,
       body: { quarantined: await deps.storage.reminders.listQuarantined() },
     }),
+  },
+  // Only PATCH and DELETE take an id, so they cannot shadow the literal GET
+  // above. Like the listing, they act on the main bot's scope.
+  {
+    method: "PATCH",
+    path: /^\/api\/admin\/reminders\/([^/]+)$/,
+    handle: async ({ req, deps, params }) => {
+      const existing = await deps.storage.reminders.get(params[0]!);
+      if (!existing) return REMINDER_NOT_FOUND;
+      const patched = applyReminderPatch(req.body, existing, Date.now());
+      if (!patched.ok) return { status: 400, body: { error: patched.error } };
+      await deps.storage.reminders.save(patched.reminder);
+      return { status: 200, body: { reminder: patched.reminder } };
+    },
+  },
+  {
+    method: "DELETE",
+    path: /^\/api\/admin\/reminders\/([^/]+)$/,
+    handle: async ({ deps, params }) => {
+      // Fetched first: the store's delete needs the owner to clean their index.
+      const existing = await deps.storage.reminders.get(params[0]!);
+      if (!existing) return REMINDER_NOT_FOUND;
+      await deps.storage.reminders.delete(existing.id, existing.userId);
+      return { status: 200, body: { ok: true } };
+    },
   },
 ];
