@@ -16,7 +16,6 @@ export function DisplayNameField({
   footer,
   value,
   onChange,
-  onCommit,
   error,
 }: {
   label: string;
@@ -24,8 +23,6 @@ export function DisplayNameField({
   footer: ReactNode;
   value: string;
   onChange: (v: string) => void;
-  // Called when editing ends (blur or Enter), for forms that save as they go.
-  onCommit?: () => void;
   error: DisplayNameError | null;
 }) {
   const { t: s } = useI18n();
@@ -40,10 +37,6 @@ export function DisplayNameField({
             placeholder={placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            onBlur={onCommit}
-            onKeyDown={(e) => {
-              if (onCommit && e.key === "Enter") e.currentTarget.blur();
-            }}
           />
         </label>
       </Card>

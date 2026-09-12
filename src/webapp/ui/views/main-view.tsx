@@ -6,27 +6,16 @@ import { useI18n } from "../i18n-context";
 import { api, type MeResponse, type SpendSummary } from "../api-client";
 import { SpendingCard } from "../components/spending-card";
 import { composeFullName, type Gender } from "../../../shared/types";
-import { type Lang } from "../../../shared/i18n";
-import {
-  DATE_FORMATS,
-  DATE_FORMAT_SAMPLE_MS,
-  formatDateTime,
-  type DateFormat,
-} from "../../../shared/date-format";
 import { validateDisplayName } from "../../../shared/display-name";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../components/layout";
+import { Card, SectionHeader, Stack } from "../components/layout";
 import { RowButton } from "../components/controls";
 import { SaveStatus } from "../components/save-status";
-import { SelectRow } from "../components/select-row";
-import { DisplayNameField } from "../components/display-name-field";
 import { GenderField } from "../components/gender-field";
 import { TimezoneField } from "../components/timezone-field";
-import { LanguageField } from "../components/language-field";
+import {
+  ProfileSettingsCard,
+  type ProfileChoices,
+} from "../components/profile-settings-card";
 import { useAutosave } from "../lib/use-autosave";
 
 type ProfilePatch = Parameters<typeof api.putMe>[0];
@@ -50,10 +39,10 @@ export function MainView({
   const [tzValue, setTzValue] = useState(me.timezone ?? "UTC");
   const [genderOn, setGenderOn] = useState(me.gender !== null);
   const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
-  const [langValue, setLangValue] = useState<Lang>(resolvedLang);
-  const [dateFormatValue, setDateFormatValue] = useState<DateFormat | null>(
-    me.dateFormat,
-  );
+  const [choices, setChoices] = useState<ProfileChoices>({
+    dateFormat: me.dateFormat,
+    language: resolvedLang,
+  });
   const [spending, setSpending] = useState<SpendSummary | null>(null);
 
   useEffect(() => {
@@ -76,18 +65,18 @@ export function MainView({
         setTzOverride(me.timezone !== null);
         if (me.timezone !== null) setTzValue(me.timezone);
       }
-      if ("language" in patch) setLangValue(resolvedLang);
-      if ("dateFormat" in patch) setDateFormatValue(me.dateFormat);
+      setChoices((c) => ({
+        dateFormat: "dateFormat" in patch ? me.dateFormat : c.dateFormat,
+        language: "language" in patch ? resolvedLang : c.language,
+      }));
     },
   });
 
-  const tg = window.Telegram?.WebApp;
-  const tgUser = tg?.initDataUnsafe?.user;
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
   const tgName = tgUser
     ? composeFullName(tgUser.first_name, tgUser.last_name)
     : "";
 
-  const desiredTz = tzOverride ? tzValue : null;
   const nameValidation = validateDisplayName(name);
   const nameError = !nameValidation.ok ? nameValidation.reason : null;
 
@@ -98,16 +87,22 @@ export function MainView({
     save({ displayName: next || null });
   };
 
+  const choose = (patch: Partial<ProfileChoices>) => {
+    setChoices((c) => ({ ...c, ...patch }));
+    save(patch);
+  };
+
   return (
     <Stack>
-      <DisplayNameField
-        label={s.ui_main_name}
-        placeholder={tgName || s.ui_main_your_name}
-        footer={s.ui_main_name_footer}
-        value={name}
-        onChange={setName}
-        onCommit={commitName}
-        error={nameError}
+      <ProfileSettingsCard
+        name={name}
+        namePlaceholder={tgName || s.ui_main_your_name}
+        nameError={nameError}
+        onNameChange={setName}
+        onNameCommit={commitName}
+        choices={choices}
+        onChoice={choose}
+        timezone={tzOverride ? tzValue : null}
       />
 
       <GenderField
@@ -133,38 +128,6 @@ export function MainView({
         onChange={(tz) => {
           setTzValue(tz);
           save({ timezone: tz });
-        }}
-      />
-
-      <SectionHeader>{s.ui_main_time_format}</SectionHeader>
-      <Card>
-        <SelectRow
-          label={s.ui_main_time_format_auto}
-          selected={dateFormatValue === null}
-          onSelect={() => {
-            setDateFormatValue(null);
-            save({ dateFormat: null });
-          }}
-        />
-        {DATE_FORMATS.map((fmt) => (
-          <SelectRow
-            key={fmt}
-            label={formatDateTime(DATE_FORMAT_SAMPLE_MS, fmt, desiredTz)}
-            selected={dateFormatValue === fmt}
-            onSelect={() => {
-              setDateFormatValue(fmt);
-              save({ dateFormat: fmt });
-            }}
-          />
-        ))}
-      </Card>
-      <SectionFooter>{s.ui_main_time_format_footer}</SectionFooter>
-
-      <LanguageField
-        value={langValue}
-        onChange={(lang) => {
-          setLangValue(lang);
-          save({ language: lang });
         }}
       />
 
