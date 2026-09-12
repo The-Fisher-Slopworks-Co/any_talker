@@ -23,9 +23,8 @@ each one depends on the result of the previous one.
 
 0. **Preflight.** Stop and report, without creating anything, if: the Task is
    empty; one of the open PRs in Context already does this (return its URL).
-   If the Task allows several readings that lead to materially different
-   work, ask. Otherwise pick the reading a careful colleague would and record
-   the assumption in the PR body. Do not create a GitHub issue.
+   Do not create a GitHub issue. Ambiguity is not a preflight failure — it is
+   handled in step 1.
 
 1. **Restate.** Before touching anything, tell the user in one or two
    sentences how you understood the Task: what changes and where, in the
@@ -33,12 +32,14 @@ each one depends on the result of the previous one.
    names, no implementation details. Take the narrowest reading that
    satisfies the Task and say so explicitly: "remove the element from this
    screen" means that one page, not the element everywhere in the system,
-   unless the Task says otherwise. Then **stop and wait** for the user's
+   unless the Task says otherwise. If several readings lead to materially
+   different work, name them and say which one you would take, instead of
+   silently picking one. Then **stop and wait** for the user's
    explicit confirmation — end the turn, do not create the worktree, do not
    read code. Only a clear "yes" continues; a correction replaces your
    reading — restate the corrected version and wait again. Silence is not
-   consent. The same restatement, in English, becomes the "Why" of the PR
-   body (step 6).
+   consent. The confirmed restatement, in English, becomes the "Why" of the
+   PR body (step 6), together with the assumptions the user agreed to.
 
 2. **Worktree.**
    - If cwd is already inside `.claude/worktrees/` (the session stayed in the
