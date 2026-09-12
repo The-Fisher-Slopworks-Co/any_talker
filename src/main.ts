@@ -174,16 +174,14 @@ async function main() {
   });
 
   await bot.api.deleteWebhook();
-  // The family is still just the main bot here — the character bots start in
-  // `loadAndStartAll` below, and each of those starts re-syncs the whole family
-  // (which is what hands the shared commands to the smallest id).
-  await syncBotCommands(bot.api, {
-    ownerId: config.botOwnerId,
-    selfBotId: mainBotId,
-    familyBotIds: [mainBotId],
-  }).catch((err) => {
-    console.error("syncBotCommands failed:", err);
-  });
+  // The global menus only: which bot lists a shared command (`/feedback`) in a
+  // given group is resolved per chat, from the presence registry, as the bots
+  // meet there (`bot/chat-commands.ts`).
+  await syncBotCommands(bot.api, { ownerId: config.botOwnerId }).catch(
+    (err) => {
+      console.error("syncBotCommands failed:", err);
+    },
+  );
   // The main bot is the family hub (token brokering, owner notifications), so
   // its polling loop dying (revoked token / getUpdates conflict) is fatal — but
   // exit explicitly and loudly rather than via an unhandled rejection.

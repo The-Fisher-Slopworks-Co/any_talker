@@ -4,8 +4,8 @@
 import { Bot, GrammyError } from "grammy";
 import { proxiedFetch } from "../proxy";
 import { createBot, type BotDeps } from "../bot";
-import { syncCommandsAfterStart } from "./commands";
 import { ALLOWED_UPDATES } from "../bot/allowed-updates";
+import { syncBotCommands } from "../bot/commands";
 import { createManagedPersonaResolver } from "./persona";
 import { rebrokerRevokedToken } from "./tokens";
 import type { ManagerRuntime } from "./runtime";
@@ -104,9 +104,16 @@ async function startBotInner(
     });
   runtime.running.set(record.botId, { record, bot });
   // Register the command menu for this bot too (best-effort), so a managed bot
-  // exposes the same commands as the main bot in its own DMs. Done once the bot
-  // is in `running`, so the family it is weighed against includes itself.
-  await syncCommandsAfterStart(runtime, record.botId);
+  // exposes the same commands as the main bot in its own DMs. Only its own
+  // menus: which family bot lists a shared command in a given group is resolved
+  // per chat, as the bots meet there (`bot/chat-commands.ts`).
+  await syncBotCommands(bot.api, { ownerId: runtime.deps.ownerId }).catch(
+    (err) =>
+      console.error(
+        `[managed-bots] syncBotCommands failed for ${record.botId}:`,
+        err,
+      ),
+  );
   console.log(`[managed-bots] started ${record.botId} (@${username})`);
 }
 
