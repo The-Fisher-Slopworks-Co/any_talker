@@ -7,7 +7,7 @@ export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 
 // How long the outcome of a burst stays on screen before the toast hides; a
 // failure lingers longer, since the change it reports did not stick.
-const OUTCOME_SHOWN_MS = { saved: 2000, failed: 5000 };
+const OUTCOME_SHOWN_MS = { saved: 1500, failed: 5000 };
 
 // Sends every change as its own patch, one request at a time in the order the
 // changes were made, so an older response can never land after a newer one and
