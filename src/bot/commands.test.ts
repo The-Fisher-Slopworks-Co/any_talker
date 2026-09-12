@@ -7,6 +7,7 @@ import {
   BOT_COMMAND_SCOPES,
   BOT_COMMANDS_EN,
   BOT_COMMANDS_RU,
+  groupCommandsWithoutShared,
   OWNER_COMMANDS_EN,
   OWNER_COMMANDS_RU,
   ownsSharedCommands,
@@ -342,73 +343,34 @@ describe("syncBotCommands", () => {
   });
 });
 
-// The bug this guards: a group holding two family bots showed `/feedback`
-// twice, once per bot. Only the smallest id lists it there now.
-describe("syncBotCommands with a family", () => {
-  test("the smallest id keeps the shared commands everywhere", async () => {
+// #151 hid the shared commands from the group-facing scopes of every bot but
+// the family-wide smallest id — including in the groups that bot was not a
+// member of, where nobody listed them at all. The global lists carry them for
+// every bot again; the de-duplication is a chat-scoped menu now, resolved per
+// chat (`chat-commands.test.ts`).
+describe("shared commands in the global scopes", () => {
+  test("every scope keeps them, whichever bot uploads", async () => {
     const { api, calls } = recordingApi();
 
-    await syncBotCommands(api, {
-      ownerId: "1",
-      selfBotId: "100",
-      familyBotIds: ["100", "200"],
-    });
+    await syncBotCommands(api, { ownerId: "1" });
 
     for (const c of calls) {
       expect(c.commands.map((cmd) => cmd.command)).toContain("feedback");
     }
   });
 
-  test("a bigger id drops them from the group-facing scopes only", async () => {
-    const { api, calls } = recordingApi();
-
-    await syncBotCommands(api, {
-      ownerId: "1",
-      selfBotId: "200",
-      familyBotIds: ["100", "200"],
-    });
-
-    const groupish = calls.filter(
-      (c) =>
-        c.other?.scope === undefined ||
-        c.other.scope.type === "all_group_chats" ||
-        c.other.scope.type === "all_chat_administrators",
+  test("the chat-scoped list is the group list minus the shared commands", () => {
+    expect(groupCommandsWithoutShared("en")).toEqual(
+      withoutShared(BOT_COMMANDS_EN),
     );
-    expect(groupish).toHaveLength(3 + 6);
-    for (const c of groupish) {
-      expect(c.commands.map((cmd) => cmd.command)).not.toContain("feedback");
-    }
-    expect(groupish.map((c) => c.commands)).toEqual([
-      withoutShared(BOT_COMMANDS_EN),
-      withoutShared(BOT_COMMANDS_EN),
+    expect(groupCommandsWithoutShared("ru")).toEqual(
       withoutShared(BOT_COMMANDS_RU),
-      withoutShared(BOT_COMMANDS_EN),
-      withoutShared(BOT_COMMANDS_EN),
-      withoutShared(BOT_COMMANDS_RU),
-      withoutShared(BOT_COMMANDS_EN),
-      withoutShared(BOT_COMMANDS_EN),
-      withoutShared(BOT_COMMANDS_RU),
-    ]);
-  });
-
-  // A DM is one-on-one: there is no second bot in it to duplicate the entry.
-  test("a bigger id keeps them in every private scope", async () => {
-    const { api, calls } = recordingApi();
-
-    await syncBotCommands(api, {
-      ownerId: "12345",
-      selfBotId: "200",
-      familyBotIds: ["100", "200"],
-    });
-
-    const dmCalls = calls.filter(
-      (c) =>
-        c.other?.scope?.type === "all_private_chats" ||
-        c.other?.scope?.type === "chat",
     );
-    expect(dmCalls).toHaveLength(6);
-    for (const c of dmCalls) {
-      expect(c.commands.map((cmd) => cmd.command)).toContain("feedback");
+    for (const lang of ["en", "ru"] as const) {
+      const names = groupCommandsWithoutShared(lang).map((c) => c.command);
+      expect(names).not.toContain("feedback");
+      // Only the shared ones go: the per-character commands stay on every bot.
+      expect(names).toContain("ask");
     }
   });
 });

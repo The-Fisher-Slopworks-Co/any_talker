@@ -14,8 +14,8 @@ export type SyncCommandsApi = {
 // command whose behaviour does not depend on which bot of the family answers
 // it — `/feedback` files the same report from the main bot and from every
 // character bot — so a group holding several of them would otherwise show the
-// same entry once per bot. Shared commands are listed in group chats by a
-// single bot; see `ownsSharedCommands`.
+// same entry once per bot. Exactly one bot lists them per group chat; which one
+// is resolved chat by chat in `bot/chat-commands.ts`.
 export type FamilyCommand = BotCommand & { readonly shared?: true };
 
 // The flag never leaves this module: Telegram only ever sees `BotCommand`.
@@ -99,18 +99,17 @@ export const BOT_COMMAND_SCOPES: readonly BotCommandScope[] = [
 export type SyncCommandsOptions = {
   // The owner's Telegram user id, if known: their own DM gets `/digest` on top.
   ownerId?: string | undefined;
-  // This bot's own Telegram id, plus the ids of every family bot currently
-  // running (this one included). Together they decide who lists the shared
-  // commands in groups.
-  selfBotId?: string | undefined;
-  familyBotIds?: readonly string[] | undefined;
 };
 
-// Whether this bot is the one that lists the shared commands in group chats:
-// the family member with the smallest id. Ids are Telegram user ids, so they
+// Whether this bot is the one that lists the shared commands among the given
+// family bots: the one with the smallest id. Ids are Telegram user ids, so they
 // are compared as numbers — "9999" must not outrank "10000". With no id to
 // compare against (a lone bot, or an id we failed to learn) the commands stay:
 // a duplicated menu entry is a nuisance, a missing one is a lost feature.
+//
+// The caller passes the bots of ONE chat (`bot/chat-commands.ts`), never the
+// whole family: a family-wide winner need not be a member of the group being
+// decided, and then nobody in it would list the command at all.
 export function ownsSharedCommands(
   selfBotId: string | undefined,
   familyBotIds: readonly string[] | undefined,
@@ -129,13 +128,14 @@ export function ownsSharedCommands(
 // base one. The default (scope-less) upload stays the base list — it is the
 // fallback for chat types no explicit scope covers, all of them group-like.
 //
-// A DM holds exactly one bot, so nothing can duplicate there; only the
-// group-facing scopes (the default included) drop the shared commands when
-// another family bot with a smaller id already lists them.
+// Every one of these lists carries the shared commands, the group-facing ones
+// included. They are taken away one chat at a time, by a chat-scoped menu that
+// outranks these (`bot/chat-commands.ts`), and only in a chat where a sibling
+// family bot is present to list them instead. A chat this app has not seen yet
+// therefore shows the command once per bot rather than not at all.
 function commandsFor(
   scope: BotCommandScope | undefined,
   lang: "en" | "ru",
-  opts: SyncCommandsOptions,
 ): BotCommand[] {
   const isPrivate = scope?.type === "all_private_chats";
   const ru = lang === "ru";
@@ -146,8 +146,13 @@ function commandsFor(
     : ru
       ? BOT_COMMANDS_RU
       : BOT_COMMANDS_EN;
-  if (isPrivate || ownsSharedCommands(opts.selfBotId, opts.familyBotIds))
-    return toBotCommands(list);
+  return toBotCommands(list);
+}
+
+// The group list minus the shared commands: what a bot uploads under
+// `BotCommandScopeChat` in a group where a smaller-id family bot lists them.
+export function groupCommandsWithoutShared(lang: "en" | "ru"): BotCommand[] {
+  const list = lang === "ru" ? BOT_COMMANDS_RU : BOT_COMMANDS_EN;
   return toBotCommands(list.filter((c) => !c.shared));
 }
 
@@ -155,18 +160,18 @@ export async function syncBotCommands(
   api: SyncCommandsApi,
   opts: SyncCommandsOptions = {},
 ): Promise<void> {
-  const fallbackEn = commandsFor(undefined, "en", opts);
-  const fallbackRu = commandsFor(undefined, "ru", opts);
+  const fallbackEn = commandsFor(undefined, "en");
+  const fallbackRu = commandsFor(undefined, "ru");
   await api.setMyCommands(fallbackEn);
   await api.setMyCommands(fallbackEn, { language_code: "en" });
   await api.setMyCommands(fallbackRu, { language_code: "ru" });
   for (const scope of BOT_COMMAND_SCOPES) {
-    await api.setMyCommands(commandsFor(scope, "en", opts), { scope });
-    await api.setMyCommands(commandsFor(scope, "en", opts), {
+    await api.setMyCommands(commandsFor(scope, "en"), { scope });
+    await api.setMyCommands(commandsFor(scope, "en"), {
       scope,
       language_code: "en",
     });
-    await api.setMyCommands(commandsFor(scope, "ru", opts), {
+    await api.setMyCommands(commandsFor(scope, "ru"), {
       scope,
       language_code: "ru",
     });
@@ -174,7 +179,6 @@ export async function syncBotCommands(
   if (opts.ownerId === undefined) return;
   // A chat scope outranks `all_private_chats`, so this replaces (not appends
   // to) the default list in the owner's DM — hence spreading the base list.
-  // That DM is one-on-one, so it keeps the shared commands unconditionally.
   const scope: BotCommandScope = { type: "chat", chat_id: opts.ownerId };
   const ownerEn = toBotCommands(OWNER_COMMANDS_EN);
   const ownerRu = toBotCommands(OWNER_COMMANDS_RU);
