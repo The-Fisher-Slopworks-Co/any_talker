@@ -30,6 +30,30 @@ export const remindersMessages = {
     en: "Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure.",
     ru: "Ожидающие напоминания всех пользователей. Доставки с временными ошибками остаются до успешной или окончательной ошибки.",
   }),
+  ui_reminders_edit: m({
+    en: "Edit",
+    ru: "Изменить",
+  }),
+  ui_reminders_cancel: m({
+    en: "Cancel",
+    ru: "Отмена",
+  }),
+  ui_reminders_fire_at_label: m({
+    en: "Fires at",
+    ru: "Сработает",
+  }),
+  ui_reminders_delete_confirm: m({
+    en: "Delete this reminder? Its author is not notified.",
+    ru: "Удалить это напоминание? Автор не получит уведомления.",
+  }),
+  ui_reminders_fire_at_too_soon: m({
+    en: "Pick a time at least a minute from now.",
+    ru: "Выбери время хотя бы на минуту позже текущего.",
+  }),
+  ui_reminders_save_error: m({
+    en: (code: string) => `Could not save: ${code}`,
+    ru: (code: string) => `Не удалось сохранить: ${code}`,
+  }),
   ui_reminders_cap_header: m({
     en: "Per-User Limit",
     ru: "Лимит на пользователя",

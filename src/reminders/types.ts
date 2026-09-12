@@ -52,6 +52,9 @@ export type Recurrence = {
 
 export const MIN_LEAD_MS = 60_000;
 
+// Longest note a reminder may carry, as the scheduling tools accept it.
+export const REMINDER_TEXT_MAX_LEN = 2000;
+
 // Nothing repeats faster than this. Every fire re-runs the LLM, so a
 // one-minute series is a money pump rather than a feature.
 export const MIN_RECURRENCE_INTERVAL_MS = 5 * 60_000;
