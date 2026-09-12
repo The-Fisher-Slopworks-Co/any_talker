@@ -86,23 +86,32 @@ export async function dispatchDigestCommand(
 
 // `/usage` — the user's own rate-limit standing, in percent. Handled inline
 // alongside `/digest` for the same reason: this listener owns `message:text`
-// and doesn't call `next()`.
+// and doesn't call `next()`. In a group the answer is ephemeral, as
+// `/feedback`'s is: how close someone is to their ceiling is nobody else's
+// business, and the menu entry promises as much (`is_ephemeral`).
 export async function dispatchUsageCommand(
   rt: BotRuntime,
   ctx: BotContext,
 ): Promise<void> {
-  const from = ctx.from;
-  if (!from) return;
+  // The windows are keyed the way `/ask` charges them — on the resolved sender,
+  // not `ctx.from.id`, which for a message sent as a chat is a Telegram-wide
+  // pseudo-account (`bot/identity.ts`).
+  const identity = resolveSenderIdentity({
+    from: ctx.from,
+    sender_chat: ctx.senderChat,
+  });
+  // An ephemeral message names a user id, which a chat has none of: with no
+  // `from` there is nobody to answer.
+  const receiver = ctx.from?.id;
+  if (!identity || receiver === undefined) return;
   const outcome = await usageCommandHandler({
     storage: rt.deps.storage,
     ownerId: rt.deps.ownerId,
-    isPrivateChat: ctx.chat?.type === "private",
-    fromUserId: String(from.id),
+    fromUserId: identity.userId,
     lang: ctx.lang,
     nowMs: Date.now(),
   });
-  if (outcome.kind === "ignored") return;
-  await ctx.reply(outcome.text);
+  await replyEphemeral(ctx, outcome.text, receiver);
 }
 
 // `/feedback <text>` — handled inline alongside `/digest` and `/usage` for the

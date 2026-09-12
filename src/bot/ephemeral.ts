@@ -15,9 +15,9 @@ export type EphemeralReplyCtx = {
 };
 
 // The answer to a command the bot menu declares `is_ephemeral` (`bot/commands.ts`
-// — `/feedback` is the only one today). Such a command answers the person who
-// typed it and nobody else, so every one of its answers is ephemeral: the
-// recorded line, the usage hint, the daily cap. There is no case in which it
+// — `/feedback` and `/usage`). Such a command answers the person who typed it
+// and nobody else, so every one of its answers is ephemeral: the recorded line,
+// the usage hint, the daily cap, the limit report. There is no case in which it
 // may put a message in front of the rest of the chat.
 //
 // Which is why a rejected ephemeral send is only logged. Falling back to a
