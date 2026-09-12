@@ -24,7 +24,7 @@ import { settingsApi } from "./settings";
 // not to read the absence as dead code.
 export type { MeResponse, UserFact, FactBot, FactsResponse } from "./me";
 /** @public */
-export type { SpendingResponse } from "./me";
+export type { SpendingResponse } from "./admin-users";
 export type { UserSettingsResponse } from "./admin-users";
 /** @public */
 export type { ChatSettingsResponse } from "./admin-chats";
