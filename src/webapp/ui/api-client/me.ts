@@ -4,7 +4,6 @@
 import type { Gender } from "../../../shared/types";
 import type { Lang } from "../../../shared/i18n";
 import type { DateFormat } from "../../../shared/date-format";
-import type { SpendSummary } from "../../../spending/window";
 import type { UsageShare } from "../../../ratelimit/share";
 import { req } from "./http";
 
@@ -16,9 +15,6 @@ export type MeResponse = {
   language: Lang | null;
   dateFormat: DateFormat | null;
 };
-export type SpendingResponse = {
-  spending: SpendSummary;
-};
 export type UserFact = { key: string; value: string };
 export type FactBot = {
   botId: string | null;
@@ -27,9 +23,9 @@ export type FactBot = {
 };
 export type FactsResponse = { facts: UserFact[]; cap: number };
 
-// `webapp/routes/me.ts` — the caller's own profile, spending, bots and fact
-// vaults. Every vault mutation answers with the fresh list plus the cap, so the
-// UI replaces its state without a second round trip.
+// `webapp/routes/me.ts` — the caller's own profile, bots and fact vaults. Every
+// vault mutation answers with the fresh list plus the cap, so the UI replaces
+// its state without a second round trip.
 export const meApi = {
   getMe: () => req<MeResponse>("GET", "/api/me"),
   putMe: (patch: {
@@ -43,7 +39,6 @@ export const meApi = {
   // from `getMyUsage` in `./ratelimit`, which is the owner-gated admin route
   // carrying raw token counts.
   getMyUsageShare: () => req<{ usage: UsageShare }>("GET", "/api/me/usage"),
-  getMySpending: () => req<SpendingResponse>("GET", "/api/me/spending"),
   listMyBots: () => req<{ bots: FactBot[] }>("GET", "/api/me/bots"),
   listMyFacts: (scope: string) =>
     req<FactsResponse>("GET", `/api/me/facts/${scope}`),

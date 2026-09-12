@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../i18n-context";
-import { api, type MeResponse, type SpendSummary } from "../api-client";
-import { SpendingCard } from "../components/spending-card";
+import { api, type MeResponse } from "../api-client";
 import { composeFullName, type Gender } from "../../../shared/types";
 import { validateDisplayName } from "../../../shared/display-name";
 import { Card, SectionHeader, Stack } from "../components/layout";
@@ -43,12 +42,6 @@ export function MainView({
     dateFormat: me.dateFormat,
     language: resolvedLang,
   });
-  const [spending, setSpending] = useState<SpendSummary | null>(null);
-
-  useEffect(() => {
-    api.getMySpending().then((r) => setSpending(r.spending));
-  }, []);
-
   // Each change is saved on its own as soon as it is made; responses only feed
   // `onMe`, never the fields, so a slow answer cannot undo a newer change.
   const { save, status } = useAutosave<ProfilePatch, MeResponse>({
@@ -132,8 +125,6 @@ export function MainView({
       />
 
       <SaveStatus status={status} />
-
-      {spending && <SpendingCard spending={spending} />}
 
       <SectionHeader>{s.ui_main_reminders}</SectionHeader>
       <Card>

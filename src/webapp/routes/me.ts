@@ -100,17 +100,6 @@ export const meRoutes: Route[] = [
       };
     },
   },
-  {
-    method: "GET",
-    path: "/api/me/spending",
-    handle: async ({ deps, actor }) => {
-      const spending = await deps.storage.spend.getUser(
-        actor.userId,
-        Date.now(),
-      );
-      return { status: 200, body: { spending } };
-    },
-  },
   // The viewer's own rate-limit standing, for the Web App header. Percentage
   // only: unlike the owner-gated `/api/ratelimit/*` routes, this one is
   // reachable by every authenticated user, so it must not carry the raw token
