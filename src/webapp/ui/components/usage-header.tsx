@@ -51,25 +51,19 @@ function WindowBar({ label, share }: { label: string; share: WindowShare }) {
 // handed a `UsageShare`, which carries no token counts at all (see
 // `ratelimit/share.ts`), so the same rule the `/usage` command follows holds
 // here. Renders nothing until the fetch lands, so the layout below it doesn't
-// jump twice.
+// jump twice — and nothing at all for an exempt owner, who has no bars to see.
 export function UsageHeader({ usage }: { usage: UsageShare | null }) {
   const { t: s } = useI18n();
-  if (!usage) return null;
+  if (!usage || usage.exempt) return null;
   return (
     <div className="mb-3 rounded-xl bg-tg-section px-4 py-3">
       <div className="pb-2 text-[13px] font-medium text-tg-section-header">
         {s.ui_usage_header_title}
       </div>
-      {usage.exempt ? (
-        <div className="text-[13px] text-tg-hint">
-          {s.ui_usage_header_exempt}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          <WindowBar label={s.ui_usage_header_5h} share={usage.fiveHour} />
-          <WindowBar label={s.ui_usage_header_weekly} share={usage.weekly} />
-        </div>
-      )}
+      <div className="flex flex-col gap-2.5">
+        <WindowBar label={s.ui_usage_header_5h} share={usage.fiveHour} />
+        <WindowBar label={s.ui_usage_header_weekly} share={usage.weekly} />
+      </div>
     </div>
   );
 }

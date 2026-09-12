@@ -70,11 +70,9 @@ describe("UsageHeader markup", () => {
     expect(values).toEqual(["25", "60"]);
   });
 
-  test("shows no bars, and no percentages, for an exempt owner", () => {
-    const html = render(share({ exempt: true }));
-    expect(html).toContain("No limits apply to you.");
-    expect(html).not.toContain("aria-valuenow");
-    expect(html).not.toContain("%");
+  test("renders nothing for an exempt owner", () => {
+    expect(render(share({ exempt: true }))).toBe("");
+    expect(render(share({ exempt: true }), "ru")).toBe("");
   });
 
   test("translates", () => {

@@ -72,8 +72,4 @@ export const rateLimitMessages = {
     en: (ms: number) => `~${etaEn(ms)} until reset`,
     ru: (ms: number) => `~${etaRu(ms)} до сброса`,
   }),
-  ui_usage_header_exempt: m({
-    en: "No limits apply to you.",
-    ru: "На тебя лимиты не распространяются.",
-  }),
 };
