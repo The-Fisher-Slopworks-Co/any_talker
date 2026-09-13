@@ -57,7 +57,7 @@ each one depends on the result of the previous one.
 
 3. **Implement.** Read the code the Task points at, and its tests, before
    writing anything. Conventions live in CLAUDE.md: SPDX header on new files,
-   user-facing strings via `ctx.t` and `src/shared/i18n.ts`, dependency
+   user-facing strings via `ctx.t` and `src/shared/i18n/`, dependency
    injection, tagged outcomes, co-located `*.test.ts`. A test that covers the
    change (reproduces the bug, or exercises the new behaviour) is a mandatory
    part of it. Scope: only what the Task needs, no drive-by refactors. Size:

@@ -46,6 +46,8 @@ export function loadConfig(
   // One release of grace for deployments still on the pre-OpenRouter names.
   // Those names would actively lie about what this build talks to, but a hard
   // boot failure on every existing deployment is a worse trade than a warning.
+  // Safe to remove on or after 2026-10-13, together with the `legacy` warning
+  // and the note in .env.example.
   const legacy: string[] = [];
   const withLegacyFallback = (
     name: string,
