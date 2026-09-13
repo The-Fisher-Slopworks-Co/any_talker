@@ -46,6 +46,3 @@ bun.lockb
 
 # git worktrees
 .claude/worktrees
-
-# local production overrides (copied from .example)
-Caddyfile
