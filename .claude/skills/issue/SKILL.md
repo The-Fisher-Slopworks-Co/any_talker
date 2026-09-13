@@ -58,7 +58,7 @@ in order** — each one depends on the result of the previous one.
 
 3. **Implement.** Read the code the issue points at, and its tests, before
    writing anything. Conventions live in CLAUDE.md: SPDX header on new files,
-   user-facing strings via `ctx.t` and `src/shared/i18n.ts`, dependency
+   user-facing strings via `ctx.t` and `src/shared/i18n/`, dependency
    injection, tagged outcomes, co-located `*.test.ts`. A test that reproduces
    the issue is a mandatory part of the fix. Scope: only what the issue needs,
    no drive-by refactors. Size: if the complete fix is clearly above ~300

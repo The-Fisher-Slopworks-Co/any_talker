@@ -28,7 +28,7 @@
 "area:i18n":
   - changed-files:
       - any-glob-to-any-file:
-          - src/shared/i18n.ts
+          - src/shared/i18n.test.ts
           - src/shared/i18n/**
 
 "area:e2e":

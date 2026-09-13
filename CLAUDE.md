@@ -35,7 +35,7 @@ bun test           # tests (co-located *.test.ts)
   // SPDX-License-Identifier: AGPL-3.0-or-later
   // Copyright (C) 2026 The Fisher Slopworks Co
   ```
-- **i18n:** languages are `en` | `ru`. Never hardcode user-facing strings — add keys to `src/shared/i18n.ts` and use `ctx.t` in handlers.
+- **i18n:** languages are `en` | `ru`. Never hardcode user-facing strings — add keys to the matching domain file in `src/shared/i18n/` and use `ctx.t` in handlers.
 - **Dependency injection:** `createBot(deps)` / `startServer(deps)` take injected `storage`, `ai`, `rateLimiter`. Keep handlers as pure functions for testability.
 - **Tagged outcomes:** handlers return `{ kind: "answered" | "denied" | "rateLimited" | "error" | ... }` objects the dispatcher switches on, rather than sending replies themselves.
 - **Adding an AI tool:** define a `Tool` (Zod `parameters` — must be a `z.object(...)`, `execute(input, ctx)`), then `registerTool(withLogging(tool))` in `main.ts`. See `src/ai/tools/registry.ts`.
