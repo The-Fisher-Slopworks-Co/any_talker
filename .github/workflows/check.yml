@@ -36,6 +36,6 @@ jobs:
         run: bun run typecheck
 
       # `bun run test` narrows the run to `src/`; `e2e/` needs a Telegram
-      # account and runs on demand from e2e.yml instead.
+      # account and runs on demand with `bun run e2e` instead.
       - name: Run tests
         run: bun run test
