@@ -55,7 +55,7 @@ function renderPrettyValue(v: unknown): string {
 }
 
 // Routes `error`/`warn` to stderr (console.error) and the rest to stdout
-// (console.log). Downstream Vector reads both as JSON lines, but anyone
+// (console.log). A log collector reading both streams sees JSON lines, but anyone
 // routing stderr separately (or running `bun run … 2>/dev/null` locally)
 // will lose warnings — keep that in mind before changing this split.
 export function emitLog(record: LogRecord, format: LogFormat): void {

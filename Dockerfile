@@ -28,8 +28,7 @@ COPY . .
 
 USER bun
 EXPOSE 8080/tcp
-# Belt-and-braces alongside the compose-level healthcheck: lets `docker run`
-# and orchestrators outside compose see the same liveness signal.
+# Liveness signal for `docker run` and orchestrators.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -q --spider http://localhost:8080/health || exit 1
 CMD ["bun", "run", "src/main.ts"]

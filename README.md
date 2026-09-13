@@ -42,60 +42,13 @@ How to work in this code — layout, conventions, and the Definition of done for
 pull request — is in `CLAUDE.md`, which `AGENTS.md` symlinks to so every coding
 agent reads the same file.
 
-## Production deploy
-
-A ready-to-run Compose file is provided in `docker-compose.prod.yml`. It pulls
-the bot image from GHCR (published by CI on every push to `main`), runs KeyDB
-with persistence, fronts both with Caddy for automatic HTTPS (Let's Encrypt),
-and bundles a small observability stack (VictoriaMetrics + VictoriaLogs +
-Vector). On a fresh server with DNS pointed at it:
-
-```bash
-cp .env.example .env          # fill BOT_TOKEN, OPENROUTER_API_KEY,
-                              # BOT_OWNER_ID, DOMAIN, LETSENCRYPT_EMAIL
-cp Caddyfile.example Caddyfile
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Only Caddy exposes ports (80/443); everything else (bot, KeyDB,
-VictoriaMetrics, VictoriaLogs, Vector) stays on an internal Docker network.
-
 ## Observability
 
-The bot exposes Prometheus metrics on `GET /metrics` (port 8080, internal
-network only — Caddy returns 404 if that path is requested publicly). The
-production Compose runs:
-
-- **VictoriaMetrics** (`victoriametrics/victoria-metrics`) — scrapes the
-  bot's `/metrics` every 15s using `vmagent.yml`. Retention defaults to
-  `VM_RETENTION=90d`.
-- **VictoriaLogs** (`victoriametrics/victoria-logs`) — receives logs over
-  the Elasticsearch bulk API. Retention defaults to `VL_RETENTION=30d`.
-- **Vector** (`timberio/vector`) — tails Docker container logs (containers
-  labelled `observability.collect=true`), parses the bot's JSON lines, and
-  forwards them to VictoriaLogs.
-
-Useful endpoints (from inside the compose network):
-
-```bash
-# Live metrics in Prometheus exposition format
-docker compose -f docker-compose.prod.yml exec victoriametrics \
-  wget -qO- http://bot:8080/metrics
-
-# VictoriaMetrics query API (PromQL)
-docker compose -f docker-compose.prod.yml exec victoriametrics \
-  wget -qO- 'http://localhost:8428/api/v1/query?query=bot_ask_total'
-
-# VictoriaLogs query API (LogsQL)
-docker compose -f docker-compose.prod.yml exec victorialogs \
-  wget -qO- --post-data='_msg:* AND container_name:*bot*' \
-  http://localhost:9428/select/logsql/query
-```
-
-To browse the VictoriaMetrics/VictoriaLogs UIs from a laptop, set up an SSH
-tunnel (e.g. `ssh -L 8428:victoriametrics:8428 -L 9428:victorialogs:9428
-user@host`) — neither is exposed publicly by Caddy. The bot publishes the
-following metric families:
+The bot exposes Prometheus metrics on `GET /metrics` (port 8080) and writes
+logs as JSON lines when `LOG_FORMAT=json` (the default under
+`NODE_ENV=production`). `/metrics` is unauthenticated and shares the port with
+the Web App, so block that path at whatever proxy fronts the bot publicly. The
+bot publishes the following metric families:
 
 | Metric | Type | Labels | Purpose |
 |---|---|---|---|
