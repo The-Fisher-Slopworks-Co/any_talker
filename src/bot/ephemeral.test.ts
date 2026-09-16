@@ -2,12 +2,19 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { replyEphemeral, type EphemeralReplyCtx } from "./ephemeral";
+import {
+  replyEphemeral,
+  type EphemeralReplyCtx,
+  type EphemeralReplyExtras,
+} from "./ephemeral";
 
 type ReplyCall = {
   text: string;
   other?:
-    { ephemeral_message_parameters?: { receiver_user_id: number } } | undefined;
+    | (EphemeralReplyExtras & {
+        ephemeral_message_parameters?: { receiver_user_id: number };
+      })
+    | undefined;
 };
 
 function makeCtx(args: {
@@ -67,6 +74,24 @@ describe("replyEphemeral", () => {
     expect(ctx.calls).toEqual([
       { text: "Your report is saved.", other: undefined },
     ]);
+  });
+
+  test("keeps the markup and parse mode in both kinds of chat", async () => {
+    const extras: EphemeralReplyExtras = {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "b", callback_data: "c" }]] },
+    };
+    const dm = makeCtx({ chatType: "private" });
+    const group = makeCtx({ chatType: "group" });
+
+    await replyEphemeral(dm, "<b>x</b>", 777, extras);
+    await replyEphemeral(group, "<b>x</b>", 777, extras);
+
+    expect(dm.calls[0]!.other).toEqual(extras);
+    expect(group.calls[0]!.other).toEqual({
+      ...extras,
+      ephemeral_message_parameters: { receiver_user_id: 777 },
+    });
   });
 
   // Only the ephemeral attempt is swallowed; a DM that cannot be written to is

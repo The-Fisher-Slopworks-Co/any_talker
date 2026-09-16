@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { InlineKeyboardMarkup } from "grammy/types";
+
+// What an answer may carry besides its text — `/help` sends HTML pages with
+// navigation buttons.
+export type EphemeralReplyExtras = {
+  parse_mode?: "HTML";
+  reply_markup?: InlineKeyboardMarkup;
+};
+
 // Everything `replyEphemeral` needs from a `BotContext`, spelled structurally
 // so a test can hand it a plain object — the shape `SyncCommandsApi` takes for
 // `setMyCommands`.
@@ -8,14 +17,14 @@ export type EphemeralReplyCtx = {
   chat?: { type: string } | undefined;
   reply(
     text: string,
-    other?: {
+    other?: EphemeralReplyExtras & {
       ephemeral_message_parameters?: { receiver_user_id: number };
     },
   ): Promise<unknown>;
 };
 
 // The answer to a command the bot menu declares `is_ephemeral` (`bot/commands.ts`
-// — `/feedback` and `/usage`). Such a command answers the person who typed it
+// — `/feedback`, `/usage` and `/help`). Such a command answers the person who typed it
 // and nobody else, so every one of its answers is ephemeral: the recorded line,
 // the usage hint, the daily cap, the limit report. There is no case in which it
 // may put a message in front of the rest of the chat.
@@ -34,13 +43,15 @@ export async function replyEphemeral(
   ctx: EphemeralReplyCtx,
   text: string,
   receiverUserId: number,
+  extras?: EphemeralReplyExtras,
 ): Promise<void> {
   if (ctx.chat?.type === "private") {
-    await ctx.reply(text);
+    await ctx.reply(text, extras);
     return;
   }
   try {
     await ctx.reply(text, {
+      ...extras,
       ephemeral_message_parameters: { receiver_user_id: receiverUserId },
     });
   } catch (err) {
