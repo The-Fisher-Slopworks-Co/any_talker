@@ -1,4 +1,4 @@
-name: PR preview deploy
+name: PR preview publish
 
 on:
   issue_comment:
@@ -11,14 +11,14 @@ permissions:
 
 jobs:
   preview:
-    name: Deploy PR head to preview
+    name: Publish PR head as preview image
     if: |
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/deploy') &&
       contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     concurrency:
-      group: pr-preview-deploy-${{ github.event.issue.number }}
+      group: pr-preview-publish-${{ github.event.issue.number }}
       cancel-in-progress: true
     steps:
       - name: Acknowledge comment
@@ -75,21 +75,13 @@ jobs:
           cache-from: type=gha,scope=preview
           cache-to: type=gha,mode=max,scope=preview,ignore-error=true
 
-      - name: Trigger Portainer webhook
-        env:
-          PREVIEW_DEPLOY_WEBHOOK_URL: ${{ secrets.PREVIEW_DEPLOY_WEBHOOK_URL }}
-        run: |
-          curl -fsS -X POST \
-            --retry 5 --retry-all-errors --retry-delay 2 \
-            --max-time 30 \
-            "$PREVIEW_DEPLOY_WEBHOOK_URL"
-
       - name: Comment success
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.pr.outputs.branch }}
           SHA: ${{ steps.pr.outputs.sha }}
+          IMAGE: ${{ steps.img.outputs.name }}
           PR_NUMBER: ${{ github.event.issue.number }}
         run: |
           gh pr comment "$PR_NUMBER" \
-            --body "✅ Preview deployed: branch \`$BRANCH\` at \`$SHA\`."
+            --body "✅ Preview image published: \`$IMAGE:preview\` from branch \`$BRANCH\` at \`$SHA\`."
