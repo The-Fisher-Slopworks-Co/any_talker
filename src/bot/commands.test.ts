@@ -48,6 +48,12 @@ describe("command lists", () => {
         is_ephemeral: true,
         shared: true,
       },
+      {
+        command: "help",
+        description: "How to use the bot",
+        is_ephemeral: true,
+        shared: true,
+      },
     ]);
   });
 
@@ -67,14 +73,20 @@ describe("command lists", () => {
         is_ephemeral: true,
         shared: true,
       },
+      {
+        command: "help",
+        description: "Как пользоваться ботом",
+        is_ephemeral: true,
+        shared: true,
+      },
     ]);
   });
 
   // The flag is what gives the entry its icon in the group menu, where the
   // reply really is ephemeral.
-  test("/feedback and /usage are marked ephemeral in the group lists", () => {
+  test("/feedback, /usage and /help are marked ephemeral in the group lists", () => {
     for (const list of [BOT_COMMANDS_EN, BOT_COMMANDS_RU]) {
-      for (const name of ["feedback", "usage"]) {
+      for (const name of ["feedback", "usage", "help"]) {
         const entry = list.find((c) => c.command === name);
         expect(entry?.is_ephemeral).toBe(true);
       }
@@ -90,7 +102,7 @@ describe("command lists", () => {
       OWNER_COMMANDS_EN,
       OWNER_COMMANDS_RU,
     ]) {
-      for (const name of ["feedback", "usage"]) {
+      for (const name of ["feedback", "usage", "help"]) {
         const entry = list.find((c) => c.command === name);
         expect(entry).toBeDefined();
         expect(entry?.is_ephemeral).toBeUndefined();
@@ -101,7 +113,7 @@ describe("command lists", () => {
   // `/feedback` and `/usage` behave the same whichever family bot answers
   // them; `/ask` and `/askwise` address one specific character, so they are
   // per-bot.
-  test("only /feedback and /usage are marked shared", () => {
+  test("only /feedback, /usage and /help are marked shared", () => {
     for (const list of [
       BOT_COMMANDS_EN,
       BOT_COMMANDS_RU,
@@ -113,6 +125,7 @@ describe("command lists", () => {
       expect(list.filter((c) => c.shared).map((c) => c.command)).toEqual([
         "feedback",
         "usage",
+        "help",
       ]);
     }
   });
@@ -127,6 +140,7 @@ describe("command lists", () => {
         description: "Your limits, in percent",
         shared: true,
       },
+      { command: "help", description: "How to use the bot", shared: true },
     ]);
     expect(PRIVATE_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
@@ -137,6 +151,7 @@ describe("command lists", () => {
         description: "Твои лимиты, в процентах",
         shared: true,
       },
+      { command: "help", description: "Как пользоваться ботом", shared: true },
     ]);
   });
 
