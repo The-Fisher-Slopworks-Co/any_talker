@@ -5,7 +5,7 @@
 # and Release (pushes to main). It exists as its own workflow rather than a job
 # in each caller because a job whose `if:` excludes the current event is still
 # created — as a skipped check cluttering every PR. Splitting the triggers per
-# file is the only way to keep the Docker/deploy jobs off pull requests.
+# file is the only way to keep the Docker publish jobs off pull requests.
 #
 # Called with a local path, so it always runs the copy from the caller's own
 # commit — a PR is gated by its own version of this file.
