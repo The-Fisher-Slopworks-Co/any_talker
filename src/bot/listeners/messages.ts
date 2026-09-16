@@ -7,11 +7,13 @@ import type { BotContext } from "../middleware/lang";
 import { matchAsk } from "../routing";
 import { matchDigestCommand } from "../handlers/digest";
 import { matchFeedbackCommand } from "../handlers/feedback";
+import { matchHelpCommand } from "../handlers/help";
 import { matchUsageCommand } from "../handlers/usage";
 import {
   dispatchTextCommand,
   dispatchDigestCommand,
   dispatchFeedbackCommand,
+  dispatchHelpCommand,
   dispatchUsageCommand,
 } from "../dispatch/commands";
 import { dispatchAsk } from "../dispatch/ask";
@@ -29,6 +31,12 @@ export function registerMessageListeners(
   bot.on("message:text", async (ctx) => {
     if (matchDigestCommand(ctx.message.text, ctx.me.username)) {
       await dispatchDigestCommand(rt, ctx);
+      return;
+    }
+    const help = matchHelpCommand(ctx.message.text, ctx.me.username);
+    if (help) {
+      if (await rt.shouldHandleSharedCommand(ctx, help.explicit))
+        await dispatchHelpCommand(ctx);
       return;
     }
     // `/usage` and `/feedback` are shared commands: every family bot in the

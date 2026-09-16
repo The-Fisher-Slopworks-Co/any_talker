@@ -5,6 +5,7 @@ import type { DetailLevel } from "../../ai/instruction";
 import { getBuildInfo } from "../../build-info";
 import { digestCommandHandler } from "../handlers/digest";
 import { feedbackHandler } from "../handlers/feedback";
+import { helpPage, type HelpPageId } from "../handlers/help";
 import { usageCommandHandler } from "../handlers/usage";
 import { resolveSenderIdentity } from "../identity";
 import { replyEphemeral } from "../ephemeral";
@@ -175,4 +176,38 @@ export async function dispatchFeedbackCommand(
         ? ctx.t.bot_feedback_limited
         : ctx.t.bot_feedback_recorded;
   await replyEphemeral(ctx, answer, receiver);
+}
+
+// `/help` and `/start` — the guide's home page. Handled inline alongside
+// `/usage` for the same reason, and answered the same way: ephemeral in a
+// group, a plain reply in a DM.
+export async function dispatchHelpCommand(ctx: BotContext): Promise<void> {
+  const receiver = ctx.from?.id;
+  if (receiver === undefined) return;
+  const page = helpPage(ctx.lang, "home");
+  await replyEphemeral(ctx, page.text, receiver, {
+    parse_mode: "HTML",
+    reply_markup: page.replyMarkup,
+  });
+}
+
+// A guide button: the page replaces the one it was pressed on. An ephemeral
+// message has an edit method of its own — the regular one addresses a message
+// id, and an ephemeral message's is 0.
+export async function dispatchHelpCallback(
+  ctx: BotContext,
+  pageId: HelpPageId,
+): Promise<void> {
+  const page = helpPage(ctx.lang, pageId);
+  const other = { parse_mode: "HTML", reply_markup: page.replyMarkup } as const;
+  try {
+    if (ctx.callbackQuery?.message?.ephemeral_message_id !== undefined) {
+      await ctx.editEphemeralMessageText(page.text, other);
+    } else {
+      await ctx.editMessageText(page.text, other);
+    }
+  } catch (err) {
+    console.error("help page edit failed:", err);
+  }
+  await ctx.answerCallbackQuery().catch(() => {});
 }

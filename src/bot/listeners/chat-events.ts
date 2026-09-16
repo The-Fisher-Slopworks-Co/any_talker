@@ -7,6 +7,8 @@ import { checksProcessedTotal } from "../../metrics";
 import { migrateChatData } from "../../storage/migrate-chat";
 import { dropChatMenu } from "../chat-commands";
 import { handleCheckCallback } from "../handlers/check-callback";
+import { HELP_CALLBACK_RE, type HelpPageId } from "../handlers/help";
+import { dispatchHelpCallback } from "../dispatch/commands";
 import { contactHandler } from "../handlers/contact";
 import type { BotContext } from "../middleware/lang";
 import type { BotRuntime } from "../runtime";
@@ -162,5 +164,9 @@ export function registerChatEventListeners(
       });
     }
     await ctx.answerCallbackQuery().catch(() => {});
+  });
+
+  bot.callbackQuery(HELP_CALLBACK_RE, async (ctx) => {
+    await dispatchHelpCallback(ctx, ctx.match[1] as HelpPageId);
   });
 }

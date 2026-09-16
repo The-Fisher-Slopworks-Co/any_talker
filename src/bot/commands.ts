@@ -23,7 +23,7 @@ function toBotCommands(list: readonly FamilyCommand[]): BotCommand[] {
   return list.map(({ shared: _shared, ...cmd }) => cmd);
 }
 
-// `is_ephemeral` earns `/feedback` and `/usage` their icon in the bot menu:
+// `is_ephemeral` earns `/feedback`, `/usage` and `/help` their icon in the bot menu:
 // outside a DM the reply is visible only to whoever sent it, and the menu says
 // so up front. The group lists are the ones that carry it — see
 // `withPlainReplies` for why the DM lists must not.
@@ -42,6 +42,12 @@ export const BOT_COMMANDS_EN: readonly FamilyCommand[] = [
     is_ephemeral: true,
     shared: true,
   },
+  {
+    command: "help",
+    description: "How to use the bot",
+    is_ephemeral: true,
+    shared: true,
+  },
 ];
 
 export const BOT_COMMANDS_RU: readonly FamilyCommand[] = [
@@ -56,6 +62,12 @@ export const BOT_COMMANDS_RU: readonly FamilyCommand[] = [
   {
     command: "usage",
     description: "Твои лимиты, в процентах",
+    is_ephemeral: true,
+    shared: true,
+  },
+  {
+    command: "help",
+    description: "Как пользоваться ботом",
     is_ephemeral: true,
     shared: true,
   },

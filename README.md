@@ -124,6 +124,9 @@ are supported as `host:port`).
 - Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
   (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
+- **`/help`** (and `/start`) — an in-bot guide limited to what the UI does not reveal: that the bot
+  only answers `/ask`, that context follows reply chains, reminders, groups with several characters.
+  A home page with section buttons; ephemeral in a group, a plain reply in a DM.
 - **`/usage`** — any user can ask where they stand: per window, the share of that budget
   already spent and when it resets. In a group the answer is an ephemeral message only the asker
   sees, as `/feedback`'s is; in a DM it is a plain reply. The Web App shows the same two figures as progress
