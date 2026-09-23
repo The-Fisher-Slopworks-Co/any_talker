@@ -7,6 +7,8 @@ import type { WindowKind } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
 import { summarizeUsage } from "../../ratelimit/window";
 import { usageShare, type WindowShare } from "../../ratelimit/share";
+import { activeBoost, boostedRateLimit } from "../../ratelimit/boost";
+import { localDateTimeString } from "../../shared/tz";
 
 // `/usage` — anyone asking how much of their own dual-window budget is left.
 // The answer is personal, so in a group it goes out as an ephemeral message
@@ -59,10 +61,20 @@ export async function usageCommandHandler(
 
   if (exempt) return { kind: "usage", text: s.bot_usage_exempt };
 
-  const stored = await input.storage.usage.get(input.fromUserId);
+  const [stored, userTimezone] = await Promise.all([
+    input.storage.usage.get(input.fromUserId),
+    input.storage.profile.getTimezone(input.fromUserId),
+  ]);
+  const boost = activeBoost(settings.limitBoost, input.nowMs);
   const share = usageShare(
-    summarizeUsage(input.fromUserId, settings.rateLimit, stored, input.nowMs),
+    summarizeUsage(
+      input.fromUserId,
+      boostedRateLimit(settings.rateLimit, boost, input.nowMs),
+      stored,
+      input.nowMs,
+    ),
     exempt,
+    boost,
   );
 
   // Two lines per window: the window with its share, then how long until it
@@ -80,6 +92,17 @@ export async function usageCommandHandler(
       s.bot_usage_header,
       block("fiveHour", share.fiveHour),
       block("weekly", share.weekly),
+      ...(boost
+        ? [
+            s.bot_usage_boost(
+              boost.percent,
+              localDateTimeString(
+                boost.untilMs,
+                userTimezone ?? settings.timezone,
+              ),
+            ),
+          ]
+        : []),
     ].join("\n\n"),
   };
 }

@@ -6,7 +6,12 @@
 // touches one concern may import the domain file directly instead — e.g.
 // `shared/types/ratelimit` for the token-window shapes.
 
-export type { RateLimitConfig, WindowKind, UserUsage } from "./types/ratelimit";
+export type {
+  RateLimitConfig,
+  WindowKind,
+  UserUsage,
+  LimitBoost,
+} from "./types/ratelimit";
 export type {
   BudgetDenyReason,
   BudgetConfig,

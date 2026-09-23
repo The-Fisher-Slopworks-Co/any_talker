@@ -61,6 +61,7 @@ describe("applyChatOverrides", () => {
       whitelistEnabled: DEFAULT_SETTINGS.whitelistEnabled,
       // Rate limit is per-user and global — chat settings never override it.
       rateLimit: DEFAULT_SETTINGS.rateLimit,
+      limitBoost: DEFAULT_SETTINGS.limitBoost,
       // Budget/anomaly are global policy too — never overridden per chat.
       budget: DEFAULT_SETTINGS.budget,
       anomaly: DEFAULT_SETTINGS.anomaly,

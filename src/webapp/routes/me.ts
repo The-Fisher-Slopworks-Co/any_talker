@@ -7,6 +7,7 @@ import { readValidDisplayName } from "../../shared/display-name";
 import { getOrInitSettings } from "../../settings";
 import { summarizeUsage } from "../../ratelimit/window";
 import { usageShare } from "../../ratelimit/share";
+import { activeBoost, boostedRateLimit } from "../../ratelimit/boost";
 import { ANY_METHOD, type ApiResponse, type Route } from "./types";
 import { applyUserFieldUpdates } from "./profile-fields";
 import {
@@ -114,12 +115,16 @@ export const meRoutes: Route[] = [
       const stored = await deps.storage.usage.get(actor.userId);
       const status = summarizeUsage(
         actor.userId,
-        settings.rateLimit,
+        boostedRateLimit(settings.rateLimit, settings.limitBoost, now),
         stored,
         now,
       );
       const exempt = actor.isOwner && settings.rateLimit.ownerExempt;
-      return { status: 200, body: { usage: usageShare(status, exempt) } };
+      const boost = activeBoost(settings.limitBoost, now);
+      return {
+        status: 200,
+        body: { usage: usageShare(status, exempt, boost) },
+      };
     },
   },
   // Memory vault: the family roster for the character switcher. A narrow DTO

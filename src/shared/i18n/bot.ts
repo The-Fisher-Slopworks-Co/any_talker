@@ -254,6 +254,14 @@ export const botMessages = {
   }),
   // Shown instead of the bars when the viewer is the (exempt) owner: their
   // usage is never accrued, so a 0% bar would be meaningless rather than true.
+  // Appended to `/usage` while an admin's limit promo runs; the percentages
+  // above are already against the raised budget.
+  bot_usage_boost: m({
+    en: (percent: number, until: string) =>
+      `Promo: +${percent}% to limits until ${until}`,
+    ru: (percent: number, until: string) =>
+      `Акция: +${percent}% к лимитам до ${until}`,
+  }),
   bot_usage_exempt: m({
     en: "The limits don't apply to you.",
     ru: "На тебя лимиты не распространяются.",
