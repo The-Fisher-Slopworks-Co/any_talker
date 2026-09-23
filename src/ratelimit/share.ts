@@ -8,6 +8,7 @@
 // never see a token number. Pure math, no I/O: `summarizeUsage` resolves the
 // windows, this collapses them to a share of budget.
 
+import type { LimitBoost } from "../shared/types";
 import type { UsageStatus, WindowStatus } from "./window";
 
 export type WindowShare = {
@@ -27,6 +28,9 @@ export type UsageShare = {
   // are deducted for them at all, so the percentages would sit at 0 forever.
   // Surfaces render "no limit" instead of a permanently empty bar.
   exempt: boolean;
+  // The running "+X% until <date>" promo, if any — already baked into the
+  // percentages above; carried so surfaces can say why the budget is bigger.
+  boost: LimitBoost | null;
 };
 
 function shareOf(w: WindowStatus): WindowShare {
@@ -44,10 +48,15 @@ function shareOf(w: WindowStatus): WindowShare {
   };
 }
 
-export function usageShare(status: UsageStatus, exempt: boolean): UsageShare {
+export function usageShare(
+  status: UsageStatus,
+  exempt: boolean,
+  boost: LimitBoost | null = null,
+): UsageShare {
   return {
     fiveHour: shareOf(status.fiveHour),
     weekly: shareOf(status.weekly),
     exempt,
+    boost,
   };
 }

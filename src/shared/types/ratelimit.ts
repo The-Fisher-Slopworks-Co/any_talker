@@ -28,3 +28,11 @@ export type UserUsage = {
   fiveHour: UsageWindow;
   weekly: UsageWindow;
 };
+
+// Admin-run promo: every user's budgets (both windows) are raised by `percent`
+// until `untilMs` (epoch ms), after which the base budgets apply again on their
+// own — no cleanup job, an expired boost is simply ignored on read.
+export type LimitBoost = {
+  percent: number;
+  untilMs: number;
+};

@@ -165,6 +165,39 @@ describe("usageCommandHandler", () => {
     expect(outcome.text).toContain("5 hours: 50%");
   });
 
+  test("measures against the promo-raised budget and names the promo", async () => {
+    const storage = await withLimits(1000, 10_000);
+    const current = await storage.settings.get();
+    const untilMs = Date.UTC(2023, 10, 20, 9, 30);
+    await storage.settings.save({
+      ...current!,
+      timezone: "Europe/Moscow",
+      limitBoost: { percent: 50, untilMs },
+    });
+    await spend(storage, USER, 300);
+    const outcome = await run(storage);
+    expect(outcome.text).toContain("5 hours: 20%");
+    expect(outcome.text).toContain(
+      "🎁 Promo: +50% to limits until 2023-11-20 12:30",
+    );
+    // The user's own timezone wins over the bot default.
+    await storage.profile.setTimezone(USER, "UTC");
+    expect((await run(storage)).text).toContain("until 2023-11-20 09:30");
+  });
+
+  test("drops the promo line and bonus once the promo has ended", async () => {
+    const storage = await withLimits(1000, 10_000);
+    const current = await storage.settings.get();
+    await storage.settings.save({
+      ...current!,
+      limitBoost: { percent: 50, untilMs: NOW },
+    });
+    await spend(storage, USER, 300);
+    const outcome = await run(storage);
+    expect(outcome.text).toContain("5 hours: 30%");
+    expect(outcome.text).not.toContain("Promo");
+  });
+
   test("does not accrue usage — asking is free", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);

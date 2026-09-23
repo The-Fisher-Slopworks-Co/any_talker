@@ -17,6 +17,7 @@ import {
 } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
 import { buildPromptOptimizationTemplate } from "../../ai/prompt-optimization";
+import { MAX_BOOST_PERCENT, isValidLimitBoost } from "../../ratelimit/boost";
 import type { ApiResponse, Route } from "./types";
 import { BAD_TIMEZONE } from "./responses";
 import { unknownModelsError } from "./models";
@@ -57,6 +58,13 @@ const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
 const BAD_RATE_LIMIT_TOKENS: ApiResponse = {
   status: 400,
   body: { error: "rate-limit token budgets must be non-negative numbers" },
+};
+
+const BAD_LIMIT_BOOST: ApiResponse = {
+  status: 400,
+  body: {
+    error: `limitBoost must be null or { percent: integer 1..${MAX_BOOST_PERCENT}, untilMs: number }`,
+  },
 };
 
 const BAD_EXPANDABLE_THRESHOLD: ApiResponse = {
@@ -213,6 +221,10 @@ export const settingsRoutes: Route[] = [
             return BAD_RATE_LIMIT_TOKENS;
           }
         }
+      }
+      // `null` ends the promo; a new one replaces the old wholesale (no merge).
+      if (!nullOrValid(patch.limitBoost, isValidLimitBoost)) {
+        return BAD_LIMIT_BOOST;
       }
       if (patch.expandableBlockquoteThreshold !== undefined) {
         const v = patch.expandableBlockquoteThreshold;

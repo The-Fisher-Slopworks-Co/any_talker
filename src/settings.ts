@@ -17,6 +17,7 @@ import {
   isValidReasoningEffort,
   isValidServiceTier,
 } from "./shared/types";
+import { isValidLimitBoost } from "./ratelimit/boost";
 
 // Reads a non-negative finite number, falling back to `def`.
 function num(v: unknown, def: number): number {
@@ -155,6 +156,9 @@ function normalize(s: Settings): Settings {
       ? s.timezone
       : DEFAULT_SETTINGS.timezone;
   const rateLimit = normalizeRateLimit(s.rateLimit);
+  // Absent on rows that predate promos; a malformed one is dropped rather than
+  // risk applying a bogus multiplier to everyone's budget.
+  const limitBoost = isValidLimitBoost(s.limitBoost) ? s.limitBoost : null;
   const budget = normalizeBudget(s.budget);
   const anomaly = normalizeAnomaly(s.anomaly);
   const expandableBlockquoteThreshold =
@@ -194,6 +198,7 @@ function normalize(s: Settings): Settings {
     reasoningEffort,
     whitelistEnabled,
     rateLimit,
+    limitBoost,
     budget,
     anomaly,
     timezone,
@@ -223,6 +228,7 @@ export function applyChatOverrides(
     whitelistEnabled: global.whitelistEnabled,
     // Rate limit is per-user and global; there is no per-chat override.
     rateLimit: global.rateLimit,
+    limitBoost: global.limitBoost,
     // Budget caps and anomaly thresholds are global policy, like the rate
     // limit; a per-chat override would let the per-chat cap be sidestepped.
     budget: global.budget,

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { useI18n } from "../i18n-context";
+import { useDateFmt } from "../datetime-context";
 import type { UsageShare, WindowShare } from "../../../ratelimit/share";
 
 // Fill colour by how much of the window is gone — green-ish default, amber as
@@ -55,6 +56,7 @@ function WindowBar({ label, share }: { label: string; share: WindowShare }) {
 // jump twice.
 export function UsageHeader({ usage }: { usage: UsageShare | null }) {
   const { t: s } = useI18n();
+  const { format } = useDateFmt();
   if (!usage) return null;
   return (
     <div className="mb-3 rounded-xl bg-tg-section px-4 py-3">
@@ -69,6 +71,14 @@ export function UsageHeader({ usage }: { usage: UsageShare | null }) {
         <div className="flex flex-col gap-2.5">
           <WindowBar label={s.ui_usage_header_5h} share={usage.fiveHour} />
           <WindowBar label={s.ui_usage_header_weekly} share={usage.weekly} />
+          {usage.boost ? (
+            <div className="text-[13px] text-tg-hint">
+              {s.ui_usage_header_boost(
+                usage.boost.percent,
+                format(usage.boost.untilMs),
+              )}
+            </div>
+          ) : null}
         </div>
       )}
     </div>

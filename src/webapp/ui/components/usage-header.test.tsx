@@ -9,6 +9,7 @@
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
+import { DateFmtProvider } from "../datetime-context";
 import { UsageHeader } from "./usage-header";
 import type { UsageShare } from "../../../ratelimit/share";
 
@@ -26,13 +27,16 @@ const share = (over: Partial<UsageShare> = {}): UsageShare => ({
     resetMs: Date.now() + 72 * HOUR,
   },
   exempt: false,
+  boost: null,
   ...over,
 });
 
 function render(usage: UsageShare | null, lang: "en" | "ru" = "en"): string {
   return renderToStaticMarkup(
     <I18nProvider lang={lang}>
-      <UsageHeader usage={usage} />
+      <DateFmtProvider dateFormat="iso" timezone="UTC">
+        <UsageHeader usage={usage} />
+      </DateFmtProvider>
     </I18nProvider>,
   );
 }
@@ -81,6 +85,13 @@ describe("UsageHeader markup", () => {
     const html = render(share(), "ru");
     expect(html).toContain("Твои лимиты");
     expect(html).toContain("осталось 75%");
+  });
+
+  test("names a running limit promo and its end date", () => {
+    const untilMs = Date.UTC(2026, 9, 7, 12, 0, 0);
+    expect(render(share())).not.toContain("Promo");
+    const html = render(share({ boost: { percent: 50, untilMs } }));
+    expect(html).toContain("Promo: +50% to limits until 2026-10-07 12:00:00");
   });
 
   test("turns the bar destructive once a window is nearly spent", () => {

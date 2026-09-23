@@ -72,6 +72,12 @@ export const rateLimitMessages = {
     en: (ms: number) => `~${etaEn(ms)} until reset`,
     ru: (ms: number) => `~${etaRu(ms)} до сброса`,
   }),
+  ui_usage_header_boost: m({
+    en: (percent: number, until: string) =>
+      `🎁 Promo: +${percent}% to limits until ${until}`,
+    ru: (percent: number, until: string) =>
+      `🎁 Акция: +${percent}% к лимитам до ${until}`,
+  }),
   ui_usage_header_exempt: m({
     en: "No limits apply to you.",
     ru: "На тебя лимиты не распространяются.",
