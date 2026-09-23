@@ -41,7 +41,7 @@ function createGetUserSettingsTool(deps: {
       "(isDefault:false) or an inherited default (isDefault:true). " +
       "'name' is the name you see for the user (their override, or their Telegram name if unset). " +
       "'timezone' is the IANA zone used for dates/times (their override, else the chat or global default). " +
-      "'gender' is 'male'/'female', or null when unset. 'language' is 'en' or 'ru' (the bot UI + reply language). " +
+      "'gender' is 'male'/'female', or null when unset. 'language' is 'en' or 'ru' (the bot UI language; replies follow the language the user writes in, this is only the fallback). " +
       `${SETTINGS_SCOPE_DOC} ` +
       "Call this before answering questions like 'what's my timezone?' or before editing a setting, so you know the current state.",
     parameters: GetSchema,
@@ -137,7 +137,7 @@ function createUpdateUserSettingsTool(deps: {
       "CRITICAL: do NOT touch the timezone in any other case. If the user does not name a place or zone, do NOT call this tool for 'timezone' at all — never guess, default, 'confirm', re-apply, or reset it. " +
       "A bare time with no place (e.g. 'remind me at 15:00') is NOT a timezone signal: leave the timezone unchanged and schedule in the user's existing zone. A pure lookup about somewhere the user isn't claiming ('what time is it in Tokyo?') is also not a change. " +
       "When the user DOES name a zone and you are also scheduling/rescheduling a reminder for it, set the timezone here FIRST, then schedule afterwards — once saved, the new zone applies to your reminder tool calls in this same reply, so a wall-clock time like '15:00' is interpreted in the new zone. " +
-      "'gender': 'male' or 'female'. 'language': 'en' or 'ru' (the bot UI and reply language). " +
+      "'gender': 'male' or 'female'. 'language': 'en' or 'ru' (the bot UI language; replies follow the language the user writes in, this is only the fallback). " +
       "Pass only the fields you want to change. To reset a field to its default instead of setting it, list its name in 'clear' " +
       "(e.g. clear:['gender'] removes the stored gender; clear:['timezone'] reverts to the chat/global zone; " +
       "clear:['name'] reverts to the Telegram name; clear:['language'] reverts to auto-detect). " +
