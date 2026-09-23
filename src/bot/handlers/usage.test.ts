@@ -178,7 +178,7 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage);
     expect(outcome.text).toContain("5 hours: 20%");
     expect(outcome.text).toContain(
-      "🎁 Promo: +50% to limits until 2023-11-20 12:30",
+      "Promo: +50% to limits until 2023-11-20 12:30",
     );
     // The user's own timezone wins over the bot default.
     await storage.profile.setTimezone(USER, "UTC");

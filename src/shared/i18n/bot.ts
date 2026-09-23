@@ -258,9 +258,9 @@ export const botMessages = {
   // above are already against the raised budget.
   bot_usage_boost: m({
     en: (percent: number, until: string) =>
-      `🎁 Promo: +${percent}% to limits until ${until}`,
+      `Promo: +${percent}% to limits until ${until}`,
     ru: (percent: number, until: string) =>
-      `🎁 Акция: +${percent}% к лимитам до ${until}`,
+      `Акция: +${percent}% к лимитам до ${until}`,
   }),
   bot_usage_exempt: m({
     en: "The limits don't apply to you.",
