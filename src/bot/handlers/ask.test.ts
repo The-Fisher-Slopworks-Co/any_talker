@@ -275,6 +275,20 @@ describe("askHandler", () => {
     if (out.kind === "rateLimited") expect(out.msUntilReset).toBeGreaterThan(0);
   });
 
+  test("a running limit promo lets a user past the base budget", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      limitBoost: { percent: 50, untilMs: 2_000 },
+    });
+    const rlStorage = new MemoryStorage();
+    await exhaustUsage(rlStorage, "42", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
+    const out = await askHandler(baseInput({ storage, rateLimiter: rl }));
+    expect(out.kind).toBe("answered");
+  });
+
   test("owner with ownerExempt skips rate limit", async () => {
     const storage = new MemoryStorage();
     await storage.settings.save({

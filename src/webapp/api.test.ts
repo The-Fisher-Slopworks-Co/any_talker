@@ -641,6 +641,37 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(400);
   });
 
+  test("starts, replaces and ends a limit promo", async () => {
+    const d = deps();
+    const put = (limitBoost: unknown) =>
+      handleApi(
+        { method: "PUT", path: "/api/settings", body: { limitBoost } },
+        d,
+        owner,
+      );
+    const boost = { percent: 50, untilMs: Date.now() + 60_000 };
+    expect((await put(boost)).status).toBe(200);
+    expect((await d.storage.settings.get())?.limitBoost).toEqual(boost);
+    expect((await put(null)).status).toBe(200);
+    expect((await d.storage.settings.get())?.limitBoost).toBeNull();
+  });
+
+  test("rejects a malformed limit promo", async () => {
+    const d = deps();
+    for (const limitBoost of [
+      { percent: 0, untilMs: Date.now() + 60_000 },
+      { percent: 50 },
+      "50%",
+    ]) {
+      const res = await handleApi(
+        { method: "PUT", path: "/api/settings", body: { limitBoost } },
+        d,
+        owner,
+      );
+      expect(res.status).toBe(400);
+    }
+  });
+
   test("rejects non-positive multipliers", async () => {
     const d = deps();
     const res = await handleApi(
@@ -999,6 +1030,23 @@ describe("GET /api/me/usage", () => {
     expect(usage.fiveHour.remainingPercent).toBe(75);
     expect(usage.weekly.usedPercent).toBe(3);
     expect(usage.exempt).toBe(false);
+  });
+
+  test("measures against a running limit promo and reports it", async () => {
+    const d = deps();
+    await setLimits(d);
+    const current = await d.storage.settings.get();
+    const boost = { percent: 100, untilMs: Date.now() + 60_000 };
+    await d.storage.settings.save({ ...current!, limitBoost: boost });
+    const starts = currentWindowStarts("42", Date.now());
+    await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
+
+    const r = await get(d, guest("42"));
+    const { usage } = r.body as {
+      usage: { fiveHour: { usedPercent: number }; boost: unknown };
+    };
+    expect(usage.fiveHour.usedPercent).toBe(13);
+    expect(usage.boost).toEqual(boost);
   });
 
   test("carries no token counts — percentages and reset times only", async () => {

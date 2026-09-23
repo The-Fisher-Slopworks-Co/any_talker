@@ -4,6 +4,7 @@
 import type { Storage } from "../../storage/types";
 import type { RateLimitConfig } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
+import { boostedRateLimit } from "../../ratelimit/boost";
 import { summarizeUsage, type UsageStatus } from "../../ratelimit/window";
 import type { ApiResponse, Route } from "./types";
 
@@ -24,11 +25,12 @@ async function respondUsage(
   userId: string,
 ): Promise<ApiResponse> {
   const settings = await getOrInitSettings(storage);
+  const now = Date.now();
   const usage = await userUsageStatus(
     storage,
     userId,
-    settings.rateLimit,
-    Date.now(),
+    boostedRateLimit(settings.rateLimit, settings.limitBoost, now),
+    now,
   );
   return { status: 200, body: { usage } };
 }
@@ -51,11 +53,12 @@ export const rateLimitRoutes: Route[] = [
       // by-id route below; both orderings are preserved as they were.
       const settings = await getOrInitSettings(deps.storage);
       if (wantsReset(req.body)) await deps.rateLimiter.reset(deps.ownerId);
+      const now = Date.now();
       const usage = await userUsageStatus(
         deps.storage,
         deps.ownerId,
-        settings.rateLimit,
-        Date.now(),
+        boostedRateLimit(settings.rateLimit, settings.limitBoost, now),
+        now,
       );
       return { status: 200, body: { usage } };
     },

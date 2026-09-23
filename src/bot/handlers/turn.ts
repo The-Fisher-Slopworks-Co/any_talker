@@ -17,6 +17,7 @@ import type { DetailLevel } from "../../ai/instruction";
 import type { ToolCallSource, ToolEffect } from "../../ai/tools/registry";
 import { recordDenial } from "../../spending/record";
 import { runAiTurn } from "../../ai/turn";
+import { boostedRateLimit } from "../../ratelimit/boost";
 
 // The gates-plus-call half of a chat turn, shared by /ask and guest mode: the
 // budget gate, the token rate limit, and the `runAiTurn` invocation with its
@@ -101,7 +102,11 @@ export async function runGatedAiTurn(
   if (!skipRateLimit) {
     const r = await input.rateLimiter.check(
       input.userId,
-      input.settings.rateLimit,
+      boostedRateLimit(
+        input.settings.rateLimit,
+        input.settings.limitBoost,
+        input.now,
+      ),
       input.now,
     );
     if (!r.allowed) {

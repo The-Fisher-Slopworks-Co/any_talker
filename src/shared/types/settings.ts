@@ -7,7 +7,7 @@ import type {
   ReasoningEffortConfig,
   ServiceTier,
 } from "./models";
-import type { RateLimitConfig } from "./ratelimit";
+import type { LimitBoost, RateLimitConfig } from "./ratelimit";
 
 export type Settings = {
   systemPrompt: string;
@@ -30,6 +30,9 @@ export type Settings = {
   // owner is always allowed either way. Defaults to true (whitelist enforced).
   whitelistEnabled: boolean;
   rateLimit: RateLimitConfig;
+  // Temporary "+X% to limits until <date>" promo, applied on top of
+  // `rateLimit` for everyone. `null` = no promo. Global, no per-chat override.
+  limitBoost: LimitBoost | null;
   // Hard USD spend caps (the budget-protection safety net) and the alert-only
   // anomaly thresholds. Global policy like `rateLimit` — no per-chat override.
   budget: BudgetConfig;
@@ -65,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
     ownerExempt: true,
     wiseMultiplier: 1.8,
   },
+  limitBoost: null,
   // Defaults sized for a small (~$20/month) budget: the monthly cap is the real
   // ceiling (with a little headroom), the daily cap stops one day from eating
   // the month, and per-chat/new-user caps keep any single chat or unknown
