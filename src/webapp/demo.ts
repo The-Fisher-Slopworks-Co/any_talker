@@ -2,8 +2,9 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 // Serves the admin Web App to a plain browser, outside Telegram, on throwaway
-// in-memory storage — for local UI work and screenshots in pull requests. No
-// bot, no KeyDB, no secrets: every API call is answered as the demo user.
+// in-memory storage seeded with demo data (`demo-data.ts`) — for local UI work
+// and screenshots in pull requests. No bot, no KeyDB, no secrets: every API
+// call is answered as the demo user.
 //
 //   bun run webapp:demo [--port 3000] [--as owner|user] [--lang en|ru]
 
@@ -14,6 +15,7 @@ import { createModelCatalog } from "../ai/model-catalog";
 import { isValidLang } from "../shared/i18n";
 import { fetchOpenRouterEndpoints } from "./openrouter-proxy";
 import { startServer } from "./server";
+import { seedDemoData } from "./demo-data";
 import type { ManagedBotController } from "./api";
 
 const DEMO_OWNER_ID = "1000001";
@@ -46,6 +48,14 @@ if (!isValidLang(values.lang)) {
 }
 
 const storage = new MemoryStorage();
+const rateLimiter = new DualWindowLimiter(storage);
+await seedDemoData(
+  storage,
+  rateLimiter,
+  { ownerId: DEMO_OWNER_ID, userId: DEMO_USER_ID },
+  // Whole minutes, so seeded times don't read as "10:38:01".
+  Math.floor(Date.now() / 60_000) * 60_000,
+);
 const demoUserId = values.as === "owner" ? DEMO_OWNER_ID : DEMO_USER_ID;
 await storage.profile.setLang(demoUserId, values.lang);
 
@@ -54,7 +64,7 @@ const server = startServer({
   botToken: "",
   ownerId: DEMO_OWNER_ID,
   storage,
-  rateLimiter: new DualWindowLimiter(storage),
+  rateLimiter,
   botManager: idleBotManager,
   // The public catalogue needs no key; offline, the model picker shows its
   // error state and everything else still renders.
