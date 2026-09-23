@@ -38,6 +38,12 @@ bun run typecheck
 bun run check    # typecheck + lint + format + knip + tests, the pre-commit gate
 ```
 
+To open the admin Web App in a plain browser — no Telegram, bot, KeyDB or
+`.env` — run `bun run webapp:demo` and go to `http://localhost:3000/webapp`.
+It serves throwaway in-memory data and answers every API call as a demo user;
+`--as user` shows a regular user instead of the owner, `--lang ru` switches the
+language, `--port` moves it. Handy for UI work and screenshots in pull requests.
+
 How to work in this code — layout, conventions, and the Definition of done for a
 pull request — is in `CLAUDE.md`, which `AGENTS.md` symlinks to so every coding
 agent reads the same file.

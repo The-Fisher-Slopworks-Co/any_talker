@@ -15,7 +15,24 @@ bun run format     # prettier --write over src/ + e2e/ (config: .prettierrc.json
 bun run knip       # unused files/exports/deps (config: knip.ts)
 bun run test       # unit tests = `bun test src`; one file: `bun test src/path/x.test.ts`
 bun run e2e        # e2e/ against real Telegram; needs `.env.e2e` (see `.env.e2e.example`)
+bun run webapp:demo  # Web App in a plain browser on in-memory data: localhost:3000/webapp
 ```
+
+For a webapp change, open it with `bun run webapp:demo` (`--as user`,
+`--lang ru`, `--port N`) — no Telegram, KeyDB or `.env` needed — and put
+screenshots of the affected screens in the PR's "UI changes" section.
+
+Screenshots never go into git. Once the PR exists, upload them to a pre-release
+named after it and link the assets from the body (`gh pr edit N --body-file`):
+
+```bash
+gh release create pr-N-evidence --prerelease --title "PR #N evidence" --notes "Screenshots for #N" before.png after.png
+gh release upload pr-N-evidence after.png --clobber   # add or replace later
+# ![after](https://github.com/The-Fisher-Slopworks-Co/any_talker/releases/download/pr-N-evidence/after.png)
+```
+
+No workflow reacts to releases or tags. After the PR merges the release can go:
+`gh release delete pr-N-evidence --cleanup-tag --yes`.
 
 Never run a bare `bun test`: it walks the whole repo and drags `e2e/` in (needs
 MTProto credentials + a KeyDB it flushes). `e2e/scaffold.test.ts` guards this.
