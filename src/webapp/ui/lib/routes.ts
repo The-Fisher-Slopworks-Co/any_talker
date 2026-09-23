@@ -17,7 +17,8 @@ export type AdminSection =
   | "quarantine"
   | "checks"
   | "bots"
-  | "feedback";
+  | "feedback"
+  | "api-token";
 
 export type Route =
   | { kind: "main" }
@@ -52,6 +53,7 @@ export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "checks",
   "bots",
   "feedback",
+  "api-token",
 ];
 
 export function adminSection(
@@ -100,6 +102,11 @@ export function adminSection(
       return {
         label: s.ui_admin_feedback,
         description: s.ui_admin_feedback_desc,
+      };
+    case "api-token":
+      return {
+        label: s.ui_admin_api_token,
+        description: s.ui_admin_api_token_desc,
       };
   }
 }
