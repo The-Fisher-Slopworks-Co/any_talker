@@ -97,9 +97,12 @@ export function t(lang: Lang): Strings {
   return MESSAGES[lang];
 }
 
+// The user's language setting is only a hint for the reply language: the model
+// answers in whatever language the user writes in, and falls back to the
+// setting only when the message itself doesn't show one.
 export function languageSection(lang: Lang): string {
   if (lang === "ru") {
-    return "# Язык ответа\n\nОтвечай на русском языке, если пользователь явно не пишет на другом.";
+    return "# Язык ответа\n\nОтвечай на том языке, на котором пишет пользователь, и не переходи на другой. Если язык сообщения не понять (стикер, эмодзи, одно слово вроде «ок»), отвечай на русском — это язык, выбранный пользователем в настройках.";
   }
-  return "# Response language\n\nReply in English unless the user explicitly writes in another language.";
+  return "# Response language\n\nReply in the language the user writes in, and don't switch to another one. If the message's language is unclear (a sticker, an emoji, a single word like \"ok\"), reply in English — the language the user picked in their settings.";
 }
