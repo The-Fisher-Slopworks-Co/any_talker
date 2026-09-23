@@ -9,6 +9,7 @@ import { Card, SectionFooter, SectionHeader } from "../../components/layout";
 import { Toggle } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
 import { OverrideSection } from "../../components/override-section";
+import { OptimizePromptButton } from "../../components/optimize-prompt-button";
 import { ProviderSortField } from "../../components/provider-sort-field";
 import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
@@ -131,14 +132,17 @@ export function SystemPromptSection({ form, set, global }: SectionProps) {
           : s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)
       }
     >
-      <Card>
-        <textarea
-          className={PROMPT_TEXTAREA_CLS}
-          value={form.promptValue}
-          onChange={(e) => set("promptValue", e.target.value)}
-          placeholder={s.ui_chat_prompt_placeholder}
-        />
-      </Card>
+      <>
+        <Card>
+          <textarea
+            className={PROMPT_TEXTAREA_CLS}
+            value={form.promptValue}
+            onChange={(e) => set("promptValue", e.target.value)}
+            placeholder={s.ui_chat_prompt_placeholder}
+          />
+        </Card>
+        <OptimizePromptButton prompt={form.promptValue} />
+      </>
     </OverrideSection>
   );
 }

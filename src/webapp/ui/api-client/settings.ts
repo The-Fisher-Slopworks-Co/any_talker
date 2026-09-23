@@ -9,4 +9,6 @@ export const settingsApi = {
   getSettings: () => req<Settings>("GET", "/api/settings"),
   putSettings: (patch: Partial<Settings>) =>
     req<Settings>("PUT", "/api/settings", patch),
+  getPromptOptimizationTemplate: () =>
+    req<{ template: string }>("GET", "/api/settings/prompt-optimization"),
 };
