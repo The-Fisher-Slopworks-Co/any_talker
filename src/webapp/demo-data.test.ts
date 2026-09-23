@@ -6,6 +6,8 @@ import { MemoryStorage } from "../storage/memory";
 import { DualWindowLimiter } from "../ratelimit/dual-window";
 import { handleApi, type ApiDeps } from "./api";
 import { seedDemoData } from "./demo-data";
+import { summarizeUsage } from "../ratelimit/window";
+import { DEFAULT_SETTINGS } from "../shared/types";
 
 const ids = { ownerId: "1", userId: "2" };
 const NOW = Date.UTC(2026, 8, 23, 12, 0);
@@ -46,5 +48,16 @@ describe("seedDemoData", () => {
     expect(reminders.reminders!.length).toBeGreaterThan(0);
     const facts = await get("/api/me/facts/main", ids.userId);
     expect(facts.facts!.length).toBeGreaterThan(0);
+  });
+
+  test("spends part of the demo user's 5-hour window", async () => {
+    const status = summarizeUsage(
+      ids.userId,
+      DEFAULT_SETTINGS.rateLimit,
+      await deps.storage.usage.get(ids.userId),
+      NOW,
+    );
+    expect(status.fiveHour.used).toBeGreaterThan(0);
+    expect(status.fiveHour.remaining).toBeGreaterThan(0);
   });
 });

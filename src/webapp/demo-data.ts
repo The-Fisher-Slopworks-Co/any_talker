@@ -248,10 +248,11 @@ export async function seedDemoData(
 
   // Token usage fills the limit bars; spend fills the owner's dashboard.
   // Against the default 30k / 300k limits: 40% of the 5-hour window, 24% of
-  // the week.
-  await rateLimiter.deduct(ids.userId, 12_000, now - 2 * HOUR);
-  await rateLimiter.deduct(ids.userId, 60_000, now - 3 * DAY);
-  await rateLimiter.deduct("1000003", 15_000, now - HOUR);
+  // the week. Each window keeps one bucket and a deduction from an older
+  // window replaces it, so the earlier spend has to go first.
+  await rateLimiter.deduct(ids.userId, 60_000, now - 6 * HOUR);
+  await rateLimiter.deduct(ids.userId, 12_000, now - MINUTE);
+  await rateLimiter.deduct("1000003", 15_000, now - MINUTE);
   for (const [userId, chatId, model, usd] of [
     [ids.ownerId, chats[0]!.id, "anthropic/claude-sonnet-5", 1.84],
     [ids.userId, chats[1]!.id, "openai/gpt-5-mini", 0.37],
