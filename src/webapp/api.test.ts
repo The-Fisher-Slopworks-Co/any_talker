@@ -7,6 +7,7 @@ import { DualWindowLimiter } from "../ratelimit/dual-window";
 import { currentWindowStarts } from "../ratelimit/window";
 import { handleApi } from "./api";
 import { DEFAULT_SETTINGS } from "../shared/types";
+import { CHARACTER_PROMPT_SLOT } from "../shared/prompt-optimization";
 import type { UsageStatus } from "../ratelimit/window";
 import type { ModelCatalog, ModelInfo } from "../ai/model-catalog";
 
@@ -2265,6 +2266,28 @@ describe("/api/admin/chats", () => {
   test("non-owner gets 403", async () => {
     const r = await handleApi(
       { method: "GET", path: "/api/admin/chats", body: null },
+      deps(),
+      guest("42"),
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
+describe("GET /api/settings/prompt-optimization", () => {
+  test("returns the optimization template to the owner", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/settings/prompt-optimization", body: null },
+      deps(),
+      owner,
+    );
+    expect(r.status).toBe(200);
+    const body = r.body as { template: string };
+    expect(body.template).toContain(CHARACTER_PROMPT_SLOT);
+  });
+
+  test("is forbidden to non-owners", async () => {
+    const r = await handleApi(
+      { method: "GET", path: "/api/settings/prompt-optimization", body: null },
       deps(),
       guest("42"),
     );

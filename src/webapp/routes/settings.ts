@@ -16,6 +16,7 @@ import {
   isValidServiceTier,
 } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
+import { buildPromptOptimizationTemplate } from "../../ai/prompt-optimization";
 import type { ApiResponse, Route } from "./types";
 import { BAD_TIMEZONE } from "./responses";
 import { unknownModelsError } from "./models";
@@ -152,6 +153,16 @@ export const settingsRoutes: Route[] = [
       const s = await getOrInitSettings(deps.storage);
       return { status: 200, body: s };
     },
+  },
+  // The request the admin copies into an outside chat to trim a character
+  // prompt against the system prompt (see `ai/prompt-optimization.ts`).
+  {
+    method: "GET",
+    path: "/api/settings/prompt-optimization",
+    handle: async () => ({
+      status: 200,
+      body: { template: buildPromptOptimizationTemplate() },
+    }),
   },
   {
     method: "PUT",

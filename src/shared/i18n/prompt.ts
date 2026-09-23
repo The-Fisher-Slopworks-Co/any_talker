@@ -17,6 +17,22 @@ export const promptMessages = {
     en: "Character description embedded into the system instruction.",
     ru: "Описание персонажа, встраиваемое в системную инструкцию.",
   }),
+  ui_prompt_optimize_copy: m({
+    en: "Copy for optimization",
+    ru: "Скопировать для оптимизации",
+  }),
+  ui_prompt_optimize_copied: m({
+    en: "Copied",
+    ru: "Скопировано",
+  }),
+  ui_prompt_optimize_footer: m({
+    en: "Copies a ready request with the system prompt and this character prompt. Paste it into claude.ai or any other chat, then paste the shortened prompt back here and save.",
+    ru: "Копирует готовый запрос с системным промптом и этим промптом персонажа. Вставьте его в claude.ai или другой чат, затем вставьте сокращённый промпт обратно сюда и сохраните.",
+  }),
+  ui_prompt_optimize_failed: m({
+    en: "Could not copy to the clipboard.",
+    ru: "Не удалось скопировать в буфер обмена.",
+  }),
   ui_prompt_placeholder: m({
     en: "Describe how the bot should behave",
     ru: "Опиши, как должен вести себя бот",

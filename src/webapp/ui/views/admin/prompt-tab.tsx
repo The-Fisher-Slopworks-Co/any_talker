@@ -23,6 +23,7 @@ import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
 import { ReasoningEffortField } from "../../components/reasoning-effort-field";
 import { TimezoneSelect } from "../../components/timezone-select";
+import { OptimizePromptButton } from "../../components/optimize-prompt-button";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 
 export function PromptTab({
@@ -158,6 +159,7 @@ export function PromptTab({
         />
       </Card>
       <SectionFooter>{s.ui_prompt_system_prompt_footer}</SectionFooter>
+      <OptimizePromptButton prompt={prompt} />
 
       <SectionHeader>{s.ui_prompt_timezone}</SectionHeader>
       <TimezoneSelect value={timezone} onChange={setTimezone} />

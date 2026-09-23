@@ -11,6 +11,7 @@ import {
   Stack,
 } from "../../components/layout";
 import { LoadingState } from "../../components/states";
+import { OptimizePromptButton } from "../../components/optimize-prompt-button";
 import { DeleteButton, RowButton, SaveButton } from "../../components/controls";
 import {
   INPUT_CLS,
@@ -233,6 +234,7 @@ function EditBotForm({
         />
       </Card>
       <SectionFooter>{s.ui_mbot_system_prompt_footer}</SectionFooter>
+      <OptimizePromptButton prompt={systemPrompt} />
 
       <SectionHeader>{s.ui_mbot_avatar}</SectionHeader>
       <Card>
