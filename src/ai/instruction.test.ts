@@ -94,13 +94,15 @@ describe("buildInstruction", () => {
   test("appends English language section when lang=en", () => {
     const out = buildInstruction("X", { lang: "en" });
     expect(out).toContain("# Response language");
-    expect(out).toContain("Reply in English");
+    expect(out).toContain("Reply in the language the user writes in");
+    expect(out).toContain("reply in English");
   });
 
   test("appends Russian language section when lang=ru", () => {
     const out = buildInstruction("X", { lang: "ru" });
     expect(out).toContain("# Язык ответа");
-    expect(out).toContain("на русском");
+    expect(out).toContain("на котором пишет пользователь");
+    expect(out).toContain("отвечай на русском");
   });
 
   test("omits language section when lang is not provided", () => {
