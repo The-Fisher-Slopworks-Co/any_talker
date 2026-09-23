@@ -3,6 +3,7 @@
 
 import {
   handleApi,
+  type ApiActor,
   type ApiDeps,
   type ApiRequest,
   type ManagedBotController,
@@ -29,6 +30,10 @@ export type ServerDeps = {
   botManager: ManagedBotController;
   modelCatalog?: ModelCatalog;
   fetchProviderEndpoints?: ApiDeps["fetchProviderEndpoints"];
+  // Skips the Telegram initData check and serves every API call as this user,
+  // so the Web App opens in a plain browser. Only the demo entrypoint
+  // (`webapp/demo.ts`) sets it; `main.ts` never does.
+  demoUserId?: string;
 };
 
 export function startServer(deps: ServerDeps) {
@@ -39,6 +44,24 @@ export function startServer(deps: ServerDeps) {
     modelCatalog: deps.modelCatalog,
     managedBots: deps.botManager,
     fetchProviderEndpoints: deps.fetchProviderEndpoints,
+  };
+
+  const authenticate = async (req: Request): Promise<ApiActor | Response> => {
+    if (deps.demoUserId !== undefined) {
+      const userId = deps.demoUserId;
+      return { userId, isOwner: userId === deps.ownerId };
+    }
+    const authHeader = req.headers.get("authorization") ?? "";
+    const match = authHeader.match(/^tma (.+)$/);
+    if (!match) {
+      return Response.json({ error: "missing initData" }, { status: 401 });
+    }
+    const verify = await verifyInitData(match[1]!, deps.botToken, Date.now());
+    if (!verify.ok) {
+      return Response.json({ error: verify.reason }, { status: 401 });
+    }
+    const userId = String(verify.user.id);
+    return { userId, isOwner: userId === deps.ownerId };
   };
 
   const handleDynamic = async (req: Request): Promise<Response> => {
@@ -62,17 +85,8 @@ export function startServer(deps: ServerDeps) {
     }
 
     if (url.pathname.startsWith("/api/")) {
-      const authHeader = req.headers.get("authorization") ?? "";
-      const match = authHeader.match(/^tma (.+)$/);
-      if (!match) {
-        return Response.json({ error: "missing initData" }, { status: 401 });
-      }
-      const verify = await verifyInitData(match[1]!, deps.botToken, Date.now());
-      if (!verify.ok) {
-        return Response.json({ error: verify.reason }, { status: 401 });
-      }
-      const userId = String(verify.user.id);
-      const actor = { userId, isOwner: userId === deps.ownerId };
+      const actor = await authenticate(req);
+      if (actor instanceof Response) return actor;
 
       let body: unknown = null;
       if (req.method !== "GET" && req.method !== "DELETE") {
