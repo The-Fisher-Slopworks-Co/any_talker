@@ -78,6 +78,39 @@ export const rateLimitMessages = {
     ru: (percent: number, until: string) =>
       `Акция: +${percent}% к лимитам до ${until}`,
   }),
+  // Admin "+X% to limits until <date>" promo (`components/limit-boost-card.tsx`).
+  ui_boost_header: m({
+    en: "Limit promo",
+    ru: "Акция на лимиты",
+  }),
+  ui_boost_percent: m({
+    en: "Bonus, %",
+    ru: "Бонус, %",
+  }),
+  ui_boost_until: m({
+    en: "Until",
+    ru: "До",
+  }),
+  ui_boost_until_invalid: m({
+    en: "Pick a date in the future.",
+    ru: "Выбери дату в будущем.",
+  }),
+  ui_boost_start: m({
+    en: "Start promo",
+    ru: "Запустить акцию",
+  }),
+  ui_boost_end: m({
+    en: "End promo now",
+    ru: "Завершить акцию сейчас",
+  }),
+  ui_boost_active: m({
+    en: (percent: number, until: string) => `+${percent}% until ${until}`,
+    ru: (percent: number, until: string) => `+${percent}% до ${until}`,
+  }),
+  ui_boost_footer: m({
+    en: "Raises both limits for everyone by the given percent until the end date; users see it in /usage and the Web App.",
+    ru: "Повышает оба лимита для всех на указанный процент до даты окончания; пользователи видят акцию в /usage и в Web App.",
+  }),
   ui_usage_header_exempt: m({
     en: "No limits apply to you.",
     ru: "На тебя лимиты не распространяются.",

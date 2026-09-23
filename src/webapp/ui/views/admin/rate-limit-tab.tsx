@@ -15,6 +15,7 @@ import { RowButton, SaveButton } from "../../components/controls";
 import { RateLimitFields } from "../../components/rate-limit-fields";
 import { UsageCard } from "../../components/usage-card";
 import { TimeNote } from "../../components/time-note";
+import { LimitBoostCard } from "../../components/limit-boost-card";
 
 export function RateLimitTab({
   settings,
@@ -53,6 +54,12 @@ export function RateLimitTab({
       <SectionFooter>{s.ui_ratelimit_footer}</SectionFooter>
 
       <SaveButton saving={saving} dirty={dirty} onClick={save} />
+
+      <SectionHeader>{s.ui_boost_header}</SectionHeader>
+      <LimitBoostCard settings={settings} onSaved={onSaved} />
+      <SectionFooter>
+        {s.ui_boost_footer} <TimeNote />
+      </SectionFooter>
 
       <SectionHeader>{s.ui_ratelimit_my_usage}</SectionHeader>
       {usage ? (
