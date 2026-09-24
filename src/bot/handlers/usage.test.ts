@@ -178,11 +178,28 @@ describe("usageCommandHandler", () => {
     const outcome = await run(storage);
     expect(outcome.text).toContain("5 hours: 20%");
     expect(outcome.text).toContain(
-      "Promo: +50% to limits until 2023-11-20 12:30",
+      "Promo: +50% to limits until 20/11/2023, 12:30",
     );
     // The user's own timezone wins over the bot default.
     await storage.profile.setTimezone(USER, "UTC");
-    expect((await run(storage)).text).toContain("until 2023-11-20 09:30");
+    expect((await run(storage)).text).toContain("until 20/11/2023, 09:30");
+  });
+
+  test("formats the promo end in the reply language or the user's date format", async () => {
+    const storage = await withLimits(1000, 10_000);
+    const current = await storage.settings.get();
+    await storage.settings.save({
+      ...current!,
+      timezone: "UTC",
+      limitBoost: { percent: 25, untilMs: Date.UTC(2026, 9, 1, 16, 0) },
+    });
+    expect((await run(storage, { lang: "ru" })).text).toContain(
+      "Акция: +25% к лимитам до 01.10.2026, 16:00",
+    );
+    await storage.profile.setDateFormat(USER, "iso");
+    expect((await run(storage, { lang: "ru" })).text).toContain(
+      "до 2026-10-01 16:00",
+    );
   });
 
   test("drops the promo line and bonus once the promo has ended", async () => {
