@@ -97,3 +97,27 @@ function hexDigestsEqual(a: string, b: string): boolean {
     aDecoded.length === DIGEST_BYTES && bDecoded.length === DIGEST_BYTES;
   return timingSafeEqual(ab, bb) && lengthsMatch;
 }
+
+// The admin API token: 32 random bytes as hex. Stored only as its SHA-256.
+export function generateApiToken(): string {
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString(
+    "hex",
+  );
+}
+
+export async function hashApiToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(token),
+  );
+  return Buffer.from(digest).toString("hex");
+}
+
+// Whether `token` is the one whose hash is stored; false when none is.
+export async function verifyApiToken(
+  token: string,
+  storedHash: string | null,
+): Promise<boolean> {
+  if (storedHash === null) return false;
+  return hexDigestsEqual(await hashApiToken(token), storedHash);
+}
