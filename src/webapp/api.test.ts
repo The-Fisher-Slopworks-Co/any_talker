@@ -1056,7 +1056,11 @@ describe("GET /api/me/usage", () => {
     await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
 
     const r = await get(d, guest("42"));
-    const json = JSON.stringify(r.body);
+    // Reset times are epoch ms taken from the real clock, so their digits can
+    // contain "250" or "10000" by chance — drop them before the substring checks.
+    const json = JSON.stringify(r.body, (key, value) =>
+      key === "resetMs" ? undefined : value,
+    );
     for (const key of ['used"', "limit", 'remaining"', "windowStart"]) {
       expect(json).not.toContain(key);
     }
