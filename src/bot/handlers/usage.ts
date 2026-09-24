@@ -8,7 +8,7 @@ import { getOrInitSettings } from "../../settings";
 import { summarizeUsage } from "../../ratelimit/window";
 import { usageShare, type WindowShare } from "../../ratelimit/share";
 import { activeBoost, boostedRateLimit } from "../../ratelimit/boost";
-import { localDateTimeString } from "../../shared/tz";
+import { formatBotDateTime } from "../../shared/date-format";
 
 // `/usage` — anyone asking how much of their own dual-window budget is left.
 // The answer is personal, so in a group it goes out as an ephemeral message
@@ -61,9 +61,10 @@ export async function usageCommandHandler(
 
   if (exempt) return { kind: "usage", text: s.bot_usage_exempt };
 
-  const [stored, userTimezone] = await Promise.all([
+  const [stored, userTimezone, dateFormat] = await Promise.all([
     input.storage.usage.get(input.fromUserId),
     input.storage.profile.getTimezone(input.fromUserId),
+    input.storage.profile.getDateFormat(input.fromUserId),
   ]);
   const boost = activeBoost(settings.limitBoost, input.nowMs);
   const share = usageShare(
@@ -96,8 +97,10 @@ export async function usageCommandHandler(
         ? [
             s.bot_usage_boost(
               boost.percent,
-              localDateTimeString(
+              formatBotDateTime(
                 boost.untilMs,
+                dateFormat,
+                input.lang,
                 userTimezone ?? settings.timezone,
               ),
             ),

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { Lang } from "./i18n";
+
 // Date/time display format for the Web App. `null` (the default, stored as an
 // absent key) means "auto": the viewer's device locale decides, imposing
 // nothing. The explicit options are BCP-47 locales whose formatting Intl
@@ -45,4 +47,29 @@ export function formatDateTime(
   } catch {
     return new Date(ms).toLocaleString(locale);
   }
+}
+
+// Bot replies have no device locale to fall back on, so an unset preference
+// follows the reply language instead. Minutes are the finest unit a chat
+// message needs, so seconds are dropped.
+const LANG_DATE_FORMAT: Record<Lang, DateFormat> = {
+  en: "en-GB",
+  ru: "ru-RU",
+};
+
+export function formatBotDateTime(
+  ms: number,
+  format: DateFormat | null,
+  lang: Lang,
+  timezone: string,
+): string {
+  const f = format ?? LANG_DATE_FORMAT[lang];
+  return new Date(ms).toLocaleString(f === "iso" ? "sv-SE" : f, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timezone,
+  });
 }
