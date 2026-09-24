@@ -21,6 +21,7 @@ import type {
   ChecksStore,
   FactsStore,
   FeedbackStore,
+  ApiTokenStore,
 } from "./types";
 import type {
   Settings,
@@ -40,6 +41,7 @@ import type { DateFormat } from "../shared/date-format";
 import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 import type { FeedbackEntry } from "../shared/types/feedback";
+import type { ApiTokenRecord } from "./types/api-token";
 import type { ManagedBot } from "../managed-bots/types";
 import { MemoryManagedBotsStore } from "./memory/managed-bots";
 import { MemoryPresenceStore } from "./memory/presence";
@@ -59,6 +61,7 @@ import { MemoryPrivateChatsStore } from "./memory/private-chats";
 import { MemoryChecksStore } from "./memory/checks";
 import { MemoryFactsStore } from "./memory/facts";
 import { MemoryFeedbackStore } from "./memory/feedback";
+import { MemoryApiTokenStore } from "./memory/api-token";
 
 // All mutable state lives in one object shared by reference across every
 // `forBot` view, so a managed bot's storage and the main bot's storage see the
@@ -109,6 +112,8 @@ export type Backing = {
   feedback: Map<string, FeedbackEntry>;
   // `/feedback`'s daily anti-spam counter: UTC date -> (userId -> count).
   feedbackRate: Map<string, Map<string, number>>;
+  // The admin API token's hash; wrapped so the scalar is shared across views.
+  apiToken: { value: ApiTokenRecord | null };
   photoCache: Map<string, Uint8Array>;
   albums: Map<string, Map<number, string>>;
   userFacts: Map<string, Map<string, string>>;
@@ -153,6 +158,7 @@ function createBacking(): Backing {
     checks: new Map(),
     feedback: new Map(),
     feedbackRate: new Map(),
+    apiToken: { value: null },
     photoCache: new Map(),
     albums: new Map(),
     userFacts: new Map(),
@@ -203,6 +209,7 @@ export class MemoryStorage implements Storage {
   readonly checks: ChecksStore;
   readonly facts: FactsStore;
   readonly feedback: FeedbackStore;
+  readonly apiToken: ApiTokenStore;
 
   constructor(backing?: Backing, scope = "") {
     const b = backing ?? createBacking();
@@ -236,6 +243,7 @@ export class MemoryStorage implements Storage {
     this.checks = new MemoryChecksStore(b);
     this.facts = new MemoryFactsStore(b, s);
     this.feedback = new MemoryFeedbackStore(b);
+    this.apiToken = new MemoryApiTokenStore(b);
   }
 
   // The new view shares this instance's backing object by reference: it is a

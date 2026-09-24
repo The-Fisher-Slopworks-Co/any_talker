@@ -8,7 +8,7 @@ import {
   type ApiRequest,
   type ManagedBotController,
 } from "./api";
-import { verifyInitData } from "./auth";
+import { verifyApiToken, verifyInitData } from "./auth";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { ModelCatalog } from "../ai/model-catalog";
@@ -52,6 +52,16 @@ export function startServer(deps: ServerDeps) {
       return { userId, isOwner: userId === deps.ownerId };
     }
     const authHeader = req.headers.get("authorization") ?? "";
+    // The admin API token, created in the Web App: acts as the owner, for a
+    // client that has no Telegram initData.
+    const bearer = authHeader.match(/^Bearer (.+)$/);
+    if (bearer) {
+      const stored = await deps.storage.apiToken.get();
+      if (!(await verifyApiToken(bearer[1]!, stored?.hash ?? null))) {
+        return Response.json({ error: "bad api token" }, { status: 401 });
+      }
+      return { userId: deps.ownerId, isOwner: true };
+    }
     const match = authHeader.match(/^tma (.+)$/);
     if (!match) {
       return Response.json({ error: "missing initData" }, { status: 401 });
