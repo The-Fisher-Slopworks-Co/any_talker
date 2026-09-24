@@ -10,6 +10,7 @@ import { adminChatsApi } from "./admin-chats";
 import { adminChecksApi } from "./admin-checks";
 import { adminFeedbackApi } from "./admin-feedback";
 import { adminManagedBotsApi } from "./admin-managed-bots";
+import { adminApiTokenApi } from "./admin-api-token";
 import { adminSpendApi } from "./admin-spend";
 import { adminUsersApi } from "./admin-users";
 import { buildInfoApi } from "./build-info";
@@ -68,5 +69,6 @@ export const api = {
   ...adminChecksApi,
   ...adminFeedbackApi,
   ...adminManagedBotsApi,
+  ...adminApiTokenApi,
   ...buildInfoApi,
 };

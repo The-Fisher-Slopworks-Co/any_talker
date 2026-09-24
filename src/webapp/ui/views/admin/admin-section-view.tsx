@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api-client";
 import type { Settings } from "../../../../shared/types";
 import { LoadingState } from "../../components/states";
+import { ApiTokenTab } from "./api-token-tab";
 import { ChatsTab } from "./chats-tab";
 import { ChecksTab } from "./checks-tab";
 import { FeedbackTab } from "./feedback-tab";
@@ -51,6 +52,7 @@ export function AdminSectionView({
   if (section === "spend") return <SpendTab />;
   if (section === "quarantine") return <QuarantineTab />;
   if (section === "feedback") return <FeedbackTab onOpen={onOpenFeedback} />;
+  if (section === "api-token") return <ApiTokenTab />;
   if (section === "users") return <UsersTab onEdit={goUser} />;
   if (section === "chats") return <ChatsTab onEdit={goChat} />;
   if (section === "checks")

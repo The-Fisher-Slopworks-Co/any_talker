@@ -85,4 +85,70 @@ export const adminMessages = {
     en: "Recurring daily questions with Yes/No buttons",
     ru: "Циклические вопросы с кнопками Да/Нет",
   }),
+
+  // The admin API token: a bearer that opens the admin API without Telegram.
+  ui_admin_api_token: m({
+    en: "API token",
+    ru: "API-токен",
+  }),
+  ui_admin_api_token_desc: m({
+    en: "Admin API access for scripts and agents",
+    ru: "Доступ к админскому API для скриптов и агентов",
+  }),
+  ui_api_token_status: m({
+    en: "Token",
+    ru: "Токен",
+  }),
+  ui_api_token_none: m({
+    en: "Not created",
+    ru: "Не создан",
+  }),
+  ui_api_token_created: m({
+    en: (at: string) => `Created ${at}`,
+    ru: (at: string) => `Создан ${at}`,
+  }),
+  ui_api_token_create: m({
+    en: "Create token",
+    ru: "Создать токен",
+  }),
+  ui_api_token_recreate: m({
+    en: "Create a new token",
+    ru: "Создать новый токен",
+  }),
+  ui_api_token_recreate_confirm: m({
+    en: "The current token will stop working. Create a new one?",
+    ru: "Текущий токен перестанет работать. Создать новый?",
+  }),
+  ui_api_token_delete: m({
+    en: "Delete token",
+    ru: "Удалить токен",
+  }),
+  ui_api_token_delete_confirm: m({
+    en: "Delete the token? Everything that uses it loses access.",
+    ru: "Удалить токен? Всё, что им пользуется, потеряет доступ.",
+  }),
+  ui_api_token_footer: m({
+    en: "Send it as the Authorization: Bearer <token> header. It has the same access to the admin API as you.",
+    ru: "Передавай его в заголовке Authorization: Bearer <токен>. У него тот же доступ к админскому API, что и у тебя.",
+  }),
+  ui_api_token_new_header: m({
+    en: "New token",
+    ru: "Новый токен",
+  }),
+  ui_api_token_new_footer: m({
+    en: "Shown only once. Copy it now.",
+    ru: "Показывается только один раз. Скопируй его сейчас.",
+  }),
+  ui_api_token_copy: m({
+    en: "Copy",
+    ru: "Скопировать",
+  }),
+  ui_api_token_copied: m({
+    en: "Copied",
+    ru: "Скопировано",
+  }),
+  ui_api_token_error: m({
+    en: "Something went wrong. Try again.",
+    ru: "Что-то пошло не так. Попробуй ещё раз.",
+  }),
 };
