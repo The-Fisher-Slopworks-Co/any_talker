@@ -1055,17 +1055,25 @@ describe("GET /api/me/usage", () => {
     const starts = currentWindowStarts("42", Date.now());
     await d.storage.usage.add("42", 250, starts.fiveHour, starts.weekly);
 
+    // An exact shape: any raw token count, limit or window start the endpoint
+    // started to return would show up here as an unexpected field.
     const r = await get(d, guest("42"));
-    // Reset times are epoch ms taken from the real clock, so their digits can
-    // contain "250" or "10000" by chance — drop them before the substring checks.
-    const json = JSON.stringify(r.body, (key, value) =>
-      key === "resetMs" ? undefined : value,
-    );
-    for (const key of ['used"', "limit", 'remaining"', "windowStart"]) {
-      expect(json).not.toContain(key);
-    }
-    expect(json).not.toContain("250");
-    expect(json).not.toContain("10000");
+    expect(r.body).toEqual({
+      usage: {
+        fiveHour: {
+          usedPercent: 25,
+          remainingPercent: 75,
+          resetMs: expect.any(Number),
+        },
+        weekly: {
+          usedPercent: 3,
+          remainingPercent: 97,
+          resetMs: expect.any(Number),
+        },
+        exempt: false,
+        boost: null,
+      },
+    });
   });
 
   test("is scoped to the actor — another user's spend is invisible", async () => {
