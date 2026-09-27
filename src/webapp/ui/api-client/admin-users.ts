@@ -20,6 +20,8 @@ export type UserSettingsResponse = {
   whitelisted: boolean;
   blacklisted: boolean;
   limitClass: LimitClass | null;
+  // Drawn from the limit-class allowance this UTC calendar month.
+  allowanceMonthUsd: number;
 };
 
 // `webapp/routes/admin-users.ts`
