@@ -111,6 +111,40 @@ export const rateLimitMessages = {
     en: "Raises both limits for everyone by the given percent until the end date; users see it in /usage and the Web App.",
     ru: "Повышает оба лимита для всех на указанный процент до даты окончания; пользователи видят акцию в /usage и в Web App.",
   }),
+  // Admin-assigned limit classes: their config here, the assignment on the
+  // user's page. Admin-only; users are never shown their class.
+  ui_limit_classes_header: m({
+    en: "Limit classes",
+    ru: "Классы лимитов",
+  }),
+  ui_limit_class_header: m({
+    en: "Limit class",
+    ru: "Класс лимитов",
+  }),
+  ui_limit_class_name: m({
+    en: (n: number) => `Level ${n}`,
+    ru: (n: number) => `Уровень ${n}`,
+  }),
+  ui_limit_class_none: m({
+    en: "None",
+    ru: "Нет",
+  }),
+  ui_limit_class_multiplier: m({
+    en: "Token multiplier",
+    ru: "Множитель токенов",
+  }),
+  ui_limit_class_reminders: m({
+    en: "Reminder cap",
+    ru: "Лимит напоминаний",
+  }),
+  ui_limit_classes_footer: m({
+    en: "A user is put in a class on their page. The multiplier raises both token limits, and a running promo multiplies on top; the reminder cap never drops below the global one.",
+    ru: "Класс назначается на странице пользователя. Множитель повышает оба лимита токенов, действующая акция умножается поверх; лимит напоминаний не опускается ниже общего.",
+  }),
+  ui_limit_class_footer: m({
+    en: "Raises this user's limits by the class settings on the Limits tab. The user isn't told about it.",
+    ru: "Повышает лимиты пользователя по настройкам класса на вкладке лимитов. Пользователю об этом не сообщается.",
+  }),
   ui_usage_header_exempt: m({
     en: "No limits apply to you.",
     ru: "На тебя лимиты не распространяются.",
