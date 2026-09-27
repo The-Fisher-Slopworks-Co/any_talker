@@ -13,6 +13,7 @@ import {
 } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
 import { UsageCard } from "../../components/usage-card";
+import { LimitClassCard } from "../../components/limit-class-card";
 import type { Gender } from "../../../../shared/types";
 import { DEFAULT_LANG, type Lang } from "../../../../shared/i18n";
 import {
@@ -210,6 +211,14 @@ export function UserEditView({ userId }: { userId: string }) {
           </Card>
         </>
       ) : null}
+
+      <LimitClassCard
+        userId={user.id}
+        initial={data.limitClass}
+        onChanged={() =>
+          api.getUserUsage(userId).then((r) => setUsage(r.usage))
+        }
+      />
 
       <SectionHeader>{s.ui_user_facts_header}</SectionHeader>
       {factBots && factBots.length > 1 ? (
