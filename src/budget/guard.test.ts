@@ -4,6 +4,7 @@
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
 import { SpendBudgetGuard } from "./guard";
+import { recordSpend } from "../spending/record";
 import {
   DEFAULT_SETTINGS,
   type BudgetConfig,
@@ -78,6 +79,36 @@ describe("SpendBudgetGuard", () => {
     const guard = new SpendBudgetGuard(storage);
     const r = await guard.check(args(), cfg({ globalMonthlyCapUsd: 18 }));
     expect(r).toEqual({ allowed: false, reason: "globalMonthly" });
+  });
+
+  // Limit-class allowance spend is money spent, but not the regular users'
+  // share of the day.
+  test("allowance spend is left out of the daily caps, not the monthly one", async () => {
+    const storage = new MemoryStorage();
+    await recordSpend(
+      storage,
+      {
+        userId: "u2",
+        chatId: "c1",
+        modelId: null,
+        costUsd: 5,
+        priced: true,
+        fromAllowance: true,
+      },
+      NOW,
+    );
+    const guard = new SpendBudgetGuard(storage);
+    const daily = cfg({ globalDailyCapUsd: 2, perChatDailyCapUsd: 1 });
+    expect(await guard.check(args(), daily)).toEqual({ allowed: true });
+    await storage.spend.addGlobal(2, NOW);
+    expect(await guard.check(args(), daily)).toEqual({
+      allowed: false,
+      reason: "globalDaily",
+    });
+    expect(await guard.check(args(), cfg({ globalMonthlyCapUsd: 5 }))).toEqual({
+      allowed: false,
+      reason: "globalMonthly",
+    });
   });
 
   test("global daily cap denies when today's global spend is over", async () => {

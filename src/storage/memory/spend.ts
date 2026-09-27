@@ -6,6 +6,7 @@ import {
   SPEND_RETENTION_DAYS,
   summarizeSpend,
   utcDateKey,
+  utcMonthToDateKeys,
 } from "../../spending/window";
 import type { SpendStore } from "../types/spend";
 import type { Backing } from "../memory";
@@ -109,6 +110,39 @@ export class MemorySpendStore implements SpendStore {
 
   async listModels(): Promise<string[]> {
     return [...this.b.spendModels];
+  }
+
+  async addAllowance(
+    userId: string,
+    chatId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    const a = this.b.allowanceSpend;
+    accrueDailyBucket(this.nestedBucket(a.user, userId), costUsd, nowMs);
+    accrueDailyBucket(this.nestedBucket(a.chat, chatId), costUsd, nowMs);
+    accrueDailyBucket(a.global, costUsd, nowMs);
+  }
+
+  async getAllowanceMonth(userId: string, nowMs: number): Promise<number> {
+    const byDate = this.b.allowanceSpend.user.get(userId);
+    return utcMonthToDateKeys(nowMs).reduce(
+      (sum, d) => sum + (byDate?.get(d) ?? 0),
+      0,
+    );
+  }
+
+  async getAllowanceDay(
+    chatId: string,
+    nowMs: number,
+  ): Promise<{ global: number; chat: number }> {
+    const today = utcDateKey(nowMs);
+    const a = this.b.allowanceSpend;
+    return {
+      global: a.global.get(today) ?? 0,
+      chat: a.chat.get(chatId)?.get(today) ?? 0,
+    };
   }
 
   async flagUnpriced(modelId: string): Promise<void> {

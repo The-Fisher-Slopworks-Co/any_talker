@@ -29,16 +29,22 @@ export class SpendBudgetGuard implements BudgetGuard {
     // The new-user cap needs the user's first-seen instant; skip the read
     // entirely when the soft-start window is disabled.
     const checkNewUser = config.newUserWindowDays > 0;
-    const [global, chat, user] = await Promise.all([
+    const [global, chat, allowance, user] = await Promise.all([
       this.storage.spend.getGlobal(now),
       this.storage.spend.getChat(chatId, now),
+      this.storage.spend.getAllowanceDay(chatId, now),
       checkNewUser ? this.storage.users.get(userId) : Promise.resolve(null),
     ]);
 
+    // The monthly cap counts every dollar. The daily caps leave out what
+    // limit-class users drew from their allowances (see `budget/gate.ts`), so
+    // that spend never crowds regular users out of the day.
     if (global.month >= config.globalMonthlyCapUsd)
       return this.deny("globalMonthly");
-    if (global.day >= config.globalDailyCapUsd) return this.deny("globalDaily");
-    if (chat.day >= config.perChatDailyCapUsd) return this.deny("chatDaily");
+    if (global.day - allowance.global >= config.globalDailyCapUsd)
+      return this.deny("globalDaily");
+    if (chat.day - allowance.chat >= config.perChatDailyCapUsd)
+      return this.deny("chatDaily");
 
     // A user whose record hasn't been written yet (the upsert middleware runs
     // fire-and-forget) reads as null here and simply isn't held to the new-user
