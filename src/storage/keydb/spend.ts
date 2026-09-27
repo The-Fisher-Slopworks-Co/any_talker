@@ -10,8 +10,15 @@ import {
   recentUtcDateKeys,
   summarizeSpend,
   utcDateKey,
+  utcMonthToDateKeys,
 } from "../../spending/window";
 import { PREFIX } from "./shared";
+
+// A missing or garbled counter reads as $0.
+function toUsd(raw: string | null | undefined): number {
+  const n = raw === null || raw === undefined ? 0 : Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
 
 // Atomic per-day spend move for chat migration. KEYS is a flat list of
 // [old, new] pairs (one per retained UTC date). Each pair is moved as one
@@ -126,6 +133,45 @@ export class KeyDBSpendStore implements SpendStore {
   async listModels(): Promise<string[]> {
     const reply = await this.client.send("SMEMBERS", [`${PREFIX}spend_models`]);
     return Array.isArray(reply) ? reply.map(String) : [];
+  }
+
+  async addAllowance(
+    userId: string,
+    chatId: string,
+    costUsd: number,
+    nowMs: number,
+  ): Promise<void> {
+    if (!(costUsd > 0)) return;
+    await Promise.all([
+      this.accrueSpend(`${PREFIX}spend_allowance:${userId}`, costUsd, nowMs),
+      this.accrueSpend(
+        `${PREFIX}spend_allowance_chat:${chatId}`,
+        costUsd,
+        nowMs,
+      ),
+      this.accrueSpend(`${PREFIX}spend_allowance_global`, costUsd, nowMs),
+    ]);
+  }
+
+  async getAllowanceMonth(userId: string, nowMs: number): Promise<number> {
+    const raws = await this.client.mget(
+      ...utcMonthToDateKeys(nowMs).map(
+        (d) => `${PREFIX}spend_allowance:${userId}:${d}`,
+      ),
+    );
+    return raws.reduce((sum, raw) => sum + toUsd(raw), 0);
+  }
+
+  async getAllowanceDay(
+    chatId: string,
+    nowMs: number,
+  ): Promise<{ global: number; chat: number }> {
+    const today = utcDateKey(nowMs);
+    const [global, chat] = await this.client.mget(
+      `${PREFIX}spend_allowance_global:${today}`,
+      `${PREFIX}spend_allowance_chat:${chatId}:${today}`,
+    );
+    return { global: toUsd(global), chat: toUsd(chat) };
   }
 
   async flagUnpriced(modelId: string): Promise<void> {
