@@ -22,6 +22,7 @@ import type {
   FactsStore,
   FeedbackStore,
   ApiTokenStore,
+  LimitClassesStore,
 } from "./types";
 import type {
   Settings,
@@ -35,6 +36,7 @@ import type {
   Chat,
   ChatSettings,
   Gender,
+  LimitClass,
 } from "../shared/types";
 import type { Lang } from "../shared/i18n";
 import type { DateFormat } from "../shared/date-format";
@@ -62,6 +64,7 @@ import { MemoryChecksStore } from "./memory/checks";
 import { MemoryFactsStore } from "./memory/facts";
 import { MemoryFeedbackStore } from "./memory/feedback";
 import { MemoryApiTokenStore } from "./memory/api-token";
+import { MemoryLimitClassesStore } from "./memory/limit-classes";
 
 // All mutable state lives in one object shared by reference across every
 // `forBot` view, so a managed bot's storage and the main bot's storage see the
@@ -114,6 +117,8 @@ export type Backing = {
   feedbackRate: Map<string, Map<string, number>>;
   // The admin API token's hash; wrapped so the scalar is shared across views.
   apiToken: { value: ApiTokenRecord | null };
+  // userId -> admin-assigned limit class (global — not affected by `forBot`).
+  limitClasses: Map<string, LimitClass>;
   photoCache: Map<string, Uint8Array>;
   albums: Map<string, Map<number, string>>;
   userFacts: Map<string, Map<string, string>>;
@@ -159,6 +164,7 @@ function createBacking(): Backing {
     feedback: new Map(),
     feedbackRate: new Map(),
     apiToken: { value: null },
+    limitClasses: new Map(),
     photoCache: new Map(),
     albums: new Map(),
     userFacts: new Map(),
@@ -210,6 +216,7 @@ export class MemoryStorage implements Storage {
   readonly facts: FactsStore;
   readonly feedback: FeedbackStore;
   readonly apiToken: ApiTokenStore;
+  readonly limitClasses: LimitClassesStore;
 
   constructor(backing?: Backing, scope = "") {
     const b = backing ?? createBacking();
@@ -244,6 +251,7 @@ export class MemoryStorage implements Storage {
     this.facts = new MemoryFactsStore(b, s);
     this.feedback = new MemoryFeedbackStore(b);
     this.apiToken = new MemoryApiTokenStore(b);
+    this.limitClasses = new MemoryLimitClassesStore(b);
   }
 
   // The new view shares this instance's backing object by reference: it is a

@@ -7,7 +7,8 @@ import type { WindowKind } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
 import { summarizeUsage } from "../../ratelimit/window";
 import { usageShare, type WindowShare } from "../../ratelimit/share";
-import { activeBoost, boostedRateLimit } from "../../ratelimit/boost";
+import { activeBoost } from "../../ratelimit/boost";
+import { userRateLimit } from "../../ratelimit/limit-class";
 import { formatBotDateTime } from "../../shared/date-format";
 
 // `/usage` — anyone asking how much of their own dual-window budget is left.
@@ -61,16 +62,19 @@ export async function usageCommandHandler(
 
   if (exempt) return { kind: "usage", text: s.bot_usage_exempt };
 
-  const [stored, userTimezone, dateFormat] = await Promise.all([
+  const [stored, userTimezone, dateFormat, limitClass] = await Promise.all([
     input.storage.usage.get(input.fromUserId),
     input.storage.profile.getTimezone(input.fromUserId),
     input.storage.profile.getDateFormat(input.fromUserId),
+    input.storage.limitClasses.get(input.fromUserId),
   ]);
   const boost = activeBoost(settings.limitBoost, input.nowMs);
+  // The share is of the user's own (class-raised) budget; the report never
+  // says the user has a class.
   const share = usageShare(
     summarizeUsage(
       input.fromUserId,
-      boostedRateLimit(settings.rateLimit, boost, input.nowMs),
+      userRateLimit(settings, limitClass, input.nowMs),
       stored,
       input.nowMs,
     ),

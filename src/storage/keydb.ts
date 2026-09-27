@@ -28,6 +28,7 @@ import { KeyDBChecksStore } from "./keydb/checks";
 import { KeyDBFactsStore } from "./keydb/facts";
 import { KeyDBFeedbackStore } from "./keydb/feedback";
 import { KeyDBApiTokenStore } from "./keydb/api-token";
+import { KeyDBLimitClassesStore } from "./keydb/limit-classes";
 
 export class KeyDBStorage implements Storage {
   readonly managedBots: KeyDBManagedBotsStore;
@@ -49,6 +50,7 @@ export class KeyDBStorage implements Storage {
   readonly facts: KeyDBFactsStore;
   readonly feedback: KeyDBFeedbackStore;
   readonly apiToken: KeyDBApiTokenStore;
+  readonly limitClasses: KeyDBLimitClassesStore;
 
   // `botPrefix` is "" for the main bot (legacy unprefixed keys) or
   // `mbot:{botId}:` for a managed bot. It is interposed between the global
@@ -84,6 +86,7 @@ export class KeyDBStorage implements Storage {
     this.facts = new KeyDBFactsStore(client, sk);
     this.feedback = new KeyDBFeedbackStore(client);
     this.apiToken = new KeyDBApiTokenStore(client);
+    this.limitClasses = new KeyDBLimitClassesStore(client);
   }
 
   static async connect(url: string): Promise<KeyDBStorage> {
