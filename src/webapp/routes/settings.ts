@@ -6,9 +6,14 @@ import type {
   RateLimitConfig,
   BudgetConfig,
   AnomalyConfig,
+  LimitClass,
+  LimitClassConfig,
+  LimitClassesConfig,
   ReasoningEffortConfig,
 } from "../../shared/types";
 import {
+  LIMIT_CLASSES,
+  isLimitClass,
   isValidTimezone,
   isValidProviderSlug,
   isValidProviderSort,
@@ -64,6 +69,13 @@ const BAD_LIMIT_BOOST: ApiResponse = {
   status: 400,
   body: {
     error: `limitBoost must be null or { percent: integer 1..${MAX_BOOST_PERCENT}, untilMs: number }`,
+  },
+};
+
+const BAD_LIMIT_CLASSES: ApiResponse = {
+  status: 400,
+  body: {
+    error: `limitClasses keys must be ${LIMIT_CLASSES.join(", ")}; tokenMultiplier a number >= 1; maxReminders an integer >= 1`,
   },
 };
 
@@ -134,6 +146,31 @@ function validateAnomalyPatch(a: Partial<AnomalyConfig>): boolean {
     posIntOrUndef(a.digestIntervalHours) &&
     (mult === undefined || (typeof mult === "number" && mult >= 1))
   );
+}
+
+// Per class, partial: `{ "2": { maxReminders: 30 } }` touches only that field.
+function validateLimitClassesPatch(v: unknown): boolean {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
+  return Object.entries(v).every(([key, c]) => {
+    if (!isLimitClass(Number(key))) return false;
+    if (typeof c !== "object" || c === null || Array.isArray(c)) return false;
+    const { tokenMultiplier: mult, maxReminders } =
+      c as Partial<LimitClassConfig>;
+    return (
+      (mult === undefined ||
+        (typeof mult === "number" && Number.isFinite(mult) && mult >= 1)) &&
+      posIntOrUndef(maxReminders)
+    );
+  });
+}
+
+function mergeLimitClasses(
+  current: LimitClassesConfig,
+  patch: Partial<Record<LimitClass, Partial<LimitClassConfig>>> | undefined,
+): LimitClassesConfig {
+  const next = { ...current };
+  for (const c of LIMIT_CLASSES) next[c] = { ...current[c], ...patch?.[c] };
+  return next;
 }
 
 function validateReasoningEffortPatch(v: unknown): boolean {
@@ -226,6 +263,12 @@ export const settingsRoutes: Route[] = [
       if (!nullOrValid(patch.limitBoost, isValidLimitBoost)) {
         return BAD_LIMIT_BOOST;
       }
+      if (
+        patch.limitClasses !== undefined &&
+        !validateLimitClassesPatch(patch.limitClasses)
+      ) {
+        return BAD_LIMIT_CLASSES;
+      }
       if (patch.expandableBlockquoteThreshold !== undefined) {
         const v = patch.expandableBlockquoteThreshold;
         if (
@@ -270,6 +313,10 @@ export const settingsRoutes: Route[] = [
         ...current,
         ...patch,
         rateLimit: { ...current.rateLimit, ...patch.rateLimit },
+        limitClasses: mergeLimitClasses(
+          current.limitClasses,
+          patch.limitClasses,
+        ),
         reasoningEffort: {
           ...current.reasoningEffort,
           ...patch.reasoningEffort,

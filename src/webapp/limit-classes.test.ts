@@ -34,6 +34,13 @@ const putClass = (d: ApiDeps, id: string, body: unknown) =>
     owner,
   );
 
+const putSettings = (d: ApiDeps, limitClasses: unknown) =>
+  handleApi(
+    { method: "PUT", path: "/api/settings", body: { limitClasses } },
+    d,
+    owner,
+  );
+
 describe("limit class assignment", () => {
   test("the admin puts a user in a class, sees it, and takes them out", async () => {
     const d = await deps();
@@ -83,5 +90,30 @@ describe("limit class assignment", () => {
     );
     expect(r.status).toBe(403);
     expect(await d.storage.limitClasses.get("42")).toBeNull();
+  });
+});
+
+describe("limit class config", () => {
+  test("a patch touches one class field and keeps the rest", async () => {
+    const d = await deps();
+    const r = await putSettings(d, { 2: { maxReminders: 30 } });
+    expect(r.status).toBe(200);
+    expect((await d.storage.settings.get())?.limitClasses).toEqual({
+      1: DEFAULT_SETTINGS.limitClasses[1],
+      2: { ...DEFAULT_SETTINGS.limitClasses[2], maxReminders: 30 },
+    });
+  });
+
+  test("rejects a malformed config", async () => {
+    const d = await deps();
+    for (const bad of [
+      { 3: { maxReminders: 10 } },
+      { 1: { tokenMultiplier: 0.5 } },
+      { 1: { maxReminders: 2.5 } },
+      { 1: null },
+      [],
+    ]) {
+      expect((await putSettings(d, bad)).status).toBe(400);
+    }
   });
 });
