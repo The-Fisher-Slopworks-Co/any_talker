@@ -7,7 +7,8 @@ import { readValidDisplayName } from "../../shared/display-name";
 import { getOrInitSettings } from "../../settings";
 import { summarizeUsage } from "../../ratelimit/window";
 import { usageShare } from "../../ratelimit/share";
-import { activeBoost, boostedRateLimit } from "../../ratelimit/boost";
+import { activeBoost } from "../../ratelimit/boost";
+import { userRateLimit } from "../../ratelimit/limit-class";
 import { ANY_METHOD, type ApiResponse, type Route } from "./types";
 import { applyUserFieldUpdates } from "./profile-fields";
 import {
@@ -112,10 +113,15 @@ export const meRoutes: Route[] = [
     handle: async ({ deps, actor }) => {
       const settings = await getOrInitSettings(deps.storage);
       const now = Date.now();
-      const stored = await deps.storage.usage.get(actor.userId);
+      const [stored, limitClass] = await Promise.all([
+        deps.storage.usage.get(actor.userId),
+        deps.storage.limitClasses.get(actor.userId),
+      ]);
+      // A share of the user's own (class-raised) budget; the class itself is
+      // never in the response.
       const status = summarizeUsage(
         actor.userId,
-        boostedRateLimit(settings.rateLimit, settings.limitBoost, now),
+        userRateLimit(settings, limitClass, now),
         stored,
         now,
       );

@@ -6,6 +6,7 @@ import type { DeliveryTarget, Recurrence } from "../../../reminders/types";
 import { MIN_LEAD_MS } from "../../../reminders/types";
 import type { Storage } from "../../../storage/types";
 import { getOrInitSettings } from "../../../settings";
+import { userReminderCap } from "../../../ratelimit/limit-class";
 import { serializeMessages } from "../../serialize";
 
 // The sources a reminder-writing tool is offered to — everything but a reminder
@@ -85,8 +86,12 @@ export async function persistReminder(
   // a whole series of schedule calls in one round and the agent runtime runs
   // them in parallel, so a check-then-save pair here would let every one of
   // them see the same pre-write count and sail past the cap together.
-  const { maxRemindersPerUser } = await getOrInitSettings(storage);
-  const managedBots = await storage.managedBots.list();
+  const [settings, limitClass, managedBots] = await Promise.all([
+    getOrInitSettings(storage),
+    storage.limitClasses.get(ctx.userId),
+    storage.managedBots.list(),
+  ]);
+  const maxRemindersPerUser = userReminderCap(settings, limitClass);
   const scopeIds: (string | null)[] = [
     null,
     ctx.botId ?? null,

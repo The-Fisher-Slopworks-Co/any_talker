@@ -36,3 +36,22 @@ export type LimitBoost = {
   percent: number;
   untilMs: number;
 };
+
+// Per-user limit class, assigned by the admin by hand. A user without one is
+// held to the base limits; a class raises them by its `LimitClassConfig`.
+export const LIMIT_CLASSES = [1, 2] as const;
+export type LimitClass = (typeof LIMIT_CLASSES)[number];
+
+export function isLimitClass(v: unknown): v is LimitClass {
+  return LIMIT_CLASSES.includes(v as LimitClass);
+}
+
+// What a class raises. Both only ever raise: `tokenMultiplier` is floored at 1,
+// and the reminder cap never drops below the global `maxRemindersPerUser`.
+export type LimitClassConfig = {
+  // Applied to both token windows, before any running promo.
+  tokenMultiplier: number;
+  maxReminders: number;
+};
+
+export type LimitClassesConfig = Record<LimitClass, LimitClassConfig>;

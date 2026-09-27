@@ -62,6 +62,7 @@ describe("applyChatOverrides", () => {
       // Rate limit is per-user and global — chat settings never override it.
       rateLimit: DEFAULT_SETTINGS.rateLimit,
       limitBoost: DEFAULT_SETTINGS.limitBoost,
+      limitClasses: DEFAULT_SETTINGS.limitClasses,
       // Budget/anomaly are global policy too — never overridden per chat.
       budget: DEFAULT_SETTINGS.budget,
       anomaly: DEFAULT_SETTINGS.anomaly,
@@ -167,6 +168,33 @@ describe("applyChatOverrides", () => {
     });
     const s = await getOrInitSettings(storage);
     expect(s.maxRemindersPerUser).toBe(7);
+  });
+
+  test("normalize fills default limitClasses on legacy rows", async () => {
+    const storage = new MemoryStorage();
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      limitClasses: undefined,
+    } as never);
+    const s = await getOrInitSettings(storage);
+    expect(s.limitClasses).toEqual(DEFAULT_SETTINGS.limitClasses);
+  });
+
+  test("normalize keeps valid limit class values and replaces invalid ones", async () => {
+    const storage = new MemoryStorage();
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      limitClasses: {
+        1: { tokenMultiplier: 1.5, maxReminders: 8.7 },
+        // A multiplier below 1 would lower the limits; a zero cap would block.
+        2: { tokenMultiplier: 0.5, maxReminders: 0 },
+      },
+    });
+    const s = await getOrInitSettings(storage);
+    expect(s.limitClasses).toEqual({
+      1: { tokenMultiplier: 1.5, maxReminders: 8 },
+      2: DEFAULT_SETTINGS.limitClasses[2],
+    });
   });
 
   test("normalize defaults whitelistEnabled to true on legacy rows", async () => {
