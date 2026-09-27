@@ -289,6 +289,17 @@ describe("askHandler", () => {
     expect(out.kind).toBe("answered");
   });
 
+  test("a user's limit class lets them past the base budget", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.limitClasses.set("42", 1);
+    const rlStorage = new MemoryStorage();
+    await exhaustUsage(rlStorage, "42", 1000);
+    const rl = new DualWindowLimiter(rlStorage);
+    const out = await askHandler(baseInput({ storage, rateLimiter: rl }));
+    expect(out.kind).toBe("answered");
+  });
+
   test("owner with ownerExempt skips rate limit", async () => {
     const storage = new MemoryStorage();
     await storage.settings.save({

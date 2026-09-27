@@ -86,6 +86,24 @@ describe("usageCommandHandler", () => {
     expect(outcome.text).toContain("until reset");
   });
 
+  // The share is of the user's own raised budget, and the report looks exactly
+  // like anyone else's: nothing in it says the user has a class.
+  test("reports a share of the class-raised budget without naming the class", async () => {
+    const storage = await withLimits(1000, 10_000);
+    await storage.limitClasses.set(USER, 2);
+    await spend(storage, USER, 250);
+    const withClass = await run(storage);
+    const plain = await run(storage, { fromUserId: "u2" });
+    await spend(storage, "u2", 250);
+    const plainSpent = await run(storage, { fromUserId: "u2" });
+    // Class 2 defaults to ×5: 250 of 5000 is 5%, not 25%.
+    expect(withClass.text).toContain("5 hours: 5%");
+    expect(plainSpent.text).toContain("5 hours: 25%");
+    expect(withClass.text.split("\n")).toHaveLength(
+      plain.text.split("\n").length,
+    );
+  });
+
   test("is a header plus two lines per window", async () => {
     const storage = await withLimits(1000, 10_000);
     await spend(storage, USER, 250);

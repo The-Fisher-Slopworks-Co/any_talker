@@ -8,10 +8,13 @@ import type {
   RateLimitConfig,
   BudgetConfig,
   AnomalyConfig,
+  LimitClassConfig,
+  LimitClassesConfig,
   ReasoningEffortConfig,
 } from "./shared/types";
 import {
   DEFAULT_SETTINGS,
+  LIMIT_CLASSES,
   isValidProviderSlug,
   isValidProviderSort,
   isValidReasoningEffort,
@@ -88,6 +91,27 @@ function normalizeRateLimit(rl: RateLimitConfig | undefined): RateLimitConfig {
   return { fiveHourTokens, weeklyTokens, ownerExempt, wiseMultiplier };
 }
 
+// Backfills each limit class's config (absent on rows that predate classes).
+// A multiplier below 1 would make a class *lower* the limits; floor it at 1.
+function normalizeLimitClasses(v: unknown): LimitClassesConfig {
+  const def = DEFAULT_SETTINGS.limitClasses;
+  const raw = (v ?? {}) as Partial<Record<string, Partial<LimitClassConfig>>>;
+  const out = { ...def };
+  for (const c of LIMIT_CLASSES) {
+    const x = raw[c] ?? {};
+    out[c] = {
+      tokenMultiplier:
+        typeof x.tokenMultiplier === "number" &&
+        Number.isFinite(x.tokenMultiplier) &&
+        x.tokenMultiplier >= 1
+          ? x.tokenMultiplier
+          : def[c].tokenMultiplier,
+      maxReminders: posInt(x.maxReminders, def[c].maxReminders),
+    };
+  }
+  return out;
+}
+
 // Backfills the USD budget caps from a possibly-legacy/absent stored shape.
 // Tolerant of missing/invalid fields so old `at:settings` rows load without a
 // migration (schema-on-read), same as `normalizeRateLimit`.
@@ -159,6 +183,7 @@ function normalize(s: Settings): Settings {
   // Absent on rows that predate promos; a malformed one is dropped rather than
   // risk applying a bogus multiplier to everyone's budget.
   const limitBoost = isValidLimitBoost(s.limitBoost) ? s.limitBoost : null;
+  const limitClasses = normalizeLimitClasses(s.limitClasses);
   const budget = normalizeBudget(s.budget);
   const anomaly = normalizeAnomaly(s.anomaly);
   const expandableBlockquoteThreshold =
@@ -199,6 +224,7 @@ function normalize(s: Settings): Settings {
     whitelistEnabled,
     rateLimit,
     limitBoost,
+    limitClasses,
     budget,
     anomaly,
     timezone,
@@ -229,6 +255,7 @@ export function applyChatOverrides(
     // Rate limit is per-user and global; there is no per-chat override.
     rateLimit: global.rateLimit,
     limitBoost: global.limitBoost,
+    limitClasses: global.limitClasses,
     // Budget caps and anomaly thresholds are global policy, like the rate
     // limit; a per-chat override would let the per-chat cap be sidestepped.
     budget: global.budget,

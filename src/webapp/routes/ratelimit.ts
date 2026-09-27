@@ -2,22 +2,31 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Storage } from "../../storage/types";
-import type { RateLimitConfig } from "../../shared/types";
+import type { Settings } from "../../shared/types";
 import { getOrInitSettings } from "../../settings";
-import { boostedRateLimit } from "../../ratelimit/boost";
+import { userRateLimit } from "../../ratelimit/limit-class";
 import { summarizeUsage, type UsageStatus } from "../../ratelimit/window";
 import type { ApiResponse, Route } from "./types";
 
 // The dual-window usage is per user and global, so a single record describes a
-// user everywhere. Resolved against the current config + windows for display.
+// user everywhere. Resolved against the user's current limits + windows for
+// display.
 async function userUsageStatus(
   storage: Storage,
   userId: string,
-  config: RateLimitConfig,
+  settings: Settings,
   now: number,
 ): Promise<UsageStatus> {
-  const stored = await storage.usage.get(userId);
-  return summarizeUsage(userId, config, stored, now);
+  const [stored, limitClass] = await Promise.all([
+    storage.usage.get(userId),
+    storage.limitClasses.get(userId),
+  ]);
+  return summarizeUsage(
+    userId,
+    userRateLimit(settings, limitClass, now),
+    stored,
+    now,
+  );
 }
 
 async function respondUsage(
@@ -25,13 +34,7 @@ async function respondUsage(
   userId: string,
 ): Promise<ApiResponse> {
   const settings = await getOrInitSettings(storage);
-  const now = Date.now();
-  const usage = await userUsageStatus(
-    storage,
-    userId,
-    boostedRateLimit(settings.rateLimit, settings.limitBoost, now),
-    now,
-  );
+  const usage = await userUsageStatus(storage, userId, settings, Date.now());
   return { status: 200, body: { usage } };
 }
 
@@ -53,12 +56,11 @@ export const rateLimitRoutes: Route[] = [
       // by-id route below; both orderings are preserved as they were.
       const settings = await getOrInitSettings(deps.storage);
       if (wantsReset(req.body)) await deps.rateLimiter.reset(deps.ownerId);
-      const now = Date.now();
       const usage = await userUsageStatus(
         deps.storage,
         deps.ownerId,
-        boostedRateLimit(settings.rateLimit, settings.limitBoost, now),
-        now,
+        settings,
+        Date.now(),
       );
       return { status: 200, body: { usage } };
     },
