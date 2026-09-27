@@ -11,6 +11,7 @@ import {
 } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
 import { SELECTABLE_ROW_CLS } from "../../components/row";
+import { NavRow } from "../../components/select-row";
 import { formatUsd, userDisplayName } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
@@ -19,10 +20,27 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { data } = useLoadable(() => api.listAdminUsers(), []);
 
   if (data === null) return <LoadingState />;
-  const { users, displayNames, spending } = data;
+  const { users, displayNames, spending, limitClasses } = data;
+  const classed = users.filter((u) => limitClasses[u.id] !== undefined);
 
   return (
     <Stack>
+      {classed.length > 0 ? (
+        <>
+          <SectionHeader>{s.ui_limit_classes_header}</SectionHeader>
+          <Card>
+            {classed.map((u) => (
+              <NavRow
+                key={u.id}
+                title={userDisplayName(u, displayNames[u.id])}
+                subtitle={s.ui_limit_class_name(limitClasses[u.id]!)}
+                onClick={() => onEdit(u.id)}
+              />
+            ))}
+          </Card>
+        </>
+      ) : null}
+
       <SectionHeader>{s.ui_users_all}</SectionHeader>
       <Card>
         {users.length === 0 ? (

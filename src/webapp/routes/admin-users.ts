@@ -3,6 +3,11 @@
 
 import { readValidDisplayName } from "../../shared/display-name";
 import type { SpendSummary } from "../../spending/window";
+import {
+  LIMIT_CLASSES,
+  isLimitClass,
+  type LimitClass,
+} from "../../shared/types";
 import type { ApiResponse, Route } from "./types";
 import { applyUserFieldUpdates } from "./profile-fields";
 import {
@@ -16,9 +21,16 @@ const USER_NOT_FOUND: ApiResponse = {
   body: { error: "user not found" },
 };
 
-// ORDER-SENSITIVE. `/api/admin/users/(.+)` is greedy and would swallow the two
-// routes above it, so the collection, `/:id/spending` and `/:id/facts/:scope`
-// all have to be tried first. Keeping every `/api/admin/users` route in this
+const BAD_LIMIT_CLASS: ApiResponse = {
+  status: 400,
+  body: {
+    error: `limitClass must be null or one of ${LIMIT_CLASSES.join(", ")}`,
+  },
+};
+
+// ORDER-SENSITIVE. `/api/admin/users/(.+)` is greedy and would swallow the
+// routes above it, so the collection, `/:id/spending`, `/:id/limit-class` and
+// `/:id/facts/:scope` all have to be tried first. Keeping every `/api/admin/users` route in this
 // one array is what makes that guarantee local and reviewable.
 export const adminUserRoutes: Route[] = [
   {
@@ -43,7 +55,30 @@ export const adminUserRoutes: Route[] = [
         displayNames[id] = name;
         spending[id] = spend;
       }
-      return { status: 200, body: { users, displayNames, spending } };
+      const limitClasses: Record<string, LimitClass> = {};
+      for (const e of await deps.storage.limitClasses.list()) {
+        limitClasses[e.userId] = e.limitClass;
+      }
+      return {
+        status: 200,
+        body: { users, displayNames, spending, limitClasses },
+      };
+    },
+  },
+  // Puts the user in a limit class (`1`/`2`) or takes them out of it (`null`).
+  {
+    method: "PUT",
+    path: /^\/api\/admin\/users\/(.+)\/limit-class$/,
+    handle: async ({ req, deps, params }) => {
+      const id = params[0]!;
+      const { limitClass } = (req.body ?? {}) as { limitClass?: unknown };
+      if (limitClass !== null && !isLimitClass(limitClass)) {
+        return BAD_LIMIT_CLASS;
+      }
+      if (!(await deps.storage.users.get(id))) return USER_NOT_FOUND;
+      if (limitClass === null) await deps.storage.limitClasses.remove(id);
+      else await deps.storage.limitClasses.set(id, limitClass);
+      return { status: 200, body: { limitClass } };
     },
   },
   {
@@ -80,6 +115,7 @@ export const adminUserRoutes: Route[] = [
         language,
         whitelisted,
         blacklisted,
+        limitClass,
       ] = await Promise.all([
         deps.storage.users.get(id),
         readValidDisplayName(deps.storage, id),
@@ -88,6 +124,7 @@ export const adminUserRoutes: Route[] = [
         deps.storage.profile.getLang(id),
         deps.storage.access.isWhitelisted("users", id),
         deps.storage.access.isBlacklisted("users", id),
+        deps.storage.limitClasses.get(id),
       ]);
       if (!user) return USER_NOT_FOUND;
       return {
@@ -100,6 +137,7 @@ export const adminUserRoutes: Route[] = [
           language,
           whitelisted,
           blacklisted,
+          limitClass,
         },
       };
     },
