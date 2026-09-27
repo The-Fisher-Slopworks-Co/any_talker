@@ -17,7 +17,7 @@ import type { DetailLevel } from "../../ai/instruction";
 import type { ToolCallSource, ToolEffect } from "../../ai/tools/registry";
 import { recordDenial } from "../../spending/record";
 import { runAiTurn } from "../../ai/turn";
-import { userRateLimit } from "../../ratelimit/limit-class";
+import { checkTurnGates } from "../../budget/gate";
 
 // The gates-plus-call half of a chat turn, shared by /ask and guest mode: the
 // budget gate, the token rate limit, and the `runAiTurn` invocation with its
@@ -79,41 +79,21 @@ export type GatedTurnResult =
 export async function runGatedAiTurn(
   input: GatedTurnInput,
 ): Promise<GatedTurnResult> {
-  const isOwner = input.userId === input.ownerId;
-
-  // Hard USD budget gate (money), checked before the token rate limit
-  // (fairness) — the coarser, cheaper "is the bot even allowed to spend more"
-  // question. Disabled/owner-exempt short-circuit inside the guard.
-  const budgetVerdict = await input.budgetGuard.check(
-    {
-      userId: input.userId,
-      chatId: input.chatId,
-      isOwner,
-      now: input.now,
-    },
-    input.settings.budget,
-  );
-  if (!budgetVerdict.allowed) {
+  // Hard USD budget (money) and token rate limit (fairness), with a
+  // limit-class user's allowance as the fallback — see `checkTurnGates`.
+  const gate = await checkTurnGates({
+    storage: input.storage,
+    budgetGuard: input.budgetGuard,
+    rateLimiter: input.rateLimiter,
+    settings: input.settings,
+    userId: input.userId,
+    chatId: input.chatId,
+    isOwner: input.userId === input.ownerId,
+    now: input.now,
+  });
+  if (gate.kind !== "allowed") {
     recordDenial(input.storage, input.userId, input.now);
-    return { kind: "budgetLimited", reason: budgetVerdict.reason };
-  }
-
-  const skipRateLimit = isOwner && input.settings.rateLimit.ownerExempt;
-  if (!skipRateLimit) {
-    const limitClass = await input.storage.limitClasses.get(input.userId);
-    const r = await input.rateLimiter.check(
-      input.userId,
-      userRateLimit(input.settings, limitClass, input.now),
-      input.now,
-    );
-    if (!r.allowed) {
-      recordDenial(input.storage, input.userId, input.now);
-      return {
-        kind: "rateLimited",
-        limitedBy: r.limitedBy,
-        msUntilReset: r.msUntilReset,
-      };
-    }
+    return gate;
   }
 
   const messages = await input.buildMessages();
@@ -156,6 +136,7 @@ export async function runGatedAiTurn(
       ...(input.detailLevel && { detailLevel: input.detailLevel }),
       facts,
       contextMessages: messages,
+      fromAllowance: gate.fromAllowance,
     });
   } catch (err) {
     return {

@@ -75,7 +75,7 @@ const BAD_LIMIT_BOOST: ApiResponse = {
 const BAD_LIMIT_CLASSES: ApiResponse = {
   status: 400,
   body: {
-    error: `limitClasses keys must be ${LIMIT_CLASSES.join(", ")}; tokenMultiplier a number >= 1; maxReminders an integer >= 1`,
+    error: `limitClasses keys must be ${LIMIT_CLASSES.join(", ")}; tokenMultiplier a number >= 1; maxReminders an integer >= 1; monthlyAllowanceUsd a non-negative number`,
   },
 };
 
@@ -154,12 +154,16 @@ function validateLimitClassesPatch(v: unknown): boolean {
   return Object.entries(v).every(([key, c]) => {
     if (!isLimitClass(Number(key))) return false;
     if (typeof c !== "object" || c === null || Array.isArray(c)) return false;
-    const { tokenMultiplier: mult, maxReminders } =
-      c as Partial<LimitClassConfig>;
+    const {
+      tokenMultiplier: mult,
+      maxReminders,
+      monthlyAllowanceUsd,
+    } = c as Partial<LimitClassConfig>;
     return (
       (mult === undefined ||
         (typeof mult === "number" && Number.isFinite(mult) && mult >= 1)) &&
-      posIntOrUndef(maxReminders)
+      posIntOrUndef(maxReminders) &&
+      nonNegNum(monthlyAllowanceUsd)
     );
   });
 }

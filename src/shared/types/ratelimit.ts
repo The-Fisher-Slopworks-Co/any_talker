@@ -52,6 +52,9 @@ export type LimitClassConfig = {
   // Applied to both token windows, before any running promo.
   tokenMultiplier: number;
   maxReminders: number;
+  // USD per UTC calendar month the user may spend past what a regular user
+  // would be allowed (see `budget/gate.ts`). 0 = no allowance.
+  monthlyAllowanceUsd: number;
 };
 
 export type LimitClassesConfig = Record<LimitClass, LimitClassConfig>;

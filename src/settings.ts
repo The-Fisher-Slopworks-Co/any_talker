@@ -107,6 +107,10 @@ function normalizeLimitClasses(v: unknown): LimitClassesConfig {
           ? x.tokenMultiplier
           : def[c].tokenMultiplier,
       maxReminders: posInt(x.maxReminders, def[c].maxReminders),
+      monthlyAllowanceUsd: num(
+        x.monthlyAllowanceUsd,
+        def[c].monthlyAllowanceUsd,
+      ),
     };
   }
   return out;
