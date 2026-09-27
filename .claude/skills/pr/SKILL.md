@@ -62,8 +62,8 @@ each one depends on the result of the previous one.
    change (reproduces the bug, or exercises the new behaviour) is a mandatory
    part of it. Scope: only what the Task needs, no drive-by refactors. Size:
    if the complete change is clearly above ~300 effective lines, ship the
-   first self-contained slice and list the remaining slices in the PR body
-   and in the report.
+   first self-contained slice and list the remaining slices in the report
+   (not in the PR body — see CLAUDE.md).
 
 4. **Check.** `bun run check` must be green. Red — fix and rerun. Do not bypass
    the hook with `LEFTHOOK=0`. A failure unrelated to your change (broken
