@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import type { Gender, User } from "../../../shared/types";
+import type { Gender, LimitClass, User } from "../../../shared/types";
 import type { Lang } from "../../../shared/i18n";
 import type { SpendSummary } from "../../../spending/window";
 import type { FactsResponse } from "./me";
@@ -19,6 +19,7 @@ export type UserSettingsResponse = {
   language: Lang | null;
   whitelisted: boolean;
   blacklisted: boolean;
+  limitClass: LimitClass | null;
 };
 
 // `webapp/routes/admin-users.ts`
@@ -28,7 +29,14 @@ export const adminUsersApi = {
       users: User[];
       displayNames: Record<string, string | null>;
       spending: Record<string, SpendSummary>;
+      limitClasses: Record<string, LimitClass>;
     }>("GET", "/api/admin/users"),
+  putUserLimitClass: (id: string, limitClass: LimitClass | null) =>
+    req<{ limitClass: LimitClass | null }>(
+      "PUT",
+      `/api/admin/users/${id}/limit-class`,
+      { limitClass },
+    ),
   getAdminUser: (id: string) =>
     req<UserSettingsResponse>("GET", `/api/admin/users/${id}`),
   putAdminUser: (

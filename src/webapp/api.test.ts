@@ -1520,7 +1520,12 @@ describe("/api/admin/users", () => {
       owner,
     );
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ users: [], displayNames: {}, spending: {} });
+    expect(r.body).toEqual({
+      users: [],
+      displayNames: {},
+      spending: {},
+      limitClasses: {},
+    });
   });
 
   test("GET list returns upserted users sorted by lastSeenAt desc", async () => {

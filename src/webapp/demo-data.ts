@@ -87,6 +87,7 @@ export async function seedDemoData(
     id: "1000005",
     label: "Casey",
   });
+  await storage.limitClasses.set("1000003", 1);
 
   await storage.profile.setName(ids.ownerId, "Alex");
   await storage.profile.setTimezone(ids.ownerId, "Europe/Berlin");
