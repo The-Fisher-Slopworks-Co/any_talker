@@ -78,6 +78,7 @@ MTProto credentials + a KeyDB it flushes). `e2e/scaffold.test.ts` guards this.
   - Scope (required): a top-level `src/` module — `ai` `bot` `budget` `checks` `managed-bots` `metrics` `observability` `ratelimit` `reminders` `shared` `spending` `storage` `types` `webapp` — or `deps` `e2e` `github` `release` `docker`. A new module means adding it to the `scopes:` list in that workflow.
   - Subject: lowercase start, imperative, no trailing period.
   - The body follows `.github/pull_request_template.md`.
+  - The body describes this PR alone. No links to the other PRs of a stack, no "this is the first/second/third PR", no "the next PR will…": GitHub already shows the base branch and the PRs stacked on it.
 - **Before opening:** `bun run check` green, then `gh pr create --fill`; report the PR URL as the final step of the task.
 - **Never merge locally.** Merging happens on GitHub, squash only.
 
