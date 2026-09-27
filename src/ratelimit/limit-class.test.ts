@@ -15,8 +15,8 @@ const SETTINGS: Settings = {
     weeklyTokens: 10_001,
   },
   limitClasses: {
-    1: { tokenMultiplier: 2, maxReminders: 15 },
-    2: { tokenMultiplier: 2.5, maxReminders: 3 },
+    1: { tokenMultiplier: 2, maxReminders: 15, monthlyAllowanceUsd: 1 },
+    2: { tokenMultiplier: 2.5, maxReminders: 3, monthlyAllowanceUsd: 1 },
   },
   maxRemindersPerUser: 5,
 };

@@ -185,14 +185,14 @@ describe("applyChatOverrides", () => {
     await storage.settings.save({
       ...DEFAULT_SETTINGS,
       limitClasses: {
-        1: { tokenMultiplier: 1.5, maxReminders: 8.7 },
+        1: { tokenMultiplier: 1.5, maxReminders: 8.7, monthlyAllowanceUsd: 3 },
         // A multiplier below 1 would lower the limits; a zero cap would block.
-        2: { tokenMultiplier: 0.5, maxReminders: 0 },
+        2: { tokenMultiplier: 0.5, maxReminders: 0, monthlyAllowanceUsd: -1 },
       },
     });
     const s = await getOrInitSettings(storage);
     expect(s.limitClasses).toEqual({
-      1: { tokenMultiplier: 1.5, maxReminders: 8 },
+      1: { tokenMultiplier: 1.5, maxReminders: 8, monthlyAllowanceUsd: 3 },
       2: DEFAULT_SETTINGS.limitClasses[2],
     });
   });

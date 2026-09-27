@@ -215,6 +215,7 @@ export function UserEditView({ userId }: { userId: string }) {
       <LimitClassCard
         userId={user.id}
         initial={data.limitClass}
+        allowanceMonthUsd={data.allowanceMonthUsd}
         onChanged={() =>
           api.getUserUsage(userId).then((r) => setUsage(r.usage))
         }

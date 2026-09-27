@@ -7,6 +7,8 @@ import { api } from "../api-client";
 import { LIMIT_CLASSES, type LimitClass } from "../../../shared/types";
 import { Card, SectionFooter, SectionHeader } from "./layout";
 import { SelectRow } from "./select-row";
+import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
+import { formatUsd } from "../lib/labels";
 
 // The admin puts a user in a limit class or takes them out of it. Each pick
 // saves at once, like the whitelist toggle. `onChanged` lets the page refetch
@@ -14,10 +16,12 @@ import { SelectRow } from "./select-row";
 export function LimitClassCard({
   userId,
   initial,
+  allowanceMonthUsd,
   onChanged,
 }: {
   userId: string;
   initial: LimitClass | null;
+  allowanceMonthUsd: number;
   onChanged: () => void;
 }) {
   const { t: s } = useI18n();
@@ -53,6 +57,16 @@ export function LimitClassCard({
             onSelect={() => pick(c)}
           />
         ))}
+        {value !== null || allowanceMonthUsd > 0 ? (
+          <div className={ROW_CLS}>
+            <span className={ROW_LABEL_CLS}>
+              {s.ui_limit_class_allowance_spent}
+            </span>
+            <span className={ROW_VALUE_CLS}>
+              {formatUsd(allowanceMonthUsd)}
+            </span>
+          </div>
+        ) : null}
       </Card>
       <SectionFooter>{s.ui_limit_class_footer}</SectionFooter>
     </>
