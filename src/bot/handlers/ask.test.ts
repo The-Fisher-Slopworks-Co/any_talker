@@ -289,15 +289,30 @@ describe("askHandler", () => {
     expect(out.kind).toBe("answered");
   });
 
-  test("a user's limit class lets them past the base budget", async () => {
+  test("a user's limit class lets them past the base budget on the allowance", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     await storage.limitClasses.set("42", 1);
     const rlStorage = new MemoryStorage();
     await exhaustUsage(rlStorage, "42", 1000);
     const rl = new DualWindowLimiter(rlStorage);
-    const out = await askHandler(baseInput({ storage, rateLimiter: rl }));
+    const ai = new FakeAI({ text: "ok", totalTokens: 100, costUsd: 0.25 });
+    const out = await askHandler(baseInput({ storage, ai, rateLimiter: rl }));
     expect(out.kind).toBe("answered");
+    expect(await storage.spend.getAllowanceMonth("42", 1000)).toBeCloseTo(
+      0.25,
+      6,
+    );
+  });
+
+  test("a request within the base budget is not paid from the allowance", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.limitClasses.set("42", 1);
+    const ai = new FakeAI({ text: "ok", totalTokens: 100, costUsd: 0.25 });
+    const out = await askHandler(baseInput({ storage, ai }));
+    expect(out.kind).toBe("answered");
+    expect(await storage.spend.getAllowanceMonth("42", 1000)).toBe(0);
   });
 
   test("owner with ownerExempt skips rate limit", async () => {

@@ -91,6 +91,12 @@ export type Backing = {
   chatSpend: Map<string, Map<string, number>>;
   globalSpend: Map<string, number>;
   modelSpend: Map<string, Map<string, number>>;
+  // The limit-class allowance ledger (see `SpendStore.addAllowance`).
+  allowanceSpend: {
+    user: Map<string, Map<string, number>>;
+    chat: Map<string, Map<string, number>>;
+    global: Map<string, number>;
+  };
   spendModels: Set<string>;
   unpricedModels: Set<string>;
   // kind -> (UTC date -> set of entity ids that spent that day). Bounds the
@@ -149,6 +155,7 @@ function createBacking(): Backing {
     chatSpend: new Map(),
     globalSpend: new Map(),
     modelSpend: new Map(),
+    allowanceSpend: { user: new Map(), chat: new Map(), global: new Map() },
     spendModels: new Set(),
     unpricedModels: new Set(),
     spendActive: { user: new Map(), chat: new Map() },

@@ -137,9 +137,17 @@ export const rateLimitMessages = {
     en: "Reminder cap",
     ru: "Лимит напоминаний",
   }),
+  ui_limit_class_allowance: m({
+    en: "Monthly allowance, $",
+    ru: "Запас на месяц, $",
+  }),
+  ui_limit_class_allowance_spent: m({
+    en: "Allowance used this month",
+    ru: "Потрачено из запаса за месяц",
+  }),
   ui_limit_classes_footer: m({
-    en: "A user is put in a class on their page. The multiplier raises both token limits, and a running promo multiplies on top; the reminder cap never drops below the global one.",
-    ru: "Класс назначается на странице пользователя. Множитель повышает оба лимита токенов, действующая акция умножается поверх; лимит напоминаний не опускается ниже общего.",
+    en: "A user is put in a class on their page. The multiplier raises both token limits, and a running promo multiplies on top; the reminder cap never drops below the global one. Whatever a regular user would be denied (past the base token limit or a daily/chat/new-user cap) is paid from the monthly allowance (UTC calendar month) and kept out of the daily caps. The global monthly cap still applies to everyone.",
+    ru: "Класс назначается на странице пользователя. Множитель повышает оба лимита токенов, действующая акция умножается поверх; лимит напоминаний не опускается ниже общего. То, в чём обычному пользователю было бы отказано (сверх базового лимита токенов или дневного, чатового потолка или потолка для новичков), оплачивается из месячного запаса (календарный месяц по UTC) и не учитывается в дневных потолках. Глобальный месячный потолок действует для всех.",
   }),
   ui_limit_class_footer: m({
     en: "Raises this user's limits by the class settings on the Limits tab. The user isn't told about it.",

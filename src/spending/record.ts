@@ -18,6 +18,9 @@ export type SpendRecord = {
   // False when OpenRouter reported no cost for the ask (cost is a $0 floor) —
   // flags the model so the owner learns the ledger under-counts.
   priced: boolean;
+  // Paid from the user's limit-class allowance: also booked to the allowance
+  // ledger, which the daily caps leave out. Absent = a regular request.
+  fromAllowance?: boolean;
 };
 
 // Records `entry` across the user/chat/global/model ledgers (each a no-op for a
@@ -38,6 +41,9 @@ export async function recordSpend(
     storage.spend.addGlobal(cost, nowMs),
     entry.modelId
       ? storage.spend.addModel(entry.modelId, cost, nowMs)
+      : Promise.resolve(),
+    entry.fromAllowance
+      ? storage.spend.addAllowance(entry.userId, entry.chatId, cost, nowMs)
       : Promise.resolve(),
   ]);
   if (entry.modelId && !entry.priced) {

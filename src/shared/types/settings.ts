@@ -77,8 +77,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   limitBoost: null,
   limitClasses: {
-    1: { tokenMultiplier: 2, maxReminders: 15 },
-    2: { tokenMultiplier: 5, maxReminders: 50 },
+    1: { tokenMultiplier: 2, maxReminders: 15, monthlyAllowanceUsd: 2 },
+    2: { tokenMultiplier: 5, maxReminders: 50, monthlyAllowanceUsd: 6 },
   },
   // Defaults sized for a small (~$20/month) budget: the monthly cap is the real
   // ceiling (with a little headroom), the daily cap stops one day from eating

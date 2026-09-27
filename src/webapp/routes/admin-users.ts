@@ -116,6 +116,7 @@ export const adminUserRoutes: Route[] = [
         whitelisted,
         blacklisted,
         limitClass,
+        allowanceMonthUsd,
       ] = await Promise.all([
         deps.storage.users.get(id),
         readValidDisplayName(deps.storage, id),
@@ -125,6 +126,7 @@ export const adminUserRoutes: Route[] = [
         deps.storage.access.isWhitelisted("users", id),
         deps.storage.access.isBlacklisted("users", id),
         deps.storage.limitClasses.get(id),
+        deps.storage.spend.getAllowanceMonth(id, Date.now()),
       ]);
       if (!user) return USER_NOT_FOUND;
       return {
@@ -138,6 +140,7 @@ export const adminUserRoutes: Route[] = [
           whitelisted,
           blacklisted,
           limitClass,
+          allowanceMonthUsd,
         },
       };
     },

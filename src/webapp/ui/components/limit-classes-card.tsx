@@ -78,6 +78,23 @@ export function LimitClassesCard({
                 }
               />
             </label>
+            <label className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>
+                {s.ui_limit_class_allowance}
+              </span>
+              <NumberInput
+                className={INPUT_CLS}
+                step="0.01"
+                min={0}
+                value={config[c].monthlyAllowanceUsd}
+                onChange={(n) =>
+                  setConfig({
+                    ...config,
+                    [c]: { ...config[c], monthlyAllowanceUsd: n },
+                  })
+                }
+              />
+            </label>
           </Card>
         </Fragment>
       ))}

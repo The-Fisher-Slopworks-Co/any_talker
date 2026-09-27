@@ -95,6 +95,9 @@ export type RunAiTurnInput = {
   // failure, retrying and re-running the model — a double-spend. /ask and guest
   // do not retry, so they let a deduction failure propagate (default false).
   bestEffortDeduct?: boolean;
+  // The gate let this turn through on the user's limit-class allowance: its
+  // cost is also booked to the allowance ledger (see `budget/gate.ts`).
+  fromAllowance?: boolean;
 };
 
 export type AiTurnResult = {
@@ -194,7 +197,14 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
   const priced = result.priced ?? true;
   await recordSpend(
     input.storage,
-    { userId: input.userId, chatId: input.chatId, modelId, costUsd, priced },
+    {
+      userId: input.userId,
+      chatId: input.chatId,
+      modelId,
+      costUsd,
+      priced,
+      fromAllowance: input.fromAllowance ?? false,
+    },
     input.now,
   ).catch((err) => console.error("recording spend failed:", err));
 
