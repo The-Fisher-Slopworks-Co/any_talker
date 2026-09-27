@@ -36,6 +36,11 @@ export function recentUtcDateKeys(nowMs: number, days: number): string[] {
   return keys;
 }
 
+// The dates of `nowMs`'s UTC calendar month up to and including today.
+export function utcMonthToDateKeys(nowMs: number): string[] {
+  return recentUtcDateKeys(nowMs, new Date(nowMs).getUTCDate());
+}
+
 // Sums a per-date spend map into trailing day/week/month windows.
 export function summarizeSpend(
   byDate: ReadonlyMap<string, number> | Readonly<Record<string, number>>,
