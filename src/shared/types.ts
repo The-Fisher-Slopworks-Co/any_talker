@@ -11,7 +11,11 @@ export type {
   WindowKind,
   UserUsage,
   LimitBoost,
+  LimitClass,
+  LimitClassConfig,
+  LimitClassesConfig,
 } from "./types/ratelimit";
+export { LIMIT_CLASSES, isLimitClass } from "./types/ratelimit";
 export type {
   BudgetDenyReason,
   BudgetConfig,

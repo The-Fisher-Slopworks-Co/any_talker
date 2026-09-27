@@ -295,6 +295,30 @@ describe("persistReminder per-user cap", () => {
     expect((await persistReminder(storage, u2, future(1), "b")).ok).toBe(true);
   });
 
+  test("a user's limit class raises their cap", async () => {
+    const storage = new MemoryStorage();
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      maxRemindersPerUser: 1,
+      limitClasses: {
+        ...DEFAULT_SETTINGS.limitClasses,
+        1: { tokenMultiplier: 1, maxReminders: 2 },
+      },
+    });
+    await storage.limitClasses.set("u1", 1);
+    expect((await persistReminder(storage, baseCtx, future(0), "a")).ok).toBe(
+      true,
+    );
+    expect((await persistReminder(storage, baseCtx, future(1), "b")).ok).toBe(
+      true,
+    );
+    const out = await persistReminder(storage, baseCtx, future(2), "c");
+    expect(out).toEqual({
+      ok: false,
+      reason: expect.stringContaining("maximum of 2 active reminders"),
+    });
+  });
+
   test("the cap is shared across character bots", async () => {
     const storage = new MemoryStorage();
     await withCap(storage, 1);
