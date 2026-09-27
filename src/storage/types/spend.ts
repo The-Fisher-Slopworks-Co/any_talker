@@ -27,9 +27,9 @@ export interface SpendStore {
   listModels(): Promise<string[]>;
 
   // The allowance ledger: what a limit-class user spent past what a regular
-  // user would have been allowed, paid from their class's monthly allowance
-  // (see `budget/gate.ts`). Written on top of the regular ledgers, never
-  // instead of them. Same UTC-day buckets; non-positive costs are no-ops.
+  // user would have been allowed, counted against their class's monthly
+  // allowance (see `budget/gate.ts`). Written on top of the regular ledgers,
+  // never instead of them. Same UTC-day buckets; non-positive costs are no-ops.
   addAllowance(
     userId: string,
     chatId: string,

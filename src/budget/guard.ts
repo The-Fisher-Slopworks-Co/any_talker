@@ -37,7 +37,7 @@ export class SpendBudgetGuard implements BudgetGuard {
     ]);
 
     // The monthly cap counts every dollar. The daily caps leave out what
-    // limit-class users paid from their allowances (see `budget/gate.ts`), so
+    // limit-class users drew from their allowances (see `budget/gate.ts`), so
     // that spend never crowds regular users out of the day.
     if (global.month >= config.globalMonthlyCapUsd)
       return this.deny("globalMonthly");
