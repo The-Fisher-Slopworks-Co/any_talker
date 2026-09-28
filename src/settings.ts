@@ -141,6 +141,7 @@ function normalizeAnomaly(a: AnomalyConfig | undefined): AnomalyConfig {
   const def = DEFAULT_SETTINGS.anomaly;
   const legacy = (a ?? {}) as Partial<AnomalyConfig>;
   return {
+    digestEnabled: bool(legacy.digestEnabled, def.digestEnabled),
     digestIntervalHours: posInt(
       legacy.digestIntervalHours,
       def.digestIntervalHours,

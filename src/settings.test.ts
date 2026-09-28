@@ -28,6 +28,16 @@ describe("getOrInitSettings", () => {
     await storage.settings.save(custom);
     expect(await getOrInitSettings(storage)).toEqual(custom);
   });
+
+  test("backfills digestEnabled as on for rows that predate the toggle", async () => {
+    const storage = new MemoryStorage();
+    const { digestEnabled: _, ...legacyAnomaly } = DEFAULT_SETTINGS.anomaly;
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      anomaly: legacyAnomaly as typeof DEFAULT_SETTINGS.anomaly,
+    });
+    expect((await getOrInitSettings(storage)).anomaly.digestEnabled).toBe(true);
+  });
 });
 
 describe("applyChatOverrides", () => {
