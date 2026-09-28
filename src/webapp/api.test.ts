@@ -3369,4 +3369,36 @@ describe("PUT /api/settings — budget & anomaly", () => {
     );
     expect(r.status).toBe(400);
   });
+
+  test("turns the scheduled digest off and rejects a non-boolean toggle", async () => {
+    const d = deps();
+    const off = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { anomaly: { digestEnabled: false } },
+      },
+      d,
+      owner,
+    );
+    expect(off.status).toBe(200);
+    const anomaly = (
+      off.body as {
+        anomaly: { digestEnabled: boolean; digestIntervalHours: number };
+      }
+    ).anomaly;
+    expect(anomaly.digestEnabled).toBe(false);
+    expect(anomaly.digestIntervalHours).toBe(24);
+
+    const bad = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/settings",
+        body: { anomaly: { digestEnabled: "no" } },
+      },
+      d,
+      owner,
+    );
+    expect(bad.status).toBe(400);
+  });
 });

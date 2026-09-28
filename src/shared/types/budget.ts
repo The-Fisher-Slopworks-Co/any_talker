@@ -32,6 +32,8 @@ export type BudgetConfig = {
 // the absolute bar. The velocity signal is floored by `spikeMinBaselineUsd` so
 // trivial amounts (a few cents) can't trip it.
 export type AnomalyConfig = {
+  // Off stops the scheduled digest only; spike alerts and `/digest` still work.
+  digestEnabled: boolean;
   digestIntervalHours: number;
   spikeUserAbsoluteUsd: number;
   spikeChatAbsoluteUsd: number;

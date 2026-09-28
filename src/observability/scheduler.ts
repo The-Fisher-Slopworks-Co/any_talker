@@ -131,6 +131,14 @@ async function maybeSendDigest(
   anomaly: AnomalyConfig,
   lang: Lang,
 ): Promise<void> {
+  // While off, keep the clock at "now" so turning it back on starts a fresh
+  // interval instead of firing at once with a digest spanning the whole pause.
+  if (!anomaly.digestEnabled) {
+    await deps.storage.observability.setDigestState({
+      lastSentAtMs: deps.nowMs,
+    });
+    return;
+  }
   const state = await deps.storage.observability.getDigestState();
   // First run establishes the cadence baseline; the first digest fires one
   // interval later (no immediate "startup" digest).
