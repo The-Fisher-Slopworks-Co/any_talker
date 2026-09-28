@@ -108,7 +108,7 @@ const BAD_ANOMALY: ApiResponse = {
   status: 400,
   body: {
     error:
-      "anomaly thresholds must be non-negative numbers; velocity multiplier >= 1; digestIntervalHours an integer >= 1",
+      "anomaly thresholds must be non-negative numbers; velocity multiplier >= 1; digestIntervalHours an integer >= 1; digestEnabled a boolean",
   },
 };
 
@@ -143,6 +143,7 @@ function validateAnomalyPatch(a: Partial<AnomalyConfig>): boolean {
     nonNegNum(a.spikeUserAbsoluteUsd) &&
     nonNegNum(a.spikeChatAbsoluteUsd) &&
     nonNegNum(a.spikeMinBaselineUsd) &&
+    boolOrUndef(a.digestEnabled) &&
     posIntOrUndef(a.digestIntervalHours) &&
     (mult === undefined || (typeof mult === "number" && mult >= 1))
   );

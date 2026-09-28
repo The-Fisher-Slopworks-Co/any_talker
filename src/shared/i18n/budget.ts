@@ -50,6 +50,10 @@ export const budgetMessages = {
     en: "Alert-only — these never block a request. A spike fires on the absolute amount or a jump over the recent baseline.",
     ru: "Только уведомления — не блокируют запрос. Скачок срабатывает по абсолютной сумме или прыжку выше недавнего базового уровня.",
   }),
+  ui_budget_digest_enabled: m({
+    en: "Regular digest",
+    ru: "Регулярный дайджест",
+  }),
   ui_budget_digest_interval: m({
     en: "Digest every (hours)",
     ru: "Дайджест каждые (часов)",

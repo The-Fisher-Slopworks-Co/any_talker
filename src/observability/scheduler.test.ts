@@ -5,6 +5,7 @@ import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../storage/memory";
 import { runObservabilityTick } from "./scheduler";
 import type { NotifyApi } from "./types";
+import { getOrInitSettings } from "../settings";
 
 const NOW = 1_700_000_000_000;
 const HOUR = 60 * 60 * 1000;
@@ -28,6 +29,17 @@ class FakeNotify implements NotifyApi {
     });
     return {};
   }
+}
+
+async function setDigestEnabled(
+  storage: MemoryStorage,
+  digestEnabled: boolean,
+) {
+  const s = await getOrInitSettings(storage);
+  await storage.settings.save({
+    ...s,
+    anomaly: { ...s.anomaly, digestEnabled },
+  });
 }
 
 const tick = (storage: MemoryStorage, api: NotifyApi, nowMs: number) =>
@@ -155,5 +167,31 @@ describe("runObservabilityTick — digest", () => {
     const md = api.rich[0]!.markdown;
     expect(md).toContain("The group");
     expect(md).not.toContain("@solo");
+  });
+
+  test("sends no digest while turned off; spike alerts keep firing", async () => {
+    const storage = new MemoryStorage();
+    await setDigestEnabled(storage, false);
+    await storage.spend.addGlobal(1, NOW);
+    await storage.spend.addUser("u1", 2, NOW);
+    const api = new FakeNotify();
+    await tick(storage, api, NOW);
+    await tick(storage, api, NOW + 25 * HOUR);
+    expect(api.rich).toEqual([]);
+    expect(api.sent.filter((m) => m.text.includes("spike"))).toHaveLength(1);
+  });
+
+  test("turning it back on starts a fresh interval instead of firing at once", async () => {
+    const storage = new MemoryStorage();
+    await storage.spend.addGlobal(1, NOW);
+    const api = new FakeNotify();
+    await tick(storage, api, NOW); // establish
+    await setDigestEnabled(storage, false);
+    await tick(storage, api, NOW + 48 * HOUR);
+    await setDigestEnabled(storage, true);
+    await tick(storage, api, NOW + 49 * HOUR);
+    expect(api.rich).toEqual([]);
+    await tick(storage, api, NOW + 73 * HOUR);
+    expect(api.rich).toHaveLength(1);
   });
 });

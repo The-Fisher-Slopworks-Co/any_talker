@@ -144,13 +144,20 @@ export function BudgetTab({
 
       <SectionHeader>{s.ui_budget_anomaly_header}</SectionHeader>
       <Card>
-        <NumRow
-          label={s.ui_budget_digest_interval}
-          integer
-          min={1}
-          value={anomaly.digestIntervalHours}
-          onChange={(n) => a({ digestIntervalHours: n })}
+        <ToggleRow
+          label={s.ui_budget_digest_enabled}
+          value={anomaly.digestEnabled}
+          onChange={(v) => a({ digestEnabled: v })}
         />
+        {anomaly.digestEnabled && (
+          <NumRow
+            label={s.ui_budget_digest_interval}
+            integer
+            min={1}
+            value={anomaly.digestIntervalHours}
+            onChange={(n) => a({ digestIntervalHours: n })}
+          />
+        )}
         <NumRow
           label={s.ui_budget_spike_user_abs}
           step="0.1"

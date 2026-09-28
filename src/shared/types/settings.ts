@@ -94,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
     newUserWindowDays: 3,
   },
   anomaly: {
+    digestEnabled: true,
     digestIntervalHours: 24,
     spikeUserAbsoluteUsd: 0.5,
     spikeChatAbsoluteUsd: 1,
