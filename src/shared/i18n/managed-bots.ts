@@ -10,8 +10,8 @@ export const managedBotsMessages = {
     ru: "Боты-персонажи",
   }),
   ui_admin_bots_desc: m({
-    en: "Managed bots — extra characters with their own persona",
-    ru: "Управляемые боты — дополнительные персонажи со своей персоной",
+    en: "Extra characters with their own persona",
+    ru: "Дополнительные персонажи со своей персоной",
   }),
   ui_route_bot_edit: m({
     en: "Edit Bot",
@@ -30,8 +30,8 @@ export const managedBotsMessages = {
     ru: "Пока нет ботов-персонажей.",
   }),
   ui_mbots_footer: m({
-    en: "Each character is its own Telegram bot with its own avatar, prompt, reminders and memory. It answers only when addressed as /ask@its_username.",
-    ru: "Каждый персонаж — это отдельный Telegram-бот со своей аватаркой, промптом, напоминаниями и памятью. Отвечает только при обращении /ask@его_username.",
+    en: "Each character is a separate Telegram bot, answering only to /ask@its_username.",
+    ru: "Каждый персонаж — отдельный Telegram-бот, отвечает только на /ask@его_username.",
   }),
   ui_mbots_create: m({
     en: "New character bot",
@@ -66,8 +66,8 @@ export const managedBotsMessages = {
     ru: "Опишите персону этого персонажа…",
   }),
   ui_mbot_system_prompt_footer: m({
-    en: "Overrides the global prompt for this bot only. All other settings (models, limits, provider) are inherited from the main bot.",
-    ru: "Переопределяет глобальный промпт только для этого бота. Все остальные настройки (модели, лимиты, провайдер) наследуются от основного бота.",
+    en: "Replaces the global prompt for this bot only; other settings are inherited.",
+    ru: "Заменяет глобальный промпт только для этого бота; остальное наследуется.",
   }),
   ui_mbot_status: m({
     en: "Status",
@@ -82,8 +82,8 @@ export const managedBotsMessages = {
     ru: "Загрузить изображение",
   }),
   ui_mbot_avatar_footer: m({
-    en: "A static .jpg/.png. Applied immediately to the running bot via Telegram.",
-    ru: "Статичный .jpg/.png. Применяется к запущенному боту через Telegram немедленно.",
+    en: "Static .jpg/.png, applied immediately.",
+    ru: "Статичный .jpg/.png, применяется сразу.",
   }),
   ui_mbot_avatar_saved: m({
     en: "Avatar updated.",
@@ -98,8 +98,8 @@ export const managedBotsMessages = {
     ru: "Удалить бота",
   }),
   ui_mbot_delete_confirm: m({
-    en: "Delete this character bot? It will stop running. Its reminders and memory are left in storage.",
-    ru: "Удалить этого бота-персонажа? Он перестанет работать. Его напоминания и память останутся в хранилище.",
+    en: "Delete this bot? It stops running; reminders and memory stay in storage.",
+    ru: "Удалить бота? Он остановится; напоминания и память останутся в хранилище.",
   }),
   ui_mbot_not_found: m({
     en: "Bot not found.",
@@ -110,12 +110,12 @@ export const managedBotsMessages = {
     ru: (code: string) => `Не удалось сохранить: ${code}`,
   }),
   ui_mbot_create_intro: m({
-    en: "Creating a character bot opens @BotFather in Telegram to make a brand-new bot that this bot will manage. When it's done, it appears in the list above.",
-    ru: "Создание бота-персонажа открывает @BotFather в Telegram, чтобы сделать нового бота, которым будет управлять этот бот. После создания он появится в списке выше.",
+    en: "Opens @BotFather to create a new bot managed by this one.",
+    ru: "Откроет @BotFather для создания нового бота под управлением этого.",
   }),
   ui_mbot_create_need_manage: m({
-    en: "First enable bot management for the main bot in the @BotFather Mini App, then come back here.",
-    ru: "Сначала включите управление ботами для основного бота в Mini App @BotFather, затем вернитесь сюда.",
+    en: "First enable bot management for the main bot in the @BotFather Mini App.",
+    ru: "Сначала включите управление ботами для основного бота в Mini App @BotFather.",
   }),
   ui_mbot_create_name: m({
     en: "Suggested name",
@@ -138,7 +138,7 @@ export const managedBotsMessages = {
     ru: "Создать в Telegram",
   }),
   ui_mbot_create_footer: m({
-    en: "After Telegram finishes creating the bot, return here and pull to refresh — it will show up, then you can set its prompt and avatar.",
-    ru: "После того как Telegram создаст бота, вернитесь сюда и обновите страницу — он появится, и вы сможете задать ему промпт и аватар.",
+    en: "Once created, refresh here to set its prompt and avatar.",
+    ru: "После создания обновите страницу, чтобы задать промпт и аватар.",
   }),
 };

@@ -15,20 +15,20 @@ export const remindersMessages = {
     ru: "Напоминаний не запланировано.",
   }),
   ui_reminders_footer_my: m({
-    en: "Ask the bot in chat to schedule a reminder.",
-    ru: "Попроси бота в чате запланировать напоминание.",
+    en: "Ask the bot in chat to add one.",
+    ru: "Попроси бота в чате добавить.",
   }),
   ui_reminders_admin_header: m({
     en: "All Reminders",
     ru: "Все напоминания",
   }),
   ui_reminders_admin_empty: m({
-    en: "No reminders scheduled by anyone.",
-    ru: "Никто пока не запланировал напоминаний.",
+    en: "No reminders.",
+    ru: "Напоминаний нет.",
   }),
   ui_reminders_admin_footer: m({
-    en: "Pending reminders across all users. Failed deliveries that hit a transient error stay until they succeed or hit a permanent failure.",
-    ru: "Ожидающие напоминания всех пользователей. Доставки с временными ошибками остаются до успешной или окончательной ошибки.",
+    en: "Failed deliveries are retried.",
+    ru: "Неудачная доставка повторяется.",
   }),
   ui_reminders_edit: m({
     en: "Edit",
@@ -43,12 +43,12 @@ export const remindersMessages = {
     ru: "Сработает",
   }),
   ui_reminders_delete_confirm: m({
-    en: "Delete this reminder? Its author is not notified.",
-    ru: "Удалить это напоминание? Автор не получит уведомления.",
+    en: "Delete this reminder? The author isn't notified.",
+    ru: "Удалить напоминание? Автор не узнает.",
   }),
   ui_reminders_fire_at_too_soon: m({
-    en: "Pick a time at least a minute from now.",
-    ru: "Выбери время хотя бы на минуту позже текущего.",
+    en: "Pick a time at least a minute ahead.",
+    ru: "Выбери время минимум через минуту.",
   }),
   ui_reminders_save_error: m({
     en: (code: string) => `Could not save: ${code}`,
@@ -63,20 +63,20 @@ export const remindersMessages = {
     ru: "Максимум напоминаний",
   }),
   ui_reminders_cap_footer: m({
-    en: "How many reminders one user may hold at once, counted across every character. Creation past the limit is rejected — nothing is evicted, so lowering it leaves reminders already scheduled in place.",
-    ru: "Сколько напоминаний может держать один пользователь одновременно, считая по всем персонажам. Создание сверх лимита отклоняется — ничего не вытесняется, поэтому понижение не трогает уже запланированные напоминания.",
+    en: "Per user, across all characters. Lowering it keeps existing reminders.",
+    ru: "На пользователя, по всем персонажам. Понижение не трогает существующие.",
   }),
   ui_quarantine_header: m({
     en: "Quarantined",
     ru: "Карантин",
   }),
   ui_quarantine_empty: m({
-    en: "Nothing was rejected — every stored reminder parsed cleanly.",
-    ru: "Ничего не отбраковано — все сохранённые напоминания разобрались.",
+    en: "Nothing quarantined.",
+    ru: "Карантин пуст.",
   }),
   ui_quarantine_footer: m({
-    en: "Reminders the delivery pass could not parse. The raw payload is kept for 30 days so a parser fix can still recover it; after that it is gone.",
-    ru: "Напоминания, которые не смог разобрать проход доставки. Сырые данные хранятся 30 дней, чтобы их можно было восстановить после починки парсера; потом они пропадают.",
+    en: "Reminders that failed to parse. Raw payload is kept 30 days.",
+    ru: "Напоминания, которые не удалось разобрать. Данные хранятся 30 дней.",
   }),
   ui_quarantine_reason_invalid_json: m({
     en: "Not valid JSON",
