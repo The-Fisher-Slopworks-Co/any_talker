@@ -55,11 +55,6 @@ const BAD_REASONING_EFFORT: ApiResponse = {
   },
 };
 
-const BAD_RATE_LIMIT_MULTIPLIER: ApiResponse = {
-  status: 400,
-  body: { error: "the /askwise multiplier must be a number >= 1" },
-};
-
 const BAD_RATE_LIMIT_TOKENS: ApiResponse = {
   status: 400,
   body: { error: "rate-limit token budgets must be non-negative numbers" },
@@ -181,10 +176,7 @@ function mergeLimitClasses(
 function validateReasoningEffortPatch(v: unknown): boolean {
   if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
   const r = v as Partial<Record<keyof ReasoningEffortConfig, unknown>>;
-  return (
-    nullOrValid(r.short, isValidReasoningEffort) &&
-    nullOrValid(r.wise, isValidReasoningEffort)
-  );
+  return nullOrValid(r.short, isValidReasoningEffort);
 }
 
 function isValidModelsList(value: unknown): value is string[] {
@@ -249,12 +241,6 @@ export const settingsRoutes: Route[] = [
       }
       if (patch.rateLimit !== undefined) {
         const rl = patch.rateLimit as Partial<RateLimitConfig>;
-        if (
-          rl.wiseMultiplier !== undefined &&
-          (typeof rl.wiseMultiplier !== "number" || !(rl.wiseMultiplier >= 1))
-        ) {
-          return BAD_RATE_LIMIT_MULTIPLIER;
-        }
         for (const v of [rl.fiveHourTokens, rl.weeklyTokens]) {
           if (
             v !== undefined &&

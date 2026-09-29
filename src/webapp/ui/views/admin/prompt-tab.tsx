@@ -74,7 +74,6 @@ export function PromptTab({
     provider !== settings.provider ||
     serviceTier !== settings.serviceTier ||
     reasoningEffort.short !== settings.reasoningEffort.short ||
-    reasoningEffort.wise !== settings.reasoningEffort.wise ||
     thresholdDirty;
   const canSave = dirty && trimmed.length > 0 && thresholdValid && modelsValid;
 
@@ -140,11 +139,6 @@ export function PromptTab({
           onChange={(short) =>
             setReasoningEffort({ ...reasoningEffort, short })
           }
-        />
-        <ReasoningEffortField
-          label={s.ui_effort_wise}
-          value={reasoningEffort.wise}
-          onChange={(wise) => setReasoningEffort({ ...reasoningEffort, wise })}
         />
       </Card>
       <SectionFooter>{s.ui_prompt_reasoning_effort_footer}</SectionFooter>

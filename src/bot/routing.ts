@@ -6,15 +6,10 @@ import type { Storage } from "../storage/types";
 import type { DetailLevel } from "../ai/instruction";
 import type { BotContext } from "./middleware/lang";
 
-// `/ask`/`/askwise`, an optional `@username` (group 2, without the @), and the
-// optional text (group 3). The `g` flag is intentionally absent so `.match`
+// `/ask`, an optional `@username` (group 1, without the @), and the
+// optional text (group 2). The `g` flag is intentionally absent so `.match`
 // stays stateless and the instance is reusable.
-const ASK_RE = /^\/(ask|askwise)(?:@(\w+))?(?:\s+([\s\S]*))?$/i;
-
-const COMMAND_TO_DETAIL: Record<string, DetailLevel> = {
-  ask: "short",
-  askwise: "wise",
-};
+const ASK_RE = /^\/ask(?:@(\w+))?(?:\s+([\s\S]*))?$/i;
 
 export type AskMatch = {
   detailLevel: DetailLevel;
@@ -25,7 +20,7 @@ export type AskMatch = {
   explicit: boolean;
 };
 
-// Parse an `/ask(wise)` command or media caption and decide whether it is even
+// Parse an `/ask` command or media caption and decide whether it is even
 // addressed to THIS bot. Matching is done against the bot's LIVE `ctx.me.username`
 // so it can't go stale: a `@mention` to a *different* bot returns null (this is
 // what stops the main bot from stealing a `/ask@CharacterBot` photo caption). A
@@ -37,7 +32,7 @@ export function matchAsk(
 ): AskMatch | null {
   const m = raw.match(ASK_RE);
   if (!m) return null;
-  const mention = m[2];
+  const mention = m[1];
   if (
     mention &&
     (!selfUsername || mention.toLowerCase() !== selfUsername.toLowerCase())
@@ -45,8 +40,8 @@ export function matchAsk(
     return null;
   }
   return {
-    detailLevel: COMMAND_TO_DETAIL[m[1]!.toLowerCase()] ?? "short",
-    userText: (m[3] ?? "").trim(),
+    detailLevel: "short",
+    userText: (m[2] ?? "").trim(),
     explicit: mention !== undefined,
   };
 }

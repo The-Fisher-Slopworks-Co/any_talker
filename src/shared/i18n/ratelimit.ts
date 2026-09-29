@@ -22,13 +22,9 @@ export const rateLimitMessages = {
     en: "Owner exempt",
     ru: "Владелец без лимита",
   }),
-  ui_ratelimit_wise_multiplier: m({
-    en: "/askwise multiplier",
-    ru: "Коэффициент /askwise",
-  }),
   ui_ratelimit_footer: m({
-    en: "Each user has two token budgets — one per rolling 5-hour window and one per week — spent per /ask (/askwise costs the multiplier times more). A request is allowed while both have budget left. Window start times are staggered per user.",
-    ru: "У каждого пользователя два бюджета токенов — на скользящее окно 5 часов и на неделю — списываются за /ask (для /askwise — в коэффициент раз больше). Запрос разрешён, пока в обоих окнах есть бюджет. Начала окон сдвинуты у каждого пользователя по-своему.",
+    en: "Each user has two token budgets — one per rolling 5-hour window and one per week — spent per /ask. A request is allowed while both have budget left. Window start times are staggered per user.",
+    ru: "У каждого пользователя два бюджета токенов — на скользящее окно 5 часов и на неделю — списываются за /ask. Запрос разрешён, пока в обоих окнах есть бюджет. Начала окон сдвинуты у каждого пользователя по-своему.",
   }),
   ui_ratelimit_my_usage: m({
     en: "My Usage",

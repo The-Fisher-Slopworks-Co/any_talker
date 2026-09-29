@@ -26,7 +26,13 @@ test("matchAsk parses bare and @self, marking explicit", () => {
   });
   // case-insensitive self-mention
   expect(matchAsk("/ask@mainbot hello", SELF)?.explicit).toBe(true);
-  expect(matchAsk("/askwise foo", SELF)?.detailLevel).toBe("wise");
+});
+
+test("matchAsk does not treat /askwise as /ask", () => {
+  // The command was removed; it must not fall through to a short /ask.
+  expect(matchAsk("/askwise foo", SELF)).toBeNull();
+  expect(matchAsk("/askwise@MainBot foo", SELF)).toBeNull();
+  expect(matchAsk("/askwise", SELF)).toBeNull();
 });
 
 test("matchAsk rejects a command aimed at a DIFFERENT bot", () => {

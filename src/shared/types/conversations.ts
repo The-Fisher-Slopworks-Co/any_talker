@@ -44,7 +44,7 @@ export type TurnRun = {
   // can give it back. Absent on turns that have none (guest mode, reminder
   // delivery). Mirrors `DetailLevel` (`ai/instruction.ts`), which `shared/` must
   // not import; widening it there surfaces here as a type error at the write
-  // site.
+  // site. `wise` is only on turns stored before /askwise was removed.
   detail?: "short" | "wise";
   // `instructionHash` of the system prompt this turn was actually sent. The
   // prompt is rebuilt from settings on every turn (`ai/instruction.ts`) and may

@@ -84,7 +84,7 @@ describe("buildInstruction", () => {
     const out = buildInstruction("X", {
       timezone: "Europe/Moscow",
       lang: "ru",
-      detailLevel: "wise",
+      detailLevel: "short",
       facts: [{ key: "city", value: "Moscow" }],
     });
     const headings = (out.match(/^# .*/gm) ?? []).at(-1);
@@ -180,14 +180,6 @@ describe("buildInstruction", () => {
     expect(out).toContain("# Уровень подробности");
     expect(out).toContain("кратко");
     expect(out).toContain("3 предложения");
-  });
-
-  test("wise detail level asks for a detailed (not exhaustive) answer", () => {
-    const out = buildInstruction("X", { detailLevel: "wise" });
-    expect(out).toContain("# Уровень подробности");
-    expect(out).toContain("Отвечай подробно");
-    expect(out).toContain("глубина важнее объёма");
-    expect(out).not.toContain("исчерпывающе");
   });
 });
 

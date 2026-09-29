@@ -10,12 +10,12 @@ import { m } from "./message";
 export const helpMessages = {
   bot_help_home: m({
     en: [
-      "<b>The bot only answers /ask and /askwise.</b> It does not see messages without a command, including replies to its own messages.",
+      "<b>The bot only answers /ask.</b> It does not see messages without a command, including replies to its own messages.",
       "",
       "<b>A conversation continues only through replies.</b> To make the bot take earlier messages into account, reply to its message with <code>/ask …</code>. Without a reply, a new conversation starts.",
     ].join("\n"),
     ru: [
-      "<b>Бот отвечает только на /ask и /askwise.</b> Сообщения без команды он не видит, в том числе ответы на его сообщения.",
+      "<b>Бот отвечает только на /ask.</b> Сообщения без команды он не видит, в том числе ответы на его сообщения.",
       "",
       "<b>Разговор продолжается только ответом.</b> Чтобы бот учёл предыдущие сообщения, ответьте на его сообщение командой <code>/ask …</code>. Без ответа начинается новый разговор.",
     ].join("\n"),
