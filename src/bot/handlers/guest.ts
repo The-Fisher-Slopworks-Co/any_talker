@@ -201,9 +201,8 @@ export async function guestAskHandler(
       : input.priorThread;
   const priorTurns = priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
 
-  // Guest queries are always single-turn "short" asks (no /askwise), so no
-  // detail level is passed — the deduction is the raw token total
-  // (multiplier 1) and the system prompt carries no detail-level section.
+  // Guest queries are always single-turn asks with no detail level passed, so
+  // the system prompt carries no detail-level section.
   const turn = await runGatedAiTurn({
     ai: input.ai,
     rateLimiter: input.rateLimiter,

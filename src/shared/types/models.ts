@@ -18,11 +18,10 @@ export const REASONING_EFFORTS: readonly ReasoningEffort[] = [
   "max",
 ];
 
-// The effort each detail level asks for: `short` is /ask, `wise` is /askwise.
+// The effort /ask asks for (its `short` detail level).
 // `null` sends no effort at all, leaving the choice to the model.
 export type ReasoningEffortConfig = {
   short: ReasoningEffort | null;
-  wise: ReasoningEffort | null;
 };
 
 export function isValidReasoningEffort(v: unknown): v is ReasoningEffort {

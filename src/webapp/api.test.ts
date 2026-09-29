@@ -356,13 +356,13 @@ describe("PUT /api/settings", () => {
     }
   });
 
-  test("saves the reasoning effort per level and merges a partial patch", async () => {
+  test("saves the /ask reasoning effort, including a cleared level", async () => {
     const d = deps();
     let res = await handleApi(
       {
         method: "PUT",
         path: "/api/settings",
-        body: { reasoningEffort: { short: "none", wise: null } },
+        body: { reasoningEffort: { short: "none" } },
       },
       d,
       owner,
@@ -370,31 +370,24 @@ describe("PUT /api/settings", () => {
     expect(res.status).toBe(200);
     expect((await d.storage.settings.get())?.reasoningEffort).toEqual({
       short: "none",
-      wise: null,
     });
     res = await handleApi(
       {
         method: "PUT",
         path: "/api/settings",
-        body: { reasoningEffort: { wise: "max" } },
+        body: { reasoningEffort: { short: null } },
       },
       d,
       owner,
     );
     expect(res.status).toBe(200);
     expect((await d.storage.settings.get())?.reasoningEffort).toEqual({
-      short: "none",
-      wise: "max",
+      short: null,
     });
   });
 
   test("rejects an unknown reasoning effort with 400 and leaves the stored value alone", async () => {
-    for (const reasoningEffort of [
-      { short: "extreme" },
-      { wise: 3 },
-      "high",
-      null,
-    ]) {
+    for (const reasoningEffort of [{ short: "extreme" }, "high", null]) {
       const d = deps();
       const res = await handleApi(
         { method: "PUT", path: "/api/settings", body: { reasoningEffort } },
@@ -478,7 +471,6 @@ describe("PUT /api/settings", () => {
             fiveHourTokens: 50000,
             weeklyTokens: 400000,
             ownerExempt: false,
-            wiseMultiplier: 2.2,
           },
         },
       },
@@ -490,7 +482,6 @@ describe("PUT /api/settings", () => {
     expect(saved?.rateLimit.fiveHourTokens).toBe(50000);
     expect(saved?.rateLimit.weeklyTokens).toBe(400000);
     expect(saved?.rateLimit.ownerExempt).toBe(false);
-    expect(saved?.rateLimit.wiseMultiplier).toBe(2.2);
   });
 
   test("accepts a valid expandableBlockquoteThreshold", async () => {
@@ -670,20 +661,6 @@ describe("PUT /api/settings", () => {
       );
       expect(res.status).toBe(400);
     }
-  });
-
-  test("rejects non-positive multipliers", async () => {
-    const d = deps();
-    const res = await handleApi(
-      {
-        method: "PUT",
-        path: "/api/settings",
-        body: { rateLimit: { wiseMultiplier: -1 } },
-      },
-      d,
-      owner,
-    );
-    expect(res.status).toBe(400);
   });
 });
 
@@ -2125,7 +2102,6 @@ describe("/api/admin/chats", () => {
             fiveHourTokens: 1,
             weeklyTokens: 1,
             ownerExempt: false,
-            wiseMultiplier: 2.1,
           },
         },
       },

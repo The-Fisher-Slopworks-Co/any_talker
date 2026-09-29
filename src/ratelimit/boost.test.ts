@@ -17,7 +17,6 @@ describe("boostedRateLimit", () => {
     const r = boostedRateLimit(BASE, { percent: 50, untilMs: NOW + 1 }, NOW);
     expect(r.fiveHourTokens).toBe(1500);
     expect(r.weeklyTokens).toBe(15_001);
-    expect(r.wiseMultiplier).toBe(BASE.wiseMultiplier);
     expect(r.ownerExempt).toBe(BASE.ownerExempt);
   });
 

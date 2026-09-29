@@ -2,21 +2,10 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { languageSection, type Lang } from "../shared/i18n";
-import type { RateLimitConfig } from "../shared/types";
 
-export type DetailLevel = "short" | "wise";
-
-export function detailLevelMultiplier(
-  level: DetailLevel,
-  rl: RateLimitConfig,
-): number {
-  switch (level) {
-    case "short":
-      return 1;
-    case "wise":
-      return rl.wiseMultiplier;
-  }
-}
+// `short` is /ask. A turn without a detail level (guest mode, reminder
+// delivery) gets no detail section and no reasoning effort.
+export type DetailLevel = "short";
 
 const MESSAGE_FORMAT = `# Формат сообщений
 
@@ -85,10 +74,6 @@ function detailLevelSection(level: DetailLevel): string {
       return `# Уровень подробности
 
 Отвечай кратко, ориентируйся примерно на 3 предложения. Дай только суть, без лишних деталей и оговорок.`;
-    case "wise":
-      return `# Уровень подробности
-
-Отвечай подробно: раскрой тему по существу, поясни ключевые моменты и приведи примеры, где это уместно. Не растягивай ответ искусственно — глубина важнее объёма.`;
   }
 }
 

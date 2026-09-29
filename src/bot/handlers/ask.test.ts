@@ -706,30 +706,17 @@ describe("askHandler", () => {
     expect(call.reasoningEffort).toBe("low");
   });
 
-  test("detail level wise: detailed answer + high reasoning effort", async () => {
-    const storage = new MemoryStorage();
-    await storage.access.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI();
-    await askHandler(baseInput({ storage, ai, detailLevel: "wise" }));
-    const call = ai.calls[0] as { system: string; reasoningEffort: unknown };
-    expect(call.system).toContain("# Уровень подробности");
-    expect(call.system).toContain("Отвечай подробно");
-    expect(call.reasoningEffort).toBe("high");
-  });
-
   test("the stored reasoning effort overrides the per-level default", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     await storage.settings.save({
       ...DEFAULT_SETTINGS,
-      reasoningEffort: { short: null, wise: "medium" },
+      reasoningEffort: { short: null },
     });
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai, detailLevel: "short" }));
-    await askHandler(baseInput({ storage, ai, detailLevel: "wise" }));
     const calls = ai.calls as { reasoningEffort: unknown }[];
     expect(calls[0]!.reasoningEffort).toBeUndefined();
-    expect(calls[1]!.reasoningEffort).toBe("medium");
   });
 
   test("timezone resolution: user > chat > global", async () => {
@@ -804,44 +791,6 @@ describe("askHandler", () => {
     const out = await askHandler(baseInput({ storage, rateLimiter: rl, ai }));
     expect(out.kind).toBe("answered");
     expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1234);
-  });
-
-  test("wise level multiplies deduction by wiseMultiplier", async () => {
-    const storage = new MemoryStorage();
-    await storage.access.addWhitelist("users", { id: "42" });
-    await storage.settings.save({
-      ...DEFAULT_SETTINGS,
-      rateLimit: {
-        ...DEFAULT_SETTINGS.rateLimit,
-        wiseMultiplier: 1.8,
-      },
-    });
-    const rlStorage = new MemoryStorage();
-    const rl = new DualWindowLimiter(rlStorage);
-    const ai = new FakeAI({ text: "ok", totalTokens: 1000 });
-    await askHandler(
-      baseInput({ storage, rateLimiter: rl, ai, detailLevel: "wise" }),
-    );
-    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1800);
-  });
-
-  test("short level deducts raw tokens (multiplier = 1)", async () => {
-    const storage = new MemoryStorage();
-    await storage.access.addWhitelist("users", { id: "42" });
-    await storage.settings.save({
-      ...DEFAULT_SETTINGS,
-      rateLimit: {
-        ...DEFAULT_SETTINGS.rateLimit,
-        wiseMultiplier: 10,
-      },
-    });
-    const rlStorage = new MemoryStorage();
-    const rl = new DualWindowLimiter(rlStorage);
-    const ai = new FakeAI({ text: "ok", totalTokens: 1000 });
-    await askHandler(
-      baseInput({ storage, rateLimiter: rl, ai, detailLevel: "short" }),
-    );
-    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1000);
   });
 
   test("answered: records reported costUsd to the user's spend", async () => {
@@ -1379,7 +1328,7 @@ describe("askHandler — the run on the persisted turn", () => {
     await storage.access.addWhitelist("users", { id: "42" });
 
     const out = await askHandler(
-      baseInput({ storage, ai: new FakeAI(ANSWERED), detailLevel: "wise" }),
+      baseInput({ storage, ai: new FakeAI(ANSWERED), detailLevel: "short" }),
     );
     if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
     await out.persistConversation(999);
@@ -1388,7 +1337,7 @@ describe("askHandler — the run on the persisted turn", () => {
     expect(node!.run).toEqual({
       gen: ["gen-1789064867-b8Jgaf", "gen-1789064870-zJbTnX"],
       model: "anthropic/claude-sonnet-4.5",
-      detail: "wise",
+      detail: "short",
       instr: expect.any(String),
     });
     // Both keys of the turn carry it, as with every other node field.

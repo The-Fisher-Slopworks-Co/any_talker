@@ -28,8 +28,7 @@ function toBotCommands(list: readonly FamilyCommand[]): BotCommand[] {
 // so up front. The group lists are the ones that carry it — see
 // `withPlainReplies` for why the DM lists must not.
 export const BOT_COMMANDS_EN: readonly FamilyCommand[] = [
-  { command: "ask", description: "Ask (short answer)" },
-  { command: "askwise", description: "Ask (detailed answer)" },
+  { command: "ask", description: "Ask" },
   {
     command: "feedback",
     description: "Report a problem",
@@ -51,8 +50,7 @@ export const BOT_COMMANDS_EN: readonly FamilyCommand[] = [
 ];
 
 export const BOT_COMMANDS_RU: readonly FamilyCommand[] = [
-  { command: "ask", description: "Спросить (коротко)" },
-  { command: "askwise", description: "Спросить (подробно)" },
+  { command: "ask", description: "Спросить" },
   {
     command: "feedback",
     description: "Сообщить о проблеме",

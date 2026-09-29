@@ -18,7 +18,6 @@ const cfg: RateLimitConfig = {
   fiveHourTokens: 100,
   weeklyTokens: 1000,
   ownerExempt: true,
-  wiseMultiplier: 1.8,
 };
 
 describe("hashUserId", () => {

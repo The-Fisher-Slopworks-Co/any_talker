@@ -42,7 +42,8 @@ function posInt(v: unknown, def: number): number {
 // Reads the per-detail-level reasoning effort. A missing object (rows that
 // predate the field) keeps the historical mapping via the defaults; an explicit
 // `null` per level is preserved (send no effort); anything else that is not a
-// known effort falls back to the default for that level.
+// known effort falls back to the default for that level. The `wise` level of
+// the removed /askwise is dropped on read.
 function normalizeReasoningEffort(v: unknown): ReasoningEffortConfig {
   const raw = (v ?? {}) as Partial<
     Record<keyof ReasoningEffortConfig, unknown>
@@ -52,7 +53,7 @@ function normalizeReasoningEffort(v: unknown): ReasoningEffortConfig {
     if (x === null || isValidReasoningEffort(x)) return x;
     return DEFAULT_SETTINGS.reasoningEffort[key];
   };
-  return { short: level("short"), wise: level("wise") };
+  return { short: level("short") };
 }
 
 export async function getOrInitSettings(storage: Storage): Promise<Settings> {
@@ -65,7 +66,8 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
 // Backfills the dual-window config from possibly-legacy stored shapes. A legacy
 // token-bucket `capacity` (the old burst budget) maps to the 5-hour budget;
 // everything else falls back to defaults. Tolerant of missing/invalid fields so
-// old `at:settings` rows load without a migration (schema-on-read).
+// old `at:settings` rows load without a migration (schema-on-read). The
+// `wiseMultiplier` of the removed /askwise is dropped the same way.
 function normalizeRateLimit(rl: RateLimitConfig | undefined): RateLimitConfig {
   const def = DEFAULT_SETTINGS.rateLimit;
   const legacy = (rl ?? {}) as Partial<RateLimitConfig> & { capacity?: number };
@@ -83,12 +85,7 @@ function normalizeRateLimit(rl: RateLimitConfig | undefined): RateLimitConfig {
     typeof legacy.ownerExempt === "boolean"
       ? legacy.ownerExempt
       : def.ownerExempt;
-  // /askwise must never cost less than /ask, so the multiplier is floored at 1.
-  const wiseMultiplier =
-    typeof legacy.wiseMultiplier === "number" && legacy.wiseMultiplier >= 1
-      ? legacy.wiseMultiplier
-      : def.wiseMultiplier;
-  return { fiveHourTokens, weeklyTokens, ownerExempt, wiseMultiplier };
+  return { fiveHourTokens, weeklyTokens, ownerExempt };
 }
 
 // Backfills each limit class's config (absent on rows that predate classes).

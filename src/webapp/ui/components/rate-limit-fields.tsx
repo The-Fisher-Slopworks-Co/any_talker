@@ -45,16 +45,6 @@ export function RateLimitFields({
           onChange={(v) => onChange({ ...value, ownerExempt: v })}
         />
       </div>
-      <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_wise_multiplier}</span>
-        <NumberInput
-          className={INPUT_CLS}
-          step="0.1"
-          min={1}
-          value={value.wiseMultiplier}
-          onChange={(n) => onChange({ ...value, wiseMultiplier: n })}
-        />
-      </label>
     </Card>
   );
 }

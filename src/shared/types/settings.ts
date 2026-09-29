@@ -25,7 +25,7 @@ export type Settings = {
   // no fallback.
   provider: string | null;
   serviceTier: ServiceTier | null;
-  // Reasoning effort per detail level (`short` = /ask, `wise` = /askwise).
+  // Reasoning effort per detail level (`short` = /ask).
   // Global policy like `rateLimit` — no per-chat override.
   reasoningEffort: ReasoningEffortConfig;
   // Whether the user/chat whitelist is enforced as an access gate. When false,
@@ -67,13 +67,12 @@ export const DEFAULT_SETTINGS: Settings = {
   providerSort: null,
   provider: null,
   serviceTier: null,
-  reasoningEffort: { short: "low", wise: "high" },
+  reasoningEffort: { short: "low" },
   whitelistEnabled: true,
   rateLimit: {
     fiveHourTokens: 30000,
     weeklyTokens: 300000,
     ownerExempt: true,
-    wiseMultiplier: 1.8,
   },
   limitBoost: null,
   limitClasses: {
