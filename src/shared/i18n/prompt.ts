@@ -163,8 +163,8 @@ export const promptMessages = {
     ru: "Максимальный",
   }),
   ui_effort_short: m({
-    en: "/ask (short)",
-    ru: "/ask (коротко)",
+    en: "/ask",
+    ru: "/ask",
   }),
   ui_tier_default: m({
     en: "Default",
