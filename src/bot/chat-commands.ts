@@ -26,6 +26,13 @@ type MenuStorage = Pick<Storage, "presence" | "commandMenus">;
 
 const MENU_LANGS = ["en", "ru"] as const;
 
+// Fingerprint of the lists `uploadChatMenu` sends. Recorded with every upload,
+// so a menu uploaded before the command list changed (a command removed, a
+// description reworded) no longer matches and is uploaded again.
+export const CHAT_MENU_VERSION = Bun.hash(
+  JSON.stringify(MENU_LANGS.map((lang) => groupCommandsWithoutShared(lang))),
+).toString(36);
+
 // Uploads this bot's chat-scoped menu for one group. `BotCommandScopeChat`
 // outranks both `all_chat_administrators` and `all_group_chats`, so these three
 // calls cover everyone in the chat; the language-less one is what a user whose
@@ -85,7 +92,8 @@ export type ChatMenuSync = (args: {
 //
 // `commandMenus` is both the record that makes the overrides revertible and the
 // memo that keeps a busy chat quiet — nothing is uploaded while the applied
-// state already matches. Telegram is written first and the registry second, so
+// state already matches, command list version included: Telegram keeps the
+// list as it was uploaded, and only this re-upload brings it up to date. Telegram is written first and the registry second, so
 // a failure leaves at most a repeated (idempotent) upload for the next update
 // to redo, never a row claiming an override that was never applied.
 export function makeChatMenuSync(deps: {
@@ -99,17 +107,19 @@ export function makeChatMenuSync(deps: {
       isPresenceFresh(presence[id], nowMs, BOT_PRESENCE_TTL_MS),
     );
     const wanted = !ownsSharedCommands(selfBotId, present);
-    const applied = await deps.storage.commandMenus.has(chatId, selfBotId);
-    if (wanted === applied) return;
+    const applied = await deps.storage.commandMenus.get(chatId, selfBotId);
     if (wanted) {
+      if (applied?.version === CHAT_MENU_VERSION) return;
       await uploadChatMenu(api, chatId);
       await deps.storage.commandMenus.record({
         chatId,
         botId: selfBotId,
         atMs: nowMs,
+        version: CHAT_MENU_VERSION,
       });
       return;
     }
+    if (applied === null) return;
     await removeChatMenu(api, chatId);
     await deps.storage.commandMenus.forget(chatId, selfBotId);
   };
