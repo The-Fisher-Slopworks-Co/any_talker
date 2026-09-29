@@ -18,7 +18,7 @@ export class MemoryCommandMenusStore implements CommandMenusStore {
       m = new Map();
       this.b.chatCommandMenus.set(menu.chatId, m);
     }
-    m.set(menu.botId, menu.atMs);
+    m.set(menu.botId, { ...menu });
   }
 
   async forget(chatId: string, botId: string): Promise<void> {
@@ -32,10 +32,15 @@ export class MemoryCommandMenusStore implements CommandMenusStore {
     return this.b.chatCommandMenus.get(chatId)?.has(botId) ?? false;
   }
 
+  async get(chatId: string, botId: string): Promise<ChatCommandMenu | null> {
+    const menu = this.b.chatCommandMenus.get(chatId)?.get(botId);
+    return menu ? { ...menu } : null;
+  }
+
   async list(): Promise<ChatCommandMenu[]> {
     const out: ChatCommandMenu[] = [];
-    for (const [chatId, m] of this.b.chatCommandMenus) {
-      for (const [botId, atMs] of m) out.push({ chatId, botId, atMs });
+    for (const m of this.b.chatCommandMenus.values()) {
+      for (const menu of m.values()) out.push({ ...menu });
     }
     return out;
   }

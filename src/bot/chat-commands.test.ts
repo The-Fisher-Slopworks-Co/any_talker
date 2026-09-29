@@ -7,6 +7,7 @@ import { MemoryStorage } from "../storage/memory";
 import type { Storage } from "../storage/types";
 import { BOT_PRESENCE_TTL_MS } from "./routing";
 import {
+  CHAT_MENU_VERSION,
   dropChatMenu,
   makeChatMenuSync,
   type ChatCommandsApi,
@@ -117,7 +118,7 @@ describe("makeChatMenuSync", () => {
     // Alone in its own chat, so it keeps them — the loss this fixes.
     expect(dog.uploads).toEqual([]);
     expect(await storage.commandMenus.list()).toEqual([
-      { chatId: "chat-1", botId: CAT, atMs: NOW },
+      { chatId: "chat-1", botId: CAT, atMs: NOW, version: CHAT_MENU_VERSION },
     ]);
   });
 
@@ -129,6 +130,45 @@ describe("makeChatMenuSync", () => {
 
     await sync({ api, chatId: "chat-1", selfBotId: CAT, nowMs: NOW });
     await sync({ api, chatId: "chat-1", selfBotId: CAT, nowMs: NOW + 1000 });
+
+    expect(uploads).toHaveLength(3);
+  });
+
+  // The bug: once recorded, a menu was never uploaded again, so a command
+  // removed from the list (`/askwise`) stayed in every chat where this bot hid
+  // the shared ones.
+  test("a menu uploaded from an older command list is uploaded again", async () => {
+    const storage = new MemoryStorage();
+    await seedTwoChats(storage);
+    await storage.commandMenus.record({
+      chatId: "chat-1",
+      botId: CAT,
+      atMs: NOW - 1000,
+      version: "outdated",
+    });
+    const { api, uploads } = fakeApi();
+    const sync = syncFor(storage, CAT, [MAIN, CAT, DOG]);
+
+    await sync({ api, chatId: "chat-1", selfBotId: CAT, nowMs: NOW });
+
+    expect(uploads).toHaveLength(3);
+    expect(await storage.commandMenus.list()).toEqual([
+      { chatId: "chat-1", botId: CAT, atMs: NOW, version: CHAT_MENU_VERSION },
+    ]);
+  });
+
+  test("a menu recorded before versions existed is uploaded again", async () => {
+    const storage = new MemoryStorage();
+    await seedTwoChats(storage);
+    await storage.commandMenus.record({
+      chatId: "chat-1",
+      botId: CAT,
+      atMs: NOW - 1000,
+    });
+    const { api, uploads } = fakeApi();
+    const sync = syncFor(storage, CAT, [MAIN, CAT, DOG]);
+
+    await sync({ api, chatId: "chat-1", selfBotId: CAT, nowMs: NOW });
 
     expect(uploads).toHaveLength(3);
   });
