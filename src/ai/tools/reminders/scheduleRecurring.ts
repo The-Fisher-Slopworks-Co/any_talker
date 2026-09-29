@@ -13,6 +13,7 @@ import {
 import { formatLocalParts, parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import { isValidTimezone } from "../../../shared/types";
 import {
+  PERSIST_RESULT_DOC,
   persistReminder,
   REMINDER_WRITE_SOURCES,
   type PersistResult,
@@ -65,7 +66,8 @@ export function createScheduleRecurringReminderTool(deps: {
       String(MAX_REMINDER_OCCURRENCES) +
       " times before it ends — say so when confirming, and use schedule_reminder_in / schedule_reminder_at for a one-off. " +
       "The whole series counts as ONE reminder against the user's reminder limit. " +
-      "The 'text' field is a private note to yourself describing what to remind about — on each occurrence you'll receive it as a system event and compose the actual user-facing message then.",
+      "The 'text' field is a private note to yourself describing what to remind about — on each occurrence you'll receive it as a system event and compose the actual user-facing message then. " +
+      PERSIST_RESULT_DOC,
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
     execute: async ({ amount, unit, startAt, text }, ctx) => {

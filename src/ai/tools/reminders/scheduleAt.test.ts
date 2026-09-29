@@ -27,7 +27,8 @@ describe("schedule_reminder_at", () => {
       { ...askCtx, timezone: "Europe/Moscow" },
     );
     if (!("ok" in out) || !out.ok) throw new Error("expected ok");
-    expect(out.fireAt).toBe("2026-05-20T15:00:00.000Z");
+    // Local wall-clock time, the same form the input took — not UTC.
+    expect(out.fireAt).toBe("2026-05-20T18:00");
   });
 
   test("rejects datetime in the past", async () => {
@@ -109,7 +110,7 @@ describe("schedule_reminder_at", () => {
       },
     );
     if (!("ok" in out) || !out.ok) throw new Error("expected ok");
-    expect(out.fireAt).toBe("2026-06-01T10:00:00.000Z");
+    expect(out.fireAt).toBe("2026-06-01T10:00");
     const due = await storage.reminders.fetchDue(Date.UTC(2026, 5, 1, 10, 0));
     expect(due[0]?.target).toEqual({ kind: "guest_dm", userId: "u42" });
   });

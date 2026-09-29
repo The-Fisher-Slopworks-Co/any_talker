@@ -7,6 +7,7 @@ import type { Storage } from "../../../storage/types";
 import { REMINDER_TEXT_MAX_LEN } from "../../../reminders/types";
 import {
   durationToMs,
+  PERSIST_RESULT_DOC,
   persistReminder,
   REMINDER_WRITE_SOURCES,
   type PersistResult,
@@ -28,7 +29,8 @@ export function createScheduleReminderInTool(deps: {
     description:
       "Schedule a reminder a relative duration from now (e.g. 'in 2 hours', 'in 3 days', 'tomorrow' = 24 hours). " +
       "Use when the user names a delay rather than a specific clock time. " +
-      "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then.",
+      "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then. " +
+      PERSIST_RESULT_DOC,
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
     execute: async ({ amount, unit, text }, ctx) => {

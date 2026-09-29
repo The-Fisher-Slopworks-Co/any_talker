@@ -35,7 +35,7 @@ describe("schedule_reminder_in", () => {
       { ...askCtx, now: 0 },
     );
     if (!("ok" in out) || !out.ok) throw new Error("expected ok");
-    expect(new Date(out.fireAt).getTime()).toBe(60_000);
+    expect(out.fireAt).toBe("1970-01-01T00:01");
   });
 
   test("schema rejects amount=0", () => {
@@ -100,8 +100,7 @@ describe("schedule_reminder_in", () => {
       askCtx,
     );
     if (!("ok" in out) || !out.ok) throw new Error();
-    expect(new Date(out.fireAt).getTime()).toBe(
-      askCtx.now + 2 * 24 * 60 * 60_000,
-    );
+    // now (00:16:40 UTC) + 2 days, as local wall-clock time.
+    expect(out.fireAt).toBe("1970-01-03T00:16");
   });
 });

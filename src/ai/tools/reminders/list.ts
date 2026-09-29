@@ -4,6 +4,7 @@
 import { z } from "zod";
 import type { Tool } from "../registry";
 import type { Storage } from "../../../storage/types";
+import { formatFireAt } from "./shared";
 
 // Defensive caps independent of the per-user creation cap: even if an admin
 // raises maxRemindersPerUser, a single list result can never balloon the model
@@ -37,14 +38,14 @@ export function createListRemindersTool(deps: {
     description:
       "List the current user's pending reminders, soonest first. Takes no parameters. " +
       "In a group chat this returns only reminders created in THIS chat; in a private chat with the bot it returns all of the user's reminders. " +
-      "Returns { reminders: [{ id, fireAt (ISO 8601 UTC), note }], total, truncated }, where " +
+      "Returns { reminders: [{ id, fireAt (YYYY-MM-DDTHH:MM, local time in the user's timezone — the same format schedule_reminder_at and edit_reminder take), note }], total, truncated }, where " +
       "'note' is the private reminder note (possibly shortened). " +
       "At most " +
       String(LIST_REMINDERS_LIMIT) +
       " reminders are returned; 'total' is the real count and 'truncated' is true when more exist than were returned. " +
-      "The 'id' is an INTERNAL handle, used only to pass to cancel_reminder — NEVER show it to the user. " +
+      "The 'id' is an INTERNAL handle, used only to pass to edit_reminder or cancel_reminder — NEVER show it to the user. " +
       "When telling the user about their reminders, describe each by what it is about and when it fires, never by its id. " +
-      "Call this to show the user their reminders or to find which one to cancel.",
+      "Call this to show the user their reminders or to find which one to edit or cancel.",
     parameters: Schema,
     execute: async (_input, ctx) => {
       const stored = await deps.storage
@@ -69,7 +70,7 @@ export function createListRemindersTool(deps: {
       return {
         reminders: shown.map((r) => ({
           id: r.id,
-          fireAt: new Date(r.fireAtMs).toISOString(),
+          fireAt: formatFireAt(r.fireAtMs, ctx.timezone),
           note: previewNote(r.text),
         })),
         total: all.length,
