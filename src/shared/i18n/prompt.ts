@@ -46,29 +46,21 @@ export const promptMessages = {
     ru: "Порог сворачивания",
   }),
   ui_prompt_expandable_threshold_footer: m({
-    en: "Longer replies (in characters) are collapsed. 0 collapses all.",
-    ru: "Ответы длиннее (в символах) сворачиваются. 0 — всегда.",
+    en: "In characters. 0 collapses every reply.",
+    ru: "В символах. 0 — сворачивать всё.",
   }),
   // Footer for the fallback-chain field.
-  ui_prompt_models_fallback_footer: m({
-    en: "Fallbacks are tried in order on failure.",
-    ru: "Запасные пробуются по очереди при ошибке.",
-  }),
   ui_prompt_provider_routing: m({
     en: "Provider Routing",
     ru: "Маршрутизация провайдеров",
   }),
   ui_prompt_provider_routing_footer: m({
     en: "Pinning a provider disables fallback.",
-    ru: "Закреплённый провайдер отключает резервные.",
+    ru: "Закреплённый провайдер отключает резервные модели.",
   }),
   ui_prompt_service_tier: m({
     en: "Service Tier",
     ru: "Тариф обслуживания",
-  }),
-  ui_prompt_service_tier_footer: m({
-    en: "Flex: cheaper, slower. Priority: faster, pricier.",
-    ru: "Flex: дешевле, медленнее. Priority: быстрее, дороже.",
   }),
   ui_models_model_id: m({
     en: "Model ID",
@@ -123,8 +115,8 @@ export const promptMessages = {
     ru: "Уровень размышлений",
   }),
   ui_prompt_reasoning_effort_footer: m({
-    en: "Reasoning before /ask answers. Unsupported levels may be rejected.",
-    ru: "Размышления перед ответом на /ask. Неподдерживаемый уровень может быть отклонён.",
+    en: "Not every model supports every level.",
+    ru: "Не все модели поддерживают все уровни.",
   }),
   ui_effort_default: m({
     en: "Default",

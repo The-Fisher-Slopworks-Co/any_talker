@@ -13,10 +13,6 @@ export const chatsMessages = {
     en: "No chats yet.",
     ru: "Чатов пока нет.",
   }),
-  ui_chats_footer: m({
-    en: "Overrides apply over global settings.",
-    ru: "Переопределяют глобальные настройки.",
-  }),
   ui_chat_private: m({
     en: "Private chat",
     ru: "Приватный чат",
@@ -69,10 +65,6 @@ export const chatsMessages = {
     en: "System Prompt",
     ru: "Системный промпт",
   }),
-  ui_chat_system_prompt_on_footer: m({
-    en: "Character for this chat.",
-    ru: "Персонаж для этого чата.",
-  }),
   ui_chat_system_prompt_off_footer: m({
     en: (chars: number) => `Global (${chars} chars).`,
     ru: (chars: number) => `Глобальный (${chars} симв.).`,
@@ -82,10 +74,6 @@ export const chatsMessages = {
     ru: "Модели",
   }),
   // Footer for the per-chat fallback-chain field.
-  ui_chat_models_fallback_footer: m({
-    en: "Primary first, then fallbacks in order.",
-    ru: "Сначала основная, затем запасные по порядку.",
-  }),
   ui_chat_models_off_footer: m({
     en: (list: string) => `Global: ${list}`,
     ru: (list: string) => `Глобально: ${list}`,
@@ -93,10 +81,6 @@ export const chatsMessages = {
   ui_chat_provider_routing: m({
     en: "Provider Routing",
     ru: "Маршрутизация провайдеров",
-  }),
-  ui_chat_provider_routing_on_footer: m({
-    en: "How a provider is picked.",
-    ru: "Как выбирается провайдер.",
   }),
   ui_chat_provider_routing_off_footer: m({
     en: (sort: string) => `Global (${sort}).`,
@@ -107,8 +91,8 @@ export const chatsMessages = {
     ru: "Конкретный провайдер",
   }),
   ui_chat_provider_on_footer: m({
-    en: "Pin to one provider, no fallback.",
-    ru: "Один провайдер, без запасных.",
+    en: "Pinning a provider disables fallback.",
+    ru: "Закреплённый провайдер отключает резервные модели.",
   }),
   ui_chat_provider_off_footer: m({
     en: (provider: string) => `Global (${provider}).`,
@@ -117,10 +101,6 @@ export const chatsMessages = {
   ui_chat_service_tier: m({
     en: "Service Tier",
     ru: "Тариф обслуживания",
-  }),
-  ui_chat_service_tier_on_footer: m({
-    en: "Tier for this chat.",
-    ru: "Тариф для этого чата.",
   }),
   ui_chat_service_tier_off_footer: m({
     en: (tier: string) => `Global (${tier}).`,

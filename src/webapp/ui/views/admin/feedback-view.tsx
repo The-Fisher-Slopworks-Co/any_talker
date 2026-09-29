@@ -118,7 +118,6 @@ export function FeedbackView({ feedbackId }: { feedbackId: string }) {
         ]}
         onChange={(next) => void setStatus(next)}
       />
-      <SectionFooter>{s.ui_feedback_status_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_feedback_text_header}</SectionHeader>
       <Card>

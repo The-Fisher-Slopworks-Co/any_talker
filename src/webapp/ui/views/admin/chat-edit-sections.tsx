@@ -128,7 +128,7 @@ export function SystemPromptSection({ form, set, global }: SectionProps) {
       onToggle={(v) => set("promptOverride", v)}
       footer={
         form.promptOverride
-          ? s.ui_chat_system_prompt_on_footer
+          ? undefined
           : s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)
       }
     >
@@ -156,7 +156,7 @@ export function ModelsSection({ form, set, global }: SectionProps) {
       onToggle={(v) => set("modelsOverride", v)}
       footer={
         form.modelsOverride
-          ? s.ui_chat_models_fallback_footer
+          ? undefined
           : s.ui_chat_models_off_footer(global.models.join(", "))
       }
     >
@@ -201,7 +201,7 @@ export function ProviderRoutingSection({ form, set, global }: SectionProps) {
       onToggle={(v) => set("psOverride", v)}
       footer={
         form.psOverride
-          ? s.ui_chat_provider_routing_on_footer
+          ? undefined
           : s.ui_chat_provider_routing_off_footer(
               global.providerSort ?? s.ui_sort_default,
             )
@@ -249,7 +249,7 @@ export function ServiceTierSection({ form, set, global }: SectionProps) {
       onToggle={(v) => set("stOverride", v)}
       footer={
         form.stOverride
-          ? s.ui_chat_service_tier_on_footer
+          ? undefined
           : s.ui_chat_service_tier_off_footer(
               global.serviceTier ?? s.ui_tier_default,
             )

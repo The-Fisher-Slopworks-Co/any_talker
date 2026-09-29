@@ -37,10 +37,6 @@ export const feedbackMessages = {
     en: "No reports yet.",
     ru: "Пока нет отчётов.",
   }),
-  ui_feedback_footer: m({
-    en: "Newest first. Deleting a report deletes its thread snapshot.",
-    ru: "Сначала новые. Удаление отчёта удаляет и снимок диалогов.",
-  }),
   // The filter names sets of reports, so Russian puts its options in the
   // plural — next to "Все" a singular option reads as a different kind of
   // control.
@@ -157,10 +153,6 @@ export const feedbackMessages = {
   ui_feedback_status_header: m({
     en: "Status",
     ru: "Статус",
-  }),
-  ui_feedback_status_footer: m({
-    en: "Closed marks a report as processed.",
-    ru: "«Закрыт» — отчёт обработан.",
   }),
   ui_feedback_text_header: m({
     en: "What was reported",

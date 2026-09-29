@@ -173,10 +173,6 @@ export const checksMessages = {
     en: "Days since a date",
     ru: "Дни с даты",
   }),
-  ui_check_counter_source_footer: m({
-    en: "Days since a date: {count} is days from the anchor date to today.",
-    ru: "«Дни с даты»: {count} — дни от опорной даты до сегодня.",
-  }),
   ui_check_counter_anchor_date: m({
     en: "Anchor date",
     ru: "Опорная дата",
@@ -204,10 +200,6 @@ export const checksMessages = {
   ui_check_enabled_label: m({
     en: "Enabled",
     ru: "Включён",
-  }),
-  ui_check_enabled_footer: m({
-    en: "Disabled checks don't fire or time out.",
-    ru: "Выключенный чек не срабатывает и не таймаутится.",
   }),
   ui_check_delete: m({
     en: "Delete check",

@@ -27,8 +27,8 @@ export const remindersMessages = {
     ru: "Напоминаний нет.",
   }),
   ui_reminders_admin_footer: m({
-    en: "Pending reminders of all users. Transient delivery errors are retried.",
-    ru: "Ожидающие напоминания всех пользователей. При временных ошибках доставка повторяется.",
+    en: "Failed deliveries are retried.",
+    ru: "Неудачная доставка повторяется.",
   }),
   ui_reminders_edit: m({
     en: "Edit",

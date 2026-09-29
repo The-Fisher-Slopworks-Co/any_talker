@@ -85,10 +85,6 @@ export const profileMessages = {
     en: "Language",
     ru: "Язык",
   }),
-  ui_main_language_footer: m({
-    en: "Bot UI and AI reply language.",
-    ru: "Язык интерфейса и ответов ИИ.",
-  }),
   ui_main_lang_english: m({
     en: "English",
     ru: "Английский",
