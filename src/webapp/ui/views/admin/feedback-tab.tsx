@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api, type FeedbackStatus } from "../../api-client";
-import { Card, SectionFooter, Stack } from "../../components/layout";
+import { Card, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
 import { RowButton } from "../../components/controls";
 import { SegmentedField } from "../../components/segmented-field";
@@ -91,7 +91,6 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
           )}
         </>
       )}
-      <SectionFooter>{s.ui_feedback_footer}</SectionFooter>
     </Stack>
   );
 }
