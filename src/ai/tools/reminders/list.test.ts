@@ -17,6 +17,18 @@ describe("list_reminders", () => {
     expect(out).toEqual({ reminders: [], total: 0, truncated: false });
   });
 
+  // #204: a UTC fireAt made the model do the arithmetic in UTC and pass the
+  // result back as local time, so a future time came out in the past.
+  test("fireAt is local wall-clock time in the input format, not UTC", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(
+      reminder({ id: "r1", fireAtMs: Date.UTC(2026, 8, 29, 15, 30) }),
+    );
+    const tool = createListRemindersTool({ storage });
+    const out = await tool.execute({}, { ...ctx, timezone: "Europe/Moscow" });
+    expect(out.reminders[0]?.fireAt).toBe("2026-09-29T18:30");
+  });
+
   test("returns the user's reminders soonest first with id/fireAt/note", async () => {
     const storage = new MemoryStorage();
     await storage.reminders.save(
@@ -32,7 +44,7 @@ describe("list_reminders", () => {
     expect(out.reminders.map((r) => r.id)).toEqual(["soon", "late"]);
     expect(out.reminders[0]).toEqual({
       id: "soon",
-      fireAt: new Date(2_000_000).toISOString(),
+      fireAt: "1970-01-01T00:33",
       note: "sooner",
     });
   });

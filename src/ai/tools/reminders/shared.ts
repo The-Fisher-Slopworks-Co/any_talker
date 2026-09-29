@@ -8,6 +8,42 @@ import type { Storage } from "../../../storage/types";
 import { getOrInitSettings } from "../../../settings";
 import { userReminderCap } from "../../../ratelimit/limit-class";
 import { serializeMessages } from "../../serialize";
+import { localDateTimeString } from "../../../shared/tz";
+import { isValidTimezone } from "../../../shared/types";
+
+// Appended to every reminder-writing tool: the model used to tell the user a
+// reminder was moved right after the tool refused.
+export const FAILED_WRITE_RULE =
+  "If the result has ok: false, NOTHING was changed: tell the user it failed and why, " +
+  "and never say the reminder was set, moved or changed.";
+
+// The result contract of the schedule_* tools, which all end in persistReminder.
+export const PERSIST_RESULT_DOC =
+  "Returns { ok: true, fireAt, reminderId } on success, with fireAt as YYYY-MM-DDTHH:MM in the user's timezone, " +
+  "or { ok: false, reason }. " +
+  FAILED_WRITE_RULE;
+
+// Fire times go back to the model as local wall-clock time in the same
+// YYYY-MM-DDTHH:MM form the tools take as input, so it never has to convert
+// between UTC and the user's timezone itself. An unusable timezone falls back
+// to an ISO UTC stamp, which at least says what it is.
+export function formatFireAt(ms: number, timezone: string): string {
+  if (!isValidTimezone(timezone)) return new Date(ms).toISOString();
+  return localDateTimeString(ms, timezone).replace(" ", "T");
+}
+
+// Names the resolved time and the current time, so the model can see (and tell
+// the user) why the new time was refused.
+export function tooSoonReason(
+  fireAtMs: number,
+  ctx: Pick<ToolCallContext, "now" | "timezone">,
+): string {
+  return (
+    "reminder must fire at least 1 minute from now: the requested time resolves to " +
+    `${formatFireAt(fireAtMs, ctx.timezone)}, and it is already ` +
+    `${formatFireAt(ctx.now, ctx.timezone)} in the user's timezone`
+  );
+}
 
 // The sources a reminder-writing tool is offered to — everything but a reminder
 // delivery. A delivery turn replays the archived context of the request that
@@ -57,10 +93,7 @@ export async function persistReminder(
   recurrence?: Recurrence,
 ): Promise<PersistResult> {
   if (fireAtMs - ctx.now < MIN_LEAD_MS) {
-    return {
-      ok: false,
-      reason: "reminder must fire at least 1 minute from now",
-    };
+    return { ok: false, reason: tooSoonReason(fireAtMs, ctx) };
   }
 
   // Scope the reminder (and the private-chat check that gates guest DMs) to the
@@ -133,7 +166,7 @@ export async function persistReminder(
 
   return {
     ok: true,
-    fireAt: new Date(fireAtMs).toISOString(),
+    fireAt: formatFireAt(fireAtMs, ctx.timezone),
     reminderId,
   };
 }

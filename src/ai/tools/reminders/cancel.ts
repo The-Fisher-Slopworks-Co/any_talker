@@ -24,6 +24,7 @@ export function createCancelReminderTool(deps: {
       "figure out which reminder the user means yourself and pass its id. " +
       "Returns { cancelled: true } if the reminder existed and belonged to the user and was removed, " +
       "or { cancelled: false } if no such reminder is theirs (not an error). " +
+      "On { cancelled: false } nothing was cancelled — never tell the user it was. " +
       "To cancel several, call this once per id. There is no cancel-all.",
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
