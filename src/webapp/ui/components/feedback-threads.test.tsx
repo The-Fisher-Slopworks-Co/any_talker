@@ -70,17 +70,17 @@ describe("FeedbackThreads", () => {
   // Both are normal states: the copied threads expire with the conversation
   // graph, and the snapshot is "recent threads" regardless of what was replied to.
   test("survives an empty snapshot and a pointedAt matching no thread", () => {
-    expect(render([])).toContain("No threads: they had expired");
+    expect(render([])).toContain("No threads in this snapshot");
     const missing = render([thread()], { chatId: "-100500", botMsgId: 999 });
-    expect(missing).toContain("in the snapshot; its thread");
+    expect(missing).toContain("is in none of the snapshotted threads");
     const other = render([thread()], { chatId: "-100999", botMsgId: 77 });
-    expect(other).toContain("in the snapshot; its thread");
+    expect(other).toContain("is in none of the snapshotted threads");
   });
 
   test("marks the thread the report pointed at", () => {
     const html = render([thread()], { chatId: "-100500", botMsgId: 77 });
     expect(html).toContain("chain · pointed at");
-    expect(html).not.toContain("in the snapshot; its thread");
+    expect(html).not.toContain("is in none of the snapshotted threads");
   });
 
   test("takes its labels from the catalogue, not from English literals", () => {

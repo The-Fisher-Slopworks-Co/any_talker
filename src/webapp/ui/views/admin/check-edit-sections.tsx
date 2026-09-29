@@ -141,6 +141,7 @@ export function TimezoneSection({ draft, set }: SectionProps) {
         value={draft.timezone}
         onChange={(tz) => set("timezone", tz)}
       />
+      <SectionFooter>{s.ui_check_timezone_footer}</SectionFooter>
     </>
   );
 }
@@ -246,6 +247,7 @@ export function CounterSourceSection({ draft, set }: SectionProps) {
           }}
         />
       </Card>
+      <SectionFooter>{s.ui_check_counter_source_footer}</SectionFooter>
     </>
   );
 }
@@ -327,6 +329,7 @@ export function EnabledSection({ draft, set }: SectionProps) {
           <Toggle value={draft.enabled} onChange={(v) => set("enabled", v)} />
         </div>
       </Card>
+      <SectionFooter>{s.ui_check_enabled_footer}</SectionFooter>
     </>
   );
 }

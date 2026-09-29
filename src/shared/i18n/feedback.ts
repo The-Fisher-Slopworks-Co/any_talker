@@ -30,12 +30,16 @@ export const feedbackMessages = {
     ru: "Обратная связь",
   }),
   ui_admin_feedback_desc: m({
-    en: "User reports from /feedback",
-    ru: "Отчёты пользователей из /feedback",
+    en: "What users reported with /feedback",
+    ru: "Что пользователи сообщили через /feedback",
   }),
   ui_feedback_empty: m({
-    en: "No reports yet.",
-    ru: "Пока нет отчётов.",
+    en: "Nothing here — no report has come in through /feedback.",
+    ru: "Пусто — через /feedback не пришло ни одного отчёта.",
+  }),
+  ui_feedback_footer: m({
+    en: "What users sent with /feedback, newest first. Each report carries a snapshot of the reporter's recent threads, taken when it was sent; deleting the report drops that snapshot with it.",
+    ru: "То, что пользователи отправили через /feedback, сначала новые. В каждом отчёте — снимок последних диалогов автора, сделанный в момент отправки; удаление отчёта уносит снимок вместе с ним.",
   }),
   // The filter names sets of reports, so Russian puts its options in the
   // plural — next to "Все" a singular option reads as a different kind of
@@ -75,8 +79,8 @@ export const feedbackMessages = {
     ru: "Показать ещё",
   }),
   ui_feedback_delete_confirm: m({
-    en: "Delete this report and its thread snapshot?",
-    ru: "Удалить отчёт и снимок диалогов?",
+    en: "Delete this report? The thread snapshot goes with it, and the threads it copied may already have expired.",
+    ru: "Удалить этот отчёт? Снимок диалогов уйдёт вместе с ним, а сами диалоги могли уже истечь.",
   }),
 
   // The detail view a row opens into. Deliberately plain: the record's fields,
@@ -143,8 +147,8 @@ export const feedbackMessages = {
   // A normal state, not an error: the thread a reporter pointed at can have
   // expired before the snapshot was taken.
   ui_feedback_pointed_missing: m({
-    en: "The pointed-at message isn't in the snapshot; its thread had expired.",
-    ru: "Сообщения нет в снимке: его диалог истёк.",
+    en: "The message this report pointed at is in none of the snapshotted threads — that thread had already expired.",
+    ru: "Сообщение, на которое указывает отчёт, не попало ни в один снятый диалог — тот успел истечь.",
   }),
   ui_feedback_pointed_here: m({
     en: "pointed at",
@@ -153,6 +157,10 @@ export const feedbackMessages = {
   ui_feedback_status_header: m({
     en: "Status",
     ru: "Статус",
+  }),
+  ui_feedback_status_footer: m({
+    en: "Closed is what marks a report as processed — for an analysing agent, and for whoever reads the list next. Nothing else about the record changes.",
+    ru: "«Закрыт» помечает отчёт как обработанный — и для анализирующего агента, и для того, кто откроет список следующим. Больше в записи ничего не меняется.",
   }),
   ui_feedback_text_header: m({
     en: "What was reported",
@@ -163,12 +171,12 @@ export const feedbackMessages = {
     ru: "Диалоги",
   }),
   ui_feedback_threads_footer: m({
-    en: "Copied verbatim. Generation ids link to openrouter.ai (login required).",
-    ru: "Копия дословно. Id генераций ведут на openrouter.ai (нужен вход).",
+    en: "Each thread as it was copied into the record, verbatim. A generation id links into openrouter.ai, where the activity list is what resolves it — behind that account's own login.",
+    ru: "Каждый диалог — в том виде, в каком он попал в запись, дословно. Id генерации ведёт на openrouter.ai: разрешает его список активности, за логином того же аккаунта.",
   }),
   ui_feedback_threads_empty: m({
-    en: "No threads: they had expired.",
-    ru: "Диалогов нет: они истекли.",
+    en: "No threads in this snapshot — they had expired by the time the report was sent.",
+    ru: "В снимке нет диалогов — к моменту отправки отчёта они уже истекли.",
   }),
   ui_feedback_thread_chain: m({
     en: "chain",
@@ -199,7 +207,7 @@ export const feedbackMessages = {
     ru: "Системный промпт",
   }),
   ui_feedback_prompt_footer: m({
-    en: "As rendered when the report was sent. A turn whose run.instr differs from the hash ran on another prompt.",
-    ru: "Как был собран при отправке. Ход с другим run.instr шёл на другом промпте.",
+    en: "As it was rendered when the report was sent. A turn whose run.instr differs from the hash above ran on a different prompt.",
+    ru: "В том виде, в каком он был собран при отправке отчёта. Ход, у которого run.instr не совпадает с хешем выше, шёл на другом промпте.",
   }),
 };

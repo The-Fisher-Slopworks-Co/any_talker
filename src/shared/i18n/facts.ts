@@ -58,28 +58,28 @@ export const factsMessages = {
     ru: "Удалить этот факт?",
   }),
   ui_facts_footer: m({
-    en: "Notes the bot uses in replies.",
-    ru: "Заметки, которые бот учитывает в ответах.",
+    en: "Notes the bot keeps about you and uses in its replies. Edit or delete them, or add your own.",
+    ru: "Заметки, которые бот хранит о тебе и использует в ответах. Их можно редактировать, удалять и добавлять свои.",
   }),
   ui_facts_count: m({
     en: (count: number, cap: number) => `${count} of ${cap} facts used`,
     ru: (count: number, cap: number) => `Занято фактов: ${count} из ${cap}`,
   }),
   ui_facts_error_invalid_key: m({
-    en: "Key: 1–64 Latin letters, digits or underscores.",
-    ru: "Ключ: 1–64 латинских букв, цифр или подчёркиваний.",
+    en: "The key must be 1–64 Latin letters, digits, or underscores.",
+    ru: "Ключ — от 1 до 64 латинских букв, цифр или подчёркиваний.",
   }),
   ui_facts_error_invalid_value: m({
-    en: "Text: 1–500 characters.",
-    ru: "Текст: 1–500 символов.",
+    en: "The text must be 1–500 characters.",
+    ru: "Текст — от 1 до 500 символов.",
   }),
   ui_facts_error_limit_reached: m({
-    en: "Fact limit reached. Delete one first.",
-    ru: "Лимит фактов. Сначала удали один.",
+    en: "Fact limit reached — delete one before adding another.",
+    ru: "Достигнут лимит фактов — удали один, чтобы добавить новый.",
   }),
   ui_facts_error_not_found: m({
-    en: "Fact no longer exists.",
-    ru: "Факт уже удалён.",
+    en: "This fact no longer exists.",
+    ru: "Этот факт уже не существует.",
   }),
   ui_facts_error_key_exists: m({
     en: "A fact with this key already exists.",
@@ -94,7 +94,7 @@ export const factsMessages = {
     ru: "Память",
   }),
   ui_user_facts_footer: m({
-    en: "View-only; the user manages them.",
-    ru: "Только просмотр; управляет пользователь.",
+    en: "Facts this character has saved about the user. View-only — the user manages them in their own vault.",
+    ru: "Факты, которые персонаж сохранил об этом пользователе. Только просмотр — пользователь управляет ими сам.",
   }),
 };
