@@ -26,7 +26,7 @@ function EntryList({
   onRemove,
 }: {
   header: string;
-  footer: string;
+  footer?: string;
   entries: WhitelistEntry[];
   onOpen: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
@@ -64,7 +64,7 @@ function EntryList({
           ))
         )}
       </Card>
-      <SectionFooter>{footer}</SectionFooter>
+      {footer && <SectionFooter>{footer}</SectionFooter>}
     </>
   );
 }
@@ -124,7 +124,6 @@ export function WhitelistTab({
         <>
           <EntryList
             header={s.ui_whitelist_allowed_users}
-            footer={s.ui_whitelist_footer_users}
             entries={data.users}
             onOpen={onOpenUser}
             onRemove={async (id) => {
@@ -134,7 +133,6 @@ export function WhitelistTab({
           />
           <EntryList
             header={s.ui_whitelist_allowed_chats}
-            footer={s.ui_whitelist_footer_chats}
             entries={data.chats}
             onOpen={onOpenChat}
             onRemove={async (id) => {

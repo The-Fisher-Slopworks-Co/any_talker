@@ -11,8 +11,8 @@ export const budgetMessages = {
     ru: "Жёсткие потолки в USD",
   }),
   ui_budget_caps_footer: m({
-    en: "The monthly cap is your real budget ceiling; the others bound how fast it can drain. The owner is never blocked.",
-    ru: "Месячный потолок — твой реальный лимит бюджета; остальные ограничивают скорость его расхода. Владельца никогда не блокирует.",
+    en: "Monthly is the real ceiling; the others limit burn rate. Owner is never blocked.",
+    ru: "Месячный — реальный потолок, остальные ограничивают скорость расхода. Владелец не блокируется.",
   }),
   ui_budget_enabled: m({
     en: "Enforce budget caps",
@@ -47,8 +47,8 @@ export const budgetMessages = {
     ru: "Алерты скачков и дайджест",
   }),
   ui_budget_anomaly_footer: m({
-    en: "Alert-only — these never block a request. A spike fires on the absolute amount or a jump over the recent baseline.",
-    ru: "Только уведомления — не блокируют запрос. Скачок срабатывает по абсолютной сумме или прыжку выше недавнего базового уровня.",
+    en: "Alerts only, never block requests.",
+    ru: "Только уведомления, запросы не блокируются.",
   }),
   ui_budget_digest_enabled: m({
     en: "Regular digest",
@@ -132,7 +132,7 @@ export const budgetMessages = {
     ru: (amount: string) => `30д: ${amount}`,
   }),
   ui_spending_footer: m({
-    en: "Money spent on AI requests, in USD — OpenRouter's own reported cost; models it reported no cost for are listed as under-counted. Periods are trailing windows by UTC date.",
-    ru: "Деньги, потраченные на запросы к ИИ, в USD: стоимость, которую сообщил OpenRouter; модели, по которым он её не сообщил, помечаются как занижающие траты. Периоды — скользящие окна по датам UTC.",
+    en: "OpenRouter-reported USD; models without cost data are under-counted. UTC windows.",
+    ru: "USD по данным OpenRouter; модели без данных о стоимости занижают сумму. Окна по UTC.",
   }),
 };

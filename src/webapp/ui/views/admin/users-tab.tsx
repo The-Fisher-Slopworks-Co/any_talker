@@ -3,12 +3,7 @@
 
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../../components/layout";
+import { Card, SectionHeader, Stack } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
 import { SELECTABLE_ROW_CLS } from "../../components/row";
 import { NavRow } from "../../components/select-row";
@@ -71,7 +66,6 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
           ))
         )}
       </Card>
-      <SectionFooter>{s.ui_users_footer}</SectionFooter>
     </Stack>
   );
 }

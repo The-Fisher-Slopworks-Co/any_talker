@@ -75,18 +75,18 @@ describe("ProfileSettingsCard", () => {
   });
 
   test("the footer carries one short hint", () => {
-    expect(render()).toContain("Changes are saved automatically");
+    expect(render()).toContain("Saved automatically");
   });
 
   test("a name error takes over the footer", () => {
     const html = render({ nameError: "too_long" });
     expect(html).toContain("Too long");
-    expect(html).not.toContain("Changes are saved automatically");
+    expect(html).not.toContain("Saved automatically");
   });
 
   test("is translated", () => {
     const html = render({ lang: "ru" });
     expect(html).toContain("Формат времени");
-    expect(html).toContain("Изменения сохраняются сразу");
+    expect(html).toContain("Сохраняется автоматически");
   });
 });

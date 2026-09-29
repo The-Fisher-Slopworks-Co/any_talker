@@ -141,7 +141,6 @@ export function TimezoneSection({ draft, set }: SectionProps) {
         value={draft.timezone}
         onChange={(tz) => set("timezone", tz)}
       />
-      <SectionFooter>{s.ui_check_timezone_footer}</SectionFooter>
     </>
   );
 }

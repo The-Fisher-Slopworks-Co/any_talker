@@ -23,8 +23,8 @@ export const rateLimitMessages = {
     ru: "Владелец без лимита",
   }),
   ui_ratelimit_footer: m({
-    en: "Each user has two token budgets — one per rolling 5-hour window and one per week — spent per /ask. A request is allowed while both have budget left. Window start times are staggered per user.",
-    ru: "У каждого пользователя два бюджета токенов — на скользящее окно 5 часов и на неделю — списываются за /ask. Запрос разрешён, пока в обоих окнах есть бюджет. Начала окон сдвинуты у каждого пользователя по-своему.",
+    en: "Per-user token budgets; a request needs both to have budget left.",
+    ru: "Токеновые бюджеты пользователя; запросу нужен остаток в обоих.",
   }),
   ui_ratelimit_my_usage: m({
     en: "My Usage",
@@ -104,8 +104,8 @@ export const rateLimitMessages = {
     ru: (percent: number, until: string) => `+${percent}% до ${until}`,
   }),
   ui_boost_footer: m({
-    en: "Raises both limits for everyone by the given percent until the end date; users see it in /usage and the Web App.",
-    ru: "Повышает оба лимита для всех на указанный процент до даты окончания; пользователи видят акцию в /usage и в Web App.",
+    en: "Raises both limits for everyone until the end date. Users see it.",
+    ru: "Повышает оба лимита для всех до даты окончания. Пользователи её видят.",
   }),
   // Admin-assigned limit classes: their config here, the assignment on the
   // user's page. Admin-only; users are never shown their class.
@@ -142,12 +142,12 @@ export const rateLimitMessages = {
     ru: "Потрачено из запаса за месяц",
   }),
   ui_limit_classes_footer: m({
-    en: "A user is put in a class on their page. The multiplier raises both token limits, and a running promo multiplies on top; the reminder cap never drops below the global one. Whatever a regular user would be denied (past the base token limit or a daily/chat/new-user cap) is drawn from the monthly allowance (UTC calendar month) and kept out of the daily caps. The global monthly cap still applies to everyone.",
-    ru: "Класс назначается на странице пользователя. Множитель повышает оба лимита токенов, действующая акция умножается поверх; лимит напоминаний не опускается ниже общего. То, в чём обычному пользователю было бы отказано (сверх базового лимита токенов или дневного, чатового потолка или потолка для новичков), списывается с месячного запаса (календарный месяц по UTC) и не учитывается в дневных потолках. Глобальный месячный потолок действует для всех.",
+    en: "Set on the user's page. Overflow past regular limits comes from the monthly allowance.",
+    ru: "Назначается на странице пользователя. Сверх обычных лимитов расходуется месячный запас.",
   }),
   ui_limit_class_footer: m({
-    en: "Raises this user's limits by the class settings on the Limits tab. The user isn't told about it.",
-    ru: "Повышает лимиты пользователя по настройкам класса на вкладке лимитов. Пользователю об этом не сообщается.",
+    en: "Applies the class settings from Limits. Not shown to the user.",
+    ru: "Применяет настройки класса с вкладки лимитов. Пользователю не показывается.",
   }),
   ui_usage_header_exempt: m({
     en: "No limits apply to you.",

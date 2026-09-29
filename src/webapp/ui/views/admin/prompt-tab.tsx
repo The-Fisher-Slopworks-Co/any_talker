@@ -152,7 +152,6 @@ export function PromptTab({
           placeholder={s.ui_prompt_placeholder}
         />
       </Card>
-      <SectionFooter>{s.ui_prompt_system_prompt_footer}</SectionFooter>
       <OptimizePromptButton prompt={prompt} />
 
       <SectionHeader>{s.ui_prompt_timezone}</SectionHeader>
