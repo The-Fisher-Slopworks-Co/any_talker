@@ -9,14 +9,37 @@ import type {
 import { PREFIX } from "./shared";
 
 // One global hash (unscoped, like `bot_presence`), field = `{chatId}:{botId}`,
-// value = the epoch ms the menu was applied. A single key rather than one per
-// chat so the rollback list is one `hgetall` and never a key scan.
+// value = JSON `{ atMs, version }`. A single key rather than one per chat so the
+// rollback list is one `hgetall` and never a key scan.
 const KEY = `${PREFIX}chat_command_menus`;
 
 // A chat id is `-100…`-shaped and a bot id is digits, so the last ":" always
 // separates the two.
 function field(chatId: string, botId: string): string {
   return `${chatId}:${botId}`;
+}
+
+type StoredMenu = Pick<ChatCommandMenu, "atMs" | "version">;
+
+// Rows written before `version` existed hold the bare epoch ms, which parses as
+// a JSON number: they come back version-less, i.e. as a menu to re-upload.
+export function parseValue(raw: string): StoredMenu {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { atMs: 0 };
+  }
+  if (typeof parsed === "number") {
+    return { atMs: Number.isFinite(parsed) ? parsed : 0 };
+  }
+  if (typeof parsed !== "object" || parsed === null) return { atMs: 0 };
+  const { atMs, version } = parsed as Record<string, unknown>;
+  const out: StoredMenu = {
+    atMs: typeof atMs === "number" && Number.isFinite(atMs) ? atMs : 0,
+  };
+  if (typeof version === "string") out.version = version;
+  return out;
 }
 
 export class KeyDBCommandMenusStore implements CommandMenusStore {
@@ -26,7 +49,7 @@ export class KeyDBCommandMenusStore implements CommandMenusStore {
     await this.client.hset(
       KEY,
       field(menu.chatId, menu.botId),
-      String(menu.atMs),
+      JSON.stringify({ atMs: menu.atMs, version: menu.version }),
     );
   }
 
@@ -38,17 +61,21 @@ export class KeyDBCommandMenusStore implements CommandMenusStore {
     return (await this.client.hget(KEY, field(chatId, botId))) !== null;
   }
 
+  async get(chatId: string, botId: string): Promise<ChatCommandMenu | null> {
+    const raw = await this.client.hget(KEY, field(chatId, botId));
+    return raw === null ? null : { chatId, botId, ...parseValue(raw) };
+  }
+
   async list(): Promise<ChatCommandMenu[]> {
     const raw = await this.client.hgetall(KEY);
     const out: ChatCommandMenu[] = [];
-    for (const [key, ms] of Object.entries(raw)) {
+    for (const [key, value] of Object.entries(raw)) {
       const sep = key.lastIndexOf(":");
       if (sep <= 0) continue;
-      const atMs = Number(ms);
       out.push({
         chatId: key.slice(0, sep),
         botId: key.slice(sep + 1),
-        atMs: Number.isFinite(atMs) ? atMs : 0,
+        ...parseValue(value),
       });
     }
     return out;

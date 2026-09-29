@@ -44,6 +44,7 @@ import type { Reminder } from "../reminders/types";
 import type { RecurringCheck } from "../checks/types";
 import type { FeedbackEntry } from "../shared/types/feedback";
 import type { ApiTokenRecord } from "./types/api-token";
+import type { ChatCommandMenu } from "./types/command-menus";
 import type { ManagedBot } from "../managed-bots/types";
 import { MemoryManagedBotsStore } from "./memory/managed-bots";
 import { MemoryPresenceStore } from "./memory/presence";
@@ -132,9 +133,9 @@ export type Backing = {
   managedBotTokens: Map<string, string>;
   // chatId -> (botId -> last-seen epoch ms). Shared across all `forBot` views.
   botPresence: Map<string, Map<string, number>>;
-  // chatId -> (botId -> epoch ms a chat-scoped command menu was applied).
+  // chatId -> (botId -> the chat-scoped command menu applied there).
   // Shared across all `forBot` views.
-  chatCommandMenus: Map<string, Map<string, number>>;
+  chatCommandMenus: Map<string, Map<string, ChatCommandMenu>>;
 };
 
 function createBacking(): Backing {

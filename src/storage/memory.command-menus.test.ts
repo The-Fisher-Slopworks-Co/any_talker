@@ -16,6 +16,12 @@ test("chat command menus: record, read back, and forget", async () => {
   // Per bot AND per chat: the same bot may hold a menu in one chat and not
   // another, which is the whole point of resolving it per chat.
   expect(await s.commandMenus.has("chat-2", "dog")).toBe(false);
+  expect(await s.commandMenus.get("chat-1", "cat")).toEqual({
+    chatId: "chat-1",
+    botId: "cat",
+    atMs: 1000,
+  });
+  expect(await s.commandMenus.get("chat-2", "dog")).toBeNull();
 
   // Re-recording updates the instant in place.
   await s.commandMenus.record({ chatId: "chat-1", botId: "cat", atMs: 4000 });
@@ -26,6 +32,14 @@ test("chat command menus: record, read back, and forget", async () => {
     { chatId: "chat-1", botId: "dog", atMs: 2000 },
     { chatId: "chat-2", botId: "cat", atMs: 3000 },
   ]);
+
+  await s.commandMenus.record({
+    chatId: "chat-1",
+    botId: "cat",
+    atMs: 4000,
+    version: "v2",
+  });
+  expect((await s.commandMenus.get("chat-1", "cat"))?.version).toBe("v2");
 
   await s.commandMenus.forget("chat-1", "cat");
   expect(await s.commandMenus.has("chat-1", "cat")).toBe(false);
