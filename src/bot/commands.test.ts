@@ -34,7 +34,7 @@ function withoutShared(list: readonly FamilyCommand[]): BotCommand[] {
 describe("command lists", () => {
   test("English list matches the expected shape", () => {
     expect(BOT_COMMANDS_EN).toEqual([
-      { command: "ask", description: "Ask (short answer)" },
+      { command: "ask", description: "Ask" },
       {
         command: "feedback",
         description: "Report a problem",
@@ -58,7 +58,7 @@ describe("command lists", () => {
 
   test("Russian list matches the expected shape", () => {
     expect(BOT_COMMANDS_RU).toEqual([
-      { command: "ask", description: "Спросить (коротко)" },
+      { command: "ask", description: "Спросить" },
       {
         command: "feedback",
         description: "Сообщить о проблеме",
@@ -129,7 +129,7 @@ describe("command lists", () => {
 
   test("private lists are the public ones minus the ephemeral flag", () => {
     expect(PRIVATE_COMMANDS_EN).toEqual([
-      { command: "ask", description: "Ask (short answer)" },
+      { command: "ask", description: "Ask" },
       { command: "feedback", description: "Report a problem", shared: true },
       {
         command: "usage",
@@ -139,7 +139,7 @@ describe("command lists", () => {
       { command: "help", description: "How to use the bot", shared: true },
     ]);
     expect(PRIVATE_COMMANDS_RU).toEqual([
-      { command: "ask", description: "Спросить (коротко)" },
+      { command: "ask", description: "Спросить" },
       { command: "feedback", description: "Сообщить о проблеме", shared: true },
       {
         command: "usage",
