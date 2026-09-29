@@ -36,7 +36,7 @@ export async function dispatchTextCommand(
   });
 }
 
-// Both the main and managed bots parse `/ask(wise)` from the raw text with
+// Both the main and managed bots parse `/ask` from the raw text with
 // `matchAsk` (not grammY's command filter) so the same reply-aware routing in
 // `shouldAnswer` applies to every bot: an explicit `@self` is always answered,
 // a bare `/ask` replying to a present family bot's message is answered by THAT

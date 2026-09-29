@@ -35,7 +35,6 @@ describe("command lists", () => {
   test("English list matches the expected shape", () => {
     expect(BOT_COMMANDS_EN).toEqual([
       { command: "ask", description: "Ask (short answer)" },
-      { command: "askwise", description: "Ask (detailed answer)" },
       {
         command: "feedback",
         description: "Report a problem",
@@ -60,7 +59,6 @@ describe("command lists", () => {
   test("Russian list matches the expected shape", () => {
     expect(BOT_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
-      { command: "askwise", description: "Спросить (подробно)" },
       {
         command: "feedback",
         description: "Сообщить о проблеме",
@@ -111,8 +109,7 @@ describe("command lists", () => {
   });
 
   // `/feedback` and `/usage` behave the same whichever family bot answers
-  // them; `/ask` and `/askwise` address one specific character, so they are
-  // per-bot.
+  // them; `/ask` addresses one specific character, so it is per-bot.
   test("only /feedback, /usage and /help are marked shared", () => {
     for (const list of [
       BOT_COMMANDS_EN,
@@ -133,7 +130,6 @@ describe("command lists", () => {
   test("private lists are the public ones minus the ephemeral flag", () => {
     expect(PRIVATE_COMMANDS_EN).toEqual([
       { command: "ask", description: "Ask (short answer)" },
-      { command: "askwise", description: "Ask (detailed answer)" },
       { command: "feedback", description: "Report a problem", shared: true },
       {
         command: "usage",
@@ -144,7 +140,6 @@ describe("command lists", () => {
     ]);
     expect(PRIVATE_COMMANDS_RU).toEqual([
       { command: "ask", description: "Спросить (коротко)" },
-      { command: "askwise", description: "Спросить (подробно)" },
       { command: "feedback", description: "Сообщить о проблеме", shared: true },
       {
         command: "usage",

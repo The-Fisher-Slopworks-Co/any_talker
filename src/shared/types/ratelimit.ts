@@ -4,12 +4,11 @@
 // Dual fixed-window token budget, per user (global across all chats and family
 // bots). A request is allowed only while BOTH windows have budget left; tokens
 // spent are accrued to both. Window *lengths* are fixed in code (5 hours and 1
-// week); only these budgets and the multiplier/exemption are admin-configurable.
+// week); only these budgets and the exemption are admin-configurable.
 export type RateLimitConfig = {
   fiveHourTokens: number;
   weeklyTokens: number;
   ownerExempt: boolean;
-  wiseMultiplier: number;
 };
 
 // Which of the two windows is being referred to (denial reason, UI labels).

@@ -20,7 +20,6 @@ import {
 } from "./tools/registry";
 import {
   buildInstruction,
-  detailLevelMultiplier,
   instructionHash,
   type DetailLevel,
 } from "./instruction";
@@ -29,11 +28,10 @@ import {
 // (/ask, guest mode, reminder delivery). It owns the request assembly the three
 // used to hand-write — system prompt, tool wiring, the `ToolCallContext`
 // literal (including the mutable `effects` array) — the `ai.ask` call, and the
-// post-call accounting (owner-exempt token deduction with the detail-level
-// multiplier, and the four-ledger spend booking). Callers pass domain inputs
-// and get back the answer plus the collected effects; everything about *how*
-// the model is invoked and charged lives here, so an accounting or context-shape
-// change touches one file.
+// post-call accounting (owner-exempt token deduction and the four-ledger spend
+// booking). Callers pass domain inputs and get back the answer plus the
+// collected effects; everything about *how* the model is invoked and charged
+// lives here, so an accounting or context-shape change touches one file.
 //
 // Deliberately NOT owned here (caller concerns): resolving settings/persona,
 // building the message list, the access/budget/rate-limit *gates*, the
@@ -79,11 +77,9 @@ export type RunAiTurnInput = {
   // The messages sent to the model this turn.
   messages: AIMessage[];
 
-  // Optional: when set, adds the detail-level section to the system prompt,
-  // selects the configured reasoning effort for that level, and scales the
-  // token deduction by the configured `wiseMultiplier`. Absent (guest, reminder
-  // delivery) means the "short"-equivalent path with no detail section, no
-  // reasoning effort, and a multiplier of 1.
+  // Optional: when set, adds the detail-level section to the system prompt and
+  // selects the configured reasoning effort for that level. Absent (guest,
+  // reminder delivery) means no detail section and no reasoning effort.
   detailLevel?: DetailLevel;
   // Optional user facts surfaced in the system prompt.
   facts?: Array<{ key: string; value: string }>;
@@ -164,18 +160,13 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
   });
 
   // Token deduction (after the response, so it can overshoot — see the limiter's
-  // at-least-one-more-request semantics). Owner-exempt users skip it; the
-  // detail-level multiplier scales it (1 when no detail level is set).
+  // at-least-one-more-request semantics). Owner-exempt users skip it.
   const isOwner = input.userId === input.ownerId;
   const skipDeduction = isOwner && input.rateLimit.ownerExempt;
   if (!skipDeduction) {
-    const multiplier = input.detailLevel
-      ? detailLevelMultiplier(input.detailLevel, input.rateLimit)
-      : 1;
-    const deduction = Math.round(result.totalTokens * multiplier);
     const deducting = input.rateLimiter.deduct(
       input.userId,
-      deduction,
+      result.totalTokens,
       input.now,
     );
     if (input.bestEffortDeduct) {

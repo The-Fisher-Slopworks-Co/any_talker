@@ -102,8 +102,8 @@ export const botMessages = {
       `⚠️ Видео слишком длинное — принимаю ролики не длиннее ${maxSeconds} секунд.`,
   }),
   bot_ask_usage: m({
-    en: "Usage: /ask <text> (short), /askwise <text> (detailed) — or reply to a message with either.",
-    ru: "Использование: /ask <текст> (коротко), /askwise <текст> (подробно) — или ответь на сообщение любой из этих команд.",
+    en: "Usage: /ask <text> — or reply to a message with it.",
+    ru: "Использование: /ask <текст> — или ответь этой командой на сообщение.",
   }),
   bot_rate_limited: m({
     en: (limitedBy: WindowKind, ms: number) =>

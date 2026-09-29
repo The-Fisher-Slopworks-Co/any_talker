@@ -105,9 +105,9 @@ export async function runGatedAiTurn(
   const facts = await input.storage.facts.list(input.userId);
 
   // Assemble the request, run the model, and do the post-call accounting
-  // (owner-exempt token deduction with the detail-level multiplier + the
-  // four-ledger spend booking) in one place shared with reminder delivery. A
-  // thrown `ai.ask` propagates before any accounting runs.
+  // (owner-exempt token deduction + the four-ledger spend booking) in one
+  // place shared with reminder delivery. A thrown `ai.ask` propagates before
+  // any accounting runs.
   let result;
   try {
     result = await runAiTurn({

@@ -194,17 +194,12 @@ describe("runAiTurn — request assembly", () => {
     expect(opts.reasoningEffort).toBe("low");
   });
 
-  test("detailLevel wise selects high reasoning effort", async () => {
-    const ai = new FakeAI();
-    await runAiTurn(baseInput({ ai, detailLevel: "wise" }));
-    expect(ai.calls[0]!.reasoningEffort).toBe("high");
-  });
-
   test("the configured effort per detail level is what reaches the client", async () => {
     const ai = new FakeAI();
-    const reasoningEffort = { short: "medium", wise: null } as const;
-    await runAiTurn(baseInput({ ai, detailLevel: "short", reasoningEffort }));
-    await runAiTurn(baseInput({ ai, detailLevel: "wise", reasoningEffort }));
+    for (const short of ["medium", null] as const) {
+      const reasoningEffort = { short };
+      await runAiTurn(baseInput({ ai, detailLevel: "short", reasoningEffort }));
+    }
     expect(ai.calls[0]!.reasoningEffort).toBe("medium");
     expect(ai.calls[1]!.reasoningEffort).toBeUndefined();
   });
@@ -274,25 +269,11 @@ describe("runAiTurn — token deduction", () => {
     expect((await rlStorage.usage.get("1"))?.fiveHour.used).toBe(300);
   });
 
-  test("wise detail level scales the deduction by wiseMultiplier (rounded)", async () => {
+  test("a detail level deducts the raw token total", async () => {
     const rlStorage = new MemoryStorage();
     await runAiTurn(
       baseInput({
         rateLimiter: new DualWindowLimiter(rlStorage),
-        rateLimit: { ...DEFAULT_SETTINGS.rateLimit, wiseMultiplier: 1.8 },
-        detailLevel: "wise",
-        ai: new FakeAI({ text: "ok", totalTokens: 1000 }),
-      }),
-    );
-    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1800);
-  });
-
-  test("short detail level deducts the raw total (multiplier 1)", async () => {
-    const rlStorage = new MemoryStorage();
-    await runAiTurn(
-      baseInput({
-        rateLimiter: new DualWindowLimiter(rlStorage),
-        rateLimit: { ...DEFAULT_SETTINGS.rateLimit, wiseMultiplier: 10 },
         detailLevel: "short",
         ai: new FakeAI({ text: "ok", totalTokens: 1000 }),
       }),
@@ -456,10 +437,10 @@ describe("runAiTurn — the run behind the turn", () => {
       generations: ["gen-1-aaa", "gen-2-bbb"],
       answeredBy: "anthropic/claude-sonnet-4.5",
     });
-    const res = await runAiTurn(baseInput({ ai, detailLevel: "wise" }));
+    const res = await runAiTurn(baseInput({ ai, detailLevel: "short" }));
     expect(res.run.gen).toEqual(["gen-1-aaa", "gen-2-bbb"]);
     expect(res.run.model).toBe("anthropic/claude-sonnet-4.5");
-    expect(res.run.detail).toBe("wise");
+    expect(res.run.detail).toBe("short");
   });
 
   // Both are optional on `AskResult`, and a client that records neither must not

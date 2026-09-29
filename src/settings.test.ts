@@ -275,10 +275,20 @@ describe("applyChatOverrides", () => {
     const storage = new MemoryStorage();
     await storage.settings.save({
       ...DEFAULT_SETTINGS,
-      reasoningEffort: { short: null, wise: "medium" },
+      reasoningEffort: { short: null },
     });
     const s = await getOrInitSettings(storage);
-    expect(s.reasoningEffort).toEqual({ short: null, wise: "medium" });
+    expect(s.reasoningEffort).toEqual({ short: null });
+  });
+
+  test("normalize drops the level of the removed /askwise", async () => {
+    const storage = new MemoryStorage();
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      reasoningEffort: { short: "medium", wise: "high" },
+    } as never);
+    const s = await getOrInitSettings(storage);
+    expect(s.reasoningEffort).toEqual({ short: "medium" });
   });
 
   test("normalize falls back per level for a missing or invalid reasoning effort", async () => {
@@ -288,16 +298,14 @@ describe("applyChatOverrides", () => {
     await storage.settings.save(legacy as never);
     expect((await getOrInitSettings(storage)).reasoningEffort).toEqual({
       short: "low",
-      wise: "high",
     });
 
     await storage.settings.save({
       ...DEFAULT_SETTINGS,
-      reasoningEffort: { short: "extreme", wise: "medium" },
+      reasoningEffort: { short: "extreme" },
     } as never);
     expect((await getOrInitSettings(storage)).reasoningEffort).toEqual({
       short: "low",
-      wise: "medium",
     });
   });
 
@@ -310,6 +318,7 @@ describe("applyChatOverrides", () => {
         refillAmount: 1,
         refillIntervalMs: 1000,
         ownerExempt: false,
+        wiseMultiplier: 1.8,
       } as never,
     };
     await storage.settings.save(legacy);
@@ -320,9 +329,8 @@ describe("applyChatOverrides", () => {
       DEFAULT_SETTINGS.rateLimit.weeklyTokens,
     );
     expect(s.rateLimit.ownerExempt).toBe(false);
-    expect(s.rateLimit.wiseMultiplier).toBe(
-      DEFAULT_SETTINGS.rateLimit.wiseMultiplier,
-    );
+    // The multiplier of the removed /askwise is not carried over.
+    expect("wiseMultiplier" in s.rateLimit).toBe(false);
   });
 
   test("chat timezone null overrides the global value", () => {

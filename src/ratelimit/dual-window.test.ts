@@ -16,7 +16,6 @@ const cfg: RateLimitConfig = {
   fiveHourTokens: 100,
   weeklyTokens: 1000,
   ownerExempt: true,
-  wiseMultiplier: 1.8,
 };
 
 const NOW = 1_700_000_000_000;
