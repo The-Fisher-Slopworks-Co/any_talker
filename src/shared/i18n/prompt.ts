@@ -13,10 +13,6 @@ export const promptMessages = {
     en: "System Prompt",
     ru: "Системный промпт",
   }),
-  ui_prompt_system_prompt_footer: m({
-    en: "Character description embedded into the system instruction.",
-    ru: "Описание персонажа, встраиваемое в системную инструкцию.",
-  }),
   ui_prompt_optimize_copy: m({
     en: "Copy for optimization",
     ru: "Скопировать для оптимизации",
@@ -26,8 +22,8 @@ export const promptMessages = {
     ru: "Скопировано",
   }),
   ui_prompt_optimize_footer: m({
-    en: "Copies a ready request with the system prompt and this character prompt. Paste it into claude.ai or any other chat, then paste the shortened prompt back here and save.",
-    ru: "Копирует готовый запрос с системным промптом и этим промптом персонажа. Вставьте его в claude.ai или другой чат, затем вставьте сокращённый промпт обратно сюда и сохраните.",
+    en: "Copies a request with both prompts. Paste it into any chat, then paste the shortened prompt back and save.",
+    ru: "Копирует запрос с обоими промптами. Вставьте в любой чат, затем верните сокращённый промпт и сохраните.",
   }),
   ui_prompt_optimize_failed: m({
     en: "Could not copy to the clipboard.",
@@ -42,37 +38,29 @@ export const promptMessages = {
     ru: "Часовой пояс",
   }),
   ui_prompt_timezone_footer: m({
-    en: "Default timezone used when the chat or user has no override.",
-    ru: "Часовой пояс по умолчанию, когда у чата или пользователя нет своего.",
+    en: "Default when a chat or user has no override.",
+    ru: "По умолчанию, если у чата или пользователя нет своего.",
   }),
   ui_prompt_expandable_threshold: m({
     en: "Collapse threshold",
     ru: "Порог сворачивания",
   }),
   ui_prompt_expandable_threshold_footer: m({
-    en: "Replies longer than this many characters are hidden under an expandable quote. Set to 0 to collapse everything.",
-    ru: "Ответы длиннее указанного числа символов прячутся под раскрывающуюся цитату. 0 — сворачивать всегда.",
+    en: "In characters. 0 collapses every reply.",
+    ru: "В символах. 0 — сворачивать всё.",
   }),
   // Footer for the fallback-chain field.
-  ui_prompt_models_fallback_footer: m({
-    en: "Primary model first; fallbacks are tried in order if it fails.",
-    ru: "Сначала основная модель; запасные пробуются по очереди при ошибке.",
-  }),
   ui_prompt_provider_routing: m({
     en: "Provider Routing",
     ru: "Маршрутизация провайдеров",
   }),
   ui_prompt_provider_routing_footer: m({
-    en: "How the gateway picks a provider for the model. Auto leaves it to the gateway; the others sort by price, throughput, or latency. Pinning a provider overrides the sort and disables fallback.",
-    ru: "Как шлюз выбирает провайдера для модели. «Авто» — выбор за шлюзом; остальные сортируют по цене, скорости или задержке. Закрепление провайдера отменяет сортировку и отключает запасные варианты.",
+    en: "Pinning a provider disables fallback.",
+    ru: "Закреплённый провайдер отключает резервные модели.",
   }),
   ui_prompt_service_tier: m({
     en: "Service Tier",
     ru: "Тариф обслуживания",
-  }),
-  ui_prompt_service_tier_footer: m({
-    en: "Processing tier for requests. Default is standard processing; Flex is cheaper but slower with lower availability; Priority is faster at a higher cost.",
-    ru: "Тариф обработки запросов. «По умолчанию» — стандартная обработка; Flex дешевле, но медленнее и менее доступен; Priority быстрее, но дороже.",
   }),
   ui_models_model_id: m({
     en: "Model ID",
@@ -127,8 +115,8 @@ export const promptMessages = {
     ru: "Уровень размышлений",
   }),
   ui_prompt_reasoning_effort_footer: m({
-    en: "How much reasoning the model spends before answering /ask. Default sends no level and leaves it to the model; None disables reasoning; higher levels think longer and cost more. Not every model supports every level — the gateway may reject an unsupported one.",
-    ru: "Сколько модель размышляет перед ответом на /ask. «По умолчанию» не задаёт уровень — выбор за моделью; «Нет» выключает размышления; чем выше уровень, тем дольше и дороже. Не каждая модель поддерживает все уровни — шлюз может отклонить неподдерживаемый.",
+    en: "Not every model supports every level.",
+    ru: "Не все модели поддерживают все уровни.",
   }),
   ui_effort_default: m({
     en: "Default",
@@ -214,7 +202,7 @@ export const promptMessages = {
     en: (sort: string) =>
       `No provider data for sort=${sort}; showing catalogue values.`,
     ru: (sort: string) =>
-      `Нет данных провайдера для сортировки sort=${sort}; показаны значения каталога.`,
+      `Нет данных провайдера для sort=${sort}; значения каталога.`,
   }),
   ui_modelinfo_provider_prefix: m({
     en: "Provider: ",

@@ -3,12 +3,7 @@
 
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../../components/layout";
+import { Card, SectionHeader, Stack } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
 import { NavRow } from "../../components/select-row";
 import { chatSubtitle, chatTitle } from "../../lib/labels";
@@ -40,7 +35,6 @@ export function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
           ))
         )}
       </Card>
-      <SectionFooter>{s.ui_chats_footer}</SectionFooter>
     </Stack>
   );
 }

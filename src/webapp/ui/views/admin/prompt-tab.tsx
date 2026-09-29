@@ -113,7 +113,6 @@ export function PromptTab({
         fallback={true}
         providerSort={providerSort}
       />
-      <SectionFooter>{s.ui_prompt_models_fallback_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
       <ProviderSortField value={providerSort} onChange={setProviderSort} />
@@ -129,7 +128,6 @@ export function PromptTab({
 
       <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>
       <ServiceTierField value={serviceTier} onChange={setServiceTier} />
-      <SectionFooter>{s.ui_prompt_service_tier_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_reasoning_effort}</SectionHeader>
       <Card>
@@ -152,7 +150,6 @@ export function PromptTab({
           placeholder={s.ui_prompt_placeholder}
         />
       </Card>
-      <SectionFooter>{s.ui_prompt_system_prompt_footer}</SectionFooter>
       <OptimizePromptButton prompt={prompt} />
 
       <SectionHeader>{s.ui_prompt_timezone}</SectionHeader>

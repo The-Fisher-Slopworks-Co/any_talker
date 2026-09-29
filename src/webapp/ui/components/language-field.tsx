@@ -3,7 +3,7 @@
 
 import { useI18n } from "../i18n-context";
 import { SUPPORTED_LANGS, type Lang } from "../../../shared/i18n";
-import { Card, SectionFooter, SectionHeader } from "./layout";
+import { Card, SectionHeader } from "./layout";
 import { SelectRow } from "./select-row";
 import { ToggleRow } from "./toggle-row";
 import { LANG_LABEL_KEY } from "../lib/labels";
@@ -48,7 +48,6 @@ export function LanguageField({
       ) : (
         options
       )}
-      <SectionFooter>{s.ui_main_language_footer}</SectionFooter>
     </>
   );
 }

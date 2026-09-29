@@ -10,12 +10,8 @@ export const chatsMessages = {
     ru: "Все чаты",
   }),
   ui_chats_empty: m({
-    en: "No chats yet — they appear after the first message.",
-    ru: "Чатов пока нет — они появятся после первого сообщения.",
-  }),
-  ui_chats_footer: m({
-    en: "Per-chat overrides apply on top of the global Prompt / Limits / Models.",
-    ru: "Переопределения чата применяются поверх глобальных Промпта / Лимитов / Моделей.",
+    en: "No chats yet.",
+    ru: "Чатов пока нет.",
   }),
   ui_chat_private: m({
     en: "Private chat",
@@ -58,8 +54,8 @@ export const chatsMessages = {
     ru: "Пусто — выключено",
   }),
   ui_chat_bot_name_footer: m({
-    en: "When set, every AI reply in this chat starts with the name in bold.",
-    ru: "Если задано, каждый ответ ИИ в этом чате начинается с имени жирным.",
+    en: "Bold prefix on every AI reply.",
+    ru: "Жирный префикс в каждом ответе ИИ.",
   }),
   ui_chat_override_global: m({
     en: "Override global",
@@ -69,79 +65,62 @@ export const chatsMessages = {
     en: "System Prompt",
     ru: "Системный промпт",
   }),
-  ui_chat_system_prompt_on_footer: m({
-    en: "Character description for this chat.",
-    ru: "Описание персонажа для этого чата.",
-  }),
   ui_chat_system_prompt_off_footer: m({
-    en: (chars: number) => `Using global character (${chars} chars).`,
-    ru: (chars: number) => `Используется глобальный персонаж (${chars} симв.).`,
+    en: (chars: number) => `Global (${chars} chars).`,
+    ru: (chars: number) => `Глобальный (${chars} симв.).`,
   }),
   ui_chat_models: m({
     en: "Models",
     ru: "Модели",
   }),
   // Footer for the per-chat fallback-chain field.
-  ui_chat_models_fallback_footer: m({
-    en: "Models used for this chat — primary first; fallbacks are tried in order if it fails.",
-    ru: "Модели для этого чата: сначала основная, запасные пробуются по очереди при ошибке.",
-  }),
   ui_chat_models_off_footer: m({
-    en: (list: string) => `Using global: ${list}`,
-    ru: (list: string) => `Используется глобально: ${list}`,
+    en: (list: string) => `Global: ${list}`,
+    ru: (list: string) => `Глобально: ${list}`,
   }),
   ui_chat_provider_routing: m({
     en: "Provider Routing",
     ru: "Маршрутизация провайдеров",
   }),
-  ui_chat_provider_routing_on_footer: m({
-    en: "How the gateway picks a provider for the model in this chat.",
-    ru: "Как шлюз выбирает провайдера для модели в этом чате.",
-  }),
   ui_chat_provider_routing_off_footer: m({
-    en: (sort: string) => `Using global routing (${sort}).`,
-    ru: (sort: string) => `Используется глобальная маршрутизация (${sort}).`,
+    en: (sort: string) => `Global (${sort}).`,
+    ru: (sort: string) => `Глобально (${sort}).`,
   }),
   ui_chat_provider: m({
     en: "Specific Provider",
     ru: "Конкретный провайдер",
   }),
   ui_chat_provider_on_footer: m({
-    en: "Pin requests in this chat to one provider (no fallback), overriding the sort.",
-    ru: "Закрепить запросы этого чата за одним провайдером (без запасных), игнорируя сортировку.",
+    en: "Pinning a provider disables fallback.",
+    ru: "Закреплённый провайдер отключает резервные модели.",
   }),
   ui_chat_provider_off_footer: m({
-    en: (provider: string) => `Using global provider (${provider}).`,
-    ru: (provider: string) =>
-      `Используется глобальный провайдер (${provider}).`,
+    en: (provider: string) => `Global (${provider}).`,
+    ru: (provider: string) => `Глобально (${provider}).`,
   }),
   ui_chat_service_tier: m({
     en: "Service Tier",
     ru: "Тариф обслуживания",
   }),
-  ui_chat_service_tier_on_footer: m({
-    en: "Processing tier for requests in this chat.",
-    ru: "Тариф обработки запросов в этом чате.",
-  }),
   ui_chat_service_tier_off_footer: m({
-    en: (tier: string) => `Using global tier (${tier}).`,
-    ru: (tier: string) => `Используется глобальный тариф (${tier}).`,
+    en: (tier: string) => `Global (${tier}).`,
+    ru: (tier: string) => `Глобально (${tier}).`,
   }),
   ui_chat_tz: m({
     en: "Timezone",
     ru: "Часовой пояс",
   }),
   ui_chat_tz_on_footer: m({
-    en: "Used unless a user has set their own timezone.",
-    ru: "Используется, если у пользователя нет своего пояса.",
+    en: "Unless the user sets their own.",
+    ru: "Если у пользователя нет своего.",
   }),
   ui_chat_tz_off_footer: m({
-    en: (tz: string) => `Using global timezone (${tz}).`,
-    ru: (tz: string) => `Используется глобальный пояс (${tz}).`,
+    en: (tz: string) => `Global (${tz}).`,
+    ru: (tz: string) => `Глобально (${tz}).`,
   }),
   ui_chat_prompt_placeholder: m({
-    en: "Describe how the bot should behave in this chat",
-    ru: "Опиши, как должен вести себя бот в этом чате",
+    en: "How the bot should behave here",
+    ru: "Как боту вести себя в этом чате",
   }),
   ui_chat_keyword_filter: m({
     en: "Keyword Filter",
@@ -156,7 +135,7 @@ export const chatsMessages = {
     ru: "слово1, слово2, слово3",
   }),
   ui_chat_keyword_filter_footer: m({
-    en: "Comma-separated keywords. When enabled, any new message whose text or caption contains one of these substrings (case-insensitive) is deleted by the bot.",
-    ru: "Ключевые слова через запятую. Когда включено, новые сообщения, в тексте или подписи которых встречается одна из этих подстрок (без учёта регистра), удаляются ботом.",
+    en: "Comma-separated. Messages containing any (case-insensitive) are deleted.",
+    ru: "Через запятую. Сообщения с любым из слов (без учёта регистра) удаляются.",
   }),
 };

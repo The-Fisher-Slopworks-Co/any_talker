@@ -64,12 +64,12 @@ export const commonMessages = {
   // Note shown wherever the Web App renders timestamps: which timezone they
   // are displayed in (the viewer's device, or the profile override).
   ui_time_note_local: m({
-    en: "Times are shown in your device's local timezone.",
-    ru: "Время указано в локальном часовом поясе вашего устройства.",
+    en: "Times use your device timezone.",
+    ru: "Время — по часовому поясу устройства.",
   }),
   ui_time_note_tz: m({
-    en: (tz: string) => `Times are shown in the ${tz} timezone.`,
-    ru: (tz: string) => `Время указано в часовом поясе ${tz}.`,
+    en: (tz: string) => `Times use ${tz}.`,
+    ru: (tz: string) => `Время — по поясу ${tz}.`,
   }),
   ui_tz_area: m({
     en: "Area",

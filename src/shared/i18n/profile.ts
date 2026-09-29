@@ -58,8 +58,8 @@ export const profileMessages = {
     ru: "Женский",
   }),
   ui_main_gender_footer: m({
-    en: "Sent to the AI so it uses correct grammatical gender. Off omits the field.",
-    ru: "Передаётся ИИ для правильного согласования рода. Выкл — поле опускается.",
+    en: "Lets the AI use correct grammatical gender.",
+    ru: "Чтобы ИИ правильно согласовывал род.",
   }),
   ui_main_timezone: m({
     en: "Timezone",
@@ -70,8 +70,8 @@ export const profileMessages = {
     ru: "Использовать мой пояс",
   }),
   ui_main_tz_footer: m({
-    en: "Sent to the AI as the current date/time; also used for times shown in this app. Off uses the chat or global timezone for the AI and your device's timezone here.",
-    ru: "Передаётся ИИ как текущие дата и время; также используется для времени в этом приложении. Выкл — для ИИ берётся пояс чата или глобальный, здесь — пояс устройства.",
+    en: "Off: chat or global timezone for the AI, device timezone here.",
+    ru: "Выкл: для ИИ пояс чата или глобальный, здесь — пояс устройства.",
   }),
   ui_main_time_format: m({
     en: "Time Format",
@@ -85,10 +85,6 @@ export const profileMessages = {
     en: "Language",
     ru: "Язык",
   }),
-  ui_main_language_footer: m({
-    en: "Language for the bot UI and AI replies.",
-    ru: "Язык интерфейса бота и ответов ИИ.",
-  }),
   ui_main_lang_english: m({
     en: "English",
     ru: "Английский",
@@ -98,8 +94,8 @@ export const profileMessages = {
     ru: "Русский",
   }),
   ui_main_settings_footer: m({
-    en: "The AI sees your name, gender and timezone. Changes are saved automatically.",
-    ru: "Имя, пол и часовой пояс видит ИИ. Изменения сохраняются сразу.",
+    en: "The AI sees your name, gender and timezone. Saved automatically.",
+    ru: "Имя, пол и часовой пояс видит ИИ. Сохраняется автоматически.",
   }),
   ui_main_save_failed: m({
     en: "Couldn't save. Try again.",

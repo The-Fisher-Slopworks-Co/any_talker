@@ -10,12 +10,8 @@ export const usersMessages = {
     ru: "Все пользователи",
   }),
   ui_users_empty: m({
-    en: "No users yet — they appear after their first message.",
-    ru: "Пользователей пока нет — они появятся после первого сообщения.",
-  }),
-  ui_users_footer: m({
-    en: "Users are recorded automatically the first time they message the bot.",
-    ru: "Пользователи записываются автоматически при первом сообщении боту.",
+    en: "No users yet.",
+    ru: "Пользователей пока нет.",
   }),
   ui_user_not_found: m({
     en: "User not found.",
@@ -46,8 +42,8 @@ export const usersMessages = {
     ru: "Открыть в Telegram",
   }),
   ui_user_display_name_footer: m({
-    en: "Override the name shown to the AI for this user.",
-    ru: "Переопределить имя, которое видит ИИ для этого пользователя.",
+    en: "Name shown to the AI.",
+    ru: "Имя, которое видит ИИ.",
   }),
   ui_user_set_language: m({
     en: "Set language",

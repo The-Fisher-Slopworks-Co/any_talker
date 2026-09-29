@@ -74,16 +74,16 @@ export const adminMessages = {
     ru: "Карантин",
   }),
   ui_admin_quarantine_desc: m({
-    en: "Reminders the parser rejected, kept for 30 days",
-    ru: "Напоминания, отбракованные парсером, хранятся 30 дней",
+    en: "Rejected reminders, kept 30 days",
+    ru: "Отклонённые напоминания, хранятся 30 дней",
   }),
   ui_admin_checks: m({
     en: "Checks",
     ru: "Чеки",
   }),
   ui_admin_checks_desc: m({
-    en: "Recurring daily questions with Yes/No buttons",
-    ru: "Циклические вопросы с кнопками Да/Нет",
+    en: "Daily Yes/No questions",
+    ru: "Ежедневные вопросы Да/Нет",
   }),
 
   // The admin API token: a bearer that opens the admin API without Telegram.
@@ -92,8 +92,8 @@ export const adminMessages = {
     ru: "API-токен",
   }),
   ui_admin_api_token_desc: m({
-    en: "Admin API access for scripts and agents",
-    ru: "Доступ к админскому API для скриптов и агентов",
+    en: "Admin API access for scripts",
+    ru: "Доступ к админскому API для скриптов",
   }),
   ui_api_token_status: m({
     en: "Token",
@@ -124,20 +124,20 @@ export const adminMessages = {
     ru: "Удалить токен",
   }),
   ui_api_token_delete_confirm: m({
-    en: "Delete the token? Everything that uses it loses access.",
-    ru: "Удалить токен? Всё, что им пользуется, потеряет доступ.",
+    en: "Delete the token? Its users lose access.",
+    ru: "Удалить токен? Доступ пропадёт.",
   }),
   ui_api_token_footer: m({
-    en: "Send it as the Authorization: Bearer <token> header. It has the same access to the admin API as you.",
-    ru: "Передавай его в заголовке Authorization: Bearer <токен>. У него тот же доступ к админскому API, что и у тебя.",
+    en: "Send as Authorization: Bearer <token>. Full admin API access.",
+    ru: "Передавай в Authorization: Bearer <токен>. Полный доступ к админскому API.",
   }),
   ui_api_token_new_header: m({
     en: "New token",
     ru: "Новый токен",
   }),
   ui_api_token_new_footer: m({
-    en: "Shown only once. Copy it now.",
-    ru: "Показывается только один раз. Скопируй его сейчас.",
+    en: "Shown once. Copy it now.",
+    ru: "Показывается один раз. Скопируй сейчас.",
   }),
   ui_api_token_copy: m({
     en: "Copy",
