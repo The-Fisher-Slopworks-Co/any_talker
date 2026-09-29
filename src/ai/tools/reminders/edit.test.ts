@@ -4,6 +4,7 @@
 import { test, expect, describe } from "bun:test";
 import { MemoryStorage } from "../../../storage/memory";
 import { createEditReminderTool } from "./edit";
+import { createListRemindersTool } from "./list";
 import type { ToolEffect } from "../registry";
 import {
   baseAskCtx as ctx,
@@ -11,13 +12,34 @@ import {
 } from "./tool-test-fixtures";
 
 describe("edit_reminder", () => {
-  test("schema requires at least one of text/newTime", () => {
+  test("schema requires at least one of text/new time", () => {
     const storage = new MemoryStorage();
     const tool = createEditReminderTool({ storage });
     expect(tool.parameters.safeParse({ reminderId: "r1" }).success).toBe(false);
     expect(
       tool.parameters.safeParse({ reminderId: "r1", text: "new" }).success,
     ).toBe(true);
+  });
+
+  // #204: the old nested `newTime` object kept arriving as a JSON string and
+  // failed validation; the new time is now flat top-level fields.
+  test("schema takes the new time as flat top-level fields", () => {
+    const tool = createEditReminderTool({ storage: new MemoryStorage() });
+    const ok = (v: object) =>
+      tool.parameters.safeParse({ reminderId: "r1", ...v }).success;
+    expect(ok({ inAmount: 2, inUnit: "hours" })).toBe(true);
+    expect(ok({ atDatetime: "2030-01-01T09:00" })).toBe(true);
+    // Half a relative time, or both ways at once, is ambiguous.
+    expect(ok({ inAmount: 2 })).toBe(false);
+    expect(ok({ inUnit: "hours" })).toBe(false);
+    expect(
+      ok({ inAmount: 2, inUnit: "hours", atDatetime: "2030-01-01T09:00" }),
+    ).toBe(false);
+  });
+
+  test("description tells the model a refusal changed nothing", () => {
+    const tool = createEditReminderTool({ storage: new MemoryStorage() });
+    expect(tool.description).toContain("ok: false, NOTHING was changed");
   });
 
   test("schema rejects an empty id", () => {
@@ -43,7 +65,7 @@ describe("edit_reminder", () => {
     const out = await tool.execute({ reminderId: "r1", text: "new note" }, ctx);
     expect(out).toEqual({
       ok: true,
-      fireAt: new Date(2_000_000).toISOString(),
+      fireAt: "1970-01-01T00:33",
     });
 
     const saved = await storage.reminders.get("r1");
@@ -59,12 +81,12 @@ describe("edit_reminder", () => {
     const tool = createEditReminderTool({ storage });
     // ctx.now is 1_000_000; +2 minutes = 1_120_000.
     const out = await tool.execute(
-      { reminderId: "r1", newTime: { mode: "in", amount: 2, unit: "minutes" } },
+      { reminderId: "r1", inAmount: 2, inUnit: "minutes" },
       ctx,
     );
     expect(out).toEqual({
       ok: true,
-      fireAt: new Date(1_120_000).toISOString(),
+      fireAt: "1970-01-01T00:18",
     });
     expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(1_120_000);
   });
@@ -76,15 +98,12 @@ describe("edit_reminder", () => {
     const out = await tool.execute(
       {
         reminderId: "r1",
-        newTime: { mode: "at", datetime: "2030-01-01T09:00" },
+        atDatetime: "2030-01-01T09:00",
       },
       { ...ctx, timezone: "UTC" },
     );
     const expectedMs = Date.UTC(2030, 0, 1, 9, 0);
-    expect(out).toEqual({
-      ok: true,
-      fireAt: new Date(expectedMs).toISOString(),
-    });
+    expect(out).toEqual({ ok: true, fireAt: "2030-01-01T09:00" });
     expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(expectedMs);
   });
 
@@ -98,15 +117,13 @@ describe("edit_reminder", () => {
       {
         reminderId: "r1",
         text: "new",
-        newTime: { mode: "in", amount: 1, unit: "hours" },
+        inAmount: 1,
+        inUnit: "hours",
       },
       ctx,
     );
     const expectedMs = 1_000_000 + 60 * 60_000;
-    expect(out).toEqual({
-      ok: true,
-      fireAt: new Date(expectedMs).toISOString(),
-    });
+    expect(out).toEqual({ ok: true, fireAt: "1970-01-01T01:16" });
     const saved = await storage.reminders.get("r1");
     expect(saved?.text).toBe("new");
     expect(saved?.fireAtMs).toBe(expectedMs);
@@ -118,7 +135,7 @@ describe("edit_reminder", () => {
     const effects: ToolEffect[] = [];
     const tool = createEditReminderTool({ storage });
     await tool.execute(
-      { reminderId: "r1", newTime: { mode: "in", amount: 2, unit: "minutes" } },
+      { reminderId: "r1", inAmount: 2, inUnit: "minutes" },
       { ...ctx, timezone: "Europe/Moscow", effects },
     );
     expect(effects).toEqual([
@@ -140,13 +157,56 @@ describe("edit_reminder", () => {
     const out = await tool.execute(
       {
         reminderId: "r1",
-        newTime: { mode: "at", datetime: "1970-01-01T00:00" },
+        atDatetime: "1970-01-01T00:00",
       },
       { ...ctx, timezone: "UTC", effects },
     );
     expect(out.ok).toBe(false);
     expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(2_000_000);
     expect(effects).toEqual([]);
+  });
+
+  // #204: a bare "at least 1 minute from now" left the model unable to see
+  // (or tell the user) what went wrong.
+  test("a too-soon refusal names the resolved and current local times", async () => {
+    const storage = new MemoryStorage();
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs: 2_000_000 }));
+    const tool = createEditReminderTool({ storage });
+    const now = Date.UTC(2026, 8, 29, 15, 30);
+    // 18:00 in Moscow is 15:00 UTC — half an hour ago.
+    const out = await tool.execute(
+      { reminderId: "r1", atDatetime: "2026-09-29T18:00" },
+      { ...ctx, now, timezone: "Europe/Moscow" },
+    );
+    expect(out).toEqual({
+      ok: false,
+      reason:
+        "reminder must fire at least 1 minute from now: the requested time resolves to " +
+        "2026-09-29T18:00, and it is already 2026-09-29T18:30 in the user's timezone",
+    });
+  });
+
+  // #204: list_reminders' fireAt feeds straight back into atDatetime with no
+  // timezone arithmetic by the model.
+  test("a fireAt from list_reminders round-trips as atDatetime", async () => {
+    const storage = new MemoryStorage();
+    const fireAtMs = Date.UTC(2026, 8, 29, 17, 0);
+    await storage.reminders.save(reminder({ id: "r1", fireAtMs }));
+    const moscow = {
+      ...ctx,
+      now: Date.UTC(2026, 8, 29, 15, 30),
+      timezone: "Europe/Moscow",
+    };
+    const listed = await createListRemindersTool({ storage }).execute(
+      {},
+      moscow,
+    );
+    const out = await createEditReminderTool({ storage }).execute(
+      { reminderId: "r1", atDatetime: listed.reminders[0]!.fireAt },
+      moscow,
+    );
+    expect(out).toEqual({ ok: true, fireAt: "2026-09-29T20:00" });
+    expect((await storage.reminders.get("r1"))?.fireAtMs).toBe(fireAtMs);
   });
 
   test("a note-only edit is allowed even when the reminder is about to fire", async () => {
@@ -157,7 +217,7 @@ describe("edit_reminder", () => {
     const out = await tool.execute({ reminderId: "r1", text: "tweak" }, ctx);
     expect(out).toEqual({
       ok: true,
-      fireAt: new Date(1_010_000).toISOString(),
+      fireAt: "1970-01-01T00:16",
     });
     expect((await storage.reminders.get("r1"))?.text).toBe("tweak");
   });

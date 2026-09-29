@@ -7,6 +7,7 @@ import type { Storage } from "../../../storage/types";
 import { REMINDER_TEXT_MAX_LEN } from "../../../reminders/types";
 import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import {
+  PERSIST_RESULT_DOC,
   persistReminder,
   REMINDER_WRITE_SOURCES,
   type PersistResult,
@@ -32,7 +33,8 @@ export function createScheduleReminderAtTool(deps: {
       "Schedule a reminder at a specific wall-clock datetime in the user's timezone. " +
       "Use when the user names a date/time (e.g. 'May 20 at 6pm', '2026-08-01 09:00'). " +
       "Format the datetime as YYYY-MM-DDTHH:MM in the user's local timezone. " +
-      "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then.",
+      "Minimum lead time is 1 minute. The 'text' field is a private note to yourself describing what to remind about — when the reminder fires, you'll receive it as a system event and compose the actual user-facing message then. " +
+      PERSIST_RESULT_DOC,
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
     execute: async ({ datetime, text }, ctx) => {
