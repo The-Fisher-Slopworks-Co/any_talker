@@ -118,7 +118,9 @@ export async function dispatchUsageCommand(
 }
 
 // The animation answering `/resetusage`: full bars shatter, empty ones slide
-// in. Its last frame holds for a minute, since Telegram loops every GIF.
+// in. Telegram loops every GIF and re-times its frames to a constant rate
+// (a long last-frame delay is dropped), so the settled last frame is repeated
+// as real frames for a minute before the loop starts over.
 const RESET_USAGE_ANIMATION = new URL(
   "../assets/reset-usage.gif",
   import.meta.url,
