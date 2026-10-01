@@ -3,6 +3,7 @@
 
 import { test, expect, describe } from "bun:test";
 import {
+  refuseEphemeralAsk,
   replyEphemeral,
   type EphemeralReplyCtx,
   type EphemeralReplyExtras,
@@ -107,5 +108,38 @@ describe("replyEphemeral", () => {
     await expect(
       replyEphemeral(ctx, "Your report is saved.", 777),
     ).rejects.toThrow("chat not found");
+  });
+});
+
+describe("refuseEphemeralAsk", () => {
+  const t = { bot_ask_ephemeral: "Send /ask as a regular message." };
+
+  test("refuses an ask sent as an ephemeral message, ephemerally", async () => {
+    const ctx = {
+      ...makeCtx({ chatType: "supergroup" }),
+      message: { ephemeral_message_id: 5 },
+      from: { id: 777 },
+      t,
+    };
+
+    expect(await refuseEphemeralAsk(ctx)).toBe(true);
+    expect(ctx.calls).toEqual([
+      {
+        text: "Send /ask as a regular message.",
+        other: { ephemeral_message_parameters: { receiver_user_id: 777 } },
+      },
+    ]);
+  });
+
+  test("lets a regular ask through without replying", async () => {
+    const ctx = {
+      ...makeCtx({ chatType: "supergroup" }),
+      message: {},
+      from: { id: 777 },
+      t,
+    };
+
+    expect(await refuseEphemeralAsk(ctx)).toBe(false);
+    expect(ctx.calls).toEqual([]);
   });
 });

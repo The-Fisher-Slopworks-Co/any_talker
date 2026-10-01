@@ -12,6 +12,7 @@ import { resolveReplyImages } from "../reply-images";
 import { extractReplyTarget } from "../reply";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
 import { askOutcomeLabel } from "../ask-outcome";
+import { refuseEphemeralAsk } from "../ephemeral";
 import { readValidDisplayName } from "../../shared/display-name";
 import {
   askDurationSeconds,
@@ -57,6 +58,7 @@ export async function dispatchAsk(
   });
 
   if (args.forwardOrigin) return;
+  if (await refuseEphemeralAsk(ctx)) return;
 
   // Never `ctx.from.id` directly: a message sent as a chat carries a
   // Telegram-wide pseudo-account there, and keying the rate limit, budget or
