@@ -58,7 +58,7 @@ describe("limit class assignment", () => {
     // The admin's view of the user's usage reflects the class (×5 default).
     const usage = await get(d, "/api/ratelimit/user/42");
     expect((usage.body as { usage: UsageStatus }).usage.fiveHour.limit).toBe(
-      DEFAULT_SETTINGS.rateLimit.fiveHourTokens * 5,
+      DEFAULT_SETTINGS.rateLimit.fiveHourUsd * 5,
     );
 
     expect(await putClass(d, "42", { limitClass: null })).toEqual({
@@ -108,7 +108,7 @@ describe("limit class config", () => {
     const d = await deps();
     for (const bad of [
       { 3: { maxReminders: 10 } },
-      { 1: { tokenMultiplier: 0.5 } },
+      { 1: { limitMultiplier: 0.5 } },
       { 1: { maxReminders: 2.5 } },
       { 1: null },
       [],

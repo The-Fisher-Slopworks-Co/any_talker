@@ -25,13 +25,13 @@ export const MAX_VIDEO_BYTES = 20 * 1024 * 1024;
 // Longest clip accepted at all, in either mode. This is a cost ceiling, not a
 // technical one: a model that takes video natively bills by clip length (Gemini
 // ~260 tokens per second), so a few minutes of footage would swallow a user's
-// entire token window in a single ask. A clip Telegram reports as 0 seconds —
+// entire 5-hour window in a single ask. A clip Telegram reports as 0 seconds —
 // duration unknown — is not refused; only a stated duration over the cap is.
 export const MAX_VIDEO_SECONDS = 60;
 
 // Frames sampled from a clip the ask is *about*. Each frame costs roughly one
 // image's worth of tokens, so this is deliberately modest: a user's whole
-// 5-hour token window is 30k by default.
+// 5-hour window is a few cents.
 export const MAX_VIDEO_FRAMES = 6;
 
 // Frames sampled from a clip that is only supplementary context — the message a

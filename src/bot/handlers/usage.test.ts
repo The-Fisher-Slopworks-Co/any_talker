@@ -35,8 +35,8 @@ async function withLimits(five: number, weekly: number) {
     ...DEFAULT_SETTINGS,
     rateLimit: {
       ...DEFAULT_SETTINGS.rateLimit,
-      fiveHourTokens: five,
-      weeklyTokens: weekly,
+      fiveHourUsd: five,
+      weeklyUsd: weekly,
     },
   });
   return storage;
@@ -172,8 +172,8 @@ describe("usageCommandHandler", () => {
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
-        fiveHourTokens: 1000,
-        weeklyTokens: 10_000,
+        fiveHourUsd: 1000,
+        weeklyUsd: 10_000,
         ownerExempt: false,
       },
     });

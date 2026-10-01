@@ -52,11 +52,11 @@ export function LimitClassesCard({
                 className={INPUT_CLS}
                 step="0.1"
                 min={1}
-                value={config[c].tokenMultiplier}
+                value={config[c].limitMultiplier}
                 onChange={(n) =>
                   setConfig({
                     ...config,
-                    [c]: { ...config[c], tokenMultiplier: n },
+                    [c]: { ...config[c], limitMultiplier: n },
                   })
                 }
               />

@@ -20,7 +20,7 @@ async function exhaustUsage(
   const starts = currentWindowStarts(userId, now);
   await storage.usage.add(
     userId,
-    DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
+    DEFAULT_SETTINGS.rateLimit.fiveHourUsd,
     starts.fiveHour,
     starts.weekly,
   );
@@ -810,17 +810,17 @@ describe("guestAskHandler", () => {
     );
   });
 
-  test("answered: deducts tokens from bucket", async () => {
+  test("answered: deducts the reply cost from the usage windows", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     const rlStorage = new MemoryStorage();
     const rl = new DualWindowLimiter(rlStorage);
-    const ai = new FakeAI({ text: "ok", totalTokens: 777 });
+    const ai = new FakeAI({ text: "ok", totalTokens: 777, costUsd: 0.0031 });
     const out = await guestAskHandler(
       baseInput({ storage, rateLimiter: rl, ai }),
     );
     expect(out.kind).toBe("answered");
-    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(777);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(0.0031);
   });
 
   test("answered: returns botName from chat settings", async () => {

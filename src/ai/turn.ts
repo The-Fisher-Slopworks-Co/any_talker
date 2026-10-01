@@ -159,19 +159,23 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
     },
   });
 
-  // Token deduction (after the response, so it can overshoot — see the limiter's
-  // at-least-one-more-request semantics). Owner-exempt users skip it.
+  const costUsd = result.costUsd ?? 0;
+
+  // Charge what the reply cost to the user's windows (after the response, so it
+  // can overshoot — see the limiter's at-least-one-more-request semantics). The
+  // cost already prices cached input, reasoning and fallbacks the way the
+  // provider bills them, which a token count can't. Owner-exempt users skip it.
   const isOwner = input.userId === input.ownerId;
   const skipDeduction = isOwner && input.rateLimit.ownerExempt;
   if (!skipDeduction) {
     const deducting = input.rateLimiter.deduct(
       input.userId,
-      result.totalTokens,
+      costUsd,
       input.now,
     );
     if (input.bestEffortDeduct) {
       await deducting.catch((err) =>
-        console.error("token deduction failed:", err),
+        console.error("usage deduction failed:", err),
       );
     } else {
       await deducting;
@@ -184,7 +188,6 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
   // Best-effort by contract: a storage hiccup on this accounting must not fail
   // an answer already produced.
   const modelId = result.modelId ?? null;
-  const costUsd = result.costUsd ?? 0;
   const priced = result.priced ?? true;
   await recordSpend(
     input.storage,

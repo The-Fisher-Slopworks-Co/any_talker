@@ -37,7 +37,7 @@ export type SchedulerDeps = {
   // loop and deleted ones drop out without restarting the scheduler.
   runtimes: () => ReminderRuntime[];
   ai: AIClient;
-  // The per-user token limiter and owner id — reminder delivery re-runs the LLM,
+  // The per-user rate limiter and owner id — reminder delivery re-runs the LLM,
   // so it charges tokens/records spend the same as an /ask (family-global, like
   // `ai`, so they live here rather than per-runtime).
   rateLimiter: RateLimiter;

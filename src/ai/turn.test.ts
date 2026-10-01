@@ -229,16 +229,16 @@ describe("runAiTurn — request assembly", () => {
   });
 });
 
-describe("runAiTurn — token deduction", () => {
-  test("deducts the raw token total for a normal user (multiplier 1)", async () => {
+describe("runAiTurn — usage deduction", () => {
+  test("deducts the reply's cost, not its tokens, for a normal user", async () => {
     const rlStorage = new MemoryStorage();
     await runAiTurn(
       baseInput({
         rateLimiter: new DualWindowLimiter(rlStorage),
-        ai: new FakeAI({ text: "ok", totalTokens: 500 }),
+        ai: new FakeAI({ text: "ok", totalTokens: 500, costUsd: 0.002 }),
       }),
     );
-    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(500);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(0.002);
   });
 
   test("owner with ownerExempt skips the deduction", async () => {
@@ -263,22 +263,22 @@ describe("runAiTurn — token deduction", () => {
         userId: "1",
         ownerId: "1",
         rateLimit: { ...DEFAULT_SETTINGS.rateLimit, ownerExempt: false },
-        ai: new FakeAI({ text: "ok", totalTokens: 300 }),
+        ai: new FakeAI({ text: "ok", totalTokens: 300, costUsd: 0.001 }),
       }),
     );
-    expect((await rlStorage.usage.get("1"))?.fiveHour.used).toBe(300);
+    expect((await rlStorage.usage.get("1"))?.fiveHour.used).toBe(0.001);
   });
 
-  test("a detail level deducts the raw token total", async () => {
+  test("a detail level deducts the reply's cost", async () => {
     const rlStorage = new MemoryStorage();
     await runAiTurn(
       baseInput({
         rateLimiter: new DualWindowLimiter(rlStorage),
         detailLevel: "short",
-        ai: new FakeAI({ text: "ok", totalTokens: 1000 }),
+        ai: new FakeAI({ text: "ok", totalTokens: 1000, costUsd: 0.004 }),
       }),
     );
-    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(1000);
+    expect((await rlStorage.usage.get("42"))?.fiveHour.used).toBe(0.004);
   });
 
   test("a deduction failure propagates by default", async () => {

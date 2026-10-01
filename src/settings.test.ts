@@ -118,7 +118,7 @@ describe("applyChatOverrides", () => {
   test("chat settings never override the global rate limit", () => {
     const global = {
       ...DEFAULT_SETTINGS,
-      rateLimit: { ...DEFAULT_SETTINGS.rateLimit, fiveHourTokens: 12345 },
+      rateLimit: { ...DEFAULT_SETTINGS.rateLimit, fiveHourUsd: 12345 },
     };
     const r = applyChatOverrides(global, { systemPrompt: "x" });
     expect(r.rateLimit).toBe(global.rateLimit);
@@ -195,14 +195,14 @@ describe("applyChatOverrides", () => {
     await storage.settings.save({
       ...DEFAULT_SETTINGS,
       limitClasses: {
-        1: { tokenMultiplier: 1.5, maxReminders: 8.7, monthlyAllowanceUsd: 3 },
+        1: { limitMultiplier: 1.5, maxReminders: 8.7, monthlyAllowanceUsd: 3 },
         // A multiplier below 1 would lower the limits; a zero cap would block.
-        2: { tokenMultiplier: 0.5, maxReminders: 0, monthlyAllowanceUsd: -1 },
+        2: { limitMultiplier: 0.5, maxReminders: 0, monthlyAllowanceUsd: -1 },
       },
     });
     const s = await getOrInitSettings(storage);
     expect(s.limitClasses).toEqual({
-      1: { tokenMultiplier: 1.5, maxReminders: 8, monthlyAllowanceUsd: 3 },
+      1: { limitMultiplier: 1.5, maxReminders: 8, monthlyAllowanceUsd: 3 },
       2: DEFAULT_SETTINGS.limitClasses[2],
     });
   });
@@ -309,28 +309,37 @@ describe("applyChatOverrides", () => {
     });
   });
 
-  test("normalize backfills the dual-window config from a legacy token-bucket shape", async () => {
+  test("normalize drops legacy token budgets for the USD defaults", async () => {
     const storage = new MemoryStorage();
     const legacy = {
       ...DEFAULT_SETTINGS,
       rateLimit: {
-        capacity: 12345,
-        refillAmount: 1,
-        refillIntervalMs: 1000,
+        fiveHourTokens: 100000,
+        weeklyTokens: 700000,
         ownerExempt: false,
-        wiseMultiplier: 1.8,
       } as never,
     };
     await storage.settings.save(legacy);
     const s = await getOrInitSettings(storage);
-    // Legacy burst capacity maps to the 5-hour budget; the rest defaults in.
-    expect(s.rateLimit.fiveHourTokens).toBe(12345);
-    expect(s.rateLimit.weeklyTokens).toBe(
-      DEFAULT_SETTINGS.rateLimit.weeklyTokens,
-    );
-    expect(s.rateLimit.ownerExempt).toBe(false);
-    // The multiplier of the removed /askwise is not carried over.
-    expect("wiseMultiplier" in s.rateLimit).toBe(false);
+    // A token count is not a dollar amount, so neither is carried over.
+    expect(s.rateLimit).toEqual({
+      fiveHourUsd: DEFAULT_SETTINGS.rateLimit.fiveHourUsd,
+      weeklyUsd: DEFAULT_SETTINGS.rateLimit.weeklyUsd,
+      ownerExempt: false,
+    });
+  });
+
+  test("normalize reads a limit class's legacy tokenMultiplier", async () => {
+    const storage = new MemoryStorage();
+    await storage.settings.save({
+      ...DEFAULT_SETTINGS,
+      limitClasses: {
+        ...DEFAULT_SETTINGS.limitClasses,
+        1: { tokenMultiplier: 3, maxReminders: 15, monthlyAllowanceUsd: 2 },
+      } as never,
+    });
+    const s = await getOrInitSettings(storage);
+    expect(s.limitClasses[1].limitMultiplier).toBe(3);
   });
 
   test("chat timezone null overrides the global value", () => {

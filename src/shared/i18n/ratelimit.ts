@@ -10,21 +10,21 @@ export const rateLimitMessages = {
     en: "Limits",
     ru: "Лимиты",
   }),
-  ui_ratelimit_5h_tokens: m({
-    en: "5-hour limit",
-    ru: "Лимит за 5 часов",
+  ui_ratelimit_5h_usd: m({
+    en: "5-hour limit ($)",
+    ru: "Лимит за 5 часов ($)",
   }),
-  ui_ratelimit_weekly_tokens: m({
-    en: "Weekly limit",
-    ru: "Недельный лимит",
+  ui_ratelimit_weekly_usd: m({
+    en: "Weekly limit ($)",
+    ru: "Недельный лимит ($)",
   }),
   ui_ratelimit_owner_exempt: m({
     en: "Owner exempt",
     ru: "Владелец без лимита",
   }),
   ui_ratelimit_footer: m({
-    en: "Per-user token budgets; a request needs both to have budget left.",
-    ru: "Токеновые бюджеты пользователя; запросу нужен остаток в обоих.",
+    en: "Per-user spend budgets; a request needs both to have budget left.",
+    ru: "Бюджеты трат пользователя; запросу нужен остаток в обоих.",
   }),
   ui_ratelimit_my_usage: m({
     en: "My Usage",
@@ -126,8 +126,8 @@ export const rateLimitMessages = {
     ru: "Нет",
   }),
   ui_limit_class_multiplier: m({
-    en: "Token multiplier",
-    ru: "Множитель токенов",
+    en: "Limit multiplier",
+    ru: "Множитель лимитов",
   }),
   ui_limit_class_reminders: m({
     en: "Reminder cap",

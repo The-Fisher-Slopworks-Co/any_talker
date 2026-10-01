@@ -112,12 +112,12 @@ export const botMessages = {
   bot_rate_limited: m({
     en: (limitedBy: WindowKind, ms: number) =>
       limitedBy === "weekly"
-        ? `Weekly token limit reached. Resets in ~${etaEn(ms)}.`
-        : `5-hour token limit reached. Resets in ~${etaEn(ms)}.`,
+        ? `Weekly limit reached. Resets in ~${etaEn(ms)}.`
+        : `5-hour limit reached. Resets in ~${etaEn(ms)}.`,
     ru: (limitedBy: WindowKind, ms: number) =>
       limitedBy === "weekly"
-        ? `Недельный лимит токенов исчерпан. Восстановится примерно через ${etaRu(ms)}.`
-        : `Лимит токенов за 5 часов исчерпан. Восстановится примерно через ${etaRu(ms)}.`,
+        ? `Недельный лимит исчерпан. Восстановится примерно через ${etaRu(ms)}.`
+        : `Лимит за 5 часов исчерпан. Восстановится примерно через ${etaRu(ms)}.`,
   }),
   // Shown to a user denied by a hard USD budget cap. Deliberately generic — it
   // never leaks the financial/operational detail (which cap, how much) to a

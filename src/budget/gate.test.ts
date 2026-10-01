@@ -19,8 +19,8 @@ const SETTINGS: Settings = {
   ...DEFAULT_SETTINGS,
   rateLimit: {
     ...DEFAULT_SETTINGS.rateLimit,
-    fiveHourTokens: 1000,
-    weeklyTokens: 10_000,
+    fiveHourUsd: 1000,
+    weeklyUsd: 10_000,
   },
   budget: {
     ...DEFAULT_SETTINGS.budget,
@@ -31,7 +31,7 @@ const SETTINGS: Settings = {
   },
   limitClasses: {
     ...DEFAULT_SETTINGS.limitClasses,
-    1: { tokenMultiplier: 2, maxReminders: 5, monthlyAllowanceUsd: 1 },
+    1: { limitMultiplier: 2, maxReminders: 5, monthlyAllowanceUsd: 1 },
   },
 };
 
@@ -75,20 +75,20 @@ describe("checkTurnGates", () => {
     expect(await gate()).toEqual({ kind: "allowed", fromAllowance: false });
   });
 
-  test("a user without a class is held to the base token limit", async () => {
+  test("a user without a class is held to the base limit", async () => {
     const { gate, useTokens } = setup();
     await useTokens(1000);
     expect((await gate()).kind).toBe("rateLimited");
   });
 
-  test("past the base token limit, a class user is drawn from the allowance", async () => {
+  test("past the base limit, a class user is drawn from the allowance", async () => {
     const { storage, gate, useTokens } = setup();
     await storage.limitClasses.set("u1", 1);
     await useTokens(1000);
     expect(await gate()).toEqual({ kind: "allowed", fromAllowance: true });
   });
 
-  test("the class's raised token limit is the ceiling", async () => {
+  test("the class's raised limit is the ceiling", async () => {
     const { storage, gate, useTokens } = setup();
     await storage.limitClasses.set("u1", 1);
     await useTokens(2000);

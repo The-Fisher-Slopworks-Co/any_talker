@@ -18,23 +18,23 @@ export function RateLimitFields({
   return (
     <Card>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_5h_tokens}</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_5h_usd}</span>
         <NumberInput
           className={INPUT_CLS}
-          integer
+          step="0.005"
           min={0}
-          value={value.fiveHourTokens}
-          onChange={(n) => onChange({ ...value, fiveHourTokens: n })}
+          value={value.fiveHourUsd}
+          onChange={(n) => onChange({ ...value, fiveHourUsd: n })}
         />
       </label>
       <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_weekly_tokens}</span>
+        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_weekly_usd}</span>
         <NumberInput
           className={INPUT_CLS}
-          integer
+          step="0.025"
           min={0}
-          value={value.weeklyTokens}
-          onChange={(n) => onChange({ ...value, weeklyTokens: n })}
+          value={value.weeklyUsd}
+          onChange={(n) => onChange({ ...value, weeklyUsd: n })}
         />
       </label>
       <div className={ROW_CLS}>

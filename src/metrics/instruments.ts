@@ -115,10 +115,10 @@ export const rateLimitChecksTotal = registry.register(
   ),
 );
 
-export const rateLimitTokensDeductedTotal = registry.register(
+export const rateLimitUsdDeductedTotal = registry.register(
   new Counter(
-    "bot_rate_limit_tokens_deducted_total",
-    "Sum of tokens charged to per-user rate-limit windows after AI replies.",
+    "bot_rate_limit_usd_deducted_total",
+    "Sum of USD charged to per-user rate-limit windows after AI replies.",
   ),
 );
 
