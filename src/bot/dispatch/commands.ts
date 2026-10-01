@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import { InputFile } from "grammy";
 import type { DetailLevel } from "../../ai/instruction";
 import { getBuildInfo } from "../../build-info";
 import { digestCommandHandler } from "../handlers/digest";
 import { feedbackHandler } from "../handlers/feedback";
 import { helpPage, type HelpPageId } from "../handlers/help";
+import { resetUsageCommandHandler } from "../handlers/reset-usage";
 import { usageCommandHandler } from "../handlers/usage";
 import { resolveSenderIdentity } from "../identity";
 import { replyEphemeral } from "../ephemeral";
@@ -113,6 +115,37 @@ export async function dispatchUsageCommand(
     nowMs: Date.now(),
   });
   await replyEphemeral(ctx, outcome.text, receiver);
+}
+
+// The animation answering `/resetusage`: full bars shatter, empty ones slide
+// in. Telegram loops every GIF and re-times its frames to a constant rate
+// (a long last-frame delay is dropped), so the settled last frame is repeated
+// as real frames for a minute before the loop starts over.
+const RESET_USAGE_ANIMATION = new URL(
+  "../assets/reset-usage.gif",
+  import.meta.url,
+).pathname;
+
+// `/resetusage` — the owner clears everyone's usage. Handled inline alongside
+// `/usage` for the same reason; the only answer is the animation, sent as a
+// reply to the command.
+export async function dispatchResetUsageCommand(
+  rt: BotRuntime,
+  ctx: BotContext,
+): Promise<void> {
+  const msg = ctx.message;
+  const from = ctx.from;
+  if (!msg || !from) return;
+  const outcome = await resetUsageCommandHandler({
+    storage: rt.deps.storage,
+    ownerId: rt.deps.ownerId,
+    fromUserId: String(from.id),
+  });
+  if (outcome.kind === "ignored") return;
+  console.log(`usage reset for all users (${outcome.users} cleared)`);
+  await ctx.replyWithAnimation(new InputFile(RESET_USAGE_ANIMATION), {
+    reply_parameters: { message_id: msg.message_id },
+  });
 }
 
 // `/feedback <text>` — handled inline alongside `/digest` and `/usage` for the

@@ -8,12 +8,14 @@ import { matchAsk } from "../routing";
 import { matchDigestCommand } from "../handlers/digest";
 import { matchFeedbackCommand } from "../handlers/feedback";
 import { matchHelpCommand } from "../handlers/help";
+import { matchResetUsageCommand } from "../handlers/reset-usage";
 import { matchUsageCommand } from "../handlers/usage";
 import {
   dispatchTextCommand,
   dispatchDigestCommand,
   dispatchFeedbackCommand,
   dispatchHelpCommand,
+  dispatchResetUsageCommand,
   dispatchUsageCommand,
 } from "../dispatch/commands";
 import { dispatchAsk } from "../dispatch/ask";
@@ -46,6 +48,15 @@ export function registerMessageListeners(
     if (usage) {
       if (await rt.shouldHandleSharedCommand(ctx, usage.explicit))
         await dispatchUsageCommand(rt, ctx);
+      return;
+    }
+    const resetUsage = matchResetUsageCommand(
+      ctx.message.text,
+      ctx.me.username,
+    );
+    if (resetUsage) {
+      if (await rt.shouldHandleSharedCommand(ctx, resetUsage.explicit))
+        await dispatchResetUsageCommand(rt, ctx);
       return;
     }
     const feedback = matchFeedbackCommand(ctx.message.text, ctx.me.username);
