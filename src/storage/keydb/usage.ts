@@ -95,4 +95,24 @@ export class KeyDBUsageStore implements UsageStore {
   async reset(userId: string): Promise<void> {
     await this.client.del(`${PREFIX}usage:${userId}`);
   }
+
+  // There is no index of usage keys, so walk them with SCAN (non-blocking,
+  // unlike KEYS) and delete each batch as it comes.
+  async resetAll(): Promise<number> {
+    let cursor = "0";
+    let cleared = 0;
+    do {
+      const reply = (await this.client.send("SCAN", [
+        cursor,
+        "MATCH",
+        `${PREFIX}usage:*`,
+        "COUNT",
+        "500",
+      ])) as [string, string[]];
+      cursor = String(reply[0]);
+      const keys = reply[1];
+      if (keys.length > 0) cleared += await this.client.del(...keys);
+    } while (cursor !== "0");
+    return cleared;
+  }
 }

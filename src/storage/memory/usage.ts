@@ -45,4 +45,10 @@ export class MemoryUsageStore implements UsageStore {
   async reset(userId: string): Promise<void> {
     this.b.usage.delete(userId);
   }
+
+  async resetAll(): Promise<number> {
+    const n = this.b.usage.size;
+    this.b.usage.clear();
+    return n;
+  }
 }
