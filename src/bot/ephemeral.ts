@@ -58,3 +58,26 @@ export async function replyEphemeral(
     console.error("ephemeral reply failed, dropping the answer:", err);
   }
 }
+
+// Everything `refuseEphemeralAsk` needs from a `BotContext`.
+export type EphemeralAskCtx = EphemeralReplyCtx & {
+  message?: { ephemeral_message_id?: number | undefined } | undefined;
+  from?: { id: number } | undefined;
+  t: { bot_ask_ephemeral: string };
+};
+
+// An `/ask` sent as an ephemeral message is seen by its author and the bot
+// alone, yet its answer would land in front of the whole chat — a question
+// nobody saw, with an answer everybody does. Such an ask is refused,
+// ephemerally, instead of answered. True when the ask was refused and must go
+// no further.
+export async function refuseEphemeralAsk(
+  ctx: EphemeralAskCtx,
+): Promise<boolean> {
+  if (ctx.message?.ephemeral_message_id === undefined) return false;
+  const receiver = ctx.from?.id;
+  if (receiver !== undefined) {
+    await replyEphemeral(ctx, ctx.t.bot_ask_ephemeral, receiver);
+  }
+  return true;
+}
