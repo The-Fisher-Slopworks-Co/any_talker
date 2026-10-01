@@ -17,8 +17,8 @@ const win = (used: number, limit: number): WindowStatus => ({
 });
 
 const usage: UsageStatus = {
-  fiveHour: win(0.0011, 0.0313),
-  weekly: win(0.0011, 0.2188),
+  fiveHour: win(0.04, 1),
+  weekly: win(0.002, 1),
 };
 
 function render(percent: boolean): string {
@@ -33,12 +33,12 @@ function render(percent: boolean): string {
 
 describe("formatUsedPercent", () => {
   test("rounds to a whole percent", () => {
-    expect(formatUsedPercent(win(0.0011, 0.0313))).toBe("4%");
+    expect(formatUsedPercent(win(0.04, 1))).toBe("4%");
     expect(formatUsedPercent(win(0, 1))).toBe("0%");
   });
 
   test("shows any spend as at least 1%", () => {
-    expect(formatUsedPercent(win(0.0011, 0.2188))).toBe("1%");
+    expect(formatUsedPercent(win(0.002, 1))).toBe("1%");
   });
 
   test("keeps an overrun above 100%", () => {
@@ -60,7 +60,7 @@ describe("UsageCard markup", () => {
 
   test("default mode keeps used / limit in USD", () => {
     const html = render(false);
-    expect(html).toContain("$0.0011 / $0.0313");
-    expect(html).toContain("$0.0011 / $0.2188");
+    expect(html).toContain("$0.0400 / $1.0000");
+    expect(html).toContain("$0.0020 / $1.0000");
   });
 });
