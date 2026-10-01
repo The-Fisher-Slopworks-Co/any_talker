@@ -19,4 +19,7 @@ export interface UsageStore {
   ): Promise<UserUsage>;
   // Clears the user's usage (admin reset): both windows drop to 0.
   reset(userId: string): Promise<void>;
+  // Clears every user's usage at once (admin `/resetusage`). Returns how many
+  // users had a stored record.
+  resetAll(): Promise<number>;
 }
