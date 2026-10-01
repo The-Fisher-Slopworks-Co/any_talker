@@ -7,7 +7,7 @@
 import type { LimitClass, RateLimitConfig, Settings } from "../shared/types";
 import { boostedRateLimit } from "./boost";
 
-// The token budgets a user is held to at `now`: the base ones, raised by their
+// The USD budgets a user is held to at `now`: the base ones, raised by their
 // class's multiplier, then by the running promo on top (the two multiply).
 export function userRateLimit(
   settings: Settings,
@@ -16,14 +16,14 @@ export function userRateLimit(
 ): RateLimitConfig {
   const base = settings.rateLimit;
   const factor =
-    limitClass === null ? 1 : settings.limitClasses[limitClass].tokenMultiplier;
+    limitClass === null ? 1 : settings.limitClasses[limitClass].limitMultiplier;
   const classed =
     factor === 1
       ? base
       : {
           ...base,
-          fiveHourTokens: Math.floor(base.fiveHourTokens * factor),
-          weeklyTokens: Math.floor(base.weeklyTokens * factor),
+          fiveHourUsd: base.fiveHourUsd * factor,
+          weeklyUsd: base.weeklyUsd * factor,
         };
   return boostedRateLimit(classed, settings.limitBoost, now);
 }

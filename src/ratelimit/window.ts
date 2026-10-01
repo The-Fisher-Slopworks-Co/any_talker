@@ -117,16 +117,10 @@ export function summarizeUsage(
     fiveHour: statusFor(
       userId,
       FIVE_HOUR_MS,
-      config.fiveHourTokens,
+      config.fiveHourUsd,
       stored?.fiveHour,
       now,
     ),
-    weekly: statusFor(
-      userId,
-      WEEK_MS,
-      config.weeklyTokens,
-      stored?.weekly,
-      now,
-    ),
+    weekly: statusFor(userId, WEEK_MS, config.weeklyUsd, stored?.weekly, now),
   };
 }

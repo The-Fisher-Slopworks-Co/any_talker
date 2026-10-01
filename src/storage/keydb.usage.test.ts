@@ -34,14 +34,19 @@ class FakeRedis {
 test("resetAll deletes every usage key across SCAN pages and nothing else", async () => {
   const redis = new FakeRedis();
   for (const id of ["1", "2", "3", "4", "5"]) {
-    redis.strings.set(`at:usage:${id}`, "{}");
+    redis.strings.set(`at:usage-usd:${id}`, "{}");
   }
   redis.strings.set("at:users", "{}");
+  redis.strings.set("at:usage:1", "{}");
   redis.strings.set("at:spend:1", "{}");
   const store = new KeyDBUsageStore(redis as unknown as RedisClient);
 
   expect(await store.resetAll()).toBe(5);
-  expect([...redis.strings.keys()].sort()).toEqual(["at:spend:1", "at:users"]);
+  expect([...redis.strings.keys()].sort()).toEqual([
+    "at:spend:1",
+    "at:usage:1",
+    "at:users",
+  ]);
 });
 
 test("resetAll on an empty keyspace clears nothing", async () => {

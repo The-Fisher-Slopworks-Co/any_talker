@@ -15,8 +15,8 @@ import {
 import type { RateLimitConfig, UserUsage } from "../shared/types";
 
 const cfg: RateLimitConfig = {
-  fiveHourTokens: 100,
-  weeklyTokens: 1000,
+  fiveHourUsd: 100,
+  weeklyUsd: 1000,
   ownerExempt: true,
 };
 

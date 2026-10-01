@@ -69,7 +69,7 @@ bot publishes the following metric families:
 | `bot_tool_calls_total` | counter | `tool`, `outcome` | Tool invocations by the model |
 | `bot_tool_call_duration_seconds` | histogram | `tool` | Tool execution latency |
 | `bot_rate_limit_checks_total` | counter | `result` | Rate-limit allow/deny |
-| `bot_rate_limit_tokens_deducted_total` | counter | — | Total tokens charged to usage windows |
+| `bot_rate_limit_usd_deducted_total` | counter | — | Total USD charged to usage windows |
 | `bot_budget_denied_total` | counter | `reason` | Requests denied by a USD budget cap (global/chat/new-user) |
 | `bot_reminders_delivered_total` | counter | `outcome` | Reminder scheduler results |
 | `bot_checks_processed_total` | counter | `outcome` | Recurring-check fires/timeouts/answers |
@@ -104,7 +104,7 @@ are supported as `host:port`).
   than **60 seconds**, or above Telegram's 20 MB download ceiling, are refused with a note saying
   which limit was hit. The duration cap is a cost guard: native video is billed by clip length
   (Gemini charges ~260 tokens per second), so a few minutes of footage would swallow a user's whole
-  token window in one ask.
+  5-hour window in one ask.
 - Tool calling — built-in `random_number` tool; add new tools via `registerTool()`. Each call and
   its result are stored with the turn and replayed on follow-ups as real `function_call` /
   `function_call_output` items, so "you missed someone" is answered from the page the bot fetched
@@ -128,8 +128,9 @@ are supported as `host:port`).
   Web App exposes). Changes are confirmed with a blockquote and applied immediately — including to a
   reminder set in the same message (e.g. "set it for 15:00, Yekaterinburg time") — and are shared
   across the main bot and all character bots. The same settings are also editable in the Web App.
-- Per-user dual-window rate limit: a rolling **5-hour** token budget and a **weekly** token budget
-  (defaults: 30k / 300k). Limited only when *either* window is exhausted; each user's window resets
+- Per-user dual-window rate limit: a rolling **5-hour** and a **weekly** USD budget, charged with
+  what each reply actually cost (so cached input counts at its discounted price and output at its
+  full one; defaults: $0.025 / $0.175). Limited only when *either* window is exhausted; each user's window resets
   are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
 - **`/help`** (and `/start`) — an in-bot guide limited to what the UI does not reveal: that the bot
   only answers `/ask`, that context follows reply chains, reminders, groups with several characters.
@@ -138,10 +139,10 @@ are supported as `host:port`).
   already spent and when it resets. In a group the answer is an ephemeral message only the asker
   sees, as `/feedback`'s is; in a DM it is a plain reply. The Web App shows the same two figures as progress
   bars in a header above every screen. Both surfaces are **percentage-only by construction** — they
-  are built from a type that carries no token counts at all, so the raw budget figures stay on the
+  are built from a type that carries no amounts at all, so the raw budget figures stay on the
   owner-gated admin routes.
-- **USD budget guard** — hard spend caps enforced independently of the token limit (money vs.
-  volume): a global **monthly** cap (the kill-switch — sized to your real budget), a global **daily**
+- **USD budget guard** — hard spend caps enforced independently of the per-user rate limit:
+  a global **monthly** cap (the kill-switch — sized to your real budget), a global **daily**
   cap, a **per-chat** daily cap, and a tighter **new-user** daily cap during a soft-start window. The
   owner is never blocked, but owner spend still counts. All caps are runtime-editable in the admin UI
   (**Budget caps** tab); disable enforcement with one toggle. Spend is tracked per user/chat/global/

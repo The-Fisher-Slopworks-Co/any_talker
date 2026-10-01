@@ -34,7 +34,7 @@ export function activeBoost(
 }
 
 // The budgets users are actually held to at `now`: the base ones, raised by the
-// active boost's percentage (rounded down to whole tokens).
+// active boost's percentage.
 export function boostedRateLimit(
   config: RateLimitConfig,
   boost: LimitBoost | null,
@@ -45,7 +45,7 @@ export function boostedRateLimit(
   const factor = 1 + active.percent / 100;
   return {
     ...config,
-    fiveHourTokens: Math.floor(config.fiveHourTokens * factor),
-    weeklyTokens: Math.floor(config.weeklyTokens * factor),
+    fiveHourUsd: config.fiveHourUsd * factor,
+    weeklyUsd: config.weeklyUsd * factor,
   };
 }

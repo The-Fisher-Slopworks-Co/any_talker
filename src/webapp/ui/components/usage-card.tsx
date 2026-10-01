@@ -7,6 +7,11 @@ import type { UsageStatus, WindowStatus } from "../../../ratelimit/window";
 import { Card } from "./layout";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
 
+// Window amounts are fractions of a cent apart, so keep four decimals.
+function formatUsd(n: number): string {
+  return `$${n.toFixed(4)}`;
+}
+
 function WindowRows({ label, w }: { label: string; w: WindowStatus }) {
   const { t: s } = useI18n();
   const { format } = useDateFmt();
@@ -15,7 +20,7 @@ function WindowRows({ label, w }: { label: string; w: WindowStatus }) {
       <div className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{label}</span>
         <span className={ROW_VALUE_CLS}>
-          {w.used.toLocaleString()} / {w.limit.toLocaleString()}
+          {formatUsd(w.used)} / {formatUsd(w.limit)}
         </span>
       </div>
       <div className={ROW_CLS}>

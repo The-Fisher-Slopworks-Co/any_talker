@@ -10,24 +10,24 @@ import { PREFIX } from "./shared";
 // Atomic usage accrual for the dual fixed-window limiter. The caller passes the
 // current start of each window (computed from the user's deterministic phase
 // offset); a stored window whose start differs has rolled over, so its `used`
-// restarts at the new tokens instead of accumulating. Runs server-side so
+// restarts at the new spend instead of accumulating. Runs server-side so
 // concurrent requests can't interleave the read-modify-write. Returns
 // [fiveUsed, weeklyUsed, fiveStart, weeklyStart] as strings.
 const ADD_USAGE_LUA = `
 local raw = redis.call('GET', KEYS[1])
 local fiveStart = tonumber(ARGV[1])
 local weekStart = tonumber(ARGV[2])
-local tokens = tonumber(ARGV[3])
+local usd = tonumber(ARGV[3])
 local ttl = tonumber(ARGV[4])
-local fiveUsed = tokens
-local weekUsed = tokens
+local fiveUsed = usd
+local weekUsed = usd
 if raw then
   local s = cjson.decode(raw)
   if s.fiveHour and s.fiveHour.windowStart == fiveStart then
-    fiveUsed = s.fiveHour.used + tokens
+    fiveUsed = s.fiveHour.used + usd
   end
   if s.weekly and s.weekly.windowStart == weekStart then
-    weekUsed = s.weekly.used + tokens
+    weekUsed = s.weekly.used + usd
   end
 end
 redis.call('SET', KEYS[1], cjson.encode({
@@ -65,35 +65,37 @@ function parseUsageEvalReply(reply: unknown): UserUsage {
 }
 
 // Usage is a shared per-user key (unscoped, like spend): the budget is global,
-// not per chat or per character bot.
+// not per chat or per character bot. The `usage-usd:` keys replaced token-count
+// `usage:` ones, which were left to expire through their TTL rather than be
+// read as dollars.
 export class KeyDBUsageStore implements UsageStore {
   constructor(private readonly client: RedisClient) {}
 
   async get(userId: string): Promise<UserUsage | null> {
-    const raw = await this.client.get(`${PREFIX}usage:${userId}`);
+    const raw = await this.client.get(`${PREFIX}usage-usd:${userId}`);
     return raw ? (JSON.parse(raw) as UserUsage) : null;
   }
 
   async add(
     userId: string,
-    tokens: number,
+    usd: number,
     fiveHourWindowStart: number,
     weeklyWindowStart: number,
   ): Promise<UserUsage> {
     const reply = await this.client.send("EVAL", [
       ADD_USAGE_LUA,
       "1",
-      `${PREFIX}usage:${userId}`,
+      `${PREFIX}usage-usd:${userId}`,
       String(fiveHourWindowStart),
       String(weeklyWindowStart),
-      String(tokens),
+      String(usd),
       String(USAGE_RETENTION_SECONDS),
     ]);
     return parseUsageEvalReply(reply);
   }
 
   async reset(userId: string): Promise<void> {
-    await this.client.del(`${PREFIX}usage:${userId}`);
+    await this.client.del(`${PREFIX}usage-usd:${userId}`);
   }
 
   // There is no index of usage keys, so walk them with SCAN (non-blocking,
@@ -105,7 +107,7 @@ export class KeyDBUsageStore implements UsageStore {
       const reply = (await this.client.send("SCAN", [
         cursor,
         "MATCH",
-        `${PREFIX}usage:*`,
+        `${PREFIX}usage-usd:*`,
         "COUNT",
         "500",
       ])) as [string, string[]];

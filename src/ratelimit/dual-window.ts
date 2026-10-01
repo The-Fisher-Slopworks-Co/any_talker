@@ -5,7 +5,7 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter, CheckResult } from "./types";
 import type { RateLimitConfig } from "../shared/types";
 import { summarizeUsage, currentWindowStarts } from "./window";
-import { rateLimitChecksTotal, rateLimitTokensDeductedTotal } from "../metrics";
+import { rateLimitChecksTotal, rateLimitUsdDeductedTotal } from "../metrics";
 
 // Per-user dual fixed-window limiter (5-hour + weekly). `check` is read-only —
 // the window math is deterministic, so the only persisted state is the spent
@@ -44,15 +44,10 @@ export class DualWindowLimiter implements RateLimiter {
     return { allowed: true };
   }
 
-  async deduct(userId: string, tokens: number, now: number): Promise<void> {
-    if (tokens > 0) rateLimitTokensDeductedTotal.inc(tokens);
+  async deduct(userId: string, usd: number, now: number): Promise<void> {
+    if (usd > 0) rateLimitUsdDeductedTotal.inc(usd);
     const starts = currentWindowStarts(userId, now);
-    await this.storage.usage.add(
-      userId,
-      tokens,
-      starts.fiveHour,
-      starts.weekly,
-    );
+    await this.storage.usage.add(userId, usd, starts.fiveHour, starts.weekly);
   }
 
   async reset(userId: string): Promise<void> {

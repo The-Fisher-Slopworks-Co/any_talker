@@ -483,13 +483,13 @@ describe("deliverReminder (AI-driven)", () => {
 });
 
 describe("deliverReminder accounting (the untracked-cost fix)", () => {
-  test("charges tokens to the user and records spend across ledgers", async () => {
+  test("charges the cost to the user and records spend across ledgers", async () => {
     const storage = new MemoryStorage();
-    const deducts: Array<{ userId: string; tokens: number }> = [];
+    const deducts: Array<{ userId: string; usd: number }> = [];
     const spyLimiter = {
       check: async () => ({ allowed: true as const }),
-      deduct: async (userId: string, tokens: number) => {
-        deducts.push({ userId, tokens });
+      deduct: async (userId: string, usd: number) => {
+        deducts.push({ userId, usd });
       },
       reset: async () => {},
     };
@@ -514,7 +514,7 @@ describe("deliverReminder accounting (the untracked-cost fix)", () => {
       r,
       r.fireAtMs,
     );
-    expect(deducts).toEqual([{ userId: "u1", tokens: 42 }]);
+    expect(deducts).toEqual([{ userId: "u1", usd: 0.3 }]);
     expect((await storage.spend.getUser("u1", r.fireAtMs)).day).toBeCloseTo(
       0.3,
     );
@@ -532,8 +532,8 @@ describe("deliverReminder accounting (the untracked-cost fix)", () => {
     const deducts: number[] = [];
     const spyLimiter = {
       check: async () => ({ allowed: true as const }),
-      deduct: async (_u: string, tokens: number) => {
-        deducts.push(tokens);
+      deduct: async (_u: string, usd: number) => {
+        deducts.push(usd);
       },
       reset: async () => {},
     };

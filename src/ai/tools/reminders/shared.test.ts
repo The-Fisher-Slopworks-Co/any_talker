@@ -302,7 +302,7 @@ describe("persistReminder per-user cap", () => {
       maxRemindersPerUser: 1,
       limitClasses: {
         ...DEFAULT_SETTINGS.limitClasses,
-        1: { tokenMultiplier: 1, maxReminders: 2, monthlyAllowanceUsd: 0 },
+        1: { limitMultiplier: 1, maxReminders: 2, monthlyAllowanceUsd: 0 },
       },
     });
     await storage.limitClasses.set("u1", 1);

@@ -11,12 +11,12 @@ const SETTINGS: Settings = {
   ...DEFAULT_SETTINGS,
   rateLimit: {
     ...DEFAULT_SETTINGS.rateLimit,
-    fiveHourTokens: 1000,
-    weeklyTokens: 10_001,
+    fiveHourUsd: 1000,
+    weeklyUsd: 10_001,
   },
   limitClasses: {
-    1: { tokenMultiplier: 2, maxReminders: 15, monthlyAllowanceUsd: 1 },
-    2: { tokenMultiplier: 2.5, maxReminders: 3, monthlyAllowanceUsd: 1 },
+    1: { limitMultiplier: 2, maxReminders: 15, monthlyAllowanceUsd: 1 },
+    2: { limitMultiplier: 2.5, maxReminders: 3, monthlyAllowanceUsd: 1 },
   },
   maxRemindersPerUser: 5,
 };
@@ -30,8 +30,8 @@ describe("userRateLimit", () => {
     const r = userRateLimit(SETTINGS, 2, NOW);
     expect(r).toEqual({
       ...SETTINGS.rateLimit,
-      fiveHourTokens: 2500,
-      weeklyTokens: 25_002,
+      fiveHourUsd: 2500,
+      weeklyUsd: 25_002.5,
     });
   });
 
@@ -41,8 +41,8 @@ describe("userRateLimit", () => {
       limitBoost: { percent: 50, untilMs: NOW + 1 },
     };
     const r = userRateLimit(settings, 1, NOW);
-    expect(r.fiveHourTokens).toBe(3000);
-    expect(r.weeklyTokens).toBe(30_003);
+    expect(r.fiveHourUsd).toBe(3000);
+    expect(r.weeklyUsd).toBe(30_003);
   });
 });
 
