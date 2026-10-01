@@ -164,6 +164,16 @@ export function UserEditView({ userId }: { userId: string }) {
         <TimeNote />
       </SectionFooter>
 
+      <SectionHeader>{s.ui_user_usage}</SectionHeader>
+      {usage ? (
+        <>
+          <UsageCard usage={usage} percent />
+          <Card>
+            <RowButton onClick={resetUsage}>{s.ui_ratelimit_reset}</RowButton>
+          </Card>
+        </>
+      ) : null}
+
       <DisplayNameField
         label={s.ui_user_name}
         placeholder={fallbackName}
@@ -201,16 +211,6 @@ export function UserEditView({ userId }: { userId: string }) {
       />
 
       {spending && <SpendingCard spending={spending} />}
-
-      <SectionHeader>{s.ui_user_usage}</SectionHeader>
-      {usage ? (
-        <>
-          <UsageCard usage={usage} />
-          <Card>
-            <RowButton onClick={resetUsage}>{s.ui_ratelimit_reset}</RowButton>
-          </Card>
-        </>
-      ) : null}
 
       <LimitClassCard
         userId={user.id}
