@@ -105,6 +105,10 @@ export const botMessages = {
     en: "Usage: /ask <text> — or reply to a message with it.",
     ru: "Использование: /ask <текст> — или ответь этой командой на сообщение.",
   }),
+  bot_ask_ephemeral: m({
+    en: "/ask doesn't work in a message only the bot can see — send it as a regular message.",
+    ru: "/ask не работает в сообщении, которое видит только бот, — отправь его обычным сообщением.",
+  }),
   bot_rate_limited: m({
     en: (limitedBy: WindowKind, ms: number) =>
       limitedBy === "weekly"
