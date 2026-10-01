@@ -18,8 +18,8 @@ export const adminMessages = {
     ru: "Лимиты",
   }),
   ui_admin_limits_desc: m({
-    en: "5-hour and weekly token budgets",
-    ru: "Бюджеты токенов за 5 часов и за неделю",
+    en: "5-hour and weekly spend budgets",
+    ru: "Бюджеты трат за 5 часов и за неделю",
   }),
   ui_admin_budget: m({
     en: "Budget caps",

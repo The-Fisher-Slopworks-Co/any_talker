@@ -55,9 +55,9 @@ const BAD_REASONING_EFFORT: ApiResponse = {
   },
 };
 
-const BAD_RATE_LIMIT_TOKENS: ApiResponse = {
+const BAD_RATE_LIMIT_USD: ApiResponse = {
   status: 400,
-  body: { error: "rate-limit token budgets must be non-negative numbers" },
+  body: { error: "rate-limit USD budgets must be non-negative numbers" },
 };
 
 const BAD_LIMIT_BOOST: ApiResponse = {
@@ -70,7 +70,7 @@ const BAD_LIMIT_BOOST: ApiResponse = {
 const BAD_LIMIT_CLASSES: ApiResponse = {
   status: 400,
   body: {
-    error: `limitClasses keys must be ${LIMIT_CLASSES.join(", ")}; tokenMultiplier a number >= 1; maxReminders an integer >= 1; monthlyAllowanceUsd a non-negative number`,
+    error: `limitClasses keys must be ${LIMIT_CLASSES.join(", ")}; limitMultiplier a number >= 1; maxReminders an integer >= 1; monthlyAllowanceUsd a non-negative number`,
   },
 };
 
@@ -151,7 +151,7 @@ function validateLimitClassesPatch(v: unknown): boolean {
     if (!isLimitClass(Number(key))) return false;
     if (typeof c !== "object" || c === null || Array.isArray(c)) return false;
     const {
-      tokenMultiplier: mult,
+      limitMultiplier: mult,
       maxReminders,
       monthlyAllowanceUsd,
     } = c as Partial<LimitClassConfig>;
@@ -241,12 +241,12 @@ export const settingsRoutes: Route[] = [
       }
       if (patch.rateLimit !== undefined) {
         const rl = patch.rateLimit as Partial<RateLimitConfig>;
-        for (const v of [rl.fiveHourTokens, rl.weeklyTokens]) {
+        for (const v of [rl.fiveHourUsd, rl.weeklyUsd]) {
           if (
             v !== undefined &&
             (typeof v !== "number" || !Number.isFinite(v) || v < 0)
           ) {
-            return BAD_RATE_LIMIT_TOKENS;
+            return BAD_RATE_LIMIT_USD;
           }
         }
       }

@@ -8,15 +8,15 @@ import { activeBoost, boostedRateLimit, isValidLimitBoost } from "./boost";
 const NOW = 1_700_000_000_000;
 const BASE = {
   ...DEFAULT_SETTINGS.rateLimit,
-  fiveHourTokens: 1000,
-  weeklyTokens: 10_001,
+  fiveHourUsd: 1000,
+  weeklyUsd: 10_001,
 };
 
 describe("boostedRateLimit", () => {
   test("raises both budgets by the percent while the promo runs", () => {
     const r = boostedRateLimit(BASE, { percent: 50, untilMs: NOW + 1 }, NOW);
-    expect(r.fiveHourTokens).toBe(1500);
-    expect(r.weeklyTokens).toBe(15_001);
+    expect(r.fiveHourUsd).toBe(1500);
+    expect(r.weeklyUsd).toBe(15_001.5);
     expect(r.ownerExempt).toBe(BASE.ownerExempt);
   });
 

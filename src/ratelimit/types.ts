@@ -16,9 +16,9 @@ export interface RateLimiter {
     config: RateLimitConfig,
     now: number,
   ): Promise<CheckResult>;
-  // Accrues spent tokens to both windows. Called after the AI responds, so it
-  // can overshoot a window's budget (at-least-one-more-request semantics).
-  deduct(userId: string, tokens: number, now: number): Promise<void>;
+  // Accrues a reply's USD cost to both windows. Called after the AI responds,
+  // so it can overshoot a window's budget (at-least-one-more-request semantics).
+  deduct(userId: string, usd: number, now: number): Promise<void>;
   // Clears a user's usage (admin reset): both windows drop to 0.
   reset(userId: string): Promise<void>;
 }

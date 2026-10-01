@@ -13,8 +13,8 @@ import {
 import type { RateLimitConfig } from "../shared/types";
 
 const cfg: RateLimitConfig = {
-  fiveHourTokens: 100,
-  weeklyTokens: 1000,
+  fiveHourUsd: 100,
+  weeklyUsd: 1000,
   ownerExempt: true,
 };
 
@@ -32,7 +32,7 @@ describe("DualWindowLimiter", () => {
     const storage = new MemoryStorage();
     const lim = new DualWindowLimiter(storage);
     const s = currentWindowStarts(U, NOW);
-    await storage.usage.add(U, cfg.fiveHourTokens, s.fiveHour, s.weekly);
+    await storage.usage.add(U, cfg.fiveHourUsd, s.fiveHour, s.weekly);
     const r = await lim.check(U, cfg, NOW);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
@@ -50,7 +50,7 @@ describe("DualWindowLimiter", () => {
     // current 5-hour window still has room and the weekly cap is what binds.
     await storage.usage.add(
       U,
-      cfg.weeklyTokens,
+      cfg.weeklyUsd,
       s.fiveHour - FIVE_HOUR_MS,
       s.weekly,
     );
@@ -70,7 +70,7 @@ describe("DualWindowLimiter", () => {
     const weekReset = windowStart(U, WEEK_MS, NOW) + WEEK_MS;
     expect(weekReset).toBeGreaterThan(fiveReset);
     const s = currentWindowStarts(U, NOW);
-    await storage.usage.add(U, cfg.weeklyTokens, s.fiveHour, s.weekly);
+    await storage.usage.add(U, cfg.weeklyUsd, s.fiveHour, s.weekly);
     const r = await lim.check(U, cfg, NOW);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
@@ -90,7 +90,7 @@ describe("DualWindowLimiter", () => {
     const weekReset = windowStart(id, WEEK_MS, now) + WEEK_MS;
     expect(fiveReset).toBeGreaterThan(weekReset); // precondition for this case
     const s = currentWindowStarts(id, now);
-    await storage.usage.add(id, cfg.weeklyTokens, s.fiveHour, s.weekly);
+    await storage.usage.add(id, cfg.weeklyUsd, s.fiveHour, s.weekly);
     const r = await lim.check(id, cfg, now);
     expect(r.allowed).toBe(false);
     if (!r.allowed) {
@@ -125,7 +125,7 @@ describe("DualWindowLimiter", () => {
   test("deduct can overshoot a window's budget (request already in flight)", async () => {
     const storage = new MemoryStorage();
     const lim = new DualWindowLimiter(storage);
-    await lim.deduct(U, cfg.fiveHourTokens + 500, NOW);
+    await lim.deduct(U, cfg.fiveHourUsd + 500, NOW);
     const r = await lim.check(U, cfg, NOW);
     expect(r.allowed).toBe(false);
   });

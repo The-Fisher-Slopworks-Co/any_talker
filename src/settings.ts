@@ -63,46 +63,37 @@ export async function getOrInitSettings(storage: Storage): Promise<Settings> {
   return DEFAULT_SETTINGS;
 }
 
-// Backfills the dual-window config from possibly-legacy stored shapes. A legacy
-// token-bucket `capacity` (the old burst budget) maps to the 5-hour budget;
-// everything else falls back to defaults. Tolerant of missing/invalid fields so
-// old `at:settings` rows load without a migration (schema-on-read). The
-// `wiseMultiplier` of the removed /askwise is dropped the same way.
+// Backfills the dual-window config from possibly-legacy stored shapes. Budgets
+// used to be token counts (`fiveHourTokens`/`weeklyTokens`, and before that a
+// token-bucket `capacity`); none of those converts to dollars, so a row without
+// the USD fields falls back to the defaults. Tolerant of missing/invalid fields
+// so old `at:settings` rows load without a migration (schema-on-read).
 function normalizeRateLimit(rl: RateLimitConfig | undefined): RateLimitConfig {
   const def = DEFAULT_SETTINGS.rateLimit;
-  const legacy = (rl ?? {}) as Partial<RateLimitConfig> & { capacity?: number };
-  const fiveHourTokens =
-    typeof legacy.fiveHourTokens === "number" && legacy.fiveHourTokens >= 0
-      ? legacy.fiveHourTokens
-      : typeof legacy.capacity === "number" && legacy.capacity >= 0
-        ? legacy.capacity
-        : def.fiveHourTokens;
-  const weeklyTokens =
-    typeof legacy.weeklyTokens === "number" && legacy.weeklyTokens >= 0
-      ? legacy.weeklyTokens
-      : def.weeklyTokens;
-  const ownerExempt =
-    typeof legacy.ownerExempt === "boolean"
-      ? legacy.ownerExempt
-      : def.ownerExempt;
-  return { fiveHourTokens, weeklyTokens, ownerExempt };
+  const legacy = (rl ?? {}) as Partial<RateLimitConfig>;
+  return {
+    fiveHourUsd: num(legacy.fiveHourUsd, def.fiveHourUsd),
+    weeklyUsd: num(legacy.weeklyUsd, def.weeklyUsd),
+    ownerExempt: bool(legacy.ownerExempt, def.ownerExempt),
+  };
 }
 
 // Backfills each limit class's config (absent on rows that predate classes).
 // A multiplier below 1 would make a class *lower* the limits; floor it at 1.
 function normalizeLimitClasses(v: unknown): LimitClassesConfig {
   const def = DEFAULT_SETTINGS.limitClasses;
-  const raw = (v ?? {}) as Partial<Record<string, Partial<LimitClassConfig>>>;
+  // `tokenMultiplier` is the field's name from when the limits counted tokens.
+  type Stored = Partial<LimitClassConfig> & { tokenMultiplier?: number };
+  const raw = (v ?? {}) as Partial<Record<string, Stored>>;
   const out = { ...def };
   for (const c of LIMIT_CLASSES) {
     const x = raw[c] ?? {};
+    const mult = x.limitMultiplier ?? x.tokenMultiplier;
     out[c] = {
-      tokenMultiplier:
-        typeof x.tokenMultiplier === "number" &&
-        Number.isFinite(x.tokenMultiplier) &&
-        x.tokenMultiplier >= 1
-          ? x.tokenMultiplier
-          : def[c].tokenMultiplier,
+      limitMultiplier:
+        typeof mult === "number" && Number.isFinite(mult) && mult >= 1
+          ? mult
+          : def[c].limitMultiplier,
       maxReminders: posInt(x.maxReminders, def[c].maxReminders),
       monthlyAllowanceUsd: num(
         x.monthlyAllowanceUsd,

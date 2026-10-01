@@ -2,10 +2,10 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 // Percentage view of the dual-window rate limit — the ONLY shape a non-owner is
-// ever shown. `UsageStatus` carries raw token counts (used/limit); those are
+// ever shown. `UsageStatus` carries raw USD amounts (used/limit); those are
 // operational detail the bot deliberately keeps to itself, so both user-facing
 // surfaces (`/usage` in a DM and the Web App header) render from this type and
-// never see a token number. Pure math, no I/O: `summarizeUsage` resolves the
+// never see a dollar amount. Pure math, no I/O: `summarizeUsage` resolves the
 // windows, this collapses them to a share of budget.
 
 import type { LimitBoost } from "../shared/types";
@@ -16,7 +16,7 @@ export type WindowShare = {
   usedPercent: number;
   // 100 - usedPercent, so callers don't recompute (and can't disagree).
   remainingPercent: number;
-  // Epoch ms when the window rolls over. A timestamp, not a token count — safe
+  // Epoch ms when the window rolls over. A timestamp, not an amount — safe
   // to show, and the only way "42% left" means anything.
   resetMs: number;
 };
@@ -24,8 +24,8 @@ export type WindowShare = {
 export type UsageShare = {
   fiveHour: WindowShare;
   weekly: WindowShare;
-  // True when the viewer is the owner AND `rateLimit.ownerExempt` — no tokens
-  // are deducted for them at all, so the percentages would sit at 0 forever.
+  // True when the viewer is the owner AND `rateLimit.ownerExempt` — nothing
+  // is deducted for them at all, so the percentages would sit at 0 forever.
   // Surfaces render "no limit" instead of a permanently empty bar.
   exempt: boolean;
   // The running "+X% until <date>" promo, if any — already baked into the

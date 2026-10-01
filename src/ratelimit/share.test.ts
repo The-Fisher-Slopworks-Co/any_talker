@@ -8,8 +8,8 @@ import type { RateLimitConfig } from "../shared/types";
 import type { UsageStatus, WindowStatus } from "./window";
 
 const CONFIG: RateLimitConfig = {
-  fiveHourTokens: 1000,
-  weeklyTokens: 10_000,
+  fiveHourUsd: 1000,
+  weeklyUsd: 10_000,
   ownerExempt: true,
 };
 

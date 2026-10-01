@@ -21,19 +21,19 @@ export class MemoryUsageStore implements UsageStore {
   // need async work, do it before the read or after the write.
   async add(
     userId: string,
-    tokens: number,
+    usd: number,
     fiveHourWindowStart: number,
     weeklyWindowStart: number,
   ): Promise<UserUsage> {
     const current = this.b.usage.get(userId);
     const fiveUsed =
       current && current.fiveHour.windowStart === fiveHourWindowStart
-        ? current.fiveHour.used + tokens
-        : tokens;
+        ? current.fiveHour.used + usd
+        : usd;
     const weeklyUsed =
       current && current.weekly.windowStart === weeklyWindowStart
-        ? current.weekly.used + tokens
-        : tokens;
+        ? current.weekly.used + usd
+        : usd;
     const next: UserUsage = {
       fiveHour: { windowStart: fiveHourWindowStart, used: fiveUsed },
       weekly: { windowStart: weeklyWindowStart, used: weeklyUsed },

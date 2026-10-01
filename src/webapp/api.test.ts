@@ -468,8 +468,8 @@ describe("PUT /api/settings", () => {
         path: "/api/settings",
         body: {
           rateLimit: {
-            fiveHourTokens: 50000,
-            weeklyTokens: 400000,
+            fiveHourUsd: 50000,
+            weeklyUsd: 400000,
             ownerExempt: false,
           },
         },
@@ -479,8 +479,8 @@ describe("PUT /api/settings", () => {
     );
     expect(res.status).toBe(200);
     const saved = await d.storage.settings.get();
-    expect(saved?.rateLimit.fiveHourTokens).toBe(50000);
-    expect(saved?.rateLimit.weeklyTokens).toBe(400000);
+    expect(saved?.rateLimit.fiveHourUsd).toBe(50000);
+    expect(saved?.rateLimit.weeklyUsd).toBe(400000);
     expect(saved?.rateLimit.ownerExempt).toBe(false);
   });
 
@@ -903,11 +903,9 @@ describe("ratelimit endpoints", () => {
     expect(r.status).toBe(200);
     const { usage } = r.body as { usage: UsageStatus };
     expect(usage.fiveHour.used).toBe(0);
-    expect(usage.fiveHour.limit).toBe(
-      DEFAULT_SETTINGS.rateLimit.fiveHourTokens,
-    );
+    expect(usage.fiveHour.limit).toBe(DEFAULT_SETTINGS.rateLimit.fiveHourUsd);
     expect(usage.weekly.used).toBe(0);
-    expect(usage.weekly.limit).toBe(DEFAULT_SETTINGS.rateLimit.weeklyTokens);
+    expect(usage.weekly.limit).toBe(DEFAULT_SETTINGS.rateLimit.weeklyUsd);
   });
 
   test("PUT /api/ratelimit/me { reset: true } clears the owner's usage", async () => {
@@ -927,7 +925,7 @@ describe("ratelimit endpoints", () => {
   test("GET /api/ratelimit/user/:id returns that user's usage", async () => {
     const d = deps();
     const starts = currentWindowStarts("42", Date.now());
-    await d.storage.usage.add("42", 1234, starts.fiveHour, starts.weekly);
+    await d.storage.usage.add("42", 0.01, starts.fiveHour, starts.weekly);
     const r = await handleApi(
       { method: "GET", path: "/api/ratelimit/user/42", body: null },
       d,
@@ -935,10 +933,10 @@ describe("ratelimit endpoints", () => {
     );
     expect(r.status).toBe(200);
     const { usage } = r.body as { usage: UsageStatus };
-    expect(usage.fiveHour.used).toBe(1234);
-    expect(usage.weekly.used).toBe(1234);
+    expect(usage.fiveHour.used).toBe(0.01);
+    expect(usage.weekly.used).toBe(0.01);
     expect(usage.fiveHour.remaining).toBe(
-      DEFAULT_SETTINGS.rateLimit.fiveHourTokens - 1234,
+      DEFAULT_SETTINGS.rateLimit.fiveHourUsd - 0.01,
     );
   });
 
@@ -977,8 +975,8 @@ describe("GET /api/me/usage", () => {
       ...DEFAULT_SETTINGS,
       rateLimit: {
         ...DEFAULT_SETTINGS.rateLimit,
-        fiveHourTokens: 1000,
-        weeklyTokens: 10_000,
+        fiveHourUsd: 1000,
+        weeklyUsd: 10_000,
       },
     });
   };
@@ -2099,8 +2097,8 @@ describe("/api/admin/chats", () => {
           // Rate limit is global/per-user now: even if sent, it is not a chat
           // override and must be dropped from the stored chat settings.
           rateLimit: {
-            fiveHourTokens: 1,
-            weeklyTokens: 1,
+            fiveHourUsd: 1,
+            weeklyUsd: 1,
             ownerExempt: false,
           },
         },

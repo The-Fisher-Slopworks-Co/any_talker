@@ -53,7 +53,7 @@ export async function checkTurnGates(args: {
   const regular = regularVerdict(budget, base);
   if (regular.kind === "allowed" || limitClass === null) return regular;
 
-  // Past the base token limit: the class's raised limit is the ceiling.
+  // Past the base limit: the class's raised limit is the ceiling.
   if (!base.allowed) {
     const classed = await rateLimiter.check(
       userId,
