@@ -39,7 +39,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: envelope({ text: "hello" }) },
     ]);
   });
@@ -242,7 +242,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: "Context (replied message from Alice): to be or not to be",
@@ -274,7 +274,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       { role: "user", content: envelope({ text: "follow-up" }) },
@@ -310,7 +310,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       { role: "user", content: "Q2" },
@@ -336,7 +336,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: "Context (replied message from Bot): old bot reply",
@@ -464,7 +464,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: "Context (replied message from Alice): what is 2+2?",
@@ -498,7 +498,7 @@ describe("buildContext", () => {
     // Without the trailing envelope the prompt would end on an assistant
     // message — a chat-completions prefill — and the model would return an
     // empty completion.
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       { role: "user", content: envelope() },
@@ -523,7 +523,7 @@ describe("buildContext", () => {
         images: [replyBytes],
       },
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: [
@@ -551,7 +551,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [bytes],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: [
@@ -579,7 +579,7 @@ describe("buildContext", () => {
       images: [],
       audios: [bytes],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: [
@@ -679,7 +679,7 @@ describe("buildContext", () => {
       },
       images: [],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       {
@@ -704,7 +704,7 @@ describe("buildContext", () => {
       replyTarget: null,
       images: [a, b, c],
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: [
@@ -781,7 +781,7 @@ describe("buildContext", () => {
       fetchPhoto,
     });
     expect(fetched).toEqual(["f1", "f2"]);
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: [
@@ -855,7 +855,7 @@ describe("buildContext", () => {
       // A foreign file id: getFile with this bot's token fails ⇒ null.
       fetchPhoto: async () => null,
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       {
         role: "user",
         content: [
@@ -937,7 +937,7 @@ describe("buildContext", () => {
       },
       fetchPhoto: async () => null,
     });
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       // The ancestor's photo is genuinely unrecoverable — its bytes are not in
       // the reply — so its turn stays text-only.
       { role: "user", content: "Q1-photo" },
@@ -1021,7 +1021,7 @@ describe("buildContext — replayed tool calls", () => {
     });
 
     const msgs = await buildContext(chainArgs(storage, "you missed someone"));
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: "Q1" },
       { role: "tool", ...CALL },
       { role: "assistant", content: "A1" },
@@ -1042,7 +1042,7 @@ describe("buildContext — replayed tool calls", () => {
     });
 
     const msgs = await buildContext(chainArgs(storage, "follow-up"));
-    expect(msgs).toEqual([
+    expect([...msgs]).toEqual([
       { role: "user", content: "Q1" },
       { role: "assistant", content: "A1" },
       { role: "user", content: envelope({ text: "follow-up" }) },

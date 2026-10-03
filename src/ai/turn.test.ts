@@ -6,7 +6,8 @@ import { z } from "zod";
 import { MemoryStorage } from "../storage/memory";
 import type { Storage, SpendStore } from "../storage/types";
 import { DualWindowLimiter } from "../ratelimit/dual-window";
-import type { AIClient, AIMessage, AskResult } from "./types";
+import type { AIClient, AskResult } from "./types";
+import { transcript } from "./transcript";
 import type { RateLimiter } from "../ratelimit/types";
 import { runAiTurn, type RunAiTurnInput } from "./turn";
 import { instructionHash } from "./instruction";
@@ -53,7 +54,7 @@ const baseInput = (overrides: Partial<RunAiTurnInput> = {}): RunAiTurnInput => {
     timezone: "Europe/Moscow",
     lang: "en",
     now: 1_000,
-    messages: [{ role: "user", content: "hi" }],
+    messages: transcript([{ role: "user", content: "hi" }]),
     ...overrides,
   };
 };
@@ -154,7 +155,7 @@ describe("runAiTurn — request assembly", () => {
 
   test("builds the system prompt from the persona + composes the context fields (ask source)", async () => {
     const ai = new FakeAI();
-    const messages: AIMessage[] = [{ role: "user", content: "q" }];
+    const messages = transcript([{ role: "user", content: "q" }]);
     await runAiTurn(
       baseInput({
         ai,

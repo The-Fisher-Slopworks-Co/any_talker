@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Tool, ToolCallContext } from "./tools/registry";
+import type { Transcript } from "./transcript";
 import type {
   ProviderSort,
   ReasoningEffort,
@@ -92,7 +93,8 @@ export interface AIClient {
   ask(opts: {
     models: string[];
     system: string;
-    messages: AIMessage[];
+    // Append-only by type: see `ai/transcript.ts`.
+    messages: Transcript;
     tools: Tool[];
     routing?: RoutingOptions | undefined;
     reasoningEffort?: ReasoningEffort | null | undefined;

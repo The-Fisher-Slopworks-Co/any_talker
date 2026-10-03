@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { $ZodObject, $ZodShape } from "zod/v4/core";
 import type { Lang } from "../../shared/i18n";
 import type { UserSettingChange } from "../../shared/types";
-import type { AIMessage } from "../types";
+import type { Transcript } from "../transcript";
 
 // Where the turn a tool call runs inside came from. `reminder_delivery` is not
 // a user request: the turn replays the archived context of the /ask that
@@ -49,7 +49,7 @@ export type ToolCallContext = {
   // Snapshot of the messages passed to ai.ask() for the turn this tool
   // call is running inside. Tools that need to durably capture the
   // conversation context (e.g. reminders) read this.
-  contextMessages?: AIMessage[] | undefined;
+  contextMessages?: Transcript | undefined;
 };
 
 // A tool's input schema. `@openrouter/agent`'s `tool()` requires a zod v4

@@ -13,7 +13,9 @@ import type {
 export const VIDEO_SNAPSHOT_MARKER =
   "[a video clip was attached here; it is not kept in this saved context]";
 
-export function serializeMessages(msgs: AIMessage[]): SerializedAIMessage[] {
+export function serializeMessages(
+  msgs: readonly AIMessage[],
+): SerializedAIMessage[] {
   return msgs.map((m) => {
     if (m.role === "assistant")
       return { role: "assistant", content: m.content };
