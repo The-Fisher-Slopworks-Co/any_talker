@@ -96,11 +96,11 @@ test("a fact written by the main bot is invisible to managed bots and vice versa
 test("reminders created via a managed bot's tool scope only fire on that bot's scheduler", async () => {
   const storage = new MemoryStorage();
   const tools = createReminderTools({ storage });
-  const scheduleIn = byName(tools, "schedule_reminder_in");
+  const scheduleIn = byName(tools, "schedule_reminder");
 
   const now = 1_700_000_000_000;
   const res = (await scheduleIn.execute(
-    { amount: 10, unit: "minutes", text: "feed me" },
+    { inAmount: 10, inUnit: "minutes", text: "feed me" },
     ctx("cat-bot", { now }),
   )) as { ok: boolean };
   expect(res.ok).toBe(true);
@@ -125,13 +125,13 @@ test("reminders created via a managed bot's tool scope only fire on that bot's s
 test("list_reminders and cancel_reminder are scoped to the calling bot", async () => {
   const storage = new MemoryStorage();
   const tools = createReminderTools({ storage });
-  const scheduleIn = byName(tools, "schedule_reminder_in");
+  const scheduleIn = byName(tools, "schedule_reminder");
   const list = byName(tools, "list_reminders");
   const cancel = byName(tools, "cancel_reminder");
 
   const now = 1_700_000_000_000;
   await scheduleIn.execute(
-    { amount: 10, unit: "minutes", text: "feed me" },
+    { inAmount: 10, inUnit: "minutes", text: "feed me" },
     ctx("cat-bot", { now }),
   );
 

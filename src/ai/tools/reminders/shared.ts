@@ -22,7 +22,7 @@ export const FAILED_WRITE_RULE =
 export const NOTE_DOC =
   "'text' is a private note to yourself about what to remind of; you word the actual message when it fires.";
 
-// The result contract of the schedule_* tools, which all end in persistReminder.
+// The result contract of schedule_reminder, which always ends in persistReminder.
 export const PERSIST_RESULT_DOC =
   "Returns { ok: true, fireAt (YYYY-MM-DDTHH:MM, user's timezone) } or { ok: false, reason }. " +
   FAILED_WRITE_RULE;
