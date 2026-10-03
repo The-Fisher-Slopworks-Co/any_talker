@@ -7,7 +7,6 @@ import {
   DOMAIN_MESSAGES,
   MESSAGES,
   isValidLang,
-  languageSection,
   normalizeLang,
   resolveLang,
   t,
@@ -138,27 +137,4 @@ describe("MESSAGES parity", () => {
       "Настройки обновлены — пол: сброшено",
     );
   });
-});
-
-describe("languageSection", () => {
-  test("returns English instruction for en", () => {
-    expect(languageSection("en")).toContain("English");
-  });
-
-  test("returns Russian instruction for ru", () => {
-    expect(languageSection("ru")).toContain("русском");
-  });
-
-  test.each(["en", "ru"] as const)(
-    "puts the user's message language first and the setting second (%s)",
-    (lang) => {
-      const text = languageSection(lang);
-      const follow =
-        lang === "ru" ? "на котором пишет пользователь" : "the user writes in";
-      const fallback =
-        lang === "ru" ? "отвечай на русском" : "reply in English";
-      expect(text).toContain(follow);
-      expect(text.indexOf(follow)).toBeLessThan(text.indexOf(fallback));
-    },
-  );
 });

@@ -8,6 +8,7 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
 import type { AIClient } from "../ai/types";
 import { append, transcript } from "../ai/transcript";
+import { profileField, type UserProfile } from "../bot/profile";
 import { runAiTurn } from "../ai/turn";
 import { deserializeMessages } from "../ai/serialize";
 import type { PersonaResolver } from "../managed-bots/persona";
@@ -245,14 +246,21 @@ async function composeReminderMessage(
   reminder: Reminder,
   nowMs: number,
 ): Promise<string> {
-  const [{ settings, botName }, userTimezone, displayName, user, gender] =
-    await Promise.all([
-      deps.resolver(reminder.chatId),
-      deps.storage.profile.getTimezone(reminder.userId),
-      readValidDisplayName(deps.storage, reminder.userId),
-      deps.storage.users.get(reminder.userId),
-      deps.storage.profile.getGender(reminder.userId),
-    ]);
+  const [
+    { settings, botName },
+    userTimezone,
+    displayName,
+    user,
+    gender,
+    facts,
+  ] = await Promise.all([
+    deps.resolver(reminder.chatId),
+    deps.storage.profile.getTimezone(reminder.userId),
+    readValidDisplayName(deps.storage, reminder.userId),
+    deps.storage.users.get(reminder.userId),
+    deps.storage.profile.getGender(reminder.userId),
+    deps.storage.facts.list(reminder.userId),
+  ]);
 
   const timezone = userTimezone ?? settings.timezone;
   const lang = reminder.lang;
@@ -268,6 +276,9 @@ async function composeReminderMessage(
       composeFullName(user?.firstName ?? null, user?.lastName ?? null) ||
       null,
     gender,
+    // Always carried: nothing continues this request, so there is no later turn
+    // a repeat could cost, and the snapshot may predate the user's last change.
+    profile: { timezone, lang, facts },
   });
 
   // The snapshot the reminder was set in, continued by the event that fired it.
@@ -332,11 +343,12 @@ type EnvelopeArgs = {
   timezone: string;
   note: string;
   displayName: string | null;
+  profile: UserProfile;
   gender: "male" | "female" | null;
 };
 
 function buildReminderEnvelope(args: EnvelopeArgs): string {
-  const obj: Record<string, string> = {
+  const obj: Record<string, unknown> = {
     system_event: "reminder_fired",
     // Everything before this envelope is the archived context of the request
     // that created the reminder — a snapshot taken before the model answered,
@@ -357,6 +369,7 @@ function buildReminderEnvelope(args: EnvelopeArgs): string {
   };
   if (args.displayName) obj.user_name = args.displayName;
   if (args.gender) obj.user_gender = args.gender;
+  obj.profile = profileField(args.profile);
   return JSON.stringify(obj);
 }
 

@@ -83,8 +83,6 @@ export type RunAiTurnInput = {
   // selects the configured reasoning effort for that level. Absent (guest,
   // reminder delivery) means no detail section and no reasoning effort.
   detailLevel?: DetailLevel;
-  // Optional user facts surfaced in the system prompt.
-  facts?: Array<{ key: string; value: string }>;
   // Optional snapshot of the conversation placed on the tool context so tools
   // (e.g. reminders) can durably capture it. Reminder delivery omits it.
   contextMessages?: Transcript;
@@ -129,10 +127,7 @@ export async function runAiTurn(input: RunAiTurnInput): Promise<AiTurnResult> {
   // hashing a second build would risk fingerprinting a prompt the model never
   // saw.
   const instruction = buildInstruction(input.systemPrompt, {
-    timezone: input.timezone,
-    lang: input.lang,
     detailLevel: input.detailLevel,
-    facts: input.facts,
   });
 
   const result = await input.ai.ask({

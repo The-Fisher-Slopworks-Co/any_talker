@@ -54,6 +54,15 @@ export type TurnRun = {
   instr?: string;
 };
 
+// Who wrote a turn's user message, and the profile its envelope carried
+// (`bot/profile.ts`). `profile` is the hash of that profile, present only on a
+// turn whose envelope carried one — which is how a later turn tells whether the
+// chain already says what it would say.
+export type TurnAuthor = {
+  userId: string;
+  profile?: string;
+};
+
 export type ConversationNode = {
   userQuestion: string;
   botAnswer: string;
@@ -68,6 +77,9 @@ export type ConversationNode = {
   // reached the model — a rate-limited or budget-denied turn still writes a node
   // so the chain survives — and on every node written before the field existed.
   run?: TurnRun;
+  // Absent on every node written before the field existed; such a turn counts
+  // as carrying no profile.
+  author?: TurnAuthor;
 };
 
 type GuestThreadTurn = {
@@ -80,6 +92,8 @@ type GuestThreadTurn = {
   toolCalls?: ToolCallRecord[];
   // As in ConversationNode: what the model run behind this turn did.
   run?: TurnRun;
+  // As in ConversationNode: who asked, and the profile the envelope carried.
+  author?: TurnAuthor;
 };
 
 // A guest thread as of one answer: every turn up to and including it. Stored
