@@ -93,8 +93,4 @@ export const factsMessages = {
     en: "Memory",
     ru: "Память",
   }),
-  ui_user_facts_footer: m({
-    en: "View-only; the user manages them.",
-    ru: "Только просмотр; управляет пользователь.",
-  }),
 };

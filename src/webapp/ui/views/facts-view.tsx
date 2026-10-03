@@ -45,15 +45,35 @@ function factErrorText(s: Strings, code: string): string {
   return key ? s[key] : s.ui_facts_save_error(code);
 }
 
+// Where a FactsEditor sends its writes: the caller's own vault, or (admin) the
+// vault of the user being viewed.
+export type FactsWriter = {
+  add: (scope: string, fact: UserFact) => Promise<FactsResponse>;
+  update: (
+    scope: string,
+    key: string,
+    patch: { value: string; newKey?: string },
+  ) => Promise<FactsResponse>;
+  remove: (scope: string, key: string) => Promise<FactsResponse>;
+};
+
+const MY_FACTS: FactsWriter = {
+  add: api.addMyFact,
+  update: api.updateMyFact,
+  remove: api.deleteMyFact,
+};
+
 // Inline editor for one fact (or a new one when `fact` is null). Renders as
 // rows inside the parent Card; every successful mutation hands the server's
 // fresh list back up via onDone.
 function FactForm({
+  writer,
   scope,
   fact,
   onDone,
   onCancel,
 }: {
+  writer: FactsWriter;
   scope: string;
   fact: UserFact | null;
   onDone: (next: FactsResponse) => void;
@@ -83,21 +103,21 @@ function FactForm({
     if (normalizedKey === null) return;
     void run(() =>
       fact
-        ? api.updateMyFact(
+        ? writer.update(
             scope,
             fact.key,
             normalizedKey !== fact.key
               ? { value, newKey: normalizedKey }
               : { value },
           )
-        : api.addMyFact(scope, { key: normalizedKey, value }),
+        : writer.add(scope, { key: normalizedKey, value }),
     );
   };
 
   const remove = () => {
     if (!fact) return;
     if (!confirm(s.ui_facts_delete_confirm)) return;
-    void run(() => api.deleteMyFact(scope, fact.key));
+    void run(() => writer.remove(scope, fact.key));
   };
 
   return (
@@ -157,28 +177,93 @@ function FactForm({
   );
 }
 
+// The editable fact list of one vault scope: a row per fact that opens its
+// inline editor, plus an add row. Edit state is local, so callers key it by
+// scope to drop an open editor when the scope changes.
+export function FactsEditor({
+  writer,
+  scope,
+  data,
+  onChange,
+}: {
+  writer: FactsWriter;
+  scope: string;
+  data: FactsResponse;
+  onChange: (next: FactsResponse) => void;
+}) {
+  const { t: s } = useI18n();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const applyResult = (next: FactsResponse) => {
+    onChange(next);
+    setEditing(null);
+    setAdding(false);
+  };
+
+  return (
+    <>
+      <Card>
+        {data.facts.map((f) =>
+          editing === f.key ? (
+            <FactForm
+              key={f.key}
+              writer={writer}
+              scope={scope}
+              fact={f}
+              onDone={applyResult}
+              onCancel={() => setEditing(null)}
+            />
+          ) : (
+            <NavRow
+              key={f.key}
+              title={f.key}
+              subtitle={f.value}
+              onClick={() => {
+                setAdding(false);
+                setEditing(f.key);
+              }}
+            />
+          ),
+        )}
+        {data.facts.length === 0 && !adding ? (
+          <EmptyState>{s.ui_facts_empty}</EmptyState>
+        ) : null}
+      </Card>
+      {adding ? (
+        <Card>
+          <FactForm
+            writer={writer}
+            scope={scope}
+            fact={null}
+            onDone={applyResult}
+            onCancel={() => setAdding(false)}
+          />
+        </Card>
+      ) : (
+        <Card>
+          <RowButton
+            disabled={data.facts.length >= data.cap}
+            onClick={() => {
+              setEditing(null);
+              setAdding(true);
+            }}
+          >
+            {s.ui_facts_add}
+          </RowButton>
+        </Card>
+      )}
+    </>
+  );
+}
+
 export function FactsView() {
   const { t: s } = useI18n();
   const { data: botsData } = useLoadable(api.listMyBots, []);
   const [scope, setScope] = useState<string>(MAIN_SCOPE);
   const { data, setData } = useLoadable(() => api.listMyFacts(scope), [scope]);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
 
   const bots = botsData?.bots ?? null;
-
-  const applyResult = (next: FactsResponse) => {
-    setData(next);
-    setEditing(null);
-    setAdding(false);
-  };
-
-  const switchScope = (next: string) => {
-    if (next === scope) return;
-    setScope(next);
-    setEditing(null);
-    setAdding(false);
-  };
 
   return (
     <Stack>
@@ -191,7 +276,7 @@ export function FactsView() {
                 key={botScope(b)}
                 label={botLabel(s, b)}
                 selected={scope === botScope(b)}
-                onSelect={() => switchScope(botScope(b))}
+                onSelect={() => setScope(botScope(b))}
               />
             ))}
           </Card>
@@ -203,54 +288,13 @@ export function FactsView() {
         <LoadingState />
       ) : (
         <>
-          <Card>
-            {data.facts.map((f) =>
-              editing === f.key ? (
-                <FactForm
-                  key={f.key}
-                  scope={scope}
-                  fact={f}
-                  onDone={applyResult}
-                  onCancel={() => setEditing(null)}
-                />
-              ) : (
-                <NavRow
-                  key={f.key}
-                  title={f.key}
-                  subtitle={f.value}
-                  onClick={() => {
-                    setAdding(false);
-                    setEditing(f.key);
-                  }}
-                />
-              ),
-            )}
-            {data.facts.length === 0 && !adding ? (
-              <EmptyState>{s.ui_facts_empty}</EmptyState>
-            ) : null}
-          </Card>
-          {adding ? (
-            <Card>
-              <FactForm
-                scope={scope}
-                fact={null}
-                onDone={applyResult}
-                onCancel={() => setAdding(false)}
-              />
-            </Card>
-          ) : (
-            <Card>
-              <RowButton
-                disabled={data.facts.length >= data.cap}
-                onClick={() => {
-                  setEditing(null);
-                  setAdding(true);
-                }}
-              >
-                {s.ui_facts_add}
-              </RowButton>
-            </Card>
-          )}
+          <FactsEditor
+            key={scope}
+            writer={MY_FACTS}
+            scope={scope}
+            data={data}
+            onChange={setData}
+          />
           <SectionFooter>
             {s.ui_facts_footer} {s.ui_facts_count(data.facts.length, data.cap)}
           </SectionFooter>

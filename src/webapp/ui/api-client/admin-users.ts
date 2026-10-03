@@ -4,7 +4,7 @@
 import type { Gender, LimitClass, User } from "../../../shared/types";
 import type { Lang } from "../../../shared/i18n";
 import type { SpendSummary } from "../../../spending/window";
-import type { FactsResponse } from "./me";
+import type { FactsResponse, UserFact } from "./me";
 import { req } from "./http";
 
 export type SpendingResponse = {
@@ -61,4 +61,22 @@ export const adminUsersApi = {
     req<SpendingResponse>("GET", `/api/admin/users/${id}/spending`),
   listUserFacts: (id: string, scope: string) =>
     req<FactsResponse>("GET", `/api/admin/users/${id}/facts/${scope}`),
+  addUserFact: (id: string, scope: string, fact: UserFact) =>
+    req<FactsResponse>("POST", `/api/admin/users/${id}/facts/${scope}`, fact),
+  updateUserFact: (
+    id: string,
+    scope: string,
+    key: string,
+    patch: { value: string; newKey?: string },
+  ) =>
+    req<FactsResponse>(
+      "PUT",
+      `/api/admin/users/${id}/facts/${scope}/${key}`,
+      patch,
+    ),
+  deleteUserFact: (id: string, scope: string, key: string) =>
+    req<FactsResponse>(
+      "DELETE",
+      `/api/admin/users/${id}/facts/${scope}/${key}`,
+    ),
 };

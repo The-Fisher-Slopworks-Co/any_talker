@@ -22,7 +22,7 @@ import {
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { EmptyState, LoadingState } from "../../components/states";
+import { LoadingState } from "../../components/states";
 import { RowButton, SaveButton } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { DisplayNameField } from "../../components/display-name-field";
@@ -33,6 +33,7 @@ import { WhitelistToggleButton } from "../../components/whitelist-toggle-button"
 import { BlacklistToggleButton } from "../../components/blacklist-toggle-button";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { botLabel, userDisplayName } from "../../lib/labels";
+import { FactsEditor, type FactsWriter } from "../facts-view";
 import { useLoadable } from "../../lib/use-loadable";
 import { openTelegramProfile } from "../../lib/telegram";
 import { validateDisplayName } from "../../../../shared/display-name";
@@ -54,7 +55,7 @@ export function UserEditView({ userId }: { userId: string }) {
   const [spending, setSpending] = useState<SpendSummary | null>(null);
   const { data: botsData } = useLoadable(api.listMyBots, []);
   const [factScope, setFactScope] = useState<string>("main");
-  const { data: factsData } = useLoadable(
+  const { data: factsData, setData: setFactsData } = useLoadable(
     () => api.listUserFacts(userId, factScope),
     [userId, factScope],
   );
@@ -87,6 +88,12 @@ export function UserEditView({ userId }: { userId: string }) {
 
   const { user } = data;
   const factBots = botsData?.bots ?? null;
+  const factsWriter: FactsWriter = {
+    add: (scope, fact) => api.addUserFact(userId, scope, fact),
+    update: (scope, key, patch) =>
+      api.updateUserFact(userId, scope, key, patch),
+    remove: (scope, key) => api.deleteUserFact(userId, scope, key),
+  };
   const fallbackName = userDisplayName(user);
   const effectiveName = userDisplayName(user, data.displayName);
   const desiredTz = tzOverride ? tzValue : null;
@@ -238,21 +245,14 @@ export function UserEditView({ userId }: { userId: string }) {
         <LoadingState />
       ) : (
         <>
-          <Card>
-            {factsData.facts.map((f) => (
-              <div key={f.key} className="row relative px-4 py-[11px]">
-                <div className="text-base">{f.key}</div>
-                <div className="text-[13px] text-tg-hint whitespace-pre-wrap break-words">
-                  {f.value}
-                </div>
-              </div>
-            ))}
-            {factsData.facts.length === 0 ? (
-              <EmptyState>{s.ui_facts_empty}</EmptyState>
-            ) : null}
-          </Card>
+          <FactsEditor
+            key={factScope}
+            writer={factsWriter}
+            scope={factScope}
+            data={factsData}
+            onChange={setFactsData}
+          />
           <SectionFooter>
-            {s.ui_user_facts_footer}{" "}
             {s.ui_facts_count(factsData.facts.length, factsData.cap)}
           </SectionFooter>
         </>
