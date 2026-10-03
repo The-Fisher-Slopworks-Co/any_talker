@@ -33,7 +33,5 @@ pre-commit:
     - name: reuse
       run: bun run reuse
 
-    # `bun run test`, not `bun test`: the script narrows the run to `src/`,
-    # while a bare `bun test` would drag `e2e/` onto the commit gate.
     - name: test
       run: bun run test

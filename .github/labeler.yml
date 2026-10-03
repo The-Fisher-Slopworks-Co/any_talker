@@ -31,11 +31,6 @@
           - src/shared/i18n.test.ts
           - src/shared/i18n/**
 
-"area:e2e":
-  - changed-files:
-      - any-glob-to-any-file:
-          - e2e/**
-
 "area:ci":
   - changed-files:
       - any-glob-to-any-file:
