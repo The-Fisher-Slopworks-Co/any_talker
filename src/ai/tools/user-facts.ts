@@ -57,7 +57,7 @@ function createListFactsTool(deps: {
   return {
     name: "list_facts",
     description:
-      "List every fact stored about the user. The system prompt already shows them, so call this only to re-check.",
+      "List every fact stored about the user. Their latest `profile` in the conversation already shows them, so call this only to re-check.",
     parameters: ListSchema,
     execute: async (_input, ctx) => {
       return deps.storage.forBot(ctx.botId ?? null).facts.list(ctx.userId);
