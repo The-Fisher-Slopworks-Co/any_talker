@@ -56,13 +56,13 @@ export class MemoryConversationsStore implements ConversationsStore {
     });
   }
 
-  async getGuest(chatId: string): Promise<GuestThreadNode | null> {
-    const v = this.b.guestThreads.get(this.scope.sk(chatId));
+  async getGuest(token: string): Promise<GuestThreadNode | null> {
+    const v = this.b.guestThreads.get(this.scope.sk(token));
     return v ? structuredClone(v) : null;
   }
 
-  async saveGuest(chatId: string, thread: GuestThreadNode): Promise<void> {
-    this.b.guestThreads.set(this.scope.sk(chatId), structuredClone(thread));
+  async saveGuest(token: string, thread: GuestThreadNode): Promise<void> {
+    this.b.guestThreads.set(this.scope.sk(token), structuredClone(thread));
   }
 
   // Keyed by the bare user id: the index is global, so every `forBot` view of

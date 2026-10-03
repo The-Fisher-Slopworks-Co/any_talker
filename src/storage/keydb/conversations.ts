@@ -64,13 +64,13 @@ export class KeyDBConversationsStore implements ConversationsStore {
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }
 
-  async getGuest(chatId: string): Promise<GuestThreadNode | null> {
-    const raw = await this.client.get(this.sk(`guest_thread:${chatId}`));
+  async getGuest(token: string): Promise<GuestThreadNode | null> {
+    const raw = await this.client.get(this.sk(`guest_thread:${token}`));
     return raw ? (JSON.parse(raw) as GuestThreadNode) : null;
   }
 
-  async saveGuest(chatId: string, thread: GuestThreadNode): Promise<void> {
-    const key = this.sk(`guest_thread:${chatId}`);
+  async saveGuest(token: string, thread: GuestThreadNode): Promise<void> {
+    const key = this.sk(`guest_thread:${token}`);
     await this.client.set(key, JSON.stringify(thread));
     await this.client.expire(key, CONVERSATION_TTL_SECONDS);
   }

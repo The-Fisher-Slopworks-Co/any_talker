@@ -27,6 +27,10 @@ export type UserThreadWrite =
       kind: "guest";
       chatId: string;
       botId: string | null;
+      // The token of the answer just stored, and the thread's new head.
+      token: string;
+      // The token of the answer this turn replied to; null starts a thread.
+      parentToken: string | null;
       ts: number;
     };
 
@@ -44,9 +48,14 @@ export function continuesThread(
 ): boolean {
   if (ref.kind !== write.kind) return false;
   if (ref.chatId !== write.chatId || ref.botId !== write.botId) return false;
-  // A guest thread is keyed by chat alone (`saveGuest`), so there is only ever
-  // one entry for it and every turn advances that one.
-  if (ref.kind === "guest" || write.kind === "guest") return true;
+  if (ref.kind === "guest" || write.kind === "guest") {
+    return (
+      ref.kind === "guest" &&
+      write.kind === "guest" &&
+      ref.token !== undefined &&
+      ref.token === write.parentToken
+    );
+  }
   return ref.botMsgId === write.parentBotMsgId;
 }
 
@@ -58,6 +67,7 @@ export function userThreadRef(write: UserThreadWrite): UserThreadRef {
         kind: "guest",
         chatId: write.chatId,
         botId: write.botId,
+        token: write.token,
         ts: write.ts,
       }
     : {
@@ -80,8 +90,9 @@ export interface ConversationsStore {
   get(chatId: string, botMsgId: number): Promise<ConversationNode | null>;
   save(chatId: string, botMsgId: number, node: ConversationNode): Promise<void>;
 
-  getGuest(chatId: string): Promise<GuestThreadNode | null>;
-  saveGuest(chatId: string, thread: GuestThreadNode): Promise<void>;
+  // Keyed by the token of the answer the thread ends on (`bot/guest-token.ts`).
+  getGuest(token: string): Promise<GuestThreadNode | null>;
+  saveGuest(token: string, thread: GuestThreadNode): Promise<void>;
 
   // Records a thread the reporting user just took part in, evicting the oldest
   // past `USER_THREAD_INDEX_MAX`. Expires with the nodes it points at

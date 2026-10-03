@@ -42,6 +42,8 @@ class FakeAI implements AIClient {
 // fixtures sit a few ms past the epoch in the default UTC timezone.
 const SENT_AT = "1970-01-01 00:00";
 
+const TOKEN = "gTOKEN0001";
+
 const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
   const storage = overrides.storage ?? new MemoryStorage();
   return {
@@ -66,7 +68,10 @@ const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
     imageFileIds: [],
     replyImageFileIds: [],
     replyTarget: null,
+    replyIsOwnAnswer: false,
     priorThread: null,
+    priorToken: null,
+    threadToken: TOKEN,
     lang: "en",
     ...overrides,
   };
@@ -218,7 +223,7 @@ describe("guestAskHandler", () => {
     expect(call.models).toEqual(DEFAULT_SETTINGS.models);
   });
 
-  test("answered: persistThread stores a fresh thread keyed by chatId", async () => {
+  test("answered: persistThread stores a fresh thread under the answer's token", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "the answer", totalTokens: 200 });
@@ -226,7 +231,7 @@ describe("guestAskHandler", () => {
     expect(out.kind).toBe("answered");
     if (out.kind !== "answered") return;
     await out.persistThread();
-    expect(await storage.conversations.getGuest("c1")).toEqual({
+    expect(await storage.conversations.getGuest(TOKEN)).toEqual({
       chatId: "c1",
       turns: [
         {
@@ -344,100 +349,20 @@ describe("guestAskHandler", () => {
     ]);
   });
 
-  test("mismatched thread is dropped: reply to another conversation's answer uses the fallback", async () => {
+  test("own answer with no stored thread is quoted as the model's own, bot name cut", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
-    // The replier's own thread ends in "пока", but they replied to a bot
-    // answer from a different conversation ("Привет").
-    const priorThread = {
-      chatId: "c1",
-      turns: [{ userQuestion: "Пока", botAnswer: "пока" }],
-      ts: 500,
-    };
     await guestAskHandler(
       baseInput({
         storage,
         ai,
-        priorThread,
-        replyTarget: {
-          messageId: 7,
-          text: "Привет",
-          authorFirstName: "Bot",
-          images: [],
-        },
-      }),
-    );
-    const call = ai.calls[0] as {
-      messages: { role: string; content: unknown }[];
-    };
-    expect(call.messages).toEqual([
-      { role: "user", content: "Context (replied message from Bot): Привет" },
-      {
-        role: "user",
-        content: JSON.stringify({
-          author: "Jane",
-          time: SENT_AT,
-          text: "hello",
+        resolver: async () => ({
+          settings: DEFAULT_SETTINGS,
+          botName: "Helper",
         }),
-      },
-    ]);
-  });
-
-  test("mismatched thread: persistThread starts a fresh thread without the stale turns", async () => {
-    const storage = new MemoryStorage();
-    await storage.access.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI({ text: "fresh answer", totalTokens: 1 });
-    const priorThread = {
-      chatId: "c1",
-      turns: [{ userQuestion: "Пока", botAnswer: "пока" }],
-      ts: 500,
-    };
-    const out = await guestAskHandler(
-      baseInput({
-        storage,
-        ai,
-        priorThread,
-        now: 2000,
-        replyTarget: {
-          messageId: 7,
-          text: "Привет",
-          authorFirstName: "Bot",
-          images: [],
-        },
-      }),
-    );
-    if (out.kind !== "answered") throw new Error("expected answered");
-    await out.persistThread();
-    const stored = await storage.conversations.getGuest("c1");
-    expect(stored?.turns).toEqual([
-      {
-        userQuestion: JSON.stringify({
-          author: "Jane",
-          time: SENT_AT,
-          text: "hello",
-        }),
-        botAnswer: "fresh answer",
-        run: { gen: [], instr: expect.any(String) },
-      },
-    ]);
-  });
-
-  test("thread survives rendering differences (markdown stripped, bot-name prefix added)", async () => {
-    const storage = new MemoryStorage();
-    await storage.access.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI();
-    const priorThread = {
-      chatId: "c1",
-      turns: [{ userQuestion: "Q1", botAnswer: "**Привет,** _Jane_!" }],
-      ts: 500,
-    };
-    await guestAskHandler(
-      baseInput({
-        storage,
-        ai,
-        priorThread,
-        // What Telegram shows: bot-name prefix + rendered body, markdown gone.
+        replyIsOwnAnswer: true,
+        // What Telegram shows: bot-name line + rendered body.
         replyTarget: {
           messageId: 7,
           text: "Helper\n\nПривет, Jane!",
@@ -450,8 +375,11 @@ describe("guestAskHandler", () => {
       messages: { role: string; content: unknown }[];
     };
     expect(call.messages).toEqual([
-      { role: "user", content: "Q1" },
-      { role: "assistant", content: "**Привет,** _Jane_!" },
+      {
+        role: "user",
+        content:
+          "Context (replied message from you, the assistant): Привет, Jane!",
+      },
       {
         role: "user",
         content: JSON.stringify({
@@ -463,20 +391,15 @@ describe("guestAskHandler", () => {
     ]);
   });
 
-  test("reply to a text-less bot message drops the thread (nothing to verify against)", async () => {
+  test("a text-less own answer is still attributed to the model", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI();
-    const priorThread = {
-      chatId: "c1",
-      turns: [{ userQuestion: "Q1", botAnswer: "A1" }],
-      ts: 500,
-    };
     await guestAskHandler(
       baseInput({
         storage,
         ai,
-        priorThread,
+        replyIsOwnAnswer: true,
         replyTarget: {
           messageId: 7,
           text: null,
@@ -490,47 +413,63 @@ describe("guestAskHandler", () => {
     };
     expect(call.messages[0]).toEqual({
       role: "user",
-      content: "Context (replied message from Bot): <media>",
+      content: "Context (replied message from you, the assistant): <media>",
     });
   });
 
-  test("emoji-only answer is unverifiable: the thread is kept", async () => {
+  test("two conversations in one chat stay apart, and a reply resumes only its own", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
-    const ai = new FakeAI();
-    const priorThread = {
-      chatId: "c1",
-      turns: [{ userQuestion: "Q1", botAnswer: "👍" }],
-      ts: 500,
+    await storage.access.addWhitelist("users", { id: "43" });
+    const turn = async (overrides: Partial<GuestAskInput>, answer: string) => {
+      const ai = new FakeAI({ text: answer, totalTokens: 1 });
+      const out = await guestAskHandler(
+        baseInput({ storage, ai, ...overrides }),
+      );
+      if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
+      await out.persistThread();
+      return ai;
     };
-    await guestAskHandler(
-      baseInput({
-        storage,
-        ai,
-        priorThread,
+    await turn({ userText: "film?", threadToken: "gFILM00001" }, "Knives Out");
+    await turn(
+      { userId: "43", userText: "tap?", threadToken: "gTAP000001" },
+      "Replace the washer",
+    );
+    // Jane replies to the film answer after the tap one was posted.
+    const ai = await turn(
+      {
+        userText: "scarier?",
+        threadToken: "gFILM00002",
+        priorToken: "gFILM00001",
+        priorThread: await storage.conversations.getGuest("gFILM00001"),
+        replyIsOwnAnswer: true,
         replyTarget: {
           messageId: 7,
-          text: "👍",
+          text: "Knives Out",
           authorFirstName: "Bot",
           images: [],
         },
-      }),
-    );
-    const call = ai.calls[0] as {
-      messages: { role: string; content: unknown }[];
-    };
-    expect(call.messages).toEqual([
-      { role: "user", content: "Q1" },
-      { role: "assistant", content: "👍" },
-      {
-        role: "user",
-        content: JSON.stringify({
-          author: "Jane",
-          time: SENT_AT,
-          text: "hello",
-        }),
       },
+      "Hereditary",
+    );
+
+    const call = ai.calls[0] as {
+      messages: { role: string; content: string }[];
+    };
+    expect(call.messages.map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
     ]);
+    expect(call.messages[1]?.content).toBe("Knives Out");
+    const answers = async (token: string) =>
+      (await storage.conversations.getGuest(token))?.turns.map(
+        (t) => t.botAnswer,
+      );
+    expect(await answers("gFILM00002")).toEqual(["Knives Out", "Hereditary"]);
+    // The answers replied to earlier keep their own threads untouched.
+    expect(await answers("gFILM00001")).toEqual(["Knives Out"]);
+    expect(await answers("gTAP000001")).toEqual(["Replace the washer"]);
   });
 
   test("empty text with a replyTarget is answered, not denied (bare-mention reply)", async () => {
@@ -651,7 +590,7 @@ describe("guestAskHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistThread();
-    const stored = await storage.conversations.getGuest("c1");
+    const stored = await storage.conversations.getGuest(TOKEN);
     expect(stored?.turns[0]?.userImageFileIds).toEqual([
       "own1",
       "reply1",
@@ -759,7 +698,7 @@ describe("guestAskHandler", () => {
     );
     if (out.kind !== "answered") throw new Error("expected answered");
     await out.persistThread();
-    const stored = await storage.conversations.getGuest("c1");
+    const stored = await storage.conversations.getGuest(TOKEN);
     expect(stored?.turns).toEqual([
       { userQuestion: "Q1", botAnswer: "A1" },
       {
@@ -802,7 +741,7 @@ describe("guestAskHandler", () => {
     });
 
     await out.persistThread();
-    const stored = await storage.conversations.getGuest("c1");
+    const stored = await storage.conversations.getGuest(TOKEN);
     expect(stored?.turns.length).toBe(MAX_REPLY_CHAIN_DEPTH);
     expect(stored?.turns[stored.turns.length - 1]?.botAnswer).toBe("newest");
     expect(stored?.turns[0]?.userQuestion).toBe(
@@ -947,7 +886,7 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
     await out.persistThread();
 
     expect(
-      (await storage.conversations.getGuest("c1"))!.turns[0]!.toolCalls,
+      (await storage.conversations.getGuest(TOKEN))!.turns[0]!.toolCalls,
     ).toEqual(RECORDS);
   });
 
@@ -961,7 +900,7 @@ describe("guestAskHandler — tool calls on the stored thread", () => {
     await out.persistThread();
 
     expect(
-      (await storage.conversations.getGuest("c1"))!.turns[0]!.toolCalls,
+      (await storage.conversations.getGuest(TOKEN))!.turns[0]!.toolCalls,
     ).toBeUndefined();
   });
 
@@ -1006,7 +945,7 @@ describe("guestAskHandler — the run on the stored turn", () => {
     if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
     await out.persistThread();
 
-    const turn = (await storage.conversations.getGuest("c1"))!.turns[0]!;
+    const turn = (await storage.conversations.getGuest(TOKEN))!.turns[0]!;
     // Guest queries are always single-turn asks with no detail level, so the
     // key is absent rather than set to the "short"-equivalent path it takes.
     expect(turn.run).toEqual({
@@ -1051,7 +990,7 @@ describe("guestAskHandler — the run on the stored turn", () => {
 });
 
 // Issue #116: a guest thread is as reportable as a chain, so it goes into the
-// same per-user index — tagged, because it is keyed by chat alone.
+// same per-user index — tagged, because it is keyed by token, not message id.
 describe("guestAskHandler — the user's thread index", () => {
   test("persistThread indexes the guest thread in the answering bot's scope", async () => {
     const storage = new MemoryStorage();
@@ -1060,15 +999,21 @@ describe("guestAskHandler — the user's thread index", () => {
     if (out.kind !== "answered") throw new Error(`unexpected ${out.kind}`);
     await out.persistThread();
     expect(await storage.conversations.listUserThreads("42")).toEqual([
-      { kind: "guest", chatId: "c1", botId: "cat-bot", ts: 1000 },
+      {
+        kind: "guest",
+        chatId: "c1",
+        botId: "cat-bot",
+        token: TOKEN,
+        ts: 1000,
+      },
     ]);
     // The scope the entry names is the one holding the thread.
     expect(
-      await storage.forBot("cat-bot").conversations.getGuest("c1"),
+      await storage.forBot("cat-bot").conversations.getGuest(TOKEN),
     ).not.toBeNull();
   });
 
-  test("a second turn refreshes the one entry rather than adding another", async () => {
+  test("a reply advances the thread's entry rather than adding another", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     const first = await guestAskHandler(baseInput({ storage }));
@@ -1080,7 +1025,9 @@ describe("guestAskHandler — the user's thread index", () => {
         storage,
         now: 2_000,
         userText: "and then?",
-        priorThread: await storage.conversations.getGuest("c1"),
+        priorThread: await storage.conversations.getGuest(TOKEN),
+        priorToken: TOKEN,
+        threadToken: "gTOKEN0002",
       }),
     );
     if (second.kind !== "answered")
@@ -1088,7 +1035,13 @@ describe("guestAskHandler — the user's thread index", () => {
     await second.persistThread();
 
     expect(await storage.conversations.listUserThreads("42")).toEqual([
-      { kind: "guest", chatId: "c1", botId: null, ts: 2000 },
+      {
+        kind: "guest",
+        chatId: "c1",
+        botId: null,
+        token: "gTOKEN0002",
+        ts: 2000,
+      },
     ]);
   });
 });

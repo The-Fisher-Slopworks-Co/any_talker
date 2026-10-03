@@ -211,11 +211,13 @@ describe("buildThreadSnapshots", () => {
         botAnswer: `a${i + 1}`,
       })),
     };
-    await storage.forBot("b1").conversations.saveGuest("g1", thread);
+    await storage.forBot("b1").conversations.saveGuest("gHEAD", thread);
     await storage.conversations.indexUserThread(USER, {
       kind: "guest",
       chatId: "g1",
       botId: "b1",
+      token: "gHEAD",
+      parentToken: null,
       ts: 5000,
     });
 
@@ -228,7 +230,7 @@ describe("buildThreadSnapshots", () => {
 
   test("an empty guest thread is dropped rather than snapshotted", async () => {
     const storage = new MemoryStorage();
-    await storage.forBot("b1").conversations.saveGuest("g1", {
+    await storage.forBot("b1").conversations.saveGuest("gHEAD", {
       chatId: "g1",
       ts: 5000,
       turns: [],
@@ -237,6 +239,8 @@ describe("buildThreadSnapshots", () => {
       kind: "guest",
       chatId: "g1",
       botId: "b1",
+      token: "gHEAD",
+      parentToken: null,
       ts: 5000,
     });
 
