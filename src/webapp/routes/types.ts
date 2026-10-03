@@ -67,8 +67,8 @@ export type Route = {
   // A string is compared with `===`; a RegExp is matched and its capture groups
   // become `RouteContext.params`.
   path: string | RegExp;
-  // `null` means "declined after all, keep matching". Only the two
-  // `/api/me/facts` routes need it: their path-level checks (unknown character
+  // `null` means "declined after all, keep matching". Only the facts routes
+  // (`/api/me/facts`, `/api/admin/users/:id/facts`) need it: their path-level checks (unknown character
   // scope, malformed key) answer for *every* verb, so those routes are entered
   // on ANY_METHOD and pick the verb themselves — anything else would either
   // turn those 404s into a fall-through or resolve the scope twice.
