@@ -8,9 +8,6 @@ import { req } from "./http";
 // carrying raw token counts. The caller's own percentage-only bars come from
 // `getMyUsageShare` in `./me`.
 export const rateLimitApi = {
-  getMyUsage: () => req<{ usage: UsageStatus }>("GET", "/api/ratelimit/me"),
-  resetMyUsage: () =>
-    req<{ usage: UsageStatus }>("PUT", "/api/ratelimit/me", { reset: true }),
   getUserUsage: (id: string) =>
     req<{ usage: UsageStatus }>("GET", `/api/ratelimit/user/${id}`),
   resetUserUsage: (id: string) =>

@@ -26,10 +26,6 @@ export const rateLimitMessages = {
     en: "Per-user spend budgets; a request needs both to have budget left.",
     ru: "Бюджеты трат пользователя; запросу нужен остаток в обоих.",
   }),
-  ui_ratelimit_my_usage: m({
-    en: "My Usage",
-    ru: "Моё использование",
-  }),
   ui_ratelimit_5h_window: m({
     en: "5-hour window",
     ru: "Окно 5 часов",

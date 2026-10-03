@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../../i18n-context";
-import { api, type UsageStatus } from "../../api-client";
+import { api } from "../../api-client";
 import type { RateLimitConfig, Settings } from "../../../../shared/types";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../../components/layout";
-import { RowButton, SaveButton } from "../../components/controls";
+import { SectionFooter, SectionHeader, Stack } from "../../components/layout";
+import { SaveButton } from "../../components/controls";
 import { RateLimitFields } from "../../components/rate-limit-fields";
-import { UsageCard } from "../../components/usage-card";
 import { TimeNote } from "../../components/time-note";
 import { LimitBoostCard } from "../../components/limit-boost-card";
 import { LimitClassesCard } from "../../components/limit-classes-card";
@@ -27,12 +21,7 @@ export function RateLimitTab({
 }) {
   const { t: s } = useI18n();
   const [config, setConfig] = useState<RateLimitConfig>(settings.rateLimit);
-  const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    api.getMyUsage().then((r) => setUsage(r.usage));
-  }, []);
 
   const dirty = JSON.stringify(config) !== JSON.stringify(settings.rateLimit);
 
@@ -41,11 +30,6 @@ export function RateLimitTab({
     const next = await api.putSettings({ rateLimit: config });
     onSaved(next);
     setSaving(false);
-  };
-
-  const reset = async () => {
-    const r = await api.resetMyUsage();
-    setUsage(r.usage);
   };
 
   return (
@@ -63,19 +47,6 @@ export function RateLimitTab({
       </SectionFooter>
 
       <LimitClassesCard settings={settings} onSaved={onSaved} />
-
-      <SectionHeader>{s.ui_ratelimit_my_usage}</SectionHeader>
-      {usage ? (
-        <>
-          <UsageCard usage={usage} />
-          <Card>
-            <RowButton onClick={reset}>{s.ui_ratelimit_reset}</RowButton>
-          </Card>
-          <SectionFooter>
-            <TimeNote />
-          </SectionFooter>
-        </>
-      ) : null}
     </Stack>
   );
 }
