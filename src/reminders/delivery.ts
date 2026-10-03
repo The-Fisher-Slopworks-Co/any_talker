@@ -6,7 +6,8 @@ import type { Reminder } from "./types";
 import type { SalvagedRecipient } from "./parse";
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
-import type { AIClient, AIMessage } from "../ai/types";
+import type { AIClient } from "../ai/types";
+import { append, transcript } from "../ai/transcript";
 import { runAiTurn } from "../ai/turn";
 import { deserializeMessages } from "../ai/serialize";
 import type { PersonaResolver } from "../managed-bots/persona";
@@ -269,8 +270,11 @@ async function composeReminderMessage(
     gender,
   });
 
-  const prior = deserializeMessages(reminder.contextMessages);
-  const messages: AIMessage[] = [...prior, { role: "user", content: envelope }];
+  // The snapshot the reminder was set in, continued by the event that fired it.
+  const messages = append(
+    transcript(deserializeMessages(reminder.contextMessages)),
+    { role: "user", content: envelope },
+  );
 
   // Re-run the LLM and account for it (charge tokens to the user's budget +
   // record spend across the ledgers, exactly as an /ask would) in the shared

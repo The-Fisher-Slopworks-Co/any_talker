@@ -7,6 +7,7 @@ import { buildDeliveryTarget, durationToMs, persistReminder } from "./shared";
 import { parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import { DEFAULT_SETTINGS } from "../../../shared/types";
 import type { ToolCallContext, ToolEffect } from "../registry";
+import { transcript } from "../../transcript";
 
 // The message union now also covers replayed tool calls, which carry `output`
 // rather than `content`. These fixtures never build one, so a hit here means a
@@ -139,10 +140,10 @@ describe("persistReminder context capture", () => {
     const fireAtMs = baseCtx.now + 5 * 60_000;
     const ctx = {
       ...baseCtx,
-      contextMessages: [
-        { role: "user" as const, content: "remind me about milk" },
-        { role: "assistant" as const, content: "ok" },
-      ],
+      contextMessages: transcript([
+        { role: "user", content: "remind me about milk" },
+        { role: "assistant", content: "ok" },
+      ]),
     };
     const out = await persistReminder(storage, ctx, fireAtMs, "milk");
     if (!out.ok) throw new Error("expected ok");
@@ -159,19 +160,15 @@ describe("persistReminder context capture", () => {
     const bytes = new Uint8Array([10, 20, 30]);
     const ctx = {
       ...baseCtx,
-      contextMessages: [
+      contextMessages: transcript([
         {
-          role: "user" as const,
+          role: "user",
           content: [
-            { type: "text" as const, text: "look:" },
-            {
-              type: "image" as const,
-              image: bytes,
-              mediaType: "image/png",
-            },
+            { type: "text", text: "look:" },
+            { type: "image", image: bytes, mediaType: "image/png" },
           ],
         },
-      ],
+      ]),
     };
     const out = await persistReminder(storage, ctx, fireAtMs, "x");
     if (!out.ok) throw new Error("expected ok");

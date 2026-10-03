@@ -4,7 +4,8 @@
 import type { Storage } from "../../storage/types";
 import type { RateLimiter } from "../../ratelimit/types";
 import type { BudgetGuard } from "../../budget/types";
-import type { AIClient, AIMessage } from "../../ai/types";
+import type { AIClient } from "../../ai/types";
+import type { Transcript } from "../../ai/transcript";
 import type {
   BudgetDenyReason,
   Settings,
@@ -48,7 +49,7 @@ export type GatedTurnInput = {
 
   // Called only once both gates pass: assembling the context reads storage and
   // re-downloads chain images, work a denied turn must not do.
-  buildMessages: () => Promise<AIMessage[]>;
+  buildMessages: () => Promise<Transcript>;
   onAIStart?: (() => void) | undefined;
 };
 

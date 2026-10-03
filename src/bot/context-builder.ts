@@ -3,6 +3,7 @@
 
 import type { Storage } from "../storage/types";
 import type { AIMessage, AIUserContentPart } from "../ai/types";
+import { append, emptyTranscript, type Transcript } from "../ai/transcript";
 import type { Gender, ToolCallRecord } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 import { localDateTimeString } from "../shared/tz";
@@ -179,13 +180,13 @@ export function toolCallMessages(records: ToolCallRecord[]): AIMessage[] {
 
 export async function buildContext(
   args: BuildContextArgs,
-): Promise<AIMessage[]> {
+): Promise<Transcript> {
   const { storage, chatId, sender, userText, quote, images, replyTarget } =
     args;
   const audios = args.audios ?? [];
   const videos = args.videos ?? [];
   const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
-  const messages: AIMessage[] = [];
+  let messages = emptyTranscript;
 
   if (replyTarget !== null) {
     const node = await storage.conversations.get(chatId, replyTarget.messageId);
@@ -218,21 +219,29 @@ export async function buildContext(
           chainImages = replyTarget.images;
         }
         if (chainImages.length > 0) {
-          messages.push({
+          messages = append(messages, {
             role: "user",
             content: withMedia(c.userQuestion, chainImages, []),
           });
         } else {
-          messages.push({ role: "user", content: c.userQuestion });
+          messages = append(messages, {
+            role: "user",
+            content: c.userQuestion,
+          });
         }
         // Between the question and the answer, where the calls actually
         // happened. Appending after the question rather than before it also
         // keeps the cacheable prefix of every older turn byte-identical.
-        if (c.toolCalls) messages.push(...toolCallMessages(c.toolCalls));
-        messages.push({ role: "assistant", content: c.botAnswer });
+        if (c.toolCalls) {
+          messages = append(messages, ...toolCallMessages(c.toolCalls));
+        }
+        messages = append(messages, {
+          role: "assistant",
+          content: c.botAnswer,
+        });
       }
     } else {
-      messages.push(buildReplyFallbackMessage(replyTarget));
+      messages = append(messages, buildReplyFallbackMessage(replyTarget));
     }
   }
 
@@ -258,12 +267,12 @@ export async function buildContext(
       sentAt: args.sentAt,
     });
     if (images.length > 0 || audios.length > 0 || videos.length > 0) {
-      messages.push({
+      messages = append(messages, {
         role: "user",
         content: withMedia(envelope, images, audios, videos),
       });
     } else {
-      messages.push({ role: "user", content: envelope });
+      messages = append(messages, { role: "user", content: envelope });
     }
   }
   return messages;

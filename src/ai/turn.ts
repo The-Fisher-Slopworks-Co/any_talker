@@ -3,7 +3,8 @@
 
 import type { Storage } from "../storage/types";
 import type { RateLimiter } from "../ratelimit/types";
-import type { AIClient, AIMessage, RoutingOptions } from "./types";
+import type { AIClient, RoutingOptions } from "./types";
+import type { Transcript } from "./transcript";
 import type {
   RateLimitConfig,
   ReasoningEffortConfig,
@@ -74,8 +75,9 @@ export type RunAiTurnInput = {
   lang: Lang;
   now: number;
 
-  // The messages sent to the model this turn.
-  messages: AIMessage[];
+  // The messages sent to the model this turn: the stored history this turn
+  // continues, with the new message appended.
+  messages: Transcript;
 
   // Optional: when set, adds the detail-level section to the system prompt and
   // selects the configured reasoning effort for that level. Absent (guest,
@@ -85,7 +87,7 @@ export type RunAiTurnInput = {
   facts?: Array<{ key: string; value: string }>;
   // Optional snapshot of the conversation placed on the tool context so tools
   // (e.g. reminders) can durably capture it. Reminder delivery omits it.
-  contextMessages?: AIMessage[];
+  contextMessages?: Transcript;
   // When true, a failed token deduction is swallowed and logged instead of
   // thrown. Reminder delivery needs this: a throw would surface as a transient
   // failure, retrying and re-running the model — a double-spend. /ask and guest

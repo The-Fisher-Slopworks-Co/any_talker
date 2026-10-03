@@ -20,6 +20,7 @@ import {
   resolveAskCost,
 } from "./openrouter-client";
 import type { AIMessage } from "./types";
+import { transcript } from "./transcript";
 import type { Tool, ToolCallContext } from "./tools/registry";
 import { aiRequestsTotal } from "../metrics";
 import { TOOL_CALLS_MAX_PER_TURN, TOOL_OUTPUT_MAX } from "./tool-calls";
@@ -287,7 +288,7 @@ const askOpts = (
 ) => ({
   models: ["a/primary"],
   system: "sys",
-  messages: [{ role: "user", content: "hi" }] as AIMessage[],
+  messages: transcript([{ role: "user", content: "hi" }]),
   tools: [] as Tool[],
   toolCallContext: {} as ToolCallContext,
   ...over,
@@ -464,7 +465,7 @@ describe("OpenRouterClient — the request that goes out", () => {
     const { client, calls } = capturingClient();
     await client.ask(
       askOpts({
-        messages: [
+        messages: transcript([
           {
             role: "user",
             content: [
@@ -476,7 +477,7 @@ describe("OpenRouterClient — the request that goes out", () => {
               },
             ],
           },
-        ],
+        ]),
       }),
     );
     const input = calls[0]!.body.input as { content: unknown }[];
@@ -885,7 +886,7 @@ describe("OpenRouterClient — the tool calls it reports", () => {
     const result = await client.ask(
       askOpts({
         tools: [echoTool],
-        messages: [
+        messages: transcript([
           { role: "user", content: "Q1" },
           {
             role: "tool",
@@ -896,7 +897,7 @@ describe("OpenRouterClient — the tool calls it reports", () => {
           },
           { role: "assistant", content: "A1" },
           { role: "user", content: "Q2" },
-        ] as AIMessage[],
+        ] as AIMessage[]),
       }),
     );
 
@@ -911,7 +912,7 @@ describe("OpenRouterClient — the tool calls it reports", () => {
     const result = await client.ask(
       askOpts({
         tools: [echoTool],
-        messages: [
+        messages: transcript([
           { role: "user", content: "Q1" },
           {
             role: "tool",
@@ -928,7 +929,7 @@ describe("OpenRouterClient — the tool calls it reports", () => {
             output: '"two"',
           },
           { role: "user", content: "Q2" },
-        ] as AIMessage[],
+        ] as AIMessage[]),
       }),
     );
 
@@ -989,7 +990,7 @@ describe("OpenRouterClient — replayed calls on the wire", () => {
     const { client, calls } = capturingClient();
     await client.ask(
       askOpts({
-        messages: [
+        messages: transcript([
           { role: "user", content: "Q1" },
           {
             role: "tool",
@@ -1000,7 +1001,7 @@ describe("OpenRouterClient — replayed calls on the wire", () => {
           },
           { role: "assistant", content: "A1" },
           { role: "user", content: "Q2" },
-        ] as AIMessage[],
+        ] as AIMessage[]),
       }),
     );
 

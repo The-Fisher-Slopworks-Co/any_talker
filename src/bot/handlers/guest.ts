@@ -17,7 +17,7 @@ import {
 } from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
 import type { ToolEffect } from "../../ai/tools/registry";
-import type { AIMessage } from "../../ai/types";
+import { append, emptyTranscript } from "../../ai/transcript";
 import {
   MAX_REPLY_CHAIN_DEPTH,
   type GuestThreadNode,
@@ -199,33 +199,40 @@ export async function guestAskHandler(
     lang: input.lang,
     now: input.now,
     buildMessages: async () => {
-      const messages: AIMessage[] = [];
+      let messages = emptyTranscript;
       for (const priorTurn of priorTurns) {
         const chainImages = await loadChainImages(
           priorTurn.userImageFileIds,
           input.fetchPhoto,
         );
         if (chainImages.length > 0) {
-          messages.push({
+          messages = append(messages, {
             role: "user",
             content: withMedia(priorTurn.userQuestion, chainImages, []),
           });
         } else {
-          messages.push({ role: "user", content: priorTurn.userQuestion });
+          messages = append(messages, {
+            role: "user",
+            content: priorTurn.userQuestion,
+          });
         }
         // Between question and answer, where the calls happened — as in
         // `buildContext`'s reply-chain replay.
         if (priorTurn.toolCalls) {
-          messages.push(...toolCallMessages(priorTurn.toolCalls));
+          messages = append(messages, ...toolCallMessages(priorTurn.toolCalls));
         }
-        messages.push({ role: "assistant", content: priorTurn.botAnswer });
+        messages = append(messages, {
+          role: "assistant",
+          content: priorTurn.botAnswer,
+        });
       }
       // A stored thread already contains the replied-to bot answer; the raw
       // replied-to message only fills in when there is no thread to speak for
       // it.
       const replyTarget = priorTurns.length === 0 ? input.replyTarget : null;
       if (replyTarget) {
-        messages.push(
+        messages = append(
+          messages,
           buildReplyFallbackMessage(
             input.replyIsOwnAnswer
               ? {
@@ -241,12 +248,12 @@ export async function guestAskHandler(
         );
       }
       if (input.images.length > 0 || audios.length > 0 || videos.length > 0) {
-        messages.push({
+        messages = append(messages, {
           role: "user",
           content: withMedia(envelope, input.images, audios, videos),
         });
       } else {
-        messages.push({ role: "user", content: envelope });
+        messages = append(messages, { role: "user", content: envelope });
       }
       return messages;
     },
