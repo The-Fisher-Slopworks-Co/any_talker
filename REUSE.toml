@@ -1,7 +1,18 @@
 version = 1
 
+# Every other file carries its own SPDX header, so `reuse lint` fails on a
+# new source file that lacks one. This list is only for formats that cannot
+# hold a comment, or where one would leak into what the file renders.
 [[annotations]]
-path = "**"
+path = [
+  "**/*.json",
+  "bun.lock",
+  "**/*.md",
+  "**/*.gif",
+  "**/*.png",
+  "**/*.jpg",
+  "**/*.webp",
+]
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 The Fisher Slopworks Co"
 SPDX-License-Identifier = "AGPL-3.0-or-later"

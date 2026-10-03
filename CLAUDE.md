@@ -8,11 +8,12 @@ user-facing feature/metrics catalog. This file covers how to work in the code.
 
 ```bash
 bun run dev        # long-polling + hot reload (src/main.ts)
-bun run check      # typecheck + lint + format + knip + tests — before every commit
+bun run check      # typecheck + lint + format + knip + reuse + tests — before every commit
 bun run typecheck  # bunx tsc --noEmit
 bun run lint       # oxlint (config: .oxlintrc.json)
 bun run format     # prettier --write over src/ + e2e/ (config: .prettierrc.json)
 bun run knip       # unused files/exports/deps (config: knip.ts)
+bun run reuse      # `uvx reuse lint` — SPDX headers; needs uv on the machine
 bun run test       # unit tests = `bun test src`; one file: `bun test src/path/x.test.ts`
 bun run e2e        # e2e/ against real Telegram; needs `.env.e2e` (see `.env.e2e.example`)
 bun run webapp:demo  # Web App in a plain browser on in-memory data: localhost:3000/webapp
@@ -57,7 +58,7 @@ MTProto credentials + a KeyDB it flushes). `e2e/scaffold.test.ts` guards this.
 
 ### Conventions
 
-- **SPDX header on every new source file** (enforced via `REUSE.toml`; all current files comply):
+- **SPDX header on every new file** that can hold a comment — `bun run reuse` fails without one. `REUSE.toml` covers only the formats that cannot (JSON, `bun.lock`, Markdown, images); `#`-comment files use the same two lines with `#`:
   ```ts
   // SPDX-License-Identifier: AGPL-3.0-or-later
   // Copyright (C) 2026 The Fisher Slopworks Co

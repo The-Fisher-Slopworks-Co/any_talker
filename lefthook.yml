@@ -28,6 +28,11 @@ pre-commit:
     - name: knip
       run: bun run knip
 
+    # Whole-tree as well: `reuse lint` also catches a license text that went
+    # missing from LICENSES/, which no single staged file shows.
+    - name: reuse
+      run: bun run reuse
+
     # `bun run test`, not `bun test`: the script narrows the run to `src/`,
     # while a bare `bun test` would drag `e2e/` onto the commit gate.
     - name: test
