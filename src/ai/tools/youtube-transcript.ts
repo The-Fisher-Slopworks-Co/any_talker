@@ -231,7 +231,7 @@ export function createYoutubeTranscriptTool(
   return {
     name: "youtube_transcript",
     description:
-      "Fetch the captions / transcript for a YouTube video and return it as plain text the model can summarise or quote. Accepts full watch URLs, youtu.be / m. / shorts URLs, or a bare 11-character video ID. By default the transcript comes back in the video's original language (auto-detected); pass a `language` ISO code only to force a (best-effort) translation. Throws if the video has no captions, is private, age-restricted, or otherwise unavailable.",
+      "Fetch a YouTube video's transcript as plain text, in the video's original language unless `language` forces a best-effort translation. Fails if the video has no captions or is unavailable.",
     parameters: Schema,
     execute: async ({ url, language }, ctx) => {
       const videoId = extractVideoId(url);

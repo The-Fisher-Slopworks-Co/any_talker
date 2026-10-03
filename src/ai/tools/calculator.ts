@@ -13,12 +13,8 @@ type Input = z.infer<typeof Schema>;
 export const calculatorTool: Tool<Input, string> = {
   name: "calculator",
   description:
-    "Evaluate a mathematical expression with full numeric precision. " +
-    "Supports + - * / % ^ (or **), unary minus, parentheses, " +
-    "functions (sqrt, abs, floor, ceil, round, sin, cos, tan, asin, acos, atan, " +
-    "log/ln (natural log), log2, log10, exp, min, max), " +
-    "and constants (pi, e). Function names and constants are case-insensitive. " +
-    "Use this for any non-trivial arithmetic instead of computing it yourself.",
+    "Evaluate a math expression; use it for any non-trivial arithmetic. " +
+    "Supports + - * / % ^, parentheses, sqrt abs floor ceil round sin cos tan asin acos atan ln log2 log10 exp min max, pi, e.",
   parameters: Schema,
   execute: ({ expression }, _ctx) => {
     const value = evaluate(expression);

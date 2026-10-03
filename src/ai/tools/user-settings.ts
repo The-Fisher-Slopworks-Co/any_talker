@@ -13,12 +13,11 @@ import {
 } from "../../shared/display-name";
 import { getEffectiveSettings } from "../../settings";
 
-// Shared doc fragment so both tools describe the same scope/semantics to the
-// model: these four attributes are user-global (one value across the main bot
-// and every character bot) and a change is applied immediately to this turn.
+// Shared doc fragment: these four attributes are user-global (one value across
+// the main bot and every character bot) and a change applies to this turn.
 const SETTINGS_SCOPE_DOC =
-  "These settings belong to the user, not the chat, and are SHARED across this bot and all its character bots. " +
-  "A change is saved immediately, and any further tool calls you make in the SAME reply (e.g. scheduling a reminder) already use the new value.";
+  "Settings are per user and shared by this bot and all its character bots. " +
+  "A change applies immediately, including to later tool calls in the same reply.";
 
 type GetUserSettingsOutput = {
   name: { value: string; isDefault: boolean };
@@ -36,14 +35,9 @@ function createGetUserSettingsTool(deps: {
   return {
     name: "get_user_settings",
     description:
-      "Read the current user's personal settings that the assistant honours: display name, timezone, gender, and language. " +
-      "Takes no parameters. Returns each field's EFFECTIVE value plus whether it is the user's own explicit choice " +
-      "(isDefault:false) or an inherited default (isDefault:true). " +
-      "'name' is the name you see for the user (their override, or their Telegram name if unset). " +
-      "'timezone' is the IANA zone used for dates/times (their override, else the chat or global default). " +
-      "'gender' is 'male'/'female', or null when unset. 'language' is 'en' or 'ru' (the bot UI language; replies follow the language the user writes in, this is only the fallback). " +
-      `${SETTINGS_SCOPE_DOC} ` +
-      "Call this before answering questions like 'what's my timezone?' or before editing a setting, so you know the current state.",
+      "Read the user's display name, timezone (IANA), gender (male/female/null) and language (en/ru, fallback only: replies follow the user's language). " +
+      "isDefault:true means an inherited default rather than the user's own choice. " +
+      SETTINGS_SCOPE_DOC,
     parameters: GetSchema,
     execute: async (_input, ctx) => {
       const [nameOverride, tzOverride, gender, langOverride, user] =
@@ -129,21 +123,16 @@ function createUpdateUserSettingsTool(deps: {
   return {
     name: "update_user_settings",
     description:
-      "Change one or more of the current user's personal settings. " +
-      "'name': display name shown to you (1–32 visible characters; letters, digits, spaces and . ' - only). " +
-      "'timezone': an IANA name like 'Europe/Moscow' or 'America/New_York'. " +
-      "CHANGE the timezone ONLY when the user, in their own words, explicitly NAMES a place or zone — e.g. 'по екб' / 'in Yekaterinburg time', \"I'm in Berlin now\", 'use Moscow time'. " +
-      "Map any shorthand or city name to its IANA zone yourself (Russian 'екб'/'екат' → 'Asia/Yekaterinburg', 'мск' → 'Europe/Moscow'). When the user names their zone like this, persist it here even if they didn't say the words 'change my timezone' and even if it's mentioned alongside another request such as a reminder. " +
-      "CRITICAL: do NOT touch the timezone in any other case. If the user does not name a place or zone, do NOT call this tool for 'timezone' at all — never guess, default, 'confirm', re-apply, or reset it. " +
-      "A bare time with no place (e.g. 'remind me at 15:00') is NOT a timezone signal: leave the timezone unchanged and schedule in the user's existing zone. A pure lookup about somewhere the user isn't claiming ('what time is it in Tokyo?') is also not a change. " +
-      "When the user DOES name a zone and you are also scheduling/rescheduling a reminder for it, set the timezone here FIRST, then schedule afterwards — once saved, the new zone applies to your reminder tool calls in this same reply, so a wall-clock time like '15:00' is interpreted in the new zone. " +
-      "'gender': 'male' or 'female'. 'language': 'en' or 'ru' (the bot UI language; replies follow the language the user writes in, this is only the fallback). " +
-      "Pass only the fields you want to change. To reset a field to its default instead of setting it, list its name in 'clear' " +
-      "(e.g. clear:['gender'] removes the stored gender; clear:['timezone'] reverts to the chat/global zone; " +
-      "clear:['name'] reverts to the Telegram name; clear:['language'] reverts to auto-detect). " +
-      "A field cannot be both set and cleared in one call. Validation is all-or-nothing: if any value is invalid, nothing is saved. " +
-      `${SETTINGS_SCOPE_DOC} ` +
-      "Returns { ok:true, applied:[{field,value}] } (value is null for a cleared field), or { ok:false, reason } on invalid input.",
+      "Change the user's settings; pass only the fields to change. " +
+      "'name': 1–32 visible characters (letters, digits, spaces, . ' -). " +
+      "'timezone': IANA name; map shorthand yourself ('екб' → 'Asia/Yekaterinburg', 'мск' → 'Europe/Moscow'). " +
+      "Set the timezone ONLY when the user explicitly names their place or zone ('по екб', \"I'm in Berlin now\"), even in passing alongside another request. " +
+      "Otherwise never touch it: a bare time ('remind me at 15:00') or a lookup ('what time is it in Tokyo?') is not a signal, and never guess, confirm or re-apply it. " +
+      "When the user names a zone while asking for a reminder, set the timezone FIRST, then schedule: the reminder time is then read in the new zone. " +
+      "'language': en/ru, fallback only. " +
+      "'clear': fields to reset to their default (name → Telegram name, timezone → chat zone, language → auto-detect); a field cannot be both set and cleared. " +
+      "If any value is invalid, nothing is saved and { ok:false, reason } comes back. " +
+      SETTINGS_SCOPE_DOC,
     parameters: UpdateSchema,
     execute: async (input, ctx) => {
       const changes: UserSettingChange[] = [];

@@ -10,6 +10,7 @@ import {
   durationToMs,
   FAILED_WRITE_RULE,
   formatFireAt,
+  NOTE_DOC,
   REMINDER_WRITE_SOURCES,
   tooSoonReason,
 } from "./shared";
@@ -30,9 +31,7 @@ const Schema = z
     atDatetime: z
       .string()
       .optional()
-      .describe(
-        "Wall-clock datetime in the user's timezone, formatted as YYYY-MM-DDTHH:MM (24h, no seconds, no offset).",
-      ),
+      .describe("YYYY-MM-DDTHH:MM (24h) in the user's timezone."),
   })
   .refine((v) => (v.inAmount === undefined) === (v.inUnit === undefined), {
     message: "inAmount and inUnit go together — pass both or neither",
@@ -62,18 +61,10 @@ export function createEditReminderTool(deps: {
   return {
     name: "edit_reminder",
     description:
-      "Edit one of the current user's pending reminders by its id (get ids from list_reminders first). " +
-      "The reminderId is an INTERNAL handle — never show it to the user or ask them for it; " +
-      "figure out which reminder the user means yourself and pass its id. " +
-      "Change the private note ('text'), the fire time, or both — at least one is required. " +
-      "Set the new time EITHER with 'inAmount' + 'inUnit' for a delay from now, " +
-      "OR with 'atDatetime' for a specific wall-clock time (YYYY-MM-DDTHH:MM in the user's timezone, " +
-      "the same local format list_reminders returns — no UTC conversion needed). " +
-      "Minimum lead time is 1 minute when changing the time. " +
-      "Like the create tools, 'text' is a private note to yourself describing what to remind about — " +
-      "the original conversation context is preserved, and when the reminder fires you'll compose the user-facing message then. " +
-      "Returns { ok: true, fireAt } on success, with fireAt as YYYY-MM-DDTHH:MM in the user's timezone, " +
-      "or { ok: false, reason } if the reminder isn't theirs or the new time is invalid. " +
+      "Change a pending reminder's note, time, or both; take its id from list_reminders. " +
+      "New time: EITHER inAmount + inUnit (delay from now) OR atDatetime; at least 1 minute ahead. " +
+      `${NOTE_DOC} ` +
+      "Returns { ok: true, fireAt } or { ok: false, reason }. " +
       FAILED_WRITE_RULE,
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
