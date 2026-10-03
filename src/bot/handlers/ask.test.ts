@@ -43,7 +43,7 @@ class FakeAI implements AIClient {
 // Every envelope carries the moment its turn was sent (that stamp lives in the
 // message, not in the system prompt, so the prompt stays cacheable). The
 // fixtures sit a few ms past the epoch in the default UTC timezone.
-const SENT_AT = "1970-01-01 00:00 +00:00";
+const SENT_AT = "1970-01-01 00:00";
 
 // What user 42's first turn in a chain carries about them (`bot/profile.ts`):
 // the default timezone, the fixture language, no facts. A later turn of theirs
@@ -471,9 +471,7 @@ describe("askHandler", () => {
     const stored = await storage.conversations.get("c1", 999);
     expect(stored!.userQuestion).toBe(sent.at(-1)!.content as string);
     // Stamped in the chat's timezone, not UTC.
-    expect(JSON.parse(stored!.userQuestion).time).toBe(
-      "2026-05-08 18:42 +03:00",
-    );
+    expect(JSON.parse(stored!.userQuestion).time).toBe("2026-05-08 18:42");
   });
 
   test("answered: persistConversation links parent when reply was to existing bot msg", async () => {
@@ -664,7 +662,7 @@ describe("askHandler", () => {
     ]);
   });
 
-  test("another user replying in the chain keeps the prompt and the history; each profile is appended once", async () => {
+  test("another user replying in the chain keeps the history; each profile is appended once", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     await storage.access.addWhitelist("users", { id: "77" });
@@ -712,10 +710,6 @@ describe("askHandler", () => {
     await storage.facts.remember("42", "pet", "dog");
     const t4 = await turn("42", 7, 6, 8);
 
-    // Nothing about whoever asks reaches the system prompt.
-    expect(new Set([t1, t2, t3, t4].map((t) => t.system)).size).toBe(1);
-    expect(t1.system).not.toContain("cat");
-    expect(t2.system).not.toContain("Kazan");
     // Every request continues the previous one unchanged.
     expect(t2.sent.slice(0, t1.sent.length)).toEqual(t1.sent);
     expect(t3.sent.slice(0, t2.sent.length)).toEqual(t2.sent);

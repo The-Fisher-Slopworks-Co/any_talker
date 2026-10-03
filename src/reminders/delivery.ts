@@ -13,7 +13,7 @@ import { runAiTurn } from "../ai/turn";
 import { deserializeMessages } from "../ai/serialize";
 import type { PersonaResolver } from "../managed-bots/persona";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../bot/format";
-import { localDateTimeString, messageTimeString } from "../shared/tz";
+import { localDateTimeString } from "../shared/tz";
 import { migratedChatId } from "../shared/chat-migration";
 import { composeFullName } from "../shared/types";
 import { readValidDisplayName } from "../shared/display-name";
@@ -362,7 +362,7 @@ function buildReminderEnvelope(args: EnvelopeArgs): string {
     // prompt cache — see `ai/instruction.ts`), so this event carries its own
     // `time` the way a user message does. It is not the same as
     // `scheduled_for`: a retried delivery fires later than it was due.
-    time: messageTimeString(args.nowMs, args.timezone),
+    time: localDateTimeString(args.nowMs, args.timezone),
     scheduled_for: formatLocalDateTime(args.fireAtMs, args.timezone),
     scheduled_at: formatLocalDateTime(args.createdAtMs, args.timezone),
     note: args.note,

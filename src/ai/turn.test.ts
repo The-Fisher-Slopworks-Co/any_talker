@@ -213,15 +213,14 @@ describe("runAiTurn — request assembly", () => {
     expect(opts.reasoningEffort).toBeUndefined();
   });
 
-  // The system prompt is the prefix every turn in a chat shares, so who asks
-  // must not change it (the asker travels in the chain, `bot/profile.ts`).
-  test("the system prompt is the same whoever asks", async () => {
+  test("facts are surfaced in the system prompt when provided", async () => {
     const ai = new FakeAI();
-    await runAiTurn(baseInput({ ai }));
     await runAiTurn(
-      baseInput({ ai, userId: "77", timezone: "Asia/Tokyo", lang: "ru" }),
+      baseInput({ ai, facts: [{ key: "city", value: "Kazan" }] }),
     );
-    expect(ai.calls[1]!.system).toBe(ai.calls[0]!.system);
+    const sys = ai.calls[0]!.system;
+    expect(sys).toContain("# Что я знаю о пользователе");
+    expect(sys).toContain("city: «Kazan»");
   });
 
   test("contextMessages is omitted from the tool context when not passed", async () => {
