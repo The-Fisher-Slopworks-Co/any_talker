@@ -45,6 +45,30 @@ export const factsMessages = {
     en: "favourite_team",
     ru: "favourite_team",
   }),
+  ui_facts_key_hint: m({
+    en: "Latin letters, digits and underscores.",
+    ru: "Латинские буквы, цифры и подчёркивания.",
+  }),
+  ui_facts_value_label: m({
+    en: "Text",
+    ru: "Текст",
+  }),
+  ui_facts_value_count: m({
+    en: (count: number, max: number) => `${count} of ${max} characters`,
+    ru: (count: number, max: number) => `Символов: ${count} из ${max}`,
+  }),
+  ui_facts_edit_title: m({
+    en: "Edit fact",
+    ru: "Изменить факт",
+  }),
+  ui_facts_new_title: m({
+    en: "New fact",
+    ru: "Новый факт",
+  }),
+  ui_facts_delete: m({
+    en: "Delete fact",
+    ru: "Удалить факт",
+  }),
   ui_facts_value_placeholder: m({
     en: "What should the bot remember?",
     ru: "Что бот должен запомнить?",
