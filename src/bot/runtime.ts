@@ -10,7 +10,6 @@ import type { AIClient } from "../ai/types";
 import type { PersonaResolver } from "../managed-bots/persona";
 import type { BudgetDenyReason, ChatType } from "../shared/types";
 import { formatLog, type LogFields, type LogFormat } from "../log";
-import type { TelegramEnv } from "../telegram-env";
 import { fetchTelegramPhoto } from "./photo";
 import { makeShouldAnswer } from "./routing";
 import { makeChatMenuSync, type ChatMenuSync } from "./chat-commands";
@@ -29,9 +28,6 @@ type BotPersona = {
 
 export type BotDeps = {
   botToken: string;
-  // Which copy of Telegram the token belongs to. Omitted ⇒ production, so a
-  // test bot (and every existing caller) needs to say nothing.
-  telegramEnv?: TelegramEnv | undefined;
   ownerId: string;
   storage: Storage;
   rateLimiter: RateLimiter;
@@ -66,9 +62,6 @@ export type BotRuntime = {
   // The managed bot's id; null for the main bot. Passed to the pure handlers,
   // which scope themselves.
   botId: string | null;
-  // `deps.telegramEnv` with its default applied, so the hand-built file URLs
-  // resolve it in one place instead of at every call site.
-  telegramEnv: TelegramEnv;
   // Storage scoped to this bot, for the per-character calls made in the bot
   // layer (private-chat flag, album index, guest thread, reply images).
   // Everything else (user/chat directory, presence, …) stays on `deps.storage`.
@@ -107,11 +100,9 @@ export type BotRuntime = {
 
 export function createRuntime(deps: BotDeps): BotRuntime {
   const botId = deps.persona?.botId ?? null;
-  const telegramEnv = deps.telegramEnv ?? "prod";
   return {
     deps,
     botId,
-    telegramEnv,
     scopedStorage: deps.storage.forBot(botId),
     debugLog: (msg, fields = {}) => {
       if (!deps.logDebug) return;
@@ -130,7 +121,6 @@ export function createRuntime(deps: BotDeps): BotRuntime {
         storage: deps.storage,
         botToken: deps.botToken,
         fileId,
-        env: telegramEnv,
       }),
     syncChatMenu: makeChatMenuSync({
       storage: deps.storage,
@@ -154,7 +144,6 @@ export function createRuntime(deps: BotDeps): BotRuntime {
     }),
     video: createVideoPipeline({
       botToken: deps.botToken,
-      telegramEnv,
       resolver: deps.resolver,
       supportsVideoInput: deps.supportsVideoInput,
     }),
