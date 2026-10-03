@@ -22,10 +22,7 @@ export type { BotDeps };
 // the runtime as its first argument.
 export function createBot(deps: BotDeps): Bot<BotContext> {
   const bot = new Bot<BotContext>(deps.botToken, {
-    client: {
-      fetch: proxiedFetch as unknown as typeof fetch,
-      environment: deps.telegramEnv ?? "prod",
-    },
+    client: { fetch: proxiedFetch as unknown as typeof fetch },
   });
 
   const rt = createRuntime(deps);

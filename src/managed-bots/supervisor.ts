@@ -38,10 +38,7 @@ async function startBotInner(
   let username = record.username;
   try {
     const me = await new Bot(token, {
-      client: {
-        fetch: proxiedFetch as unknown as typeof fetch,
-        environment: runtime.deps.telegramEnv ?? "prod",
-      },
+      client: { fetch: proxiedFetch as unknown as typeof fetch },
     }).api.getMe();
     if (me.username) username = me.username;
   } catch (err) {
@@ -58,7 +55,6 @@ async function startBotInner(
 
   const deps: BotDeps = {
     botToken: token,
-    telegramEnv: runtime.deps.telegramEnv,
     ownerId: runtime.deps.ownerId,
     storage: runtime.deps.storage,
     rateLimiter: runtime.deps.rateLimiter,

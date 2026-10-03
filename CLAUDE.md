@@ -11,11 +11,10 @@ bun run dev        # long-polling + hot reload (src/main.ts)
 bun run check      # typecheck + lint + format + knip + reuse + tests — before every commit
 bun run typecheck  # bunx tsc --noEmit
 bun run lint       # oxlint (config: .oxlintrc.json)
-bun run format     # prettier --write over src/ + e2e/ (config: .prettierrc.json)
+bun run format     # prettier --write over src/ (config: .prettierrc.json)
 bun run knip       # unused files/exports/deps (config: knip.ts)
 bun run reuse      # `uvx reuse lint` — SPDX headers; needs uv on the machine
 bun run test       # unit tests = `bun test src`; one file: `bun test src/path/x.test.ts`
-bun run e2e        # e2e/ against real Telegram; needs `.env.e2e` (see `.env.e2e.example`)
 bun run webapp:demo  # Web App in a plain browser on in-memory data: localhost:3000/webapp
 ```
 
@@ -35,9 +34,6 @@ gh release upload pr-N-evidence after.png --clobber   # add or replace later
 No workflow reacts to releases or tags. After the PR merges the release can go:
 `gh release delete pr-N-evidence --cleanup-tag --yes`.
 
-Never run a bare `bun test`: it walks the whole repo and drags `e2e/` in (needs
-MTProto credentials + a KeyDB it flushes). `e2e/scaffold.test.ts` guards this.
-
 `bun install` installs a lefthook pre-commit hook that runs the same gate
 (`lefthook.yml`, ~3s). `LEFTHOOK=0 git commit` skips it for one commit.
 
@@ -53,8 +49,6 @@ MTProto credentials + a KeyDB it flushes). `e2e/scaffold.test.ts` guards this.
 - `budget/`, `spending/`, `ratelimit/` — spend guard, spend accounting, rate limits.
 - `observability/` — digest + spike alerts; `metrics/` — instruments/registry.
 - `reminders/`, `checks/`, `shared/` (i18n, shared types, tz), `types/` (ambient `.d.ts`) — supporting subsystems.
-
-`e2e/` (repo root) — end-to-end suite, outside the commit gate.
 
 ### Conventions
 
@@ -76,7 +70,7 @@ MTProto credentials + a KeyDB it flushes). `e2e/scaffold.test.ts` guards this.
 - **One task = one branch = one PR.** Past ~300 changed lines, split it into several PRs. `pr-size.yml` labels every PR `size:XS`…`size:XXL` from additions + deletions minus tests, `bun.lock` and generated files; **`size:XL` or `size:XXL` means split the PR**, not "explain why it is large".
 - **PR title is the squash commit subject:** conventional commit with a scope, enforced by `.github/workflows/pr-title.yml`.
   - Type: `feat` `fix` `refactor` `chore` `docs` `test` `ci` `perf` `revert`.
-  - Scope (required): a top-level `src/` module — `ai` `bot` `budget` `checks` `managed-bots` `metrics` `observability` `ratelimit` `reminders` `shared` `spending` `storage` `types` `webapp` — or `deps` `e2e` `github` `release` `docker`. A new module means adding it to the `scopes:` list in that workflow.
+  - Scope (required): a top-level `src/` module — `ai` `bot` `budget` `checks` `managed-bots` `metrics` `observability` `ratelimit` `reminders` `shared` `spending` `storage` `types` `webapp` — or `deps` `github` `release` `docker`. A new module means adding it to the `scopes:` list in that workflow.
   - Subject: lowercase start, imperative, no trailing period.
   - The body follows `.github/pull_request_template.md`.
   - The body describes this PR alone. No links to the other PRs of a stack, no "this is the first/second/third PR", no "the next PR will…": GitHub already shows the base branch and the PRs stacked on it.

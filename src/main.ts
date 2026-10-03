@@ -108,7 +108,6 @@ async function main() {
   let botManager: BotManager;
   const bot = createBot({
     botToken: config.botToken,
-    telegramEnv: config.telegramEnv,
     ownerId: config.botOwnerId,
     storage,
     rateLimiter,
@@ -139,7 +138,6 @@ async function main() {
     ai,
     supportsVideoInput: (id) => modelCatalog.supportsVideoInput(id),
     ownerId: config.botOwnerId,
-    telegramEnv: config.telegramEnv,
     mainApi: bot.api,
     mainBotId,
     logFormat: config.logFormat,
