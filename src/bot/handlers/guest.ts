@@ -61,14 +61,21 @@ export type GuestAskInput = {
   attachments?: string | undefined;
   imageFileIds: string[];
   replyImageFileIds: string[];
-  // The message the guest query replied to. Guest threads only capture this
-  // bot's own answers, so a reply to anything else (another user's message, a
-  // bot answer whose stored thread has expired, or a bot answer that belongs
-  // to a different thread than the replier's own — see `threadMatchesReply`)
-  // reaches the model through /ask's unknown-reply fallback
-  // (`buildReplyFallbackMessage`).
+  // The message the guest query replied to, its thread token already cut out
+  // of `text`.
   replyTarget: ReplyTarget | null;
+  // Whether that message is one of this bot's own answers. Without a stored
+  // thread to speak for it, it is then quoted as the model's own earlier
+  // answer rather than as someone else's message.
+  replyIsOwnAnswer: boolean;
+  // The thread stored under the token the replied-to answer carried, and that
+  // token. Both null when the query is not a reply to a tokened answer, or the
+  // thread has expired.
   priorThread: GuestThreadNode | null;
+  priorToken: string | null;
+  // The token this turn's answer will carry, and the key its thread is stored
+  // under (`bot/guest-token.ts`).
+  threadToken: string;
   lang: Lang;
   onAIStart?: (() => void) | undefined;
   fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
@@ -89,36 +96,19 @@ export type GuestAskOutcome =
     }
   | { kind: "error"; message: string };
 
-// Rendering strips markdown syntax and adds chrome (bot-name prefix, effects
-// block, details summary), so the comparison keeps only letters and digits and
-// looks for the stored answer's prefix inside the rendered reply text.
-const THREAD_MATCH_PREFIX_CHARS = 64;
+// Who the context header names when the replied-to message is this bot's own
+// answer and no stored thread speaks for it. It stays a user-role context
+// message — a prompt may not open on an assistant turn with every provider —
+// but must not read as something another participant said.
+const OWN_ANSWER_AUTHOR = "you, the assistant";
 
-const normalizeForMatch = (s: string): string =>
-  s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
-
-// Whether the replied-to message is recognizably the thread's own last answer.
-//
-// A guest thread is keyed by the guest DM — one thread per user, not per
-// message — while a reply can target ANY of this bot's messages in the group,
-// including an answer given to someone else. Telegram gives no id to join on
-// (`answerGuestQuery` never returns the posted message's id), so the replied-to
-// text is the only link: continue the thread only when it matches, otherwise
-// the caller falls back to quoting the replied-to message verbatim.
-function threadMatchesReply(
-  thread: GuestThreadNode,
-  replyText: string | null,
-): boolean {
-  const lastAnswer = thread.turns[thread.turns.length - 1]?.botAnswer;
-  if (lastAnswer === undefined || replyText === null) return false;
-  const answer = normalizeForMatch(lastAnswer).slice(
-    0,
-    THREAD_MATCH_PREFIX_CHARS,
-  );
-  // Nothing verifiable survives normalization (emoji-only answer, …): keep the
-  // thread rather than silently dropping the user's own context.
-  if (answer === "") return true;
-  return normalizeForMatch(replyText).includes(answer);
+// A replied-to answer as Telegram rendered it, minus the bot-name line the
+// dispatcher put on top — the model never wrote that part.
+function ownAnswerText(text: string, botName: string | null): string {
+  const name = botName?.trim();
+  return name && text.startsWith(name)
+    ? text.slice(name.length).trimStart()
+    : text;
 }
 
 export async function guestAskHandler(
@@ -188,18 +178,8 @@ export async function guestAskHandler(
     attachments: input.attachments,
     sentAt: { ms: input.now, timezone },
   });
-  // Continue the stored thread only when the reply verifiably targets its
-  // last answer; a mismatched thread (reply to a bot answer from someone
-  // else's conversation) is dropped so the replied-to message itself becomes
-  // the context via the fallback below. Without a replyTarget there is
-  // nothing to check against, so the thread is trusted as-is.
-  const priorThread =
-    input.priorThread !== null &&
-    input.replyTarget !== null &&
-    !threadMatchesReply(input.priorThread, input.replyTarget.text)
-      ? null
-      : input.priorThread;
-  const priorTurns = priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
+  const priorTurns =
+    input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
 
   // Guest queries are always single-turn asks with no detail level passed, so
   // the system prompt carries no detail-level section.
@@ -243,8 +223,22 @@ export async function guestAskHandler(
       // A stored thread already contains the replied-to bot answer; the raw
       // replied-to message only fills in when there is no thread to speak for
       // it.
-      if (priorTurns.length === 0 && input.replyTarget) {
-        messages.push(buildReplyFallbackMessage(input.replyTarget));
+      const replyTarget = priorTurns.length === 0 ? input.replyTarget : null;
+      if (replyTarget) {
+        messages.push(
+          buildReplyFallbackMessage(
+            input.replyIsOwnAnswer
+              ? {
+                  ...replyTarget,
+                  authorFirstName: OWN_ANSWER_AUTHOR,
+                  text:
+                    replyTarget.text === null
+                      ? null
+                      : ownAnswerText(replyTarget.text, botName),
+                }
+              : replyTarget,
+          ),
+        );
       }
       if (input.images.length > 0 || audios.length > 0 || videos.length > 0) {
         messages.push({
@@ -305,19 +299,20 @@ export async function guestAskHandler(
               run: turn.run,
             },
           ].slice(-MAX_REPLY_CHAIN_DEPTH);
-          await storage.conversations.saveGuest(input.chatId, {
+          await storage.conversations.saveGuest(input.threadToken, {
             chatId: input.chatId,
             turns,
             ts: input.now,
           });
-          // A guest thread is keyed by chat alone, so it has no head to
-          // advance: every turn refreshes the one entry rather than adding a
-          // second. `botId` is this bot's own — a guest chat is a business DM,
-          // never the family-shared group namespace.
+          // A reply advances the entry of the thread it continues; anything
+          // else starts a new one. `botId` is this bot's own — a guest thread
+          // never lives in the family-shared group namespace.
           await storage.conversations.indexUserThread(input.userId, {
             kind: "guest",
             chatId: input.chatId,
             botId: input.botId ?? null,
+            token: input.threadToken,
+            parentToken: input.priorThread ? input.priorToken : null,
             ts: input.now,
           });
         },

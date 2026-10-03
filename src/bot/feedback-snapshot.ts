@@ -61,7 +61,7 @@ async function resolveThread(
   const { conversations } = storage.forBot(ref.botId);
   const turns =
     ref.kind === "guest"
-      ? await guestTurns(conversations, ref.chatId)
+      ? await guestTurns(conversations, ref.token ?? ref.chatId)
       : await chainTurns(conversations, ref.chatId, ref.botMsgId);
   if (turns.length === 0) return null;
   return {
@@ -105,14 +105,15 @@ async function chainTurns(
   return turns;
 }
 
-// A guest thread is one record keyed by chat, its turns already in order, so
-// the depth cap is a tail slice. Its turns carry neither a message id nor their
+// A guest thread is one record keyed by its head answer's token (by chat, for
+// an entry indexed before tokens), its turns already in order, so the depth cap
+// is a tail slice. Its turns carry neither a message id nor their
 // own timestamp — the thread is stamped as a whole.
 async function guestTurns(
   conversations: Storage["conversations"],
-  chatId: string,
+  key: string,
 ): Promise<ThreadSnapshotTurn[]> {
-  const thread = await conversations.getGuest(chatId);
+  const thread = await conversations.getGuest(key);
   if (!thread) return [];
   return thread.turns.slice(-SNAPSHOT_MAX_TURNS).map((turn) => ({
     userQuestion: turn.userQuestion,
