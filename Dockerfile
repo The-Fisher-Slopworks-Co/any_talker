@@ -1,4 +1,7 @@
 # syntax=docker/dockerfile:1
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
 ARG BUN_VERSION=1
 FROM oven/bun:${BUN_VERSION}-alpine AS base
 WORKDIR /usr/src/app

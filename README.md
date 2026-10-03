@@ -22,6 +22,9 @@ Telegram bot with AI integration via OpenRouter.
    prompt cache.
 2. Start KeyDB: `docker compose up -d`
 3. `bun install`
+4. Install [uv](https://docs.astral.sh/uv/): `bun run check` and the
+   pre-commit hook run `uvx reuse lint`, which fetches
+   [REUSE](https://reuse.software/) on first use.
 
 > Voice notes require `ffmpeg` on the host (the Docker image installs it):
 > Telegram ogg/opus is transcoded to mp3 before being sent. ffmpeg is also what
@@ -35,7 +38,7 @@ bun run dev      # long polling mode with hot reload
 bun run start    # production mode (long polling)
 bun test         # unit tests
 bun run typecheck
-bun run check    # typecheck + lint + format + knip + tests, the pre-commit gate
+bun run check    # typecheck + lint + format + knip + reuse + tests, the pre-commit gate
 ```
 
 To open the admin Web App in a plain browser — no Telegram, bot, KeyDB or
