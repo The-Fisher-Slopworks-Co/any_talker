@@ -35,6 +35,7 @@ import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { botLabel, userDisplayName } from "../../lib/labels";
 import { FactsEditor, type FactsWriter } from "../facts-view";
 import { useLoadable } from "../../lib/use-loadable";
+import { parseString, useSessionState } from "../../lib/session-state";
 import { openTelegramProfile } from "../../lib/telegram";
 import { validateDisplayName } from "../../../../shared/display-name";
 
@@ -54,7 +55,11 @@ export function UserEditView({ userId }: { userId: string }) {
   const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
   const { data: botsData } = useLoadable(api.listMyBots, []);
-  const [factScope, setFactScope] = useState<string>("main");
+  const [factScope, setFactScope] = useSessionState(
+    `user-facts-scope:${userId}`,
+    "main",
+    parseString,
+  );
   const { data: factsData, setData: setFactsData } = useLoadable(
     () => api.listUserFacts(userId, factScope),
     [userId, factScope],

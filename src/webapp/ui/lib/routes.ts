@@ -56,6 +56,54 @@ export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
   "api-token",
 ];
 
+function isAdminSection(v: unknown): v is AdminSection {
+  return ADMIN_SECTION_IDS.includes(v as AdminSection);
+}
+
+function isId(v: unknown): v is string {
+  return typeof v === "string" && v !== "";
+}
+
+// A route read back from storage after a reload. Anything that is not a
+// route this build knows how to render gives null.
+export function parseRoute(raw: unknown): Route | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  switch (r.kind) {
+    case "main":
+    case "admin":
+    case "my-reminders":
+    case "my-facts":
+      return { kind: r.kind };
+    case "admin-section":
+      return isAdminSection(r.section)
+        ? { kind: r.kind, section: r.section }
+        : null;
+    case "user-edit":
+      return isId(r.userId) && isAdminSection(r.from)
+        ? { kind: r.kind, userId: r.userId, from: r.from }
+        : null;
+    case "chat-edit":
+      return isId(r.chatId) && isAdminSection(r.from)
+        ? { kind: r.kind, chatId: r.chatId, from: r.from }
+        : null;
+    case "check-edit":
+      return r.checkId === null || isId(r.checkId)
+        ? { kind: r.kind, checkId: r.checkId }
+        : null;
+    case "managed-bot-edit":
+      return r.botId === null || isId(r.botId)
+        ? { kind: r.kind, botId: r.botId }
+        : null;
+    case "feedback-view":
+      return isId(r.feedbackId)
+        ? { kind: r.kind, feedbackId: r.feedbackId }
+        : null;
+    default:
+      return null;
+  }
+}
+
 export function adminSection(
   s: Strings,
   id: AdminSection,

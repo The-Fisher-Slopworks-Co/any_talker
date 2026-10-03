@@ -2,7 +2,58 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { showsUsageHeader, type Route } from "./routes";
+import { parseRoute, showsUsageHeader, type Route } from "./routes";
+
+const ALL_ROUTES: Route[] = [
+  { kind: "main" },
+  { kind: "admin" },
+  { kind: "admin-section", section: "feedback" },
+  { kind: "user-edit", userId: "1", from: "users" },
+  { kind: "chat-edit", chatId: "-100", from: "whitelist" },
+  { kind: "check-edit", checkId: null },
+  { kind: "check-edit", checkId: "c1" },
+  { kind: "managed-bot-edit", botId: null },
+  { kind: "managed-bot-edit", botId: "b1" },
+  { kind: "feedback-view", feedbackId: "f1" },
+  { kind: "my-reminders" },
+  { kind: "my-facts" },
+];
+
+describe("parseRoute", () => {
+  // A reload reads the route back from JSON: every screen, with what it was
+  // opened from, must come back unchanged so the back button leads the same way.
+  test("restores every route after a JSON round trip", () => {
+    for (const route of ALL_ROUTES) {
+      expect(parseRoute(JSON.parse(JSON.stringify(route)))).toEqual(route);
+    }
+  });
+
+  test("drops fields a route does not have", () => {
+    expect(parseRoute({ kind: "admin", section: "users" })).toEqual({
+      kind: "admin",
+    });
+  });
+
+  test("rejects values this build cannot render", () => {
+    const bad: unknown[] = [
+      null,
+      "main",
+      42,
+      {},
+      { kind: "gone" },
+      { kind: "admin-section", section: "nope" },
+      { kind: "user-edit", userId: "1" },
+      { kind: "user-edit", userId: "", from: "users" },
+      { kind: "chat-edit", chatId: 1, from: "chats" },
+      { kind: "check-edit" },
+      { kind: "managed-bot-edit", botId: 3 },
+      { kind: "feedback-view" },
+    ];
+    for (const raw of bad) {
+      expect(parseRoute(raw)).toBeNull();
+    }
+  });
+});
 
 describe("showsUsageHeader", () => {
   test("shows the usage header on the settings home", () => {
