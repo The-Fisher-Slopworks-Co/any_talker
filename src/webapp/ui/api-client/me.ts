@@ -35,9 +35,7 @@ export const meApi = {
     language?: Lang | null;
     dateFormat?: DateFormat | null;
   }) => req<MeResponse>("PUT", "/api/me", patch),
-  // Percentage-only view of the caller's own limits (the header bars). Distinct
-  // from `getMyUsage` in `./ratelimit`, which is the owner-gated admin route
-  // carrying raw token counts.
+  // Percentage-only view of the caller's own limits (the header bars).
   getMyUsageShare: () => req<{ usage: UsageShare }>("GET", "/api/me/usage"),
   listMyBots: () => req<{ bots: FactBot[] }>("GET", "/api/me/bots"),
   listMyFacts: (scope: string) =>
