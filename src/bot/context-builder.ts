@@ -5,7 +5,7 @@ import type { Storage } from "../storage/types";
 import type { AIMessage, AIUserContentPart } from "../ai/types";
 import { append, emptyTranscript, type Transcript } from "../ai/transcript";
 import type { Gender, ToolCallRecord, TurnAuthor } from "../shared/types";
-import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
+import { composeFullName } from "../shared/types";
 import { messageTimeString } from "../shared/tz";
 import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
 import type { VideoClip } from "./video";
@@ -100,7 +100,6 @@ export type BuildContextArgs = {
   // null when the chain already says it. Same rule as `sentAt`: a caller that
   // persists the turn passes the very same value.
   profile?: UserProfile | null | undefined;
-  maxDepth?: number | undefined;
   fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
 };
 
@@ -193,18 +192,12 @@ export async function buildContext(
     args;
   const audios = args.audios ?? [];
   const videos = args.videos ?? [];
-  const maxDepth = args.maxDepth ?? MAX_REPLY_CHAIN_DEPTH;
   let messages = emptyTranscript;
 
   if (replyTarget !== null) {
     const node = await storage.conversations.get(chatId, replyTarget.messageId);
     if (node) {
-      const chain = await collectChain(
-        storage,
-        chatId,
-        replyTarget.messageId,
-        maxDepth,
-      );
+      const chain = await collectChain(storage, chatId, replyTarget.messageId);
       // `collectChain` walks parents from the replied-to node and unshifts, so
       // the replied-to node is always the LAST entry.
       for (const [i, c] of chain.entries()) {
@@ -294,10 +287,9 @@ export async function chainAuthors(
   storage: Storage,
   chatId: string,
   replyTarget: ReplyTarget | null,
-  maxDepth: number = MAX_REPLY_CHAIN_DEPTH,
 ): Promise<Array<{ author?: TurnAuthor | undefined }>> {
   if (replyTarget === null) return [];
-  return collectChain(storage, chatId, replyTarget.messageId, maxDepth);
+  return collectChain(storage, chatId, replyTarget.messageId);
 }
 
 type ChainEntry = {
@@ -308,15 +300,25 @@ type ChainEntry = {
   toolCalls: ToolCallRecord[] | undefined;
 };
 
+// The whole chain, root first. Deliberately uncapped: a window that kept only
+// the newest N turns would drop the oldest one on every new turn, so the
+// request would never start the way the previous one did and the prompt cache
+// would miss the whole history each time. The chain is append-only, and so is
+// what is sent of it.
+//
+// `seen` guards against a parent pointer that loops back (only possible with
+// corrupt data — a reply always points at an older message): the walk stops
+// instead of spinning forever.
 async function collectChain(
   storage: Storage,
   chatId: string,
   startBotMsgId: number,
-  maxDepth: number,
 ): Promise<ChainEntry[]> {
   const chain: ChainEntry[] = [];
+  const seen = new Set<number>();
   let cursor: number | null = startBotMsgId;
-  while (cursor !== null && chain.length < maxDepth) {
+  while (cursor !== null && !seen.has(cursor)) {
+    seen.add(cursor);
     const node = await storage.conversations.get(chatId, cursor);
     if (!node) break;
     chain.unshift({

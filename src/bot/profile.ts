@@ -52,8 +52,6 @@ export function profileHash(profile: UserProfile): string {
 
 // The profile the new turn has to carry, or null when the turns the model is
 // about to see (oldest first) already end with the same one for this author.
-// Only those turns count: a profile that scrolled out of the context window is
-// one the model no longer has.
 export function profileToCarry(
   turns: ReadonlyArray<{ author?: TurnAuthor | undefined }>,
   userId: string,

@@ -19,11 +19,10 @@ import type { PersonaResolver } from "../../managed-bots/persona";
 import { profileToCarry, turnAuthor } from "../profile";
 import type { ToolEffect } from "../../ai/tools/registry";
 import { append, emptyTranscript } from "../../ai/transcript";
-import {
-  MAX_REPLY_CHAIN_DEPTH,
-  type GuestThreadNode,
-  type WindowKind,
-  type BudgetDenyReason,
+import type {
+  GuestThreadNode,
+  WindowKind,
+  BudgetDenyReason,
 } from "../../shared/types";
 import type { Lang } from "../../shared/i18n";
 import type { VideoClip } from "../video";
@@ -169,8 +168,9 @@ export async function guestAskHandler(
     }
   }
 
-  const priorTurns =
-    input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
+  // The whole thread: nothing is ever dropped from its front, so every request
+  // starts the way the previous one did (see `collectChain`).
+  const priorTurns = input.priorThread?.turns ?? [];
   // What the bot knows about the guest, carried only when the thread does not
   // already say it (`bot/profile.ts`).
   const profile = profileToCarry(priorTurns, input.userId, {
@@ -316,7 +316,7 @@ export async function guestAskHandler(
               run: turn.run,
               author: turnAuthor(input.userId, profile),
             },
-          ].slice(-MAX_REPLY_CHAIN_DEPTH);
+          ];
           await storage.conversations.saveGuest(input.threadToken, {
             chatId: input.chatId,
             turns,

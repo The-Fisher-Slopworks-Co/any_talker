@@ -9,7 +9,7 @@ import { currentWindowStarts } from "../../ratelimit/window";
 import type { AIClient, AskResult } from "../../ai/types";
 import { guestAskHandler, type GuestAskInput } from "./guest";
 import { createMainPersonaResolver } from "../../managed-bots/persona";
-import { DEFAULT_SETTINGS, MAX_REPLY_CHAIN_DEPTH } from "../../shared/types";
+import { DEFAULT_SETTINGS } from "../../shared/types";
 
 // Exhausts a user's 5-hour budget at `now` so the next `check` denies.
 async function exhaustUsage(
@@ -757,18 +757,15 @@ describe("guestAskHandler", () => {
     expect(sent.at(-1).profile).toBeUndefined();
   });
 
-  test("priorThread is capped at MAX_REPLY_CHAIN_DEPTH on persist and AI input", async () => {
+  test("a long thread is replayed and stored whole", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     const ai = new FakeAI({ text: "newest", totalTokens: 1 });
-    const overflowTurns = Array.from(
-      { length: MAX_REPLY_CHAIN_DEPTH + 5 },
-      (_, i) => ({
-        userQuestion: `Q${i}`,
-        botAnswer: `A${i}`,
-      }),
-    );
-    const priorThread = { chatId: "c1", turns: overflowTurns, ts: 500 };
+    const longTurns = Array.from({ length: 60 }, (_, i) => ({
+      userQuestion: `Q${i}`,
+      botAnswer: `A${i}`,
+    }));
+    const priorThread = { chatId: "c1", turns: longTurns, ts: 500 };
     const out = await guestAskHandler(
       baseInput({ storage, ai, priorThread, now: 2000 }),
     );
@@ -777,19 +774,14 @@ describe("guestAskHandler", () => {
     const call = ai.calls[0] as {
       messages: { role: string; content: unknown }[];
     };
-    expect(call.messages.length).toBe(MAX_REPLY_CHAIN_DEPTH * 2 + 1);
-    expect(call.messages[0]).toEqual({
-      role: "user",
-      content: `Q${overflowTurns.length - MAX_REPLY_CHAIN_DEPTH}`,
-    });
+    expect(call.messages.length).toBe(longTurns.length * 2 + 1);
+    expect(call.messages[0]).toEqual({ role: "user", content: "Q0" });
 
     await out.persistThread();
     const stored = await storage.conversations.getGuest(TOKEN);
-    expect(stored?.turns.length).toBe(MAX_REPLY_CHAIN_DEPTH);
-    expect(stored?.turns[stored.turns.length - 1]?.botAnswer).toBe("newest");
-    expect(stored?.turns[0]?.userQuestion).toBe(
-      `Q${overflowTurns.length - MAX_REPLY_CHAIN_DEPTH + 1}`,
-    );
+    expect(stored?.turns.length).toBe(longTurns.length + 1);
+    expect(stored?.turns[0]?.userQuestion).toBe("Q0");
+    expect(stored?.turns.at(-1)?.botAnswer).toBe("newest");
   });
 
   test("answered: deducts the reply cost from the usage windows", async () => {

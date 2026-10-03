@@ -9,9 +9,8 @@ import type {
 } from "../shared/types";
 import { USER_THREAD_INDEX_MAX } from "../shared/types";
 
-// How deep one thread is copied, counted back from its head. Deliberately
-// shorter than `MAX_REPLY_CHAIN_DEPTH`'s 20, which sizes an LLM context rather
-// than a stored record: with `TOOL_OUTPUT_MAX` 4096 and `TOOL_CALLS_MAX_PER_TURN`
+// How deep one thread is copied, counted back from its head. A stored record,
+// not an LLM context, so it stays small: with `TOOL_OUTPUT_MAX` 4096 and `TOOL_CALLS_MAX_PER_TURN`
 // 8, a single turn can carry ~32 KB of tool transcript, and those are kept
 // verbatim because a misfiring tool is the bug class this exists to surface.
 export const SNAPSHOT_MAX_TURNS = 8;
