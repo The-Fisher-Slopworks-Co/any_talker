@@ -3245,7 +3245,100 @@ describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
     expect(r.status).toBe(403);
   });
 
-  test("is read-only: writes are not routed", async () => {
+  const seedUser = (d: ReturnType<typeof deps>) =>
+    d.storage.users.upsert({
+      id: "42",
+      firstName: "A",
+      lastName: null,
+      username: "aa",
+      firstSeenAt: 1,
+      lastSeenAt: 1,
+    });
+
+  test("the owner adds a fact to another user's vault", async () => {
+    const d = deps();
+    await seedUser(d);
+    const r = await handleApi(
+      {
+        method: "POST",
+        path: "/api/admin/users/42/facts/main",
+        body: { key: "Pets", value: "two cats" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({
+      facts: [{ key: "pets", value: "two cats" }],
+      cap: 50,
+    });
+  });
+
+  test("the owner edits and renames a fact in a character scope", async () => {
+    const d = deps();
+    await seedUser(d);
+    await d.storage.managedBots.save(charBot);
+    await d.storage.forBot("777").facts.remember("42", "pets", "two cats");
+    const r = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42/facts/777/pets",
+        body: { value: "three cats", newKey: "cats" },
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect(await d.storage.forBot("777").facts.list("42")).toEqual([
+      { key: "cats", value: "three cats" },
+    ]);
+    expect(await d.storage.facts.list("42")).toEqual([]);
+  });
+
+  test("the owner deletes a fact", async () => {
+    const d = deps();
+    await seedUser(d);
+    await d.storage.facts.remember("42", "pets", "two cats");
+    const r = await handleApi(
+      {
+        method: "DELETE",
+        path: "/api/admin/users/42/facts/main/pets",
+        body: null,
+      },
+      d,
+      owner,
+    );
+    expect(r.status).toBe(200);
+    expect((r.body as { facts: unknown[] }).facts).toEqual([]);
+  });
+
+  test("writes follow the same rules as the user's own vault", async () => {
+    const d = deps();
+    await seedUser(d);
+    const bad = await handleApi(
+      {
+        method: "POST",
+        path: "/api/admin/users/42/facts/main",
+        body: { key: "bad key", value: "x" },
+      },
+      d,
+      owner,
+    );
+    expect(bad.status).toBe(400);
+    const missing = await handleApi(
+      {
+        method: "PUT",
+        path: "/api/admin/users/42/facts/main/nope",
+        body: { value: "x" },
+      },
+      d,
+      owner,
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.body).toEqual({ error: "fact not found" });
+  });
+
+  test("writes to an unknown user are 404 and store nothing", async () => {
     const d = deps();
     const r = await handleApi(
       {
@@ -3257,7 +3350,37 @@ describe("admin user facts (GET /api/admin/users/:id/facts/:scope)", () => {
       owner,
     );
     expect(r.status).toBe(404);
+    expect(r.body).toEqual({ error: "user not found" });
     expect(await d.storage.facts.list("42")).toEqual([]);
+  });
+
+  test("writes are admin-only: a non-owner gets 403 on their own id", async () => {
+    const d = deps();
+    await seedUser(d);
+    await d.storage.facts.remember("42", "pets", "two cats");
+    for (const req of [
+      {
+        method: "POST" as const,
+        path: "/api/admin/users/42/facts/main",
+        body: { key: "a", value: "b" },
+      },
+      {
+        method: "PUT" as const,
+        path: "/api/admin/users/42/facts/main/pets",
+        body: { value: "x" },
+      },
+      {
+        method: "DELETE" as const,
+        path: "/api/admin/users/42/facts/main/pets",
+        body: null,
+      },
+    ]) {
+      const r = await handleApi(req, d, guest("42"));
+      expect(r.status).toBe(403);
+    }
+    expect(await d.storage.facts.list("42")).toEqual([
+      { key: "pets", value: "two cats" },
+    ]);
   });
 });
 
