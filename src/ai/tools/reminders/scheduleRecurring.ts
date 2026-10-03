@@ -13,6 +13,7 @@ import {
 import { formatLocalParts, parseAbsoluteDateTimeMs } from "../../../shared/tz";
 import { isValidTimezone } from "../../../shared/types";
 import {
+  NOTE_DOC,
   PERSIST_RESULT_DOC,
   persistReminder,
   REMINDER_WRITE_SOURCES,
@@ -26,7 +27,7 @@ const Schema = z.object({
     .string()
     .optional()
     .describe(
-      "First occurrence as a wall-clock datetime in the user's timezone, YYYY-MM-DDTHH:MM (24h, no seconds, no offset). Omit to start one interval from now.",
+      "First occurrence, YYYY-MM-DDTHH:MM (24h) in the user's timezone; omit to start one interval from now.",
     ),
   text: z.string().min(1).max(REMINDER_TEXT_MAX_LEN),
 });
@@ -55,19 +56,11 @@ export function createScheduleRecurringReminderTool(deps: {
   return {
     name: "schedule_recurring_reminder",
     description:
-      "Schedule a reminder that repeats on a FIXED interval: every N minutes, hours, days or weeks. " +
-      "Use for 'every day at 18:30' (amount 1, unit 'days', startAt today or tomorrow at 18:30), " +
-      "'every 20 minutes' (amount 20, unit 'minutes', no startAt), " +
-      "'every two weeks starting 18 September' (amount 2, unit 'weeks', startAt that date). " +
-      "'startAt' is the FIRST occurrence in the user's timezone and must be in the future; omit it to start one interval from now. " +
-      "Only fixed intervals are supported. Calendar rules — 'every weekday', 'the first Monday of the month', 'every other Tuesday except holidays', cron expressions — are NOT supported: " +
-      "do not approximate them, tell the user what is supported and offer the nearest fixed interval instead. " +
-      "The interval must be at least 5 minutes, and the series fires at most " +
-      String(MAX_REMINDER_OCCURRENCES) +
-      " times before it ends — say so when confirming, and use schedule_reminder_in / schedule_reminder_at for a one-off. " +
-      "The whole series counts as ONE reminder against the user's reminder limit. " +
-      "The 'text' field is a private note to yourself describing what to remind about — on each occurrence you'll receive it as a system event and compose the actual user-facing message then. " +
-      PERSIST_RESULT_DOC,
+      "Schedule a reminder repeating on a FIXED interval of at least 5 minutes: " +
+      "'every day at 18:30' → amount 1, unit 'days', startAt the next 18:30; 'every 20 minutes' → no startAt. " +
+      "Calendar rules ('every weekday', 'first Monday of the month', cron) are NOT supported: do not approximate, offer the nearest fixed interval. " +
+      `The series ends after ${MAX_REMINDER_OCCURRENCES} occurrences — say so when confirming — and counts as one reminder toward the limit. ` +
+      `${NOTE_DOC} ${PERSIST_RESULT_DOC}`,
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
     execute: async ({ amount, unit, startAt, text }, ctx) => {

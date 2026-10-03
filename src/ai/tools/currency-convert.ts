@@ -115,7 +115,7 @@ function formatNumber(value: number, decimals: number): string {
 export const currencyConvertTool: Tool<Input, string> = {
   name: "currency_convert",
   description:
-    "Convert an amount from one currency to another using daily exchange rates. Accepts ISO 4217 codes (e.g. USD, EUR, JPY) and many crypto codes (e.g. btc, eth). Returns a short human-readable string with the converted amount, the rate, and the rate's date.",
+    "Convert an amount between currencies at daily rates; ISO 4217 and common crypto codes (btc, eth).",
   parameters: Schema,
   execute: async ({ amount, from, to }, _ctx) => {
     const base = from.toLowerCase();

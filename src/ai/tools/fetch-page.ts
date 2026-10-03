@@ -26,7 +26,7 @@ const td = new TurndownService({
 export const fetchPageTool: Tool<Input, string> = {
   name: "fetch_page",
   description:
-    "Fetch a public web page by URL and return its content as Markdown. Uses Readability to extract the main article body where possible; falls back to converting the full HTML page otherwise.",
+    "Fetch a public web page and return its main content as Markdown.",
   parameters: Schema,
   execute: async ({ url }, _ctx) => {
     const response = await safeFetch(url, {
