@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 The Fisher Slopworks Co
+
 # Revisions that only reformat. Skipped by:
 #   git config blame.ignoreRevsFile .git-blame-ignore-revs
 # (GitHub's blame view reads this file on its own.)
