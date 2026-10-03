@@ -10,12 +10,21 @@ import { RowButton } from "../../components/controls";
 import { SegmentedField } from "../../components/segmented-field";
 import { FeedbackCard } from "../../components/feedback-card";
 import { useLoadable } from "../../lib/use-loadable";
+import { useSessionState } from "../../lib/session-state";
 
 type Filter = FeedbackStatus | "all";
 
+function parseFilter(raw: unknown): Filter | null {
+  return raw === "all" || raw === "new" || raw === "closed" ? raw : null;
+}
+
 export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
   const { t: s } = useI18n();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useSessionState<Filter>(
+    "feedback-filter",
+    "all",
+    parseFilter,
+  );
   const [busy, setBusy] = useState(false);
   const statusParam = filter === "all" ? {} : { status: filter };
   // A `nextCursor` and no total, so this pages by "load more" rather than by

@@ -20,6 +20,7 @@ import { RowButton } from "../components/controls";
 import { NavRow, SelectRow } from "../components/select-row";
 import { INPUT_LEFT_CLS, ROW_CLS } from "../components/row";
 import { useLoadable } from "../lib/use-loadable";
+import { parseString, useSessionState } from "../lib/session-state";
 import { botLabel, FACT_ERR_KEY } from "../lib/labels";
 import type { Strings } from "../lib/routes";
 import {
@@ -291,7 +292,11 @@ export function FactsEditor({
 export function FactsView() {
   const { t: s } = useI18n();
   const { data: botsData } = useLoadable(api.listMyBots, []);
-  const [scope, setScope] = useState<string>(MAIN_SCOPE);
+  const [scope, setScope] = useSessionState(
+    "facts-scope",
+    MAIN_SCOPE,
+    parseString,
+  );
   const { data, setData } = useLoadable(() => api.listMyFacts(scope), [scope]);
 
   const bots = botsData?.bots ?? null;

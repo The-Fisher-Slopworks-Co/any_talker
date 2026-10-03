@@ -12,7 +12,13 @@ import { DateFmtProvider } from "./datetime-context";
 import { LoadingState } from "./components/states";
 import { BuildInfoFooter } from "./components/build-info-footer";
 import { UsageHeader } from "./components/usage-header";
-import { adminSection, showsUsageHeader, type Route } from "./lib/routes";
+import {
+  adminSection,
+  parseRoute,
+  showsUsageHeader,
+  type Route,
+} from "./lib/routes";
+import { useSessionState } from "./lib/session-state";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
@@ -32,7 +38,13 @@ function AppShell({
   onMe: (m: MeResponse) => void;
 }) {
   const { t: s } = useI18n();
-  const [route, setRoute] = useState<Route>({ kind: "main" });
+  // The back button walks up from the current route alone, so restoring the
+  // route after a reload restores the whole way back as well.
+  const [route, setRoute] = useSessionState<Route>(
+    "route",
+    { kind: "main" },
+    parseRoute,
+  );
   const [usage, setUsage] = useState<UsageShare | null>(null);
 
   // The header is fetched once here rather than by the main view, so it does
