@@ -115,11 +115,11 @@ are supported as `host:port`).
   they are model output, already bounded); at most 8 calls per turn are kept.
 - Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, edit a
   reminder's note or time, or cancel them by description; the AI drives this via the
-  `schedule_reminder_*` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
+  `schedule_reminder` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
   is capped at `maxRemindersPerUser` reminders shared across the main bot and all character bots
   (default 5; editable in the admin Mini App under Reminders, or via `PUT /api/settings`).
 - Recurring reminders — "every day at 18:30", "every 20 minutes", "every two weeks starting
-  18 September": `schedule_recurring_reminder` repeats a reminder on a fixed interval of minutes,
+  18 September": `schedule_reminder` with `everyAmount`/`everyUnit` repeats a reminder on a fixed interval of minutes,
   hours, days or weeks. Only fixed intervals are supported — calendar rules ("every weekday", "the
   first Monday of the month", cron) are declined with an explanation and the nearest supported
   interval. The interval floor is 5 minutes, a series fires 4 times before it ends, and the whole
