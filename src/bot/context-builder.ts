@@ -6,7 +6,7 @@ import type { AIMessage, AIUserContentPart } from "../ai/types";
 import { append, emptyTranscript, type Transcript } from "../ai/transcript";
 import type { Gender, ToolCallRecord, TurnAuthor } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
-import { localDateTimeString } from "../shared/tz";
+import { messageTimeString } from "../shared/tz";
 import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
 import type { VideoClip } from "./video";
 import { profileField, type UserProfile } from "./profile";
@@ -124,7 +124,7 @@ export function buildUserEnvelope(args: {
   const obj: Record<string, unknown> = { author };
   if (args.sender.gender !== null) obj.gender = args.sender.gender;
   if (args.sentAt) {
-    obj.time = localDateTimeString(args.sentAt.ms, args.sentAt.timezone);
+    obj.time = messageTimeString(args.sentAt.ms, args.sentAt.timezone);
   }
   if (args.profile) obj.profile = profileField(args.profile);
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
