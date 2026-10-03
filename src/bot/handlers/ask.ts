@@ -11,12 +11,14 @@ import { checkAccess, type AccessDenyReason } from "../access";
 import {
   buildContext,
   buildUserEnvelope,
+  chainAuthors,
   conversationBotId,
   conversationStorage,
   type ReplyTarget,
   type Sender,
 } from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
+import { profileToCarry, turnAuthor } from "../profile";
 import type { ToolEffect } from "../../ai/tools/registry";
 import type { DetailLevel } from "../../ai/instruction";
 import type { Lang } from "../../shared/i18n";
@@ -165,6 +167,20 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
     }
   }
 
+  // What the bot knows about the asker, carried in this turn's envelope only
+  // when the chain it continues does not already say it (`bot/profile.ts`).
+  // Decided once: the envelope sent and the one persisted must agree, or the
+  // stored turn would differ from what the model saw.
+  const [facts, authors] = await Promise.all([
+    storage.facts.list(input.userId),
+    chainAuthors(convStorage, input.chatId, input.replyTarget),
+  ]);
+  const profile = profileToCarry(authors, input.userId, {
+    timezone,
+    lang: input.lang,
+    facts,
+  });
+
   // Tools this turn ran, filled once the model call returns and read by
   // `persistTurn`, which the dispatcher invokes after the reply is sent. Same
   // mutable-handle shape as the tool `effects` array in `ai/turn.ts`, and for
@@ -199,6 +215,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         text: input.userText,
         attachments: input.attachments,
         sentAt,
+        profile,
       }),
       botAnswer,
       parentBotMsgId,
@@ -209,6 +226,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
       ...(allImageFileIds.length > 0 && { userImageFileIds: allImageFileIds }),
       ...(turnToolCalls.length > 0 && { toolCalls: turnToolCalls }),
       ...(turnRun !== null && { run: turnRun }),
+      author: turnAuthor(input.userId, profile),
     };
     await Promise.all([
       convStorage.conversations.save(input.chatId, botMsgId, node),
@@ -262,6 +280,7 @@ export async function askHandler(input: AskInput): Promise<AskOutcome> {
         attachments: input.attachments,
         replyTarget: input.replyTarget,
         sentAt,
+        profile,
         fetchPhoto: input.fetchPhoto,
       }),
     onAIStart: input.onAIStart,

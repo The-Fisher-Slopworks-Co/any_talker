@@ -4,11 +4,12 @@
 import type { Storage } from "../storage/types";
 import type { AIMessage, AIUserContentPart } from "../ai/types";
 import { append, emptyTranscript, type Transcript } from "../ai/transcript";
-import type { Gender, ToolCallRecord } from "../shared/types";
+import type { Gender, ToolCallRecord, TurnAuthor } from "../shared/types";
 import { MAX_REPLY_CHAIN_DEPTH, composeFullName } from "../shared/types";
 import { localDateTimeString } from "../shared/tz";
 import { TRANSCODED_AUDIO_MEDIA_TYPE } from "./transcode";
 import type { VideoClip } from "./video";
+import { profileField, type UserProfile } from "./profile";
 
 export type ReplyTarget = {
   messageId: number;
@@ -95,6 +96,10 @@ export type BuildContextArgs = {
   // reuse the very same value (see `ask.ts`), or the stored envelope would
   // differ from the one the model saw and break the cache on the next turn.
   sentAt: SentAt | null;
+  // The author's profile when the new turn has to carry it (`profileToCarry`),
+  // null when the chain already says it. Same rule as `sentAt`: a caller that
+  // persists the turn passes the very same value.
+  profile?: UserProfile | null | undefined;
   maxDepth?: number | undefined;
   fetchPhoto?: ((fileId: string) => Promise<Uint8Array | null>) | undefined;
 };
@@ -104,6 +109,8 @@ export function buildUserEnvelope(args: {
   quote: string | null;
   text: string;
   sentAt: SentAt | null;
+  // See `BuildContextArgs.profile`.
+  profile?: UserProfile | null | undefined;
   // Describes media that isn't self-evident from the parts themselves (video
   // frames). Persisted with the turn, so a follow-up reads the same envelope.
   attachments?: string | undefined;
@@ -114,11 +121,12 @@ export function buildUserEnvelope(args: {
       ? override
       : composeFullName(args.sender.firstName, args.sender.lastName);
 
-  const obj: Record<string, string> = { author };
+  const obj: Record<string, unknown> = { author };
   if (args.sender.gender !== null) obj.gender = args.sender.gender;
   if (args.sentAt) {
     obj.time = localDateTimeString(args.sentAt.ms, args.sentAt.timezone);
   }
+  if (args.profile) obj.profile = profileField(args.profile);
   if (args.quote !== null && args.quote !== "") obj.quote = args.quote;
   if (args.attachments) obj.attachments = args.attachments;
   obj.text = args.text;
@@ -265,6 +273,7 @@ export async function buildContext(
       text: userText,
       attachments: args.attachments,
       sentAt: args.sentAt,
+      profile: args.profile,
     });
     if (images.length > 0 || audios.length > 0 || videos.length > 0) {
       messages = append(messages, {
@@ -278,7 +287,21 @@ export async function buildContext(
   return messages;
 }
 
+// The stored turns a reply into a chain replays, oldest first, as far as
+// `profileToCarry` needs to see them. Empty when the replied-to message is not
+// a stored turn.
+export async function chainAuthors(
+  storage: Storage,
+  chatId: string,
+  replyTarget: ReplyTarget | null,
+  maxDepth: number = MAX_REPLY_CHAIN_DEPTH,
+): Promise<Array<{ author?: TurnAuthor | undefined }>> {
+  if (replyTarget === null) return [];
+  return collectChain(storage, chatId, replyTarget.messageId, maxDepth);
+}
+
 type ChainEntry = {
+  author: TurnAuthor | undefined;
   userQuestion: string;
   botAnswer: string;
   userImageFileIds: string[] | undefined;
@@ -297,6 +320,7 @@ async function collectChain(
     const node = await storage.conversations.get(chatId, cursor);
     if (!node) break;
     chain.unshift({
+      author: node.author,
       userQuestion: node.userQuestion,
       botAnswer: node.botAnswer,
       userImageFileIds: node.userImageFileIds,

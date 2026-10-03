@@ -101,10 +101,6 @@ export async function runGatedAiTurn(
 
   input.onAIStart?.();
 
-  // Surface the user's remembered facts in the system prompt so the model can
-  // use them without having to call list_facts on every turn.
-  const facts = await input.storage.facts.list(input.userId);
-
   // Assemble the request, run the model, and do the post-call accounting
   // (owner-exempt token deduction + the four-ledger spend booking) in one
   // place shared with reminder delivery. A thrown `ai.ask` propagates before
@@ -135,7 +131,6 @@ export async function runGatedAiTurn(
       now: input.now,
       messages,
       ...(input.detailLevel && { detailLevel: input.detailLevel }),
-      facts,
       contextMessages: messages,
       fromAllowance: gate.fromAllowance,
     });
