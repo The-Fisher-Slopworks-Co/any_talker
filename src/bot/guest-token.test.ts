@@ -3,12 +3,7 @@
 
 import { test, expect, describe } from "bun:test";
 import type { Message } from "grammy/types";
-import {
-  guestTokenFooter,
-  newGuestToken,
-  repliedText,
-  splitGuestToken,
-} from "./guest-token";
+import { newGuestToken, repliedText, splitGuestToken } from "./guest-token";
 import { buildRichMarkdown } from "./format";
 
 const message = (fields: Record<string, unknown>): Message =>
@@ -21,17 +16,12 @@ describe("guest thread token", () => {
     expect(newGuestToken()).not.toBe(a);
   });
 
-  test("the footer round-trips through the rendered text", () => {
+  test("the token is read back off the last line of the rendered text", () => {
     const token = newGuestToken();
-    // Telegram renders the spoiler away and leaves the letters.
     expect(splitGuestToken(`Helper\n\nThe answer.\n\n${token}`)).toEqual({
       token,
       text: "Helper\n\nThe answer.",
     });
-    // The markup itself, should a client hand it back verbatim.
-    expect(
-      splitGuestToken(`The answer.\n\n${guestTokenFooter(token)}`),
-    ).toEqual({ token, text: "The answer." });
   });
 
   test("a message that is only the token has no text left", () => {
@@ -55,7 +45,7 @@ describe("guest thread token", () => {
   });
 
   test("the footer sits outside the collapsed block and survives truncation", () => {
-    const footer = guestTokenFooter("gAbCdEf123");
+    const footer = "gAbCdEf123";
     const collapsed = buildRichMarkdown("x".repeat(50), "Helper", {
       collapseThreshold: 10,
       detailsSummary: "Details",
@@ -117,7 +107,7 @@ describe("repliedText", () => {
           },
           {
             type: "paragraph",
-            text: { type: "spoiler", text: "gAbCdEf123" },
+            text: "gAbCdEf123",
           },
         ],
       },

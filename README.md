@@ -177,8 +177,8 @@ are supported as `host:port`).
   globally and per chat.
 - **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
   Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
-  guest-mode UI. Replies are sent via `answerGuestQuery` and end with a short token under a
-  spoiler: replying to an answer continues exactly the conversation that led to it. Non-whitelisted
+  guest-mode UI. Replies are sent via `answerGuestQuery` and end with a short token on the
+  last line: replying to an answer continues exactly the conversation that led to it. Non-whitelisted
   guest invocations are silently ignored.
 - **Rich Markdown replies** (Bot API 10.1) — AI answers are sent as rich messages via
   `sendRichMessage`, so the model can use the full Rich Markdown set (headings, lists, tables,

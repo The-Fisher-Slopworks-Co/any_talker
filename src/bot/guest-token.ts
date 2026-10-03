@@ -3,8 +3,8 @@
 
 import type { Message } from "grammy/types";
 
-// A guest answer carries the key of its own stored thread, as a spoiler on the
-// last line. `answerGuestQuery` returns an inline message id while a reply
+// A guest answer carries the key of its own stored thread, as plain text on
+// its last line. `answerGuestQuery` returns an inline message id while a reply
 // arrives with the chat's message id, so nothing Telegram hands back joins the
 // two — the answer's own text is the only thing that survives the round trip.
 //
@@ -12,9 +12,8 @@ import type { Message } from "grammy/types";
 const TOKEN_ALPHABET =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const TOKEN_RANDOM_CHARS = 9;
-// The last line of the message, with or without the spoiler markup around it —
-// a reply delivers the rendered text, where the markup is already gone.
-const TRAILING_TOKEN = /(?:^|\n)[ \t]*(?:\|\|)?(g[0-9A-Za-z]{9})(?:\|\|)?\s*$/;
+// The last line of the message.
+const TRAILING_TOKEN = /(?:^|\n)[ \t]*(g[0-9A-Za-z]{9})\s*$/;
 
 export function newGuestToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(TOKEN_RANDOM_CHARS));
@@ -23,10 +22,6 @@ export function newGuestToken(): string {
     token += TOKEN_ALPHABET[byte % TOKEN_ALPHABET.length];
   }
   return token;
-}
-
-export function guestTokenFooter(token: string): string {
-  return `||${token}||`;
 }
 
 // Splits a replied-to answer into its token and the text without it. No token

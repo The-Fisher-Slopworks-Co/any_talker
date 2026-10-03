@@ -9,12 +9,7 @@ import { pickVideo, MAX_VIDEO_FRAMES, type VideoClip } from "../video";
 import { resolveSenderIdentity } from "../identity";
 import { resolveReplyImages } from "../reply-images";
 import { extractReplyTarget } from "../reply";
-import {
-  guestTokenFooter,
-  newGuestToken,
-  repliedText,
-  splitGuestToken,
-} from "../guest-token";
+import { newGuestToken, repliedText, splitGuestToken } from "../guest-token";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
 import { readValidDisplayName } from "../../shared/display-name";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../../shared/types";
@@ -54,7 +49,7 @@ export async function dispatchGuest(
   ) => {
     const content = buildRichMarkdown(text, botName, {
       topBlock,
-      footer: token === undefined ? undefined : guestTokenFooter(token),
+      footer: token,
       collapseThreshold:
         expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
       detailsSummary: ctx.t.bot_details_summary,
