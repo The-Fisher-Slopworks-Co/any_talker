@@ -19,13 +19,8 @@ export function createCancelReminderTool(deps: {
   return {
     name: "cancel_reminder",
     description:
-      "Cancel one of the current user's pending reminders by its id (get ids from list_reminders first). " +
-      "The reminderId is an INTERNAL handle — never show it to the user or ask them for it; " +
-      "figure out which reminder the user means yourself and pass its id. " +
-      "Returns { cancelled: true } if the reminder existed and belonged to the user and was removed, " +
-      "or { cancelled: false } if no such reminder is theirs (not an error). " +
-      "On { cancelled: false } nothing was cancelled — never tell the user it was. " +
-      "To cancel several, call this once per id. There is no cancel-all.",
+      "Cancel a pending reminder by its id from list_reminders; one call per reminder. " +
+      "{ cancelled: false } means nothing was cancelled — never tell the user it was.",
     parameters: Schema,
     sources: REMINDER_WRITE_SOURCES,
     execute: async ({ reminderId }, ctx) => {

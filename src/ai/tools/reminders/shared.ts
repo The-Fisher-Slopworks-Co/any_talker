@@ -17,10 +17,14 @@ export const FAILED_WRITE_RULE =
   "If the result has ok: false, NOTHING was changed: tell the user it failed and why, " +
   "and never say the reminder was set, moved or changed.";
 
+// The reminder note, as every reminder-writing tool describes it. The system
+// prompt explains the `reminder_fired` event the note comes back in.
+export const NOTE_DOC =
+  "'text' is a private note to yourself about what to remind of; you word the actual message when it fires.";
+
 // The result contract of the schedule_* tools, which all end in persistReminder.
 export const PERSIST_RESULT_DOC =
-  "Returns { ok: true, fireAt, reminderId } on success, with fireAt as YYYY-MM-DDTHH:MM in the user's timezone, " +
-  "or { ok: false, reason }. " +
+  "Returns { ok: true, fireAt (YYYY-MM-DDTHH:MM, user's timezone) } or { ok: false, reason }. " +
   FAILED_WRITE_RULE;
 
 // Fire times go back to the model as local wall-clock time in the same

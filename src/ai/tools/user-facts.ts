@@ -31,11 +31,8 @@ type ForgetInput = z.infer<typeof ForgetSchema>;
 type ForgetOutput = { existed: boolean };
 
 const FACTS_PURPOSE_DOC =
-  "Short, persistent, per-user notes that YOU (the assistant) maintain across conversations to " +
-  "personalise future replies — favourite topics, preferences, ongoing situations, hobbies, recurring " +
-  "context the user keeps mentioning. Lowercase snake_case keys (e.g. 'favourite_team', 'pets', " +
-  "'job_role'). Do NOT store secrets, passwords, contact details, or anything sensitive. Limit: " +
-  `${USER_FACTS_MAX_PER_USER} facts per user; once full, remembering a new fact evicts the oldest one.`;
+  "Facts are short notes you keep about the user across conversations to personalise replies: preferences, hobbies, ongoing situations. " +
+  "Never store secrets, passwords, contact details or anything sensitive.";
 
 function createRememberFactTool(deps: {
   storage: Storage;
@@ -43,11 +40,8 @@ function createRememberFactTool(deps: {
   return {
     name: "remember_fact",
     description:
-      `Upsert one short fact about the current user. ${FACTS_PURPOSE_DOC} ` +
-      "Use this whenever the user shares a stable preference or detail worth remembering for next time. " +
-      `Keys are case-insensitive (stored lowercased) and must match ${FACT_KEY_REGEX} (1–${FACT_KEY_MAX_LEN} chars). ` +
-      `Values are 1–${FACT_VALUE_MAX_LEN} chars. Always returns {ok:true}: updating an existing key overwrites its ` +
-      `value, and adding a new key past the ${USER_FACTS_MAX_PER_USER}-fact cap evicts the oldest fact to make room.`,
+      `Save or overwrite one fact about the user. ${FACTS_PURPOSE_DOC} ` +
+      `Keys are lowercase snake_case ('favourite_team'). Past ${USER_FACTS_MAX_PER_USER} facts the oldest one is evicted.`,
     parameters: RememberSchema,
     execute: async ({ key, value }, ctx) => {
       return deps.storage
@@ -63,9 +57,7 @@ function createListFactsTool(deps: {
   return {
     name: "list_facts",
     description:
-      `Return every fact you've previously stored about the current user. ${FACTS_PURPOSE_DOC} ` +
-      "Takes no parameters. Returns an array of {key, value} objects (may be empty). " +
-      "Call this when you want to recall what you already know about the user before answering.",
+      "List every fact stored about the user. The system prompt already shows them, so call this only to re-check.",
     parameters: ListSchema,
     execute: async (_input, ctx) => {
       return deps.storage.forBot(ctx.botId ?? null).facts.list(ctx.userId);
@@ -79,9 +71,7 @@ function createForgetFactTool(deps: {
   return {
     name: "forget_fact",
     description:
-      `Delete one previously remembered fact about the current user by key. ${FACTS_PURPOSE_DOC} ` +
-      "Keys are case-insensitive. Returns {existed:true} if a fact with that key was removed, " +
-      "{existed:false} if no fact existed under that key (not an error).",
+      "Delete one fact about the user by key. { existed: false } means there was no such fact.",
     parameters: ForgetSchema,
     execute: async ({ key }, ctx) => {
       return deps.storage

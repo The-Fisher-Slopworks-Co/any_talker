@@ -76,7 +76,7 @@ export function createSearchWebTool(
   return {
     name: "search_web",
     description:
-      "Search the internet and return a list of relevant results with title, URL, and a short description for each. Use this to find current information, news, documentation, or anything that requires a web search.",
+      "Search the web for current information; returns title, URL and a short description per result.",
     parameters: Schema,
     execute: ({ query, limit }, _ctx) =>
       sem(async () => {
