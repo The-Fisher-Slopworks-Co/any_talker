@@ -82,6 +82,9 @@ type GuestThreadTurn = {
   run?: TurnRun;
 };
 
+// A guest thread as of one answer: every turn up to and including it. Stored
+// whole under that answer's token, so a reply to any answer — not only the
+// latest — resumes exactly the conversation that led to it.
 export type GuestThreadNode = {
   chatId: string;
   turns: GuestThreadTurn[];
@@ -92,8 +95,8 @@ export type GuestThreadNode = {
 // pointer back into the conversation graph, never a copy of anything in it.
 //
 // Tagged because the two graphs are keyed differently — a reply chain by
-// `(chatId, botMsgId)`, a guest thread by chat alone — so a reader knows which
-// lookup to make without probing both.
+// `(chatId, botMsgId)`, a guest thread by the token its answer carries — so a
+// reader knows which lookup to make without probing both.
 export type UserThreadRef =
   | {
       kind: "chain";
@@ -116,6 +119,10 @@ export type UserThreadRef =
       // As above, but a guest thread is always stored in the answering bot's
       // own scope — guest chats are business DMs, never group chats.
       botId: string | null;
+      // The thread's head: the token of its most recent answer
+      // (`bot/guest-token.ts`). Absent on an entry written while a guest thread
+      // was one record per chat, which `chatId` then addresses.
+      token?: string;
       ts: number;
     };
 

@@ -10,7 +10,7 @@ import type { Lang } from "../i18n";
 // the snapshot's own order already expresses.
 export type ThreadSnapshotTurn = {
   // The bot message this turn was stored under, and what `pointedAt.botMsgId`
-  // refers to. A guest thread is keyed by chat alone, so its turns have none.
+  // refers to. A guest thread is keyed by token, so its turns have none.
   botMsgId?: number;
   userQuestion: string;
   botAnswer: string;

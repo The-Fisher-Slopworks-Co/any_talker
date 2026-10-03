@@ -34,6 +34,9 @@ export function buildRichMarkdown(
     topBlock?: string | undefined;
     collapseThreshold?: number | undefined;
     detailsSummary: string;
+    // Appended after everything else, outside the collapsible block, and never
+    // truncated away — the guest thread token (`bot/guest-token.ts`).
+    footer?: string | undefined;
   },
 ): RichContent {
   const head: string[] = [];
@@ -51,7 +54,8 @@ export function buildRichMarkdown(
   const open = collapse
     ? `<details>\n<summary>${escapeHtmlText(opts.detailsSummary)}</summary>\n\n`
     : "";
-  const close = collapse ? "\n\n</details>" : "";
+  const footer = opts.footer ? `\n\n${opts.footer}` : "";
+  const close = `${collapse ? "\n\n</details>" : ""}${footer}`;
 
   const full = `${prefix}${open}${body}${close}`;
   if (full.length <= RICH_MESSAGE_TEXT_MAX) {

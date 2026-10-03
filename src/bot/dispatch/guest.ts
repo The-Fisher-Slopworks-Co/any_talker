@@ -9,6 +9,7 @@ import { pickVideo, MAX_VIDEO_FRAMES, type VideoClip } from "../video";
 import { resolveSenderIdentity } from "../identity";
 import { resolveReplyImages } from "../reply-images";
 import { extractReplyTarget } from "../reply";
+import { newGuestToken, repliedText, splitGuestToken } from "../guest-token";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
 import { readValidDisplayName } from "../../shared/display-name";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../../shared/types";
@@ -44,9 +45,11 @@ export async function dispatchGuest(
     botName: string | null,
     topBlock?: string,
     expandableThreshold?: number,
+    token?: string,
   ) => {
     const content = buildRichMarkdown(text, botName, {
       topBlock,
+      footer: token,
       collapseThreshold:
         expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
       detailsSummary: ctx.t.bot_details_summary,
@@ -133,14 +136,25 @@ export async function dispatchGuest(
   };
 
   const replyMsg = msg.reply_to_message;
-  const replyToOurBot = replyMsg?.from?.id === ctx.me.id;
-  const priorThread = replyToOurBot
-    ? await rt.scopedStorage.conversations.getGuest(chatId)
-    : null;
-  // Always extracted when the query is a reply; the handler prefers the
-  // stored thread and falls back to the raw replied-to message (mirrors
-  // /ask, where a reply outside the conversation graph is surfaced verbatim).
+  const replyToOurBot =
+    replyMsg !== undefined &&
+    (replyMsg.from?.id === ctx.me.id || replyMsg.via_bot?.id === ctx.me.id);
+  // Always extracted when the query is a reply (mirrors /ask, where a reply
+  // outside the conversation graph is surfaced verbatim). An answer of ours is
+  // read through `repliedText` — it was sent as a rich message — and gives up
+  // its thread token, which the model never sees.
   const replyTarget = replyMsg ? extractReplyTarget(replyMsg) : null;
+  let priorToken: string | null = null;
+  if (replyTarget && replyMsg && replyToOurBot) {
+    const split = splitGuestToken(repliedText(replyMsg) ?? "");
+    replyTarget.text = split.text === "" ? null : split.text;
+    priorToken = split.token;
+  }
+  const priorThread =
+    priorToken !== null
+      ? await rt.scopedStorage.conversations.getGuest(priorToken)
+      : null;
+  const threadToken = newGuestToken();
   let replyImageFileIds: string[] = [];
   if (replyTarget && replyMsg) {
     const reply = await resolveReplyImages({
@@ -191,6 +205,8 @@ export async function dispatchGuest(
     has_quote: msg.quote !== undefined,
     has_reply_target: replyTarget !== null,
     reply_images: replyTarget?.images.length ?? 0,
+    reply_to_own_answer: replyToOurBot,
+    has_thread_token: priorToken !== null,
     prior_thread_turns: priorThread?.turns.length ?? 0,
   });
 
@@ -219,7 +235,10 @@ export async function dispatchGuest(
       imageFileIds,
       replyImageFileIds,
       replyTarget,
+      replyIsOwnAnswer: replyToOurBot,
       priorThread,
+      priorToken,
+      threadToken,
       lang: ctx.lang,
       fetchPhoto: rt.fetchPhoto,
     });
@@ -263,6 +282,7 @@ export async function dispatchGuest(
             outcome.botName,
             topBlock,
             outcome.expandableThreshold,
+            threadToken,
           );
         } catch (err) {
           console.error("answerGuestQuery failed:", err);

@@ -153,20 +153,54 @@ for (const [name, create] of implementations) {
       expect(threads.map((t) => t.chatId)).toEqual(["-200", "-100"]);
     });
 
-    test("a guest thread keeps one entry however many turns it takes", async () => {
+    test("a guest thread keeps one entry however many replies it takes", async () => {
       const store = create();
-      const guest = (ts: number) => ({
+      const guest = (
+        token: string,
+        parentToken: string | null,
+        ts: number,
+      ) => ({
         kind: "guest" as const,
         chatId: "777",
         botId: "cat-bot",
+        token,
+        parentToken,
         ts,
       });
-      await store.indexUserThread("42", guest(1_000));
-      await store.indexUserThread("42", guest(2_000));
-      await store.indexUserThread("42", guest(3_000));
+      await store.indexUserThread("42", guest("gA", null, 1_000));
+      await store.indexUserThread("42", guest("gB", "gA", 2_000));
+      await store.indexUserThread("42", guest("gC", "gB", 3_000));
       expect(await store.listUserThreads("42")).toEqual([
-        { kind: "guest", chatId: "777", botId: "cat-bot", ts: 3_000 },
+        {
+          kind: "guest",
+          chatId: "777",
+          botId: "cat-bot",
+          token: "gC",
+          ts: 3_000,
+        },
       ]);
+    });
+
+    test("two guest threads in one chat are two entries", async () => {
+      const store = create();
+      for (const [token, ts] of [
+        ["gA", 1_000],
+        ["gB", 2_000],
+      ] as const) {
+        await store.indexUserThread("42", {
+          kind: "guest",
+          chatId: "777",
+          botId: "cat-bot",
+          token,
+          parentToken: null,
+          ts,
+        });
+      }
+      expect(
+        (await store.listUserThreads("42")).map(
+          (t) => t.kind === "guest" && t.token,
+        ),
+      ).toEqual(["gB", "gA"]);
     });
 
     test("a guest thread and a chain in the same chat are separate entries", async () => {
@@ -180,6 +214,8 @@ for (const [name, create] of implementations) {
         kind: "guest",
         chatId: "777",
         botId: "cat-bot",
+        token: "gA",
+        parentToken: null,
         ts: 2_000,
       });
       expect((await store.listUserThreads("42")).map((t) => t.kind)).toEqual([
@@ -256,6 +292,8 @@ test("the index is one list per user across every forBot scope", async () => {
     kind: "guest",
     chatId: "777",
     botId: "cat-bot",
+    token: "gA",
+    parentToken: null,
     ts: 2_000,
   });
   await storage
