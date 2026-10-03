@@ -8,12 +8,13 @@ import {
   isLimitClass,
   type LimitClass,
 } from "../../shared/types";
-import type { ApiResponse, Route } from "./types";
+import { ANY_METHOD, type ApiResponse, type Route } from "./types";
 import { applyUserFieldUpdates } from "./profile-fields";
 import {
   FACTS_BOT_NOT_FOUND,
+  handleFactItem,
+  handleFactsCollection,
   resolveFactsStorage,
-  respondFacts,
 } from "./facts-store";
 
 const USER_NOT_FOUND: ApiResponse = {
@@ -29,8 +30,8 @@ const BAD_LIMIT_CLASS: ApiResponse = {
 };
 
 // ORDER-SENSITIVE. `/api/admin/users/(.+)` is greedy and would swallow the
-// routes above it, so the collection, `/:id/spending`, `/:id/limit-class` and
-// `/:id/facts/:scope` all have to be tried first. Keeping every `/api/admin/users` route in this
+// routes above it, so the collection, `/:id/spending`, `/:id/limit-class`,
+// `/:id/facts/:scope` and `/:id/facts/:scope/:key` all have to be tried first. Keeping every `/api/admin/users` route in this
 // one array is what makes that guarantee local and reviewable.
 export const adminUserRoutes: Route[] = [
   {
@@ -89,17 +90,31 @@ export const adminUserRoutes: Route[] = [
       return { status: 200, body: { spending } };
     },
   },
-  // Read-only admin view into a user's memory vault, per character scope —
-  // the same records the /api/me/facts routes serve, addressed by an explicit
-  // user id. Deliberately GET-only: edits stay with the user (and the AI tools),
-  // the admin only inspects.
+  // The admin's handle on a user's memory vault, per character scope: the
+  // same records and rules as the /api/me/facts routes, addressed by an
+  // explicit user id. Entered on every verb for the same reason those are (see
+  // `Route.handle`). Writes need a known user so a typo'd id can't seed a
+  // vault for nobody; reads stay as cheap as before.
   {
-    method: "GET",
+    method: ANY_METHOD,
     path: /^\/api\/admin\/users\/([^/]+)\/facts\/([^/]+)$/,
-    handle: async ({ deps, params }) => {
+    handle: async ({ req, deps, params }) => {
       const scoped = await resolveFactsStorage(deps.storage, params[1]!);
       if (!scoped) return FACTS_BOT_NOT_FOUND;
-      return respondFacts(scoped, params[0]!);
+      if (req.method !== "GET" && !(await deps.storage.users.get(params[0]!))) {
+        return USER_NOT_FOUND;
+      }
+      return handleFactsCollection(req, scoped, params[0]!);
+    },
+  },
+  {
+    method: ANY_METHOD,
+    path: /^\/api\/admin\/users\/([^/]+)\/facts\/([^/]+)\/([^/]+)$/,
+    handle: async ({ req, deps, params }) => {
+      const scoped = await resolveFactsStorage(deps.storage, params[1]!);
+      if (!scoped) return FACTS_BOT_NOT_FOUND;
+      if (!(await deps.storage.users.get(params[0]!))) return USER_NOT_FOUND;
+      return handleFactItem(req, scoped, params[0]!, params[2]!);
     },
   },
   {
