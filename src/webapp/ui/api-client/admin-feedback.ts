@@ -5,7 +5,10 @@ import type {
   FeedbackEntry,
   FeedbackStatus,
 } from "../../../shared/types/feedback";
-import type { FeedbackSummary } from "../../routes/admin-feedback";
+import type {
+  FeedbackNames,
+  FeedbackSummary,
+} from "../../routes/admin-feedback";
 import { req } from "./http";
 
 export type FeedbackListParams = {
@@ -36,7 +39,10 @@ export const adminFeedbackApi = {
   listFeedback: (params?: FeedbackListParams) =>
     req<FeedbackListResponse>("GET", listPath(params)),
   getFeedback: (id: string) =>
-    req<{ entry: FeedbackEntry }>("GET", `/api/admin/feedback/${id}`),
+    req<{ entry: FeedbackEntry; names: FeedbackNames }>(
+      "GET",
+      `/api/admin/feedback/${id}`,
+    ),
   // `status` is the only editable field on a record.
   setFeedbackStatus: (id: string, status: FeedbackStatus) =>
     req<{ entry: FeedbackEntry }>("PATCH", `/api/admin/feedback/${id}`, {

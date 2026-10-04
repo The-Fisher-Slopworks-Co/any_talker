@@ -11,4 +11,6 @@ export interface UsersStore {
   // drives new-user detection and the new-user soft-start budget.
   upsert(user: User): Promise<{ isNew: boolean }>;
   get(id: string): Promise<User | null>;
+  // One round trip for many ids; ids with no row are absent from the map.
+  getMany(ids: string[]): Promise<Map<string, User>>;
 }

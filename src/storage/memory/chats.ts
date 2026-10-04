@@ -33,6 +33,15 @@ export class MemoryChatsStore implements ChatsStore {
     return c ? { ...c } : null;
   }
 
+  async getMany(ids: string[]): Promise<Map<string, Chat>> {
+    const found = new Map<string, Chat>();
+    for (const id of ids) {
+      const c = this.b.chats.get(id);
+      if (c) found.set(id, { ...c });
+    }
+    return found;
+  }
+
   async delete(id: string): Promise<void> {
     this.b.chats.delete(id);
   }
