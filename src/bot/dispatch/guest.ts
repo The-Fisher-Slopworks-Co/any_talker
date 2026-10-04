@@ -13,16 +13,9 @@ import { newGuestToken, repliedText, splitGuestToken } from "../guest-token";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
 import { readValidDisplayName } from "../../shared/display-name";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../../shared/types";
-import { askOutcomeLabel } from "../ask-outcome";
 import { videoErrorText } from "../video-pipeline";
 import type { BotRuntime } from "../runtime";
 import type { BotContext } from "../middleware/lang";
-import {
-  askDurationSeconds,
-  askTokensTotal,
-  askTotal,
-  type AskOutcomeLabel,
-} from "../../metrics";
 
 export async function dispatchGuest(
   rt: BotRuntime,
@@ -208,101 +201,85 @@ export async function dispatchGuest(
     prior_thread_turns: priorThread?.turns.length ?? 0,
   });
 
-  const startedAt = performance.now();
-  let outcomeLabel: AskOutcomeLabel = "error";
-  try {
-    const outcome = await guestAskHandler({
-      storage: rt.deps.storage,
-      rateLimiter: rt.deps.rateLimiter,
-      budgetGuard: rt.deps.budgetGuard,
-      ai: rt.deps.ai,
-      resolver: rt.deps.resolver,
-      botId: rt.botId,
-      ownerId: rt.deps.ownerId,
-      now: Date.now(),
-      chatId,
-      userId,
-      senderChatId: identity.senderChatId,
-      sender,
-      userText,
-      quote: msg.quote?.text ?? null,
-      images,
-      audios,
-      videos,
-      attachments,
-      imageFileIds,
-      replyImageFileIds,
-      replyTarget,
-      replyIsOwnAnswer: replyToOurBot,
-      priorThread,
-      priorToken,
-      threadToken,
-      lang: ctx.lang,
-      fetchPhoto: rt.fetchPhoto,
-    });
-    outcomeLabel = askOutcomeLabel(outcome.kind);
-
-    switch (outcome.kind) {
-      case "denied":
-        // "empty" is a blank query, not an access decision — no log needed.
-        if (outcome.reason !== "empty") {
-          rt.logAccessDenied({
-            source: "guest",
-            chat_id: msg.chat.id,
-            user_id: userId,
-            reason: outcome.reason,
-          });
-        }
-        return;
-      case "budgetLimited":
-        void rt.alerts.globalCapBreach(ctx.api, outcome.reason);
-        await answer(ctx.t.bot_budget_limited, null).catch((err) =>
-          console.error("answerGuestQuery failed:", err),
-        );
-        return;
-      case "rateLimited":
+  const outcome = await guestAskHandler({
+    storage: rt.deps.storage,
+    rateLimiter: rt.deps.rateLimiter,
+    budgetGuard: rt.deps.budgetGuard,
+    ai: rt.deps.ai,
+    resolver: rt.deps.resolver,
+    botId: rt.botId,
+    ownerId: rt.deps.ownerId,
+    now: Date.now(),
+    chatId,
+    userId,
+    senderChatId: identity.senderChatId,
+    sender,
+    userText,
+    quote: msg.quote?.text ?? null,
+    images,
+    audios,
+    videos,
+    attachments,
+    imageFileIds,
+    replyImageFileIds,
+    replyTarget,
+    replyIsOwnAnswer: replyToOurBot,
+    priorThread,
+    priorToken,
+    threadToken,
+    lang: ctx.lang,
+    fetchPhoto: rt.fetchPhoto,
+  });
+  switch (outcome.kind) {
+    case "denied":
+      // "empty" is a blank query, not an access decision — no log needed.
+      if (outcome.reason !== "empty") {
+        rt.logAccessDenied({
+          source: "guest",
+          chat_id: msg.chat.id,
+          user_id: userId,
+          reason: outcome.reason,
+        });
+      }
+      return;
+    case "budgetLimited":
+      void rt.alerts.globalCapBreach(ctx.api, outcome.reason);
+      await answer(ctx.t.bot_budget_limited, null).catch((err) =>
+        console.error("answerGuestQuery failed:", err),
+      );
+      return;
+    case "rateLimited":
+      await answer(
+        ctx.t.bot_rate_limited(outcome.limitedBy, outcome.msUntilReset),
+        null,
+      ).catch((err) => console.error("answerGuestQuery failed:", err));
+      return;
+    case "error":
+      console.error("guest ask error:", outcome.message);
+      await answer(ctx.t.bot_ai_error, null).catch((err) =>
+        console.error("answerGuestQuery failed:", err),
+      );
+      return;
+    case "answered": {
+      try {
+        const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
         await answer(
-          ctx.t.bot_rate_limited(outcome.limitedBy, outcome.msUntilReset),
-          null,
-        ).catch((err) => console.error("answerGuestQuery failed:", err));
-        return;
-      case "error":
-        console.error("guest ask error:", outcome.message);
-        await answer(ctx.t.bot_ai_error, null).catch((err) =>
-          console.error("answerGuestQuery failed:", err),
+          outcome.text,
+          outcome.botName,
+          topBlock,
+          outcome.expandableThreshold,
+          threadToken,
         );
-        return;
-      case "answered": {
-        try {
-          const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
-          await answer(
-            outcome.text,
-            outcome.botName,
-            topBlock,
-            outcome.expandableThreshold,
-            threadToken,
-          );
-        } catch (err) {
-          console.error("answerGuestQuery failed:", err);
-          return;
-        }
-        try {
-          await outcome.persistThread();
-          if (outcome.totalTokens > 0) {
-            askTokensTotal.inc({ source: "guest" }, outcome.totalTokens);
-          }
-        } catch (err) {
-          console.error("guest thread persistence failed:", err);
-        }
+      } catch (err) {
+        console.error("answerGuestQuery failed:", err);
         return;
       }
+      try {
+        await outcome.persistThread();
+      } catch (err) {
+        console.error("guest thread persistence failed:", err);
+      }
+      return;
     }
-  } finally {
-    const seconds = (performance.now() - startedAt) / 1000;
-    askTotal.inc({ source: "guest", outcome: outcomeLabel });
-    askDurationSeconds.observe(
-      { source: "guest", outcome: outcomeLabel },
-      seconds,
-    );
   }
 }

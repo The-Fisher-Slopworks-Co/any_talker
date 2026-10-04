@@ -17,7 +17,6 @@ import {
 import { salvageQuarantinedRecipient } from "./parse";
 import { advanceRecurrence } from "./recurrence";
 import type { PersonaResolver } from "../managed-bots/persona";
-import { remindersDeliveredTotal } from "../metrics";
 
 export type Scheduler = IntervalScheduler;
 
@@ -107,7 +106,6 @@ async function runRuntimeTick(
       );
       if (blockedUser || blockedChat) {
         await runtime.storage.reminders.delete(reminder.id, reminder.userId);
-        remindersDeliveredTotal.inc({ outcome: "blocked" });
         console.log(
           blockedUser
             ? `[scheduler] dropped id=${reminder.id}: user ${reminder.userId} is blacklisted`
@@ -129,7 +127,6 @@ async function runRuntimeTick(
         nowMs,
       );
       if (outcome === "transient") {
-        remindersDeliveredTotal.inc({ outcome: "transient" });
         console.error(
           `[scheduler] transient delivery failure id=${reminder.id}, retrying next tick`,
         );
@@ -144,7 +141,6 @@ async function runRuntimeTick(
         if (next !== null) {
           try {
             await runtime.storage.reminders.save(next);
-            remindersDeliveredTotal.inc({ outcome: "delivered" });
             console.log(
               `[scheduler] delivered id=${reminder.id} kind=${reminder.target.kind}, next at ${new Date(next.fireAtMs).toISOString()} (${next.recurrence?.occurrencesLeft} left)`,
             );
@@ -170,7 +166,6 @@ async function runRuntimeTick(
         );
       }
       if (outcome === "permanent" || outcome === "unreachable") {
-        remindersDeliveredTotal.inc({ outcome });
         console.error(
           `[scheduler] ${outcome} delivery failure id=${reminder.id} kind=${reminder.target.kind}, dropped`,
         );
@@ -181,7 +176,6 @@ async function runRuntimeTick(
           await notifyDeliveryFailure(runtime.api, reminder);
         }
       } else {
-        remindersDeliveredTotal.inc({ outcome: "delivered" });
         console.log(
           `[scheduler] delivered id=${reminder.id} kind=${reminder.target.kind}`,
         );

@@ -20,9 +20,6 @@ export type GateVerdict =
 // more chance: while their class's token ceiling and monthly allowance both
 // have room, the request goes ahead and is drawn from the allowance. The global
 // monthly cap is absolute — no allowance gets past it.
-//
-// The guard counts its own denial metric, so a class user who then goes ahead
-// on the allowance still shows up there: it measures regular-user denials.
 export async function checkTurnGates(args: {
   storage: Storage;
   budgetGuard: BudgetGuard;

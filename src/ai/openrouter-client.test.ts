@@ -22,7 +22,6 @@ import {
 import type { AIMessage } from "./types";
 import { transcript } from "./transcript";
 import type { Tool, ToolCallContext } from "./tools/registry";
-import { aiRequestsTotal } from "../metrics";
 import { TOOL_CALLS_MAX_PER_TURN, TOOL_OUTPUT_MAX } from "./tool-calls";
 
 const SDK_ENV_VARS = [
@@ -300,15 +299,6 @@ const echoTool: Tool = {
   parameters: z.object({ value: z.string() }),
   execute: (input) => ({ echoed: (input as { value: string }).value }),
 };
-
-// Reads one labelled sample out of the exposition text the registry renders.
-function counterValue(outcome: "success" | "error"): number {
-  const line = aiRequestsTotal
-    .collect()
-    .split("\n")
-    .find((l) => l.startsWith(`bot_ai_requests_total{outcome="${outcome}"}`));
-  return line ? Number(line.split(" ").pop()) : 0;
-}
 
 describe("OpenRouterClient — the request that goes out", () => {
   test("POSTs to {baseURL}/responses with a bearer token", async () => {
@@ -640,44 +630,13 @@ describe("OpenRouterClient — the result that comes back", () => {
     expect(seen).toBe(ctx);
     expect(ctx.effects).toHaveLength(1);
   });
-
-  // The metric is documented as one observation per `ask()`. Hooking the HTTP
-  // layer instead would count every model call and inflate the dashboards.
-  test("a multi-call ask is one metric observation", async () => {
-    const before = counterValue("success");
-    const { client, calls } = capturingClient({
-      reply: (turn) =>
-        new Response(
-          JSON.stringify(
-            responsePayload(
-              turn === 1
-                ? { cost: 0, toolCall: { name: "echo", args: { value: "x" } } }
-                : { cost: 0 },
-            ),
-          ),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-    });
-    await client.ask(askOpts({ tools: [echoTool] }));
-    expect(calls).toHaveLength(2);
-    expect(counterValue("success") - before).toBe(1);
-  });
-
-  test("a failed ask is counted as an error, once", async () => {
-    const before = counterValue("error");
-    const { client } = capturingClient({
-      reply: () => new Response("{}", { status: 400 }),
-    });
-    await client.ask(askOpts()).catch(() => {});
-    expect(counterValue("error") - before).toBe(1);
-  });
 });
 
 describe("OpenRouterClient — the loop bound and the final turn", () => {
-  // What the ceiling is actually measured in. Cost, latency and the top bucket
-  // of `bot_ai_request_duration_seconds` all key off model calls, and the old
-  // `generateText({ stopWhen: stepCountIs(8) })` allowed 8 of them. This is
-  // the loop's own bound; the empty-final retry can add one on top.
+  // What the ceiling is actually measured in. Cost and latency key off model
+  // calls, and the old `generateText({ stopWhen: stepCountIs(8) })` allowed 8
+  // of them. This is the loop's own bound; the empty-final retry can add one on
+  // top.
   const MAX_MODEL_CALLS = 8;
 
   // Every reply is a tool call, so the loop runs to the cap.
@@ -767,7 +726,6 @@ describe("OpenRouterClient — the loop bound and the final turn", () => {
   // real, billed ask out of the ledger. `ask.ts` turns the empty text into a
   // user-visible error instead. If someone sets it, this test goes red.
   test('an empty final output resolves to "" and is still charged', async () => {
-    const before = counterValue("success");
     const { client, calls } = capturingClient({
       reply: (turn) =>
         new Response(
@@ -791,7 +749,6 @@ describe("OpenRouterClient — the loop bound and the final turn", () => {
     expect(calls).toHaveLength(3);
     expect(result.costUsd).toBeGreaterThan(0);
     expect(result.priced).toBe(true);
-    expect(counterValue("success") - before).toBe(1);
   });
 });
 

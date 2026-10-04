@@ -11,15 +11,8 @@ import { resolveSenderIdentity } from "../identity";
 import { resolveReplyImages } from "../reply-images";
 import { extractReplyTarget } from "../reply";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
-import { askOutcomeLabel } from "../ask-outcome";
 import { refuseEphemeralAsk } from "../ephemeral";
 import { readValidDisplayName } from "../../shared/display-name";
-import {
-  askDurationSeconds,
-  askTokensTotal,
-  askTotal,
-  type AskOutcomeLabel,
-} from "../../metrics";
 import type { BotRuntime } from "../runtime";
 import type { BotContext } from "../middleware/lang";
 
@@ -166,121 +159,105 @@ export async function dispatchAsk(
     }, 4000);
   };
 
-  const startedAt = performance.now();
-  let outcomeLabel: AskOutcomeLabel = "error";
+  let outcome;
   try {
-    let outcome;
-    try {
-      outcome = await askHandler({
-        storage: rt.deps.storage,
-        rateLimiter: rt.deps.rateLimiter,
-        budgetGuard: rt.deps.budgetGuard,
-        ai: rt.deps.ai,
-        resolver: rt.deps.resolver,
-        botId: rt.botId,
-        ownerId: rt.deps.ownerId,
-        now: Date.now(),
-        chatId: String(chatId),
-        userId,
-        senderChatId: identity.senderChatId,
-        askMessageId: args.askMessageId,
-        sender,
-        userText: args.userText,
-        quote: args.quote,
-        images: args.images,
-        audios: args.audios,
-        videos: args.videos,
-        attachments: args.attachments,
-        imageFileIds: args.imageFileIds,
-        replyImageFileIds,
-        replyTarget,
-        lang: ctx.lang,
-        detailLevel: args.detailLevel,
-        onAIStart: startTyping,
-        fetchPhoto: rt.fetchPhoto,
-      });
-    } finally {
-      stopTyping();
-    }
-    outcomeLabel = askOutcomeLabel(outcome.kind);
-
-    switch (outcome.kind) {
-      case "denied":
-        rt.logAccessDenied({
-          source: "ask",
-          chat_id: chatId,
-          user_id: userId,
-          reason: outcome.reason,
-        });
-        return;
-      case "usage":
-        await ctx.reply(ctx.t.bot_ask_usage);
-        return;
-      // Failure notices are still part of the conversation: persist the turn
-      // (question + the notice actually sent) so a later reply to either the
-      // notice or the user's own ask message carries the full chain.
-      case "budgetLimited": {
-        void rt.alerts.globalCapBreach(ctx.api, outcome.reason);
-        const text = ctx.t.bot_budget_limited;
-        const sent = await ctx.reply(text);
-        await outcome.persistConversation(sent.message_id, text);
-        return;
-      }
-      case "rateLimited": {
-        const text = ctx.t.bot_rate_limited(
-          outcome.limitedBy,
-          outcome.msUntilReset,
-        );
-        const sent = await ctx.reply(text);
-        await outcome.persistConversation(sent.message_id, text);
-        return;
-      }
-      case "error": {
-        console.error("ask error:", outcome.message);
-        const sent = await ctx.reply(ctx.t.bot_ai_error);
-        await outcome.persistConversation(sent.message_id, ctx.t.bot_ai_error);
-        return;
-      }
-      case "answered": {
-        const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
-        const content = buildRichMarkdown(outcome.text, outcome.botName, {
-          topBlock,
-          collapseThreshold: outcome.expandableThreshold,
-          detailsSummary: ctx.t.bot_details_summary,
-        });
-        const replyParameters = { message_id: args.askMessageId };
-        let sent: Message;
-        try {
-          // `skip_entity_detection` is deliberately left unset: Telegram
-          // auto-links plain URLs and mentions in the AI reply, matching the
-          // behavior of the `parse_mode: "HTML"` send path this replaced.
-          sent = await ctx.api.sendRichMessage(
-            chatId,
-            { markdown: content.markdown },
-            { reply_parameters: replyParameters },
-          );
-        } catch (err) {
-          // Rich send failed (markdown Telegram rejected, or the method is
-          // unavailable on this server) — fall back to a plain message so the
-          // user still gets the answer.
-          console.error("sendRichMessage failed, sending plain:", err);
-          sent = await ctx.api.sendMessage(chatId, content.markdown, {
-            reply_parameters: replyParameters,
-          });
-        }
-        await outcome.persistConversation(sent.message_id);
-        if (outcome.totalTokens > 0) {
-          askTokensTotal.inc({ source: "ask" }, outcome.totalTokens);
-        }
-        return;
-      }
-    }
+    outcome = await askHandler({
+      storage: rt.deps.storage,
+      rateLimiter: rt.deps.rateLimiter,
+      budgetGuard: rt.deps.budgetGuard,
+      ai: rt.deps.ai,
+      resolver: rt.deps.resolver,
+      botId: rt.botId,
+      ownerId: rt.deps.ownerId,
+      now: Date.now(),
+      chatId: String(chatId),
+      userId,
+      senderChatId: identity.senderChatId,
+      askMessageId: args.askMessageId,
+      sender,
+      userText: args.userText,
+      quote: args.quote,
+      images: args.images,
+      audios: args.audios,
+      videos: args.videos,
+      attachments: args.attachments,
+      imageFileIds: args.imageFileIds,
+      replyImageFileIds,
+      replyTarget,
+      lang: ctx.lang,
+      detailLevel: args.detailLevel,
+      onAIStart: startTyping,
+      fetchPhoto: rt.fetchPhoto,
+    });
   } finally {
-    const seconds = (performance.now() - startedAt) / 1000;
-    askTotal.inc({ source: "ask", outcome: outcomeLabel });
-    askDurationSeconds.observe(
-      { source: "ask", outcome: outcomeLabel },
-      seconds,
-    );
+    stopTyping();
+  }
+  switch (outcome.kind) {
+    case "denied":
+      rt.logAccessDenied({
+        source: "ask",
+        chat_id: chatId,
+        user_id: userId,
+        reason: outcome.reason,
+      });
+      return;
+    case "usage":
+      await ctx.reply(ctx.t.bot_ask_usage);
+      return;
+    // Failure notices are still part of the conversation: persist the turn
+    // (question + the notice actually sent) so a later reply to either the
+    // notice or the user's own ask message carries the full chain.
+    case "budgetLimited": {
+      void rt.alerts.globalCapBreach(ctx.api, outcome.reason);
+      const text = ctx.t.bot_budget_limited;
+      const sent = await ctx.reply(text);
+      await outcome.persistConversation(sent.message_id, text);
+      return;
+    }
+    case "rateLimited": {
+      const text = ctx.t.bot_rate_limited(
+        outcome.limitedBy,
+        outcome.msUntilReset,
+      );
+      const sent = await ctx.reply(text);
+      await outcome.persistConversation(sent.message_id, text);
+      return;
+    }
+    case "error": {
+      console.error("ask error:", outcome.message);
+      const sent = await ctx.reply(ctx.t.bot_ai_error);
+      await outcome.persistConversation(sent.message_id, ctx.t.bot_ai_error);
+      return;
+    }
+    case "answered": {
+      const topBlock = buildEffectsTopBlock(outcome.effects, ctx.lang);
+      const content = buildRichMarkdown(outcome.text, outcome.botName, {
+        topBlock,
+        collapseThreshold: outcome.expandableThreshold,
+        detailsSummary: ctx.t.bot_details_summary,
+      });
+      const replyParameters = { message_id: args.askMessageId };
+      let sent: Message;
+      try {
+        // `skip_entity_detection` is deliberately left unset: Telegram
+        // auto-links plain URLs and mentions in the AI reply, matching the
+        // behavior of the `parse_mode: "HTML"` send path this replaced.
+        sent = await ctx.api.sendRichMessage(
+          chatId,
+          { markdown: content.markdown },
+          { reply_parameters: replyParameters },
+        );
+      } catch (err) {
+        // Rich send failed (markdown Telegram rejected, or the method is
+        // unavailable on this server) — fall back to a plain message so the
+        // user still gets the answer.
+        console.error("sendRichMessage failed, sending plain:", err);
+        sent = await ctx.api.sendMessage(chatId, content.markdown, {
+          reply_parameters: replyParameters,
+        });
+      }
+      await outcome.persistConversation(sent.message_id);
+      return;
+    }
   }
 }

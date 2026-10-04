@@ -13,7 +13,6 @@ import { buildCheckCallback } from "./callback-data";
 import { resolveCheck, type CheckApi } from "./resolve";
 import { currentCount } from "./counter";
 import { migratedChatId } from "../shared/chat-migration";
-import { checksProcessedTotal } from "../metrics";
 
 export async function runChecksTick(deps: {
   storage: Storage;
@@ -52,7 +51,6 @@ async function processCheck(
         fromUserId: null,
         nowMs,
       });
-      checksProcessedTotal.inc({ outcome: "timeout" });
     }
     return;
   }
@@ -109,7 +107,6 @@ async function fireCheck(
     // retry once.
     const newChatId = migratedChatId(err);
     if (newChatId === null) {
-      checksProcessedTotal.inc({ outcome: "fire_failed" });
       console.error(`[checks] fire failed id=${check.id}:`, err);
       return;
     }
@@ -122,7 +119,6 @@ async function fireCheck(
       const sent = await send(newChatId);
       messageId = sent.message_id;
     } catch (retryErr) {
-      checksProcessedTotal.inc({ outcome: "fire_failed" });
       console.error(`[checks] fire failed id=${check.id}:`, retryErr);
       return;
     }
@@ -134,7 +130,6 @@ async function fireCheck(
     pendingMessageId: messageId,
     pendingFiredAtMs: nowMs,
   });
-  checksProcessedTotal.inc({ outcome: "fired" });
 }
 
 export type ChecksScheduler = IntervalScheduler;

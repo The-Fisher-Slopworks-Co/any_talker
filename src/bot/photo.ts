@@ -2,7 +2,6 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { fetchWithTimeout } from "../ai/tools/http";
-import { photoCacheErrorsTotal } from "../metrics";
 import type { Storage } from "../storage/types";
 
 const TELEGRAM_TIMEOUT_MS = 10_000;
@@ -70,14 +69,12 @@ export async function fetchTelegramPhoto(args: {
     .getBytes(args.fileId)
     .catch((err) => {
       console.error("photo cache read failed:", err);
-      photoCacheErrorsTotal.inc({ op: "read" });
       return null;
     });
   if (cached) return cached;
   const bytes = await downloadTelegramFile(args.botToken, args.fileId);
   args.storage.photos.saveBytes(args.fileId, bytes).catch((err) => {
     console.error("photo cache write failed:", err);
-    photoCacheErrorsTotal.inc({ op: "write" });
   });
   return bytes;
 }

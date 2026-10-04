@@ -28,7 +28,6 @@ import type {
 import { toResponsesInput } from "./responses-input";
 import { extractToolCalls } from "./tool-calls";
 import { proxiedFetch } from "../proxy";
-import { aiRequestDurationSeconds, aiRequestsTotal } from "../metrics";
 
 // The documented ceiling on `session_id`. A longer value is rejected, and the
 // rejection costs the whole request — the SDK does not validate it, so the id
@@ -248,108 +247,97 @@ export class OpenRouterClient implements AIClient {
     const generations: string[] = [];
     let answeredBy: string | undefined;
 
-    const start = performance.now();
-    let outcome: "success" | "error" = "success";
-    try {
-      const result = callModel(
-        this.client,
-        {
-          ...buildRequestFields({
-            models: opts.models,
-            routing: opts.routing ?? {},
-            reasoningEffort: opts.reasoningEffort,
-            sessionId: opts.sessionId,
-          }),
-          // Never an input item: this is the cacheable prompt prefix.
-          instructions: opts.system,
-          input,
-          // Never emit `"tools": []` — that is a different request.
-          ...(tools.length > 0 ? { tools } : {}),
-          // Counts TOOL ROUNDS, not model calls — see MAX_TOOL_ROUNDS for the
-          // rounds-to-calls arithmetic. Ceiling: 8 model calls per ask, 9 if
-          // the empty-final retry fires.
-          stopWhen: stepCountIs(MAX_TOOL_ROUNDS),
-          // "" = forbid tool calls on the final turn but append NOTHING. The
-          // default (`true`/omitted) injects a hardcoded English user message
-          // into an en|ru conversation governed by a strict response format;
-          // "" reproduces the old `generateText` wire exactly.
-          allowFinalResponse: "",
-          // An in-memory, write-nothing accessor. Its only purpose is to make
-          // `getState()` available below: without one the agent keeps no state
-          // object and the call throws. `load` returning null starts every ask
-          // fresh, and the SDK strips `state` from the outgoing request, so
-          // this changes nothing on the wire.
-          state: { load: async () => null, save: async () => {} },
-          // Observation only: the handler returns nothing, so it can neither
-          // mutate the run nor block it. A throw is logged and swallowed by the
-          // manager (`throwOnHandlerError` defaults to false), which is the
-          // right policy here — losing an id must not lose a billed answer.
-          hooks: {
-            PostModelCall: [
-              {
-                handler: (payload: PostModelCallPayload) => {
-                  generations.push(payload.responseId);
-                  // `response.model ?? ""` upstream, so an empty string means
-                  // the provider named none — leave the previous value rather
-                  // than overwriting it with nothing.
-                  if (payload.model) answeredBy = payload.model;
-                },
+    const result = callModel(
+      this.client,
+      {
+        ...buildRequestFields({
+          models: opts.models,
+          routing: opts.routing ?? {},
+          reasoningEffort: opts.reasoningEffort,
+          sessionId: opts.sessionId,
+        }),
+        // Never an input item: this is the cacheable prompt prefix.
+        instructions: opts.system,
+        input,
+        // Never emit `"tools": []` — that is a different request.
+        ...(tools.length > 0 ? { tools } : {}),
+        // Counts TOOL ROUNDS, not model calls — see MAX_TOOL_ROUNDS for the
+        // rounds-to-calls arithmetic. Ceiling: 8 model calls per ask, 9 if
+        // the empty-final retry fires.
+        stopWhen: stepCountIs(MAX_TOOL_ROUNDS),
+        // "" = forbid tool calls on the final turn but append NOTHING. The
+        // default (`true`/omitted) injects a hardcoded English user message
+        // into an en|ru conversation governed by a strict response format;
+        // "" reproduces the old `generateText` wire exactly.
+        allowFinalResponse: "",
+        // An in-memory, write-nothing accessor. Its only purpose is to make
+        // `getState()` available below: without one the agent keeps no state
+        // object and the call throws. `load` returning null starts every ask
+        // fresh, and the SDK strips `state` from the outgoing request, so
+        // this changes nothing on the wire.
+        state: { load: async () => null, save: async () => {} },
+        // Observation only: the handler returns nothing, so it can neither
+        // mutate the run nor block it. A throw is logged and swallowed by the
+        // manager (`throwOnHandlerError` defaults to false), which is the
+        // right policy here — losing an id must not lose a billed answer.
+        hooks: {
+          PostModelCall: [
+            {
+              handler: (payload: PostModelCallPayload) => {
+                generations.push(payload.responseId);
+                // `response.model ?? ""` upstream, so an empty string means
+                // the provider named none — leave the previous value rather
+                // than overwriting it with nothing.
+                if (payload.model) answeredBy = payload.model;
               },
-            ],
-          },
+            },
+          ],
         },
-        this.titleHeader,
-      );
+      },
+      this.titleHeader,
+    );
 
-      // Throws on any API/network failure, so a failed ask is never charged.
-      // May legitimately resolve to "" when a tool-using run comes back with an
-      // empty final output — `ask.ts` turns that into `kind:"error"`. We do NOT
-      // set `strictFinalResponse`, because a throw here would drop a real,
-      // billed ask out of the ledger.
-      const text = await result.getText();
-      // Loop-aggregated usage: every model call the run made, not just the
-      // final one (`getResponse().usage` would under-count every tool-using
-      // ask). Resolved after `getText()` so the run is complete and the totals
-      // are final.
-      const totals = await result.getUsage();
-      // The tool calls this run made, read off the conversation the agent
-      // actually assembled — real call ids and the exact serialization the
-      // model was handed, neither of which a wrapper around `execute` can see.
-      // Best-effort by contract: the answer is produced and billed by now, so a
-      // surprise here must not turn a good ask into a failure.
-      let toolCalls: ToolCallRecord[] = [];
-      try {
-        const state = await result.getState();
-        if (Array.isArray(state.messages)) {
-          toolCalls = extractToolCalls(state.messages, replayedCallIds);
-        }
-      } catch (err) {
-        console.error("reading tool calls off the agent state failed:", err);
+    // Throws on any API/network failure, so a failed ask is never charged.
+    // May legitimately resolve to "" when a tool-using run comes back with an
+    // empty final output — `ask.ts` turns that into `kind:"error"`. We do NOT
+    // set `strictFinalResponse`, because a throw here would drop a real,
+    // billed ask out of the ledger.
+    const text = await result.getText();
+    // Loop-aggregated usage: every model call the run made, not just the
+    // final one (`getResponse().usage` would under-count every tool-using
+    // ask). Resolved after `getText()` so the run is complete and the totals
+    // are final.
+    const totals = await result.getUsage();
+    // The tool calls this run made, read off the conversation the agent
+    // actually assembled — real call ids and the exact serialization the
+    // model was handed, neither of which a wrapper around `execute` can see.
+    // Best-effort by contract: the answer is produced and billed by now, so a
+    // surprise here must not turn a good ask into a failure.
+    let toolCalls: ToolCallRecord[] = [];
+    try {
+      const state = await result.getState();
+      if (Array.isArray(state.messages)) {
+        toolCalls = extractToolCalls(state.messages, replayedCallIds);
       }
-      const { costUsd, priced } = resolveAskCost(totals);
-
-      return {
-        text,
-        totalTokens: totals?.totalTokens ?? 0,
-        // The primary is what spend is attributed to. OpenRouter falling back
-        // to a later id in the chain bills that one instead, so the attribution
-        // (not the total) can be off by one model on a fallback — the reported
-        // cost stays correct either way.
-        modelId: primary,
-        costUsd,
-        priced,
-        toolCalls,
-        generations,
-        ...(answeredBy === undefined ? {} : { answeredBy }),
-      };
     } catch (err) {
-      outcome = "error";
-      throw err;
-    } finally {
-      const seconds = (performance.now() - start) / 1000;
-      aiRequestsTotal.inc({ outcome });
-      aiRequestDurationSeconds.observe({ outcome }, seconds);
+      console.error("reading tool calls off the agent state failed:", err);
     }
+    const { costUsd, priced } = resolveAskCost(totals);
+
+    return {
+      text,
+      totalTokens: totals?.totalTokens ?? 0,
+      // The primary is what spend is attributed to. OpenRouter falling back
+      // to a later id in the chain bills that one instead, so the attribution
+      // (not the total) can be off by one model on a fallback — the reported
+      // cost stays correct either way.
+      modelId: primary,
+      costUsd,
+      priced,
+      toolCalls,
+      generations,
+      ...(answeredBy === undefined ? {} : { answeredBy }),
+    };
   }
 }
 

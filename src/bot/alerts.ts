@@ -19,8 +19,8 @@ export function createAlerts(args: { storage: Storage; ownerId: string }): {
   // via `observability.claimAlert` so the owner gets one DM per period per UTC
   // day, not one per denied request. Only the global caps are alarms — the
   // per-chat and new-user caps are routine guardrails and stay silent (they
-  // still show on the dashboard/metrics). Fires identically for the main bot and
-  // every managed bot.
+  // still show on the dashboard). Fires identically for the main bot and every
+  // managed bot.
   const globalCapBreach = async (
     api: Api,
     reason: BudgetDenyReason,

@@ -4,7 +4,6 @@
 import type { Storage } from "../storage/types";
 import type { BudgetConfig, BudgetDenyReason } from "../shared/types";
 import type { BudgetGuard, BudgetCheckResult } from "./types";
-import { budgetDeniedTotal } from "../metrics";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -13,7 +12,7 @@ const MS_PER_DAY = 86_400_000;
 // reported reason is the top breach. The owner is never denied (when
 // `ownerExempt`), but owner spend still counts toward the global totals — the
 // money is real. All windowing math is the shared `spending/window.ts` day/week/
-// month summary; this class is the thin Storage/metrics adapter, mirroring
+// month summary; this class is the thin Storage adapter, mirroring
 // `DualWindowLimiter`.
 export class SpendBudgetGuard implements BudgetGuard {
   constructor(private readonly storage: Storage) {}
@@ -63,7 +62,6 @@ export class SpendBudgetGuard implements BudgetGuard {
   }
 
   private deny(reason: BudgetDenyReason): BudgetCheckResult {
-    budgetDeniedTotal.inc({ reason });
     return { allowed: false, reason };
   }
 }

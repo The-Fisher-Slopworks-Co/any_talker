@@ -14,12 +14,6 @@ import type { RateLimiter } from "../ratelimit/types";
 import type { ModelCatalog } from "../ai/model-catalog";
 import indexHtml from "./ui/index.html";
 import { getBuildInfo } from "../build-info";
-import {
-  CONTENT_TYPE as METRICS_CONTENT_TYPE,
-  httpRequestDurationSeconds,
-  httpRequestsTotal,
-  registry,
-} from "../metrics";
 
 export type ServerDeps = {
   port: number;
@@ -77,12 +71,6 @@ export function startServer(deps: ServerDeps) {
   const handleDynamic = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
 
-    if (url.pathname === "/metrics") {
-      return new Response(registry.render(), {
-        headers: { "content-type": METRICS_CONTENT_TYPE },
-      });
-    }
-
     if (url.pathname === "/health") {
       return new Response("ok", {
         status: 200,
@@ -126,37 +114,6 @@ export function startServer(deps: ServerDeps) {
       "/webapp": indexHtml,
       "/webapp/*": indexHtml,
     },
-    async fetch(req) {
-      const route = normalizeRoute(new URL(req.url).pathname);
-      const start = performance.now();
-      let status = 500;
-      try {
-        const res = await handleDynamic(req);
-        status = res.status;
-        return res;
-      } finally {
-        const seconds = (performance.now() - start) / 1000;
-        httpRequestsTotal.inc({
-          method: req.method,
-          route,
-          status: String(status),
-        });
-        httpRequestDurationSeconds.observe(
-          { method: req.method, route },
-          seconds,
-        );
-      }
-    },
+    fetch: handleDynamic,
   });
-}
-
-function normalizeRoute(pathname: string): string {
-  if (pathname === "/metrics") return "/metrics";
-  if (pathname === "/health") return "/health";
-  if (pathname.startsWith("/api/")) {
-    const rest = pathname.slice("/api/".length);
-    const head = rest.split("/")[0] ?? "";
-    return head ? `/api/${head}` : "/api";
-  }
-  return "/other";
 }
