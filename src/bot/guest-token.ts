@@ -3,15 +3,19 @@
 
 import type { Message } from "grammy/types";
 
-// A guest answer carries the key of its own stored thread, as plain text on
-// its last line. `answerGuestQuery` returns an inline message id while a reply
-// arrives with the chat's message id, so nothing Telegram hands back joins the
-// two — the answer's own text is the only thing that survives the round trip.
+// A guest answer carries the key of its own stored thread, as the name of an
+// empty anchor after its body. `answerGuestQuery` returns an inline message id
+// while a reply arrives with the chat's message id, so nothing Telegram hands
+// back joins the two — the answer's own content is the only thing that
+// survives the round trip. An anchor renders as nothing and comes back in the
+// replied-to message's `rich_message.blocks`. Answers sent before the anchor
+// carry the token as plain text on their last line instead.
 //
 // The leading letter keeps a token from ever looking like a chat id.
 const TOKEN_ALPHABET =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const TOKEN_RANDOM_CHARS = 9;
+const TOKEN = /^g[0-9A-Za-z]{9}$/;
 // The last line of the message.
 const TRAILING_TOKEN = /(?:^|\n)[ \t]*(g[0-9A-Za-z]{9})\s*$/;
 
@@ -34,6 +38,11 @@ export function newGuestToken(random = randomBytes): string {
   return token;
 }
 
+// The answer's footer: an anchor named after the token, invisible once rendered.
+export function guestTokenAnchor(token: string): string {
+  return `<a name="${token}"></a>`;
+}
+
 // Splits a replied-to answer into its token and the text without it. No token
 // (an answer that predates them, an error notice, a plain-text fallback) leaves
 // the text as it was.
@@ -51,6 +60,38 @@ export function splitGuestToken(text: string): {
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
+
+// The first token-shaped anchor anywhere in the blocks, as a block of its own
+// or inline in a paragraph.
+function findAnchorToken(node: unknown): string | null {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const token = findAnchorToken(child);
+      if (token !== null) return token;
+    }
+    return null;
+  }
+  if (!isRecord(node)) return null;
+  if (
+    node.type === "anchor" &&
+    typeof node.name === "string" &&
+    TOKEN.test(node.name)
+  ) {
+    return node.name;
+  }
+  return findAnchorToken(Object.values(node));
+}
+
+// The thread token a replied-to answer carries, and its text without it: the
+// anchor of a current answer, else the last line of an older one.
+export function readGuestToken(reply: Message): {
+  token: string | null;
+  text: string;
+} {
+  const split = splitGuestToken(repliedText(reply) ?? "");
+  const anchored = findAnchorToken(reply.rich_message?.blocks);
+  return anchored === null ? split : { token: anchored, text: split.text };
+}
 
 // RichText: a string, a list of them, or a formatting wrapper around one.
 function inlineText(node: unknown): string {
