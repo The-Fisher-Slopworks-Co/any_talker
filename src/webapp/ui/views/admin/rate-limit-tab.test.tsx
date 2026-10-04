@@ -29,7 +29,7 @@ describe("RateLimitTab markup", () => {
       "5-Hour Limit",
       "Weekly Limit",
       "Owner Exempt",
-      "Limit promo",
+      "Limit Promo",
       "Level 1",
       "Level 2",
       "Limit Multiplier",
