@@ -3,7 +3,13 @@
 
 import { test, expect, describe } from "bun:test";
 import type { Message } from "grammy/types";
-import { newGuestToken, repliedText, splitGuestToken } from "./guest-token";
+import {
+  guestTokenAnchor,
+  newGuestToken,
+  readGuestToken,
+  repliedText,
+  splitGuestToken,
+} from "./guest-token";
 import { buildRichMarkdown } from "./format";
 
 const message = (fields: Record<string, unknown>): Message =>
@@ -127,5 +133,74 @@ describe("repliedText", () => {
       token: "gAbCdEf123",
       text: "Helper\nDetails\nPlan\nboil water\na | b",
     });
+  });
+});
+
+describe("readGuestToken", () => {
+  // Shapes as Telegram returned them for a replied-to rich message.
+  test("the anchor after the body gives up the token, the text stays clean", () => {
+    const reply = message({
+      rich_message: {
+        blocks: [
+          { type: "paragraph", text: "The answer." },
+          { type: "anchor", name: "gAbCdEf123" },
+        ],
+      },
+    });
+    expect(readGuestToken(reply)).toEqual({
+      token: "gAbCdEf123",
+      text: "The answer.",
+    });
+  });
+
+  test("an anchor inline in a paragraph is found too", () => {
+    const reply = message({
+      rich_message: {
+        blocks: [
+          {
+            type: "paragraph",
+            text: ["The answer.", { type: "anchor", name: "gAbCdEf123" }],
+          },
+        ],
+      },
+    });
+    expect(readGuestToken(reply).token).toBe("gAbCdEf123");
+  });
+
+  test("an answer from before the anchor still yields its last-line token", () => {
+    const reply = message({
+      rich_message: {
+        blocks: [
+          { type: "paragraph", text: "The answer." },
+          { type: "paragraph", text: "gAbCdEf123" },
+        ],
+      },
+    });
+    expect(readGuestToken(reply)).toEqual({
+      token: "gAbCdEf123",
+      text: "The answer.",
+    });
+  });
+
+  test("anchors that are not token-shaped are ignored", () => {
+    const reply = message({
+      rich_message: {
+        blocks: [
+          { type: "paragraph", text: "The answer." },
+          { type: "anchor", name: "section-2" },
+        ],
+      },
+    });
+    expect(readGuestToken(reply)).toEqual({ token: null, text: "The answer." });
+  });
+
+  test("the anchor footer is the last block and survives truncation", () => {
+    const footer = guestTokenAnchor("gAbCdEf123");
+    expect(footer).toBe('<a name="gAbCdEf123"></a>');
+    const truncated = buildRichMarkdown("x ".repeat(40_000), null, {
+      detailsSummary: "Details",
+      footer,
+    }).markdown;
+    expect(truncated.endsWith(`\n\n${footer}`)).toBe(true);
   });
 });

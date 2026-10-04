@@ -9,7 +9,11 @@ import { pickVideo, MAX_VIDEO_FRAMES, type VideoClip } from "../video";
 import { resolveSenderIdentity } from "../identity";
 import { resolveReplyImages } from "../reply-images";
 import { extractReplyTarget } from "../reply";
-import { newGuestToken, repliedText, splitGuestToken } from "../guest-token";
+import {
+  guestTokenAnchor,
+  newGuestToken,
+  readGuestToken,
+} from "../guest-token";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
 import { readValidDisplayName } from "../../shared/display-name";
 import { DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD } from "../../shared/types";
@@ -42,7 +46,7 @@ export async function dispatchGuest(
   ) => {
     const content = buildRichMarkdown(text, botName, {
       topBlock,
-      footer: token,
+      footer: token ? guestTokenAnchor(token) : undefined,
       collapseThreshold:
         expandableThreshold ?? DEFAULT_EXPANDABLE_BLOCKQUOTE_THRESHOLD,
       detailsSummary: ctx.t.bot_details_summary,
@@ -133,12 +137,12 @@ export async function dispatchGuest(
     (replyMsg.from?.id === ctx.me.id || replyMsg.via_bot?.id === ctx.me.id);
   // Always extracted when the query is a reply (mirrors /ask, where a reply
   // outside the conversation graph is surfaced verbatim). An answer of ours is
-  // read through `repliedText` — it was sent as a rich message — and gives up
-  // its thread token, which the model never sees.
+  // read through `readGuestToken` — it was sent as a rich message — and gives
+  // up its thread token, which the model never sees.
   const replyTarget = replyMsg ? extractReplyTarget(replyMsg) : null;
   let priorToken: string | null = null;
   if (replyTarget && replyMsg && replyToOurBot) {
-    const split = splitGuestToken(repliedText(replyMsg) ?? "");
+    const split = readGuestToken(replyMsg);
     replyTarget.text = split.text === "" ? null : split.text;
     priorToken = split.token;
   }
