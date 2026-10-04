@@ -1,8 +1,7 @@
 ## Project
 
 Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
-See `README.md` for setup, running, deployment, observability, and the
-user-facing feature catalog. This file covers how to work in the code.
+See `README.md` for setup and running. This file covers how to work in the code.
 
 ### Commands
 

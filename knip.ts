@@ -18,7 +18,7 @@ const config: KnipConfig = {
   // Consumed by Bun from `bunfig.toml`'s `[serve.static]` plugin list, which
   // knip has no reason to read.
   ignoreDependencies: ["bun-plugin-tailwind"],
-  // `uv` is a machine prerequisite (README → Setup), not an npm package.
+  // `uv` is a machine prerequisite (README → Run it), not an npm package.
   ignoreBinaries: ["uvx"],
 };
 
