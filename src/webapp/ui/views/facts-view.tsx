@@ -38,6 +38,24 @@ const TEXTAREA_CLS =
   "block w-full box-border bg-transparent border-0 px-4 py-[11px] text-base text-tg-text min-h-[110px] resize-none";
 const SHEET_BTN_CLS =
   "bg-transparent border-0 p-0 text-[17px] text-tg-link cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+// How long the sheet takes to slide in or out; the close waits this long
+// before unmounting it.
+const SHEET_MS = 400;
+
+// Motion of the sheet: it rises from the bottom edge over a fading-in dim and
+// sinks back the same way when closing. With "reduce motion" on it only fades.
+export function sheetMotion(closing: boolean): {
+  backdrop: string;
+  panel: string;
+} {
+  const base = "transition-[opacity,translate] duration-[400ms] ease-tg-spring";
+  return {
+    backdrop: `${base} starting:opacity-0 ${closing ? "opacity-0" : ""}`,
+    panel: `${base} motion-safe:starting:translate-y-full motion-reduce:starting:opacity-0 ${
+      closing ? "motion-safe:translate-y-full motion-reduce:opacity-0" : ""
+    }`,
+  };
+}
 
 function botScope(b: FactBot): string {
   return b.botId ?? MAIN_SCOPE;
@@ -69,7 +87,8 @@ const MY_FACTS: FactsWriter = {
 // Modal sheet that edits one fact (or creates one when `fact` is null), laid
 // out the iOS way: Cancel / Save in the sheet's own header, the fields as
 // form rows, and the destructive action apart at the bottom. Every successful
-// mutation hands the server's fresh list back up via onDone.
+// mutation hands the server's fresh list back up via onDone once the sheet has
+// slid away.
 function FactSheet({
   writer,
   scope,
@@ -88,10 +107,18 @@ function FactSheet({
   const [value, setValue] = useState(fact?.value ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+
+  // Slides the sheet out, then hands control back to the caller.
+  const dismiss = useCallback((then: () => void) => {
+    setClosing(true);
+    setTimeout(then, SHEET_MS);
+  }, []);
+  const cancel = useCallback(() => dismiss(onCancel), [dismiss, onCancel]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") cancel();
     };
     window.addEventListener("keydown", onKey);
     // The page behind must not scroll along with the sheet.
@@ -101,7 +128,7 @@ function FactSheet({
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = overflow;
     };
-  }, [onCancel]);
+  }, [cancel]);
 
   const normalizedKey = normalizeFactKey(key);
   const valid = normalizedKey !== null && normalizeFactValue(value) !== null;
@@ -110,7 +137,8 @@ function FactSheet({
     setBusy(true);
     setError(null);
     try {
-      onDone(await fn());
+      const next = await fn();
+      dismiss(() => onDone(next));
     } catch (err) {
       setError((err as { code?: string | null }).code ?? "save_failed");
       setBusy(false);
@@ -138,13 +166,20 @@ function FactSheet({
     void run(() => writer.remove(scope, fact.key));
   };
 
+  const motion = sheetMotion(closing);
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col">
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+    <div
+      className={`fixed inset-0 z-50 flex flex-col ${closing ? "pointer-events-none" : ""}`}
+    >
+      <div
+        className={`absolute inset-0 bg-black/40 ${motion.backdrop}`}
+        onClick={cancel}
+      />
       <div
         role="dialog"
         aria-modal="true"
-        className="relative mt-12 flex-1 overflow-y-auto rounded-t-[14px] bg-tg-secondary px-3 pb-8"
+        className={`relative mt-12 flex-1 overflow-y-auto rounded-t-[14px] bg-tg-secondary px-3 pb-8 ${motion.panel}`}
       >
         <div className="mx-auto mt-2 mb-3 h-[5px] w-9 rounded-full bg-tg-hint/40" />
         <div className="mb-4 flex items-center px-1">
@@ -152,7 +187,7 @@ function FactSheet({
             type="button"
             className={SHEET_BTN_CLS}
             disabled={busy}
-            onClick={onCancel}
+            onClick={cancel}
           >
             {s.ui_facts_cancel}
           </button>
