@@ -33,9 +33,15 @@ export const usersMessages = {
     en: "Open in Telegram",
     ru: "Открыть в Telegram",
   }),
-  ui_user_display_name_footer: m({
-    en: "Name shown to the AI.",
-    ru: "Имя, которое видит ИИ.",
+  ui_user_about: m({
+    en: "About",
+    ru: "О пользователе",
+  }),
+  ui_user_about_footer: m({
+    en: (fallback: string) =>
+      `What the AI calls the user (empty: ${fallback}).`,
+    ru: (fallback: string) =>
+      `Как ИИ называет пользователя (пусто: ${fallback}).`,
   }),
   ui_user_set_language: m({
     en: "Set language",

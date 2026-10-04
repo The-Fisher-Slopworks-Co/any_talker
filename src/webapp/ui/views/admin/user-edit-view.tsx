@@ -12,7 +12,6 @@ import {
 } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
 import { UserLimitsSection } from "../../components/user-limits-section";
-import type { Gender } from "../../../../shared/types";
 import { DEFAULT_LANG, type Lang } from "../../../../shared/i18n";
 import {
   Card,
@@ -24,10 +23,9 @@ import { LargeTitle } from "../../components/large-title";
 import { LoadingState } from "../../components/states";
 import { SaveButton } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
-import { DisplayNameField } from "../../components/display-name-field";
-import { GenderField } from "../../components/gender-field";
 import { TimezoneField } from "../../components/timezone-field";
 import { LanguageField } from "../../components/language-field";
+import { UserAboutSection } from "../../components/user-about-section";
 import { AccessRows } from "../../components/access-rows";
 import { Hero } from "../../components/hero";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
@@ -36,17 +34,13 @@ import { FactsEditor, type FactsWriter } from "../facts-view";
 import { useLoadable } from "../../lib/use-loadable";
 import { parseString, useSessionState } from "../../lib/session-state";
 import { openTelegramProfile } from "../../lib/telegram";
-import { validateDisplayName } from "../../../../shared/display-name";
 
 export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
-  const [name, setName] = useState("");
   const [tzOverride, setTzOverride] = useState(false);
   const [tzValue, setTzValue] = useState("UTC");
-  const [genderOn, setGenderOn] = useState(false);
-  const [genderValue, setGenderValue] = useState<Gender>("male");
   const [langOn, setLangOn] = useState(false);
   const [langValue, setLangValue] = useState<Lang>(DEFAULT_LANG);
   const [saving, setSaving] = useState(false);
@@ -68,11 +62,8 @@ export function UserEditView({ userId }: { userId: string }) {
       .getAdminUser(userId)
       .then((d) => {
         setData(d);
-        setName(d.displayName ?? "");
         setTzOverride(d.timezone !== null);
         setTzValue(d.timezone ?? "UTC");
-        setGenderOn(d.gender !== null);
-        setGenderValue(d.gender ?? "male");
         setLangOn(d.language !== null);
         setLangValue(d.language ?? DEFAULT_LANG);
       })
@@ -104,31 +95,19 @@ export function UserEditView({ userId }: { userId: string }) {
   const fallbackName = userDisplayName(user);
   const effectiveName = userDisplayName(user, data.displayName);
   const desiredTz = tzOverride ? tzValue : null;
-  const desiredGender: Gender | null = genderOn ? genderValue : null;
   const desiredLang: Lang | null = langOn ? langValue : null;
-  const nameValidation = validateDisplayName(name);
-  const nameError = !nameValidation.ok ? nameValidation.reason : null;
-  const dirty =
-    name.trim() !== (data.displayName ?? "") ||
-    desiredTz !== data.timezone ||
-    desiredGender !== data.gender ||
-    desiredLang !== data.language;
+  const dirty = desiredTz !== data.timezone || desiredLang !== data.language;
 
   const save = async () => {
     setSaving(true);
     try {
       const next = await api.putAdminUser(userId, {
-        displayName: name.trim() || null,
         timezone: desiredTz,
-        gender: desiredGender,
         language: desiredLang,
       });
       setData((prev) => (prev ? { ...prev, ...next } : null));
-      setName(next.displayName ?? "");
       setTzOverride(next.timezone !== null);
       setTzValue(next.timezone ?? "UTC");
-      setGenderOn(next.gender !== null);
-      setGenderValue(next.gender ?? "male");
       setLangOn(next.language !== null);
       setLangValue(next.language ?? DEFAULT_LANG);
     } finally {
@@ -176,20 +155,10 @@ export function UserEditView({ userId }: { userId: string }) {
         allowanceMonthUsd={data.allowanceMonthUsd}
       />
 
-      <DisplayNameField
-        label={s.ui_user_name}
-        placeholder={fallbackName}
-        footer={s.ui_user_display_name_footer}
-        value={name}
-        onChange={setName}
-        error={nameError}
-      />
-
-      <GenderField
-        enabled={genderOn}
-        onEnabledChange={setGenderOn}
-        value={genderValue}
-        onChange={setGenderValue}
+      <UserAboutSection
+        userId={user.id}
+        fallbackName={fallbackName}
+        initial={{ displayName: data.displayName, gender: data.gender }}
       />
 
       <TimezoneField
@@ -208,7 +177,7 @@ export function UserEditView({ userId }: { userId: string }) {
       <SaveButton
         saving={saving}
         dirty={dirty}
-        disabled={saving || !dirty || nameError !== null}
+        disabled={saving || !dirty}
         onClick={save}
       />
 

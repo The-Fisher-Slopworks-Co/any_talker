@@ -5,10 +5,6 @@ import { m } from "./message";
 
 // The user's own settings: name, gender, timezone, language.
 export const profileMessages = {
-  ui_main_display_name: m({
-    en: "Display Name",
-    ru: "Имя для отображения",
-  }),
   ui_main_name: m({
     en: "Name",
     ru: "Имя",
@@ -45,10 +41,6 @@ export const profileMessages = {
     en: "Gender",
     ru: "Пол",
   }),
-  ui_main_tell_ai: m({
-    en: "Tell the AI",
-    ru: "Сообщить ИИ",
-  }),
   ui_main_male: m({
     en: "Male",
     ru: "Мужской",
@@ -56,10 +48,6 @@ export const profileMessages = {
   ui_main_female: m({
     en: "Female",
     ru: "Женский",
-  }),
-  ui_main_gender_footer: m({
-    en: "Lets the AI use correct grammatical gender.",
-    ru: "Чтобы ИИ правильно согласовывал род.",
   }),
   ui_main_timezone: m({
     en: "Timezone",
@@ -102,7 +90,7 @@ export const profileMessages = {
     ru: "Так ИИ знает, как к вам обращаться.",
   }),
   ui_main_gender_unset: m({
-    en: "Not set",
+    en: "Not Set",
     ru: "Не указан",
   }),
   ui_main_lang_region: m({
