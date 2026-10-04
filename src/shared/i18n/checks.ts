@@ -145,36 +145,40 @@ export const checksMessages = {
     en: "Counter",
     ru: "Счётчик",
   }),
+  ui_check_counter_value: m({
+    en: "Value",
+    ru: "Значение",
+  }),
   ui_check_counter_footer: m({
     en: "Value of {count}.",
     ru: "Значение {count}.",
   }),
   ui_check_counter_source: m({
-    en: "Counter source",
-    ru: "Источник счётчика",
+    en: "Source",
+    ru: "Источник",
   }),
   ui_check_counter_source_manual: m({
-    en: "Manual number",
+    en: "Manual Number",
     ru: "Ручное число",
   }),
   ui_check_counter_source_date: m({
-    en: "Days since a date",
+    en: "Days Since a Date",
     ru: "Дни с даты",
   }),
   ui_check_counter_anchor_date: m({
-    en: "Anchor date",
-    ru: "Опорная дата",
+    en: "Start Date",
+    ru: "Дата начала",
   }),
   ui_check_counter_anchor_date_footer: m({
     en: "{count} = days since this date. Reset mode moves it to today on Yes.",
     ru: "{count} — дни с этой даты. При сбросе «Да» переносит её на сегодня.",
   }),
   ui_check_counter_mode: m({
-    en: "Counter on Yes",
-    ru: "Счётчик при «Да»",
+    en: "On Yes",
+    ru: "При «Да»",
   }),
   ui_check_counter_mode_always: m({
-    en: "Always increment",
+    en: "Always Increment",
     ru: "Всегда увеличивать",
   }),
   ui_check_counter_mode_reset: m({

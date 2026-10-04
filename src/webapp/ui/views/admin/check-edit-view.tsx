@@ -13,9 +13,7 @@ import { checkToDraft, DEFAULT_DRAFT } from "./check-edit-form";
 import {
   ButtonsSection,
   CheckStatusCard,
-  CounterModeSection,
-  CounterSourceSection,
-  CounterValueSection,
+  CounterSection,
   EnabledSection,
   QuestionSection,
   RepliesSection,
@@ -96,9 +94,7 @@ export function CheckEditView({
       <ScheduleSection {...sectionProps} />
       <ButtonsSection {...sectionProps} />
       <RepliesSection {...sectionProps} />
-      <CounterSourceSection {...sectionProps} />
-      <CounterValueSection {...sectionProps} />
-      <CounterModeSection {...sectionProps} />
+      <CounterSection {...sectionProps} />
       <EnabledSection {...sectionProps} />
 
       {check && <CheckStatusCard check={check} />}

@@ -7,6 +7,7 @@ import { I18nProvider } from "../../i18n-context";
 import { DEFAULT_DRAFT } from "./check-edit-form";
 import {
   ButtonsSection,
+  CounterSection,
   QuestionSection,
   RecipientSection,
   RepliesSection,
@@ -70,5 +71,27 @@ describe("check editor groups", () => {
     expect(html.match(/<textarea/g)?.length).toBe(2);
     expect(html).toContain(">When Yes<");
     expect(html).toContain(">When No / Timeout<");
+  });
+
+  test("a hand-kept counter is a source picker, a value and an On Yes picker", () => {
+    const html = render(<CounterSection {...props} />);
+    expect(html.match(/<select/g)?.length).toBe(2);
+    for (const text of ["Source", "Value", "On Yes", "Manual Number"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).not.toContain('type="date"');
+    expect(html).toContain("Value of {count}.");
+  });
+
+  test("a counter by date swaps the value for a start date and its footer", () => {
+    const draft = { ...DEFAULT_DRAFT, counterAnchorDate: "2026-01-02" };
+    const html = render(<CounterSection {...props} draft={draft} />);
+    expect(html).toContain(">Start Date<");
+    // The app-formatted date is the visible text; the native input lies over it.
+    expect(html).toContain(">Jan 2, 2026</span>");
+    expect(html).toContain('type="date"');
+    expect(html).toContain('value="2026-01-02"');
+    expect(html).not.toContain(">Value<");
+    expect(html).toContain("days since this date");
   });
 });
