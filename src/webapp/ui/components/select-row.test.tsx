@@ -30,6 +30,22 @@ describe("NavRow with an avatar", () => {
   });
 });
 
+describe("NavRow title", () => {
+  const render = (wrapTitle = false) =>
+    renderToStaticMarkup(
+      <NavRow title="A long note" wrapTitle={wrapTitle} onClick={() => {}} />,
+    );
+
+  test("is cut at one line by default", () => {
+    expect(render()).toContain('class="truncate"');
+  });
+
+  test("runs to two lines when asked to wrap", () => {
+    expect(render(true)).toContain("line-clamp-2");
+    expect(render(true)).not.toContain("truncate");
+  });
+});
+
 describe("chatSubtitle", () => {
   test("names the capitalised type, with the handle when titled", () => {
     const en = t("en");

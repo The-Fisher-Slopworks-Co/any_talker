@@ -50,6 +50,7 @@ export function NavRow({
   value,
   badge,
   badgeLabel,
+  wrapTitle,
   onClick,
 }: {
   title: string;
@@ -65,6 +66,8 @@ export function NavRow({
   badge?: number;
   // What a screen reader says for the badge: a bare number means nothing.
   badgeLabel?: string;
+  // Let a long title run to two lines instead of cutting it at one.
+  wrapTitle?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -76,7 +79,9 @@ export function NavRow({
       {icon}
       {avatar}
       <div className="flex-1 min-w-0">
-        <div className="truncate">{title}</div>
+        <div className={wrapTitle ? "line-clamp-2 break-words" : "truncate"}>
+          {title}
+        </div>
         {subtitle ? (
           <div className="text-[13px] text-tg-hint truncate">{subtitle}</div>
         ) : null}

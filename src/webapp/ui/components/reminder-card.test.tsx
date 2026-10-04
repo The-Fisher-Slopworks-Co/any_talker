@@ -2,7 +2,8 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 // A server-render smoke test, like quarantined-reminder-card.test.tsx: the
-// admin row actions have to reach the markup.
+// admin rows and their swipe action have to reach the markup, and the user's
+// own list has to stay as it was.
 
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -30,7 +31,6 @@ function render(actions?: ReminderCardManage): string {
         <ReminderCard
           reminders={[reminder]}
           chats={{}}
-          showUserId={true}
           emptyText="none"
           manage={actions}
         />
@@ -40,25 +40,30 @@ function render(actions?: ReminderCardManage): string {
 }
 
 function manage(over: Partial<ReminderCardManage> = {}): ReminderCardManage {
-  return {
-    busy: false,
-    onEdit: () => {},
-    onDelete: () => {},
-    ...over,
-  };
+  return { onOpen: () => {}, onDelete: async () => {}, ...over };
 }
 
 describe("ReminderCard", () => {
-  test("the user's own list stays read-only", () => {
+  test("the user's own list stays a read-only card with the full date", () => {
     const html = render();
     expect(html).toContain("buy milk");
+    expect(html).toContain("2026-01-02 12:30:00");
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("swipe-row");
+  });
+
+  test("the admin list is one navigation row per reminder", () => {
+    const html = render(manage());
+    expect(html).toContain("buy milk");
+    // When, who and where under the text.
+    expect(html).toContain("2026-01-02 12:30 · id 42 · DM");
     expect(html).not.toContain(">Edit<");
     expect(html).not.toContain(">Remove<");
   });
 
-  test("the admin list offers edit and remove on every row", () => {
+  test("every admin row swipes to a red Delete", () => {
     const html = render(manage());
-    expect(html).toContain(">Edit<");
-    expect(html).toContain(">Remove<");
+    expect(html).toContain("swipe-row");
+    expect(html).toContain(">Delete</button>");
   });
 });
