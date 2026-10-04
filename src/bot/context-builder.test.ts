@@ -86,7 +86,7 @@ describe("buildContext", () => {
       images: [],
     });
     const obj = JSON.parse(contentOf(msgs[0]!) as string);
-    expect(obj.time).toBe("2026-05-08 18:42");
+    expect(obj.time).toBe("2026-05-08 18:42 +03:00");
     // The stamp sits with the other metadata, ahead of the text itself.
     expect(Object.keys(obj)).toEqual(["author", "time", "quote", "text"]);
   });

@@ -55,7 +55,7 @@ describe("buildInstruction", () => {
     const out = buildInstruction("X");
     expect(out).toContain("# Время");
     expect(out).toContain("`time`");
-    expect(out).toContain("в таймзоне его автора");
+    expect(out).toContain("по часам его автора и со смещением от UTC");
     expect(out).not.toContain("Таймзона пользователя:");
   });
 
@@ -64,8 +64,10 @@ describe("buildInstruction", () => {
   test("carries no current moment, so the prompt is stable over time", () => {
     const opts = { detailLevel: "short" as const };
     expect(buildInstruction("X", opts)).toBe(buildInstruction("X", opts));
-    // No wall-clock stamp anywhere in the prompt.
-    expect(buildInstruction("X", opts)).not.toMatch(
+    // No wall-clock stamp anywhere in the prompt but the format's example.
+    const example = "`2026-10-03 14:01 +05:00`";
+    expect(buildInstruction("X", opts)).toContain(example);
+    expect(buildInstruction("X", opts).replace(example, "")).not.toMatch(
       /\d{4}-\d{2}-\d{2} \d{2}:\d{2}/,
     );
   });

@@ -64,13 +64,23 @@ export function localDateString(utcMs: number, tz: string): string {
   return `${year.toString().padStart(4, "0")}-${pad(month)}-${pad(day)}`;
 }
 
-// Wall-clock stamp for the prompt: `YYYY-MM-DD HH:MM` in the user's timezone.
-// The timezone itself is not repeated here — the system prompt names it once,
-// and every stamp in a conversation is read against that one name.
+// Wall-clock `YYYY-MM-DD HH:MM` in `tz`, with no zone of its own.
 export function localDateTimeString(utcMs: number, tz: string): string {
   const { hour, minute } = formatLocalParts(utcMs, tz);
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${localDateString(utcMs, tz)} ${pad(hour)}:${pad(minute)}`;
+}
+
+// A message's `time` as the model reads it: the author's wall clock plus that
+// moment's UTC offset, `YYYY-MM-DD HH:MM +05:00`. One chain can hold authors
+// in different timezones, and the offset is what lets two stamps be compared
+// without looking anything up.
+export function messageTimeString(utcMs: number, tz: string): string {
+  const offset = tzOffsetMinutesAt(utcMs, tz);
+  const abs = Math.abs(offset);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const sign = offset < 0 ? "-" : "+";
+  return `${localDateTimeString(utcMs, tz)} ${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
 }
 
 function tzOffsetMinutesAt(utcMs: number, tz: string): number {
