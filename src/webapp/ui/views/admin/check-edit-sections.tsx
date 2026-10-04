@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { ReactNode } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import {
   isValidCounterMode,
   type RecurringCheck,
+  type ValidationError,
 } from "../../../../checks/types";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
 import { NumberRow } from "../../components/number-row";
@@ -17,21 +19,46 @@ import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import type { FormSetter } from "../../lib/use-form-reducer";
 import {
   anchorForSource,
+  errorGroup,
   formatAnchorDate,
   formatClock,
   parseClock,
   type CheckDraft,
+  type CheckGroup,
 } from "./check-edit-form";
 
 // Every section edits the one draft. `set` changes the form (a field being
 // typed in), `commit` is what such a field does when it is left, and `setNow`
 // is `set` plus `commit` for a switch or picker that is done once chosen.
+// `error` is the form's first refused field.
 type SectionProps = {
   draft: CheckDraft;
   set: FormSetter<CheckDraft>;
   setNow: FormSetter<CheckDraft>;
   commit: () => void;
+  error: ValidationError | null;
 };
+
+// The group's footer: its hint, or in red the error of a field in the group.
+function GroupFooter({
+  group,
+  error,
+  children,
+}: {
+  group: CheckGroup;
+  error: ValidationError | null;
+  children?: ReactNode;
+}) {
+  const { t: s } = useI18n();
+  if (error !== null && errorGroup(error) === group) {
+    return (
+      <SectionFooter>
+        <span className="text-tg-destructive">{s.ui_check_error(error)}</span>
+      </SectionFooter>
+    );
+  }
+  return children ? <SectionFooter>{children}</SectionFooter> : null;
+}
 
 export function EnabledSection({ draft, setNow }: SectionProps) {
   const { t: s } = useI18n();
@@ -48,7 +75,7 @@ export function EnabledSection({ draft, setNow }: SectionProps) {
   );
 }
 
-export function QuestionSection({ draft, set, commit }: SectionProps) {
+export function QuestionSection({ draft, set, commit, error }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
@@ -71,12 +98,14 @@ export function QuestionSection({ draft, set, commit }: SectionProps) {
           minHeight="min-h-[76px]"
         />
       </Card>
-      <SectionFooter>{s.ui_check_question_footer}</SectionFooter>
+      <GroupFooter group="question" error={error}>
+        {s.ui_check_question_footer}
+      </GroupFooter>
     </>
   );
 }
 
-export function RecipientSection({ draft, set, commit }: SectionProps) {
+export function RecipientSection({ draft, set, commit, error }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
@@ -105,7 +134,9 @@ export function RecipientSection({ draft, set, commit }: SectionProps) {
           maxLength={64}
         />
       </Card>
-      <SectionFooter>{s.ui_check_target_name_footer}</SectionFooter>
+      <GroupFooter group="recipient" error={error}>
+        {s.ui_check_target_name_footer}
+      </GroupFooter>
     </>
   );
 }
@@ -144,7 +175,7 @@ function PickerRow({
   );
 }
 
-export function ScheduleSection({ draft, set, setNow }: SectionProps) {
+export function ScheduleSection({ draft, set, setNow, error }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
@@ -178,12 +209,14 @@ export function ScheduleSection({ draft, set, setNow }: SectionProps) {
           max={24 * 60}
         />
       </Card>
-      <SectionFooter>{s.ui_check_timeout_footer}</SectionFooter>
+      <GroupFooter group="schedule" error={error}>
+        {s.ui_check_timeout_footer}
+      </GroupFooter>
     </>
   );
 }
 
-export function ButtonsSection({ draft, set, commit }: SectionProps) {
+export function ButtonsSection({ draft, set, commit, error }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
@@ -206,11 +239,12 @@ export function ButtonsSection({ draft, set, commit }: SectionProps) {
           maxLength={32}
         />
       </Card>
+      <GroupFooter group="buttons" error={error} />
     </>
   );
 }
 
-export function RepliesSection({ draft, set, commit }: SectionProps) {
+export function RepliesSection({ draft, set, commit, error }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
@@ -235,13 +269,15 @@ export function RepliesSection({ draft, set, commit }: SectionProps) {
           minHeight="min-h-[76px]"
         />
       </Card>
-      <SectionFooter>{s.ui_check_replies_footer}</SectionFooter>
+      <GroupFooter group="replies" error={error}>
+        {s.ui_check_replies_footer}
+      </GroupFooter>
     </>
   );
 }
 
 // The counter is either kept by hand or derived from a start date.
-export function CounterSection({ draft, setNow }: SectionProps) {
+export function CounterSection({ draft, setNow, error }: SectionProps) {
   const { t: s, lang } = useI18n();
   const byDate = draft.counterAnchorDate !== null;
   return (
@@ -298,11 +334,11 @@ export function CounterSection({ draft, setNow }: SectionProps) {
           <option value="reset_on_yes">{s.ui_check_counter_mode_reset}</option>
         </ValueSelectRow>
       </Card>
-      <SectionFooter>
+      <GroupFooter group="counter" error={error}>
         {byDate
           ? s.ui_check_counter_anchor_date_footer
           : s.ui_check_counter_footer}
-      </SectionFooter>
+      </GroupFooter>
     </>
   );
 }

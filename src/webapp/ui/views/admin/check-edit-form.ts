@@ -113,6 +113,12 @@ const ERROR_INFO = {
   { field: keyof CheckDraft; group: string }
 >;
 
+export type CheckGroup = (typeof ERROR_INFO)[ValidationError]["group"];
+
+export function errorGroup(error: ValidationError): CheckGroup {
+  return ERROR_INFO[error].group;
+}
+
 // What a change to the form comes to. `draft` is the form to show: a field the
 // server would refuse goes back to its `saved` value, so one bad field never
 // blocks the others (a new check, with no `saved`, keeps it as typed). `error`

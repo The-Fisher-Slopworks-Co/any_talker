@@ -27,6 +27,7 @@ const props = {
   set: () => {},
   setNow: () => {},
   commit: () => {},
+  error: null,
 };
 
 describe("check editor groups", () => {
@@ -119,5 +120,36 @@ describe("check editor groups", () => {
       expect(html).toContain(text);
     }
     expect(html).toContain(">Yes<");
+  });
+
+  test("a refused field shows its error in red under its own group only", () => {
+    const html = render(
+      <>
+        <QuestionSection {...props} />
+        <RecipientSection {...props} error="chat_id_empty" />
+        <ButtonsSection {...props} error="chat_id_empty" />
+      </>,
+    );
+    expect(html.match(/Enter a chat ID./g)?.length).toBe(1);
+    expect(html).toContain("text-tg-destructive");
+    // The hint it replaces is gone; the other groups keep theirs.
+    expect(html).not.toContain("Replaces {name}");
+    expect(html).toContain("{name} mentions the user");
+  });
+
+  test("the error is worded in the viewer's language", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider lang="ru">
+        <RecipientSection {...props} error="chat_id_empty" />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Укажите ID чата.");
+  });
+
+  test("a group without a hint gets a footer only for an error", () => {
+    expect(render(<ButtonsSection {...props} />)).not.toContain("pt-0.5");
+    expect(
+      render(<ButtonsSection {...props} error="no_button_empty" />),
+    ).toContain("Enter the No label.");
   });
 });
