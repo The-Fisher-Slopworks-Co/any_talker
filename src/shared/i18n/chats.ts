@@ -126,6 +126,18 @@ export const chatsMessages = {
     en: (tz: string) => `Global (${tz}).`,
     ru: (tz: string) => `Глобально (${tz}).`,
   }),
+  ui_chat_ai_header: m({
+    en: "AI Settings",
+    ru: "Настройки ИИ",
+  }),
+  ui_chat_ai_footer: m({
+    en: "A chat timezone applies unless the user sets their own. Pinning a provider disables fallback.",
+    ru: "Часовой пояс чата действует, если у пользователя нет своего. Закреплённый провайдер отключает резервные модели.",
+  }),
+  ui_chat_global_option: m({
+    en: (value: string) => `Global (${value})`,
+    ru: (value: string) => `Общее (${value})`,
+  }),
   ui_chat_prompt_placeholder: m({
     en: "How the bot should behave here",
     ru: "Как боту вести себя в этом чате",

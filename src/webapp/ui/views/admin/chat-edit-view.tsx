@@ -28,11 +28,8 @@ import {
 import {
   KeywordFilterSection,
   ModelsSection,
-  ProviderRoutingSection,
-  ProviderSection,
-  ServiceTierSection,
   SystemPromptSection,
-  TimezoneOverrideSection,
+  AiSettingsSection,
 } from "./chat-edit-sections";
 
 // The chat plus the global settings it inherits from.
@@ -174,12 +171,9 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       </div>
       <SectionFooter>{s.ui_chat_bot_name_footer}</SectionFooter>
 
+      <AiSettingsSection {...sections} />
       <SystemPromptSection {...sections} />
       <ModelsSection {...sections} />
-      <TimezoneOverrideSection {...sections} />
-      <ProviderRoutingSection {...sections} />
-      <ProviderSection {...sections} />
-      <ServiceTierSection {...sections} />
       <KeywordFilterSection {...sections} />
       <SaveStatus status={status} />
     </Stack>
