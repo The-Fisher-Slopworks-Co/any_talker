@@ -16,6 +16,7 @@ import {
   type Sender,
 } from "../context-builder";
 import type { PersonaResolver } from "../../managed-bots/persona";
+import { profileToCarry, turnAuthor } from "../profile";
 import type { ToolEffect } from "../../ai/tools/registry";
 import { append, emptyTranscript } from "../../ai/transcript";
 import {
@@ -168,6 +169,16 @@ export async function guestAskHandler(
     }
   }
 
+  const priorTurns =
+    input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
+  // What the bot knows about the guest, carried only when the thread does not
+  // already say it (`bot/profile.ts`).
+  const profile = profileToCarry(priorTurns, input.userId, {
+    timezone,
+    lang: input.lang,
+    facts: await storage.facts.list(input.userId),
+  });
+
   // One envelope, used both for the request and for the persisted thread turn,
   // so the stored text is byte-identical to what the model saw — a prefix that
   // still matches on the next turn is what keeps the prompt cache warm.
@@ -177,9 +188,8 @@ export async function guestAskHandler(
     text: input.userText,
     attachments: input.attachments,
     sentAt: { ms: input.now, timezone },
+    profile,
   });
-  const priorTurns =
-    input.priorThread?.turns.slice(-MAX_REPLY_CHAIN_DEPTH) ?? [];
 
   // Guest queries are always single-turn asks with no detail level passed, so
   // the system prompt carries no detail-level section.
@@ -304,6 +314,7 @@ export async function guestAskHandler(
               // a turn that reached the model, so there is always a run behind
               // it to record.
               run: turn.run,
+              author: turnAuthor(input.userId, profile),
             },
           ].slice(-MAX_REPLY_CHAIN_DEPTH);
           await storage.conversations.saveGuest(input.threadToken, {

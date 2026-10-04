@@ -45,6 +45,12 @@ class FakeAI implements AIClient {
 // fixtures sit a few ms past the epoch in the default UTC timezone.
 const SENT_AT = "1970-01-01 00:00";
 
+// What user 42's first turn in a chain carries about them (`bot/profile.ts`):
+// the default timezone, the fixture language, no facts. A later turn of theirs
+// in the same chain carries nothing, the chain already says it.
+const PROFILE = { timezone: "UTC", language: "en" };
+const AUTHOR = { userId: "42", profile: expect.any(String) };
+
 const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
   const storage = overrides.storage ?? new MemoryStorage();
   return {
@@ -75,6 +81,12 @@ const baseInput = (overrides: Partial<AskInput> = {}): AskInput => {
     ...overrides,
   };
 };
+
+// The `profile` the last envelope of the first AI call carried.
+function sentProfile(ai: FakeAI): { timezone: string } {
+  const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
+  return JSON.parse(sent.at(-1)!.content as string).profile;
+}
 
 describe("askHandler", () => {
   test("denied when not whitelisted and not owner", async () => {
@@ -143,7 +155,12 @@ describe("askHandler", () => {
     expect(sent[0]!.content).toEqual([
       {
         type: "text",
-        text: JSON.stringify({ author: "John Doe", time: SENT_AT, text: "" }),
+        text: JSON.stringify({
+          author: "John Doe",
+          time: SENT_AT,
+          profile: PROFILE,
+          text: "",
+        }),
       },
       {
         type: "audio",
@@ -416,6 +433,7 @@ describe("askHandler", () => {
         userQuestion: JSON.stringify({
           author: "John Doe",
           time: SENT_AT,
+          profile: PROFILE,
           text: "hello",
         }),
         botAnswer: "hi back",
@@ -424,6 +442,7 @@ describe("askHandler", () => {
         // The run behind the answer. FakeAI reports no generation ids and no
         // answering model, so only what this side knows is filled in.
         run: { gen: [], detail: "short", instr: expect.any(String) },
+        author: AUTHOR,
       });
       // The turn is also keyed by the user's ask message id, so replying to
       // one's own question resolves the chain too.
@@ -516,11 +535,13 @@ describe("askHandler", () => {
       userQuestion: JSON.stringify({
         author: "John Doe",
         time: SENT_AT,
+        profile: PROFILE,
         text: "How was your day?",
       }),
       botAnswer: "You are rate-limited",
       parentBotMsgId: 2,
       ts: 1000,
+      author: AUTHOR,
     };
     expect(await storage.conversations.get("c1", 4)).toEqual(expected);
     expect(await storage.conversations.get("c1", 3)).toEqual(expected);
@@ -543,11 +564,13 @@ describe("askHandler", () => {
       userQuestion: JSON.stringify({
         author: "John Doe",
         time: SENT_AT,
+        profile: PROFILE,
         text: "hello",
       }),
       botAnswer: "AI error",
       parentBotMsgId: null,
       ts: 1000,
+      author: AUTHOR,
     };
     expect(await storage.conversations.get("c1", 4)).toEqual(expected);
     expect(await storage.conversations.get("c1", 3)).toEqual(expected);
@@ -618,7 +641,12 @@ describe("askHandler", () => {
     expect(third.kind).toBe("answered");
     const sent = (ai.calls[0] as { messages: { content: unknown }[] }).messages;
     expect(sent.map((m) => m.content)).toEqual([
-      JSON.stringify({ author: "John Doe", time: SENT_AT, text: "hello" }),
+      JSON.stringify({
+        author: "John Doe",
+        time: SENT_AT,
+        profile: PROFILE,
+        text: "hello",
+      }),
       "Hi!",
       JSON.stringify({
         author: "John Doe",
@@ -632,6 +660,65 @@ describe("askHandler", () => {
         text: "What is my first ever message?",
       }),
     ]);
+  });
+
+  test("another user replying in the chain keeps the history; each profile is appended once", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    await storage.access.addWhitelist("users", { id: "77" });
+    await storage.facts.remember("42", "pet", "cat");
+    await storage.facts.remember("77", "city", "Kazan");
+    const reply = (messageId: number) => ({
+      messageId,
+      text: "answer",
+      authorFirstName: "Bot",
+      images: [],
+    });
+    const turn = async (
+      userId: string,
+      askMessageId: number,
+      replyTo: number | null,
+      botMsgId: number,
+    ) => {
+      const ai = new FakeAI();
+      const out = await askHandler(
+        baseInput({
+          storage,
+          ai,
+          userId,
+          askMessageId,
+          userText: `from ${userId}`,
+          replyTarget: replyTo === null ? null : reply(replyTo),
+        }),
+      );
+      if (out.kind !== "answered") throw new Error("expected answered");
+      await out.persistConversation(botMsgId);
+      const call = ai.calls[0] as {
+        system: string;
+        messages: { content: unknown }[];
+      };
+      return {
+        system: call.system,
+        sent: call.messages.map((m) => m.content as string),
+      };
+    };
+    const profileOf = (envelope: string) => JSON.parse(envelope).profile;
+
+    const t1 = await turn("42", 1, null, 2);
+    const t2 = await turn("77", 3, 2, 4);
+    const t3 = await turn("42", 5, 4, 6);
+    await storage.facts.remember("42", "pet", "dog");
+    const t4 = await turn("42", 7, 6, 8);
+
+    // Every request continues the previous one unchanged.
+    expect(t2.sent.slice(0, t1.sent.length)).toEqual(t1.sent);
+    expect(t3.sent.slice(0, t2.sent.length)).toEqual(t2.sent);
+    expect(t4.sent.slice(0, t3.sent.length)).toEqual(t3.sent);
+    // A first appearance carries the profile, a repeat does not, a change does.
+    expect(profileOf(t1.sent.at(-1)!).facts).toEqual({ pet: "cat" });
+    expect(profileOf(t2.sent.at(-1)!).facts).toEqual({ city: "Kazan" });
+    expect(profileOf(t3.sent.at(-1)!)).toBeUndefined();
+    expect(profileOf(t4.sent.at(-1)!).facts).toEqual({ pet: "dog" });
   });
 
   test("onAIStart fires immediately before the AI call", async () => {
@@ -731,8 +818,7 @@ describe("askHandler", () => {
 
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
-    const sys = (ai.calls[0] as { system: string }).system;
-    expect(sys).toContain("Таймзона пользователя: Asia/Yekaterinburg.");
+    expect(sentProfile(ai).timezone).toBe("Asia/Yekaterinburg");
   });
 
   test("timezone resolution falls back to chat when user has no override", async () => {
@@ -746,8 +832,7 @@ describe("askHandler", () => {
 
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
-    const sys = (ai.calls[0] as { system: string }).system;
-    expect(sys).toContain("Таймзона пользователя: Asia/Tokyo.");
+    expect(sentProfile(ai).timezone).toBe("Asia/Tokyo");
   });
 
   test("timezone resolution falls back to global when nothing else set", async () => {
@@ -760,8 +845,7 @@ describe("askHandler", () => {
 
     const ai = new FakeAI();
     await askHandler(baseInput({ storage, ai }));
-    const sys = (ai.calls[0] as { system: string }).system;
-    expect(sys).toContain("Таймзона пользователя: Europe/London.");
+    expect(sentProfile(ai).timezone).toBe("Europe/London");
   });
 
   test("answered: returns botName from chat settings when set", async () => {
@@ -966,6 +1050,7 @@ describe("askHandler", () => {
     const firstTurnEnvelope = JSON.stringify({
       author: "John Doe",
       time: SENT_AT,
+      profile: PROFILE,
       text: "what's on these",
     });
     expect(sent[0]!.content).toEqual([
@@ -1031,6 +1116,7 @@ describe("askHandler", () => {
       content: JSON.stringify({
         author: "John Doe",
         time: SENT_AT,
+        profile: PROFILE,
         text: "Q to main",
       }),
     });

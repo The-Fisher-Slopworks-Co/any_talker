@@ -42,6 +42,11 @@ class FakeAI implements AIClient {
 // fixtures sit a few ms past the epoch in the default UTC timezone.
 const SENT_AT = "1970-01-01 00:00";
 
+// What the guest's first turn in a thread carries about them
+// (`bot/profile.ts`): the default timezone, the fixture language, no facts.
+const PROFILE = { timezone: "UTC", language: "en" };
+const AUTHOR = { userId: "42", profile: expect.any(String) };
+
 const TOKEN = "gTOKEN0001";
 
 const baseInput = (overrides: Partial<GuestAskInput> = {}): GuestAskInput => {
@@ -238,12 +243,14 @@ describe("guestAskHandler", () => {
           userQuestion: JSON.stringify({
             author: "Jane",
             time: SENT_AT,
+            profile: PROFILE,
             text: "hello",
           }),
           botAnswer: "the answer",
           // Guest turns carry no detail level, so the run records only the ids
           // (none, from FakeAI) and the prompt hash.
           run: { gen: [], instr: expect.any(String) },
+          author: AUTHOR,
         },
       ],
       ts: 1000,
@@ -279,6 +286,7 @@ describe("guestAskHandler", () => {
         content: JSON.stringify({
           author: "Jane",
           time: SENT_AT,
+          profile: PROFILE,
           text: "hello",
         }),
       },
@@ -343,6 +351,7 @@ describe("guestAskHandler", () => {
         content: JSON.stringify({
           author: "Jane",
           time: SENT_AT,
+          profile: PROFILE,
           text: "hello",
         }),
       },
@@ -385,6 +394,7 @@ describe("guestAskHandler", () => {
         content: JSON.stringify({
           author: "Jane",
           time: SENT_AT,
+          profile: PROFILE,
           text: "hello",
         }),
       },
@@ -533,6 +543,7 @@ describe("guestAskHandler", () => {
             text: JSON.stringify({
               author: "Jane",
               time: SENT_AT,
+              profile: PROFILE,
               text: "hello",
             }),
           },
@@ -650,6 +661,7 @@ describe("guestAskHandler", () => {
         content: JSON.stringify({
           author: "Jane",
           time: SENT_AT,
+          profile: PROFILE,
           quote: "как дела",
           text: "hello",
         }),
@@ -678,6 +690,7 @@ describe("guestAskHandler", () => {
         content: JSON.stringify({
           author: "Jane",
           time: SENT_AT,
+          profile: PROFILE,
           text: "hello",
         }),
       },
@@ -705,13 +718,43 @@ describe("guestAskHandler", () => {
         userQuestion: JSON.stringify({
           author: "Jane",
           time: SENT_AT,
+          profile: PROFILE,
           text: "hello",
         }),
         botAnswer: "second answer",
         run: { gen: [], instr: expect.any(String) },
+        author: AUTHOR,
       },
     ]);
     expect(stored?.ts).toBe(2000);
+  });
+
+  test("a follow-up in the thread does not repeat the profile its first turn carried", async () => {
+    const storage = new MemoryStorage();
+    await storage.access.addWhitelist("users", { id: "42" });
+    const first = await guestAskHandler(baseInput({ storage }));
+    if (first.kind !== "answered") throw new Error("expected answered");
+    await first.persistThread();
+    const ai = new FakeAI();
+    await guestAskHandler(
+      baseInput({
+        storage,
+        ai,
+        userText: "and then?",
+        priorThread: await storage.conversations.getGuest(TOKEN),
+        priorToken: TOKEN,
+        threadToken: "gTOKEN0002",
+      }),
+    );
+    const call = ai.calls[0] as {
+      messages: { role: string; content: unknown }[];
+    };
+    const sent = call.messages
+      .filter((m) => m.role === "user")
+      .map((m) => JSON.parse(m.content as string));
+    expect(sent).toHaveLength(2);
+    expect(sent[0].profile).toEqual(PROFILE);
+    expect(sent.at(-1).profile).toBeUndefined();
   });
 
   test("priorThread is capped at MAX_REPLY_CHAIN_DEPTH on persist and AI input", async () => {
