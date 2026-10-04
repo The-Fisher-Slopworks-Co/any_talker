@@ -35,4 +35,15 @@ describe("PromptTab markup", () => {
     expect(html).toContain("Collapse Replies Over");
     expect(html).toContain("chars");
   });
+
+  test("copying for optimization sits in the prompt's card", () => {
+    const afterTextarea = html.slice(html.indexOf("<textarea"));
+    const copy = afterTextarea.indexOf("Copy for Optimization");
+    expect(copy).toBeGreaterThan(0);
+    // Still inside the card: no section footer in between.
+    expect(afterTextarea.slice(0, copy)).not.toContain("leading-[18px]");
+    // The screen has no Save button, so the footer does not tell to save.
+    expect(afterTextarea).toContain("back here.");
+    expect(afterTextarea).not.toContain("and save");
+  });
 });

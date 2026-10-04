@@ -12,7 +12,11 @@ import {
 } from "../../components/layout";
 import { ModelsCard } from "../../components/models-card";
 import { NumberRow } from "../../components/number-row";
-import { OptimizePromptButton } from "../../components/optimize-prompt-button";
+import {
+  OptimizePromptFooter,
+  OptimizePromptRow,
+  useOptimizePrompt,
+} from "../../components/optimize-prompt-button";
 import { ProviderSelectField } from "../../components/provider-select-field";
 import { ProviderSortField } from "../../components/provider-sort-field";
 import { ReasoningEffortField } from "../../components/reasoning-effort-field";
@@ -69,6 +73,8 @@ export function PromptTab({
     if (!sameList(draft.models, shown)) setModels(draft.models);
   }
 
+  const optimize = useOptimizePrompt(prompt);
+
   return (
     <Stack>
       <SectionHeader>{s.ui_prompt_models}</SectionHeader>
@@ -110,14 +116,15 @@ export function PromptTab({
       <SectionHeader>{s.ui_prompt_system_prompt}</SectionHeader>
       <Card>
         <textarea
-          className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
+          className="field-block block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px] resize-none"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onBlur={commitPrompt}
           placeholder={s.ui_prompt_placeholder}
         />
+        <OptimizePromptRow optimize={optimize} />
       </Card>
-      <OptimizePromptButton prompt={prompt} />
+      <OptimizePromptFooter optimize={optimize} autosaves />
 
       <div className="section-gap">
         <Card>
