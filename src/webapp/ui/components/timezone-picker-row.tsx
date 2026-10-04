@@ -11,16 +11,21 @@ const AUTO = "";
 const cityName = (location: string) =>
   location.replace(/_/g, " ").replace(/\//g, " / ");
 
-// The timezone as one pop-up row: "Automatic" first, then every zone grouped
-// by area, so the closed row shows just the city.
+// The timezone as one pop-up row: the empty choice first, then every zone
+// grouped by area, so the closed row shows just the city. The empty choice is
+// "Automatic" unless the caller names what null falls back to (e.g. "Global
+// (UTC)"); `emptyLabel: null` drops it for a zone that must be set.
 export function TimezonePickerRow({
   value,
   onChange,
+  emptyLabel,
 }: {
   value: string | null;
   onChange: (tz: string | null) => void;
+  emptyLabel?: string | null;
 }) {
   const { t: s } = useI18n();
+  const empty = emptyLabel === undefined ? s.ui_main_tz_auto : emptyLabel;
   const areas = getTimezoneAreas();
   // A stored zone outside the list (e.g. bare "UTC") still has to show.
   const known = value === null || value.includes("/");
@@ -30,7 +35,7 @@ export function TimezonePickerRow({
       value={value ?? AUTO}
       onChange={(v) => onChange(v === AUTO ? null : v)}
     >
-      <option value={AUTO}>{s.ui_main_tz_auto}</option>
+      {empty === null ? null : <option value={AUTO}>{empty}</option>}
       {known ? null : <option value={value}>{value}</option>}
       {areas.map((area) => (
         <optgroup key={area} label={area}>

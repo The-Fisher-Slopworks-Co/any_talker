@@ -40,21 +40,24 @@ export function showsUsageHeader(route: Route): boolean {
   return route.kind === "main";
 }
 
-export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
-  "prompt",
-  "ratelimit",
-  "budget",
-  "spend",
-  "whitelist",
-  "users",
-  "chats",
-  "reminders",
-  "quarantine",
-  "checks",
-  "bots",
-  "feedback",
-  "api-token",
+// The admin home's groups, top to bottom. A null header is a headerless
+// group, like the top block of iOS Settings.
+export type AdminGroup = "spending" | "access" | "automation";
+
+export const ADMIN_GROUPS: readonly {
+  header: AdminGroup | null;
+  sections: readonly AdminSection[];
+}[] = [
+  { header: null, sections: ["prompt", "bots"] },
+  { header: "spending", sections: ["ratelimit", "budget", "spend"] },
+  { header: "access", sections: ["whitelist", "users", "chats"] },
+  { header: "automation", sections: ["reminders", "quarantine", "checks"] },
+  { header: null, sections: ["feedback", "api-token"] },
 ];
+
+export const ADMIN_SECTION_IDS: readonly AdminSection[] = ADMIN_GROUPS.flatMap(
+  (g) => g.sections,
+);
 
 function isAdminSection(v: unknown): v is AdminSection {
   return ADMIN_SECTION_IDS.includes(v as AdminSection);
@@ -104,57 +107,33 @@ export function parseRoute(raw: unknown): Route | null {
   }
 }
 
-export function adminSection(
-  s: Strings,
-  id: AdminSection,
-): { label: string; description: string } {
+export function adminSectionLabel(s: Strings, id: AdminSection): string {
   switch (id) {
     case "prompt":
-      return { label: s.ui_admin_prompt, description: s.ui_admin_prompt_desc };
+      return s.ui_admin_prompt;
     case "ratelimit":
-      return { label: s.ui_admin_limits, description: s.ui_admin_limits_desc };
+      return s.ui_admin_limits;
     case "budget":
-      return { label: s.ui_admin_budget, description: s.ui_admin_budget_desc };
+      return s.ui_admin_budget;
     case "spend":
-      return { label: s.ui_admin_spend, description: s.ui_admin_spend_desc };
+      return s.ui_admin_spend;
     case "whitelist":
-      return {
-        label: s.ui_admin_whitelist,
-        description: s.ui_admin_whitelist_desc,
-      };
+      return s.ui_admin_whitelist;
     case "users":
-      return { label: s.ui_admin_users, description: s.ui_admin_users_desc };
+      return s.ui_admin_users;
     case "chats":
-      return { label: s.ui_admin_chats, description: s.ui_admin_chats_desc };
+      return s.ui_admin_chats;
     case "reminders":
-      return {
-        label: s.ui_admin_reminders,
-        description: s.ui_admin_reminders_desc,
-      };
+      return s.ui_admin_reminders;
     case "quarantine":
-      return {
-        label: s.ui_admin_quarantine,
-        description: s.ui_admin_quarantine_desc,
-      };
+      return s.ui_admin_quarantine;
     case "checks":
-      return {
-        label: s.ui_admin_checks,
-        description: s.ui_admin_checks_desc,
-      };
+      return s.ui_admin_checks;
     case "bots":
-      return {
-        label: s.ui_admin_bots,
-        description: s.ui_admin_bots_desc,
-      };
+      return s.ui_admin_bots;
     case "feedback":
-      return {
-        label: s.ui_admin_feedback,
-        description: s.ui_admin_feedback_desc,
-      };
+      return s.ui_admin_feedback;
     case "api-token":
-      return {
-        label: s.ui_admin_api_token,
-        description: s.ui_admin_api_token_desc,
-      };
+      return s.ui_admin_api_token;
   }
 }

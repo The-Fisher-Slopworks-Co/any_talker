@@ -9,10 +9,6 @@ export const managedBotsMessages = {
     en: "Character Bots",
     ru: "Боты-персонажи",
   }),
-  ui_admin_bots_desc: m({
-    en: "Extra characters with their own persona",
-    ru: "Дополнительные персонажи со своей персоной",
-  }),
   ui_route_bot_edit: m({
     en: "Edit Bot",
     ru: "Редактирование бота",
