@@ -95,8 +95,8 @@ export const feedbackMessages = {
     ru: "Отчёт не найден.",
   }),
   ui_feedback_record_header: m({
-    en: "Report",
-    ru: "Отчёт",
+    en: "Details",
+    ru: "Подробности",
   }),
   ui_feedback_field_sent: m({
     en: "Sent",
@@ -128,12 +128,12 @@ export const feedbackMessages = {
     ru: "Сборка",
   }),
   ui_feedback_field_prompt_hash: m({
-    en: "Prompt hash",
+    en: "Prompt Hash",
     ru: "Хеш промпта",
   }),
   // The bot message the command replied to, when it was sent as a reply.
   ui_feedback_field_pointed_at: m({
-    en: "Pointed at",
+    en: "Pointed At",
     ru: "Указывает на",
   }),
   ui_feedback_pointed_value: m({
@@ -153,10 +153,6 @@ export const feedbackMessages = {
   ui_feedback_status_header: m({
     en: "Status",
     ru: "Статус",
-  }),
-  ui_feedback_text_header: m({
-    en: "What was reported",
-    ru: "Что сообщили",
   }),
   ui_feedback_threads_header: m({
     en: "Threads",

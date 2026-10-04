@@ -20,12 +20,17 @@ export type AdminSection =
   | "feedback"
   | "api-token";
 
+// Where a user or chat page was opened from, which is where Back leads: an
+// admin section's list, or the report whose author or chat it is.
+export type EditFrom =
+  AdminSection | { kind: "feedback-view"; feedbackId: string };
+
 export type Route =
   | { kind: "main" }
   | { kind: "admin" }
   | { kind: "admin-section"; section: AdminSection }
-  | { kind: "user-edit"; userId: string; from: AdminSection }
-  | { kind: "chat-edit"; chatId: string; from: AdminSection }
+  | { kind: "user-edit"; userId: string; from: EditFrom }
+  | { kind: "chat-edit"; chatId: string; from: EditFrom }
   | { kind: "check-edit"; checkId: string | null }
   | { kind: "managed-bot-edit"; botId: string | null }
   // Read-only apart from the status, so it is a view rather than an `-edit`.
@@ -67,6 +72,20 @@ function isId(v: unknown): v is string {
   return typeof v === "string" && v !== "";
 }
 
+export function fromRoute(from: EditFrom): Route {
+  return typeof from === "string"
+    ? { kind: "admin-section", section: from }
+    : from;
+}
+
+function parseFrom(v: unknown): EditFrom | null {
+  if (isAdminSection(v)) return v;
+  const r = v as { kind?: unknown; feedbackId?: unknown } | null;
+  return r?.kind === "feedback-view" && isId(r.feedbackId)
+    ? { kind: r.kind, feedbackId: r.feedbackId }
+    : null;
+}
+
 // A route read back from storage after a reload. Anything that is not a
 // route this build knows how to render gives null.
 export function parseRoute(raw: unknown): Route | null {
@@ -82,14 +101,18 @@ export function parseRoute(raw: unknown): Route | null {
       return isAdminSection(r.section)
         ? { kind: r.kind, section: r.section }
         : null;
-    case "user-edit":
-      return isId(r.userId) && isAdminSection(r.from)
-        ? { kind: r.kind, userId: r.userId, from: r.from }
+    case "user-edit": {
+      const from = parseFrom(r.from);
+      return isId(r.userId) && from
+        ? { kind: r.kind, userId: r.userId, from }
         : null;
-    case "chat-edit":
-      return isId(r.chatId) && isAdminSection(r.from)
-        ? { kind: r.kind, chatId: r.chatId, from: r.from }
+    }
+    case "chat-edit": {
+      const from = parseFrom(r.from);
+      return isId(r.chatId) && from
+        ? { kind: r.kind, chatId: r.chatId, from }
         : null;
+    }
     case "check-edit":
       return r.checkId === null || isId(r.checkId)
         ? { kind: r.kind, checkId: r.checkId }
