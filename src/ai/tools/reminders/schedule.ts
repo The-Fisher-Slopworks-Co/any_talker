@@ -140,7 +140,9 @@ export function createScheduleReminderTool(deps: {
   return {
     name: "schedule_reminder",
     description:
-      "Schedule a reminder at least 1 minute ahead. One-off: inAmount + inUnit for a delay ('in 2 hours', 'tomorrow' = 1 day) OR atDatetime for a wall-clock time. " +
+      "Schedule a reminder at least 1 minute ahead. " +
+      "A bare 'remind me' takes its subject and time from the thread (e.g. a reply to your answer about a date): schedule it, ask ONLY what the thread leaves ambiguous. " +
+      "One-off: inAmount + inUnit for a delay ('in 2 hours', 'tomorrow' = 1 day) OR atDatetime for a wall-clock time. " +
       "Repeating: everyAmount + everyUnit, a FIXED interval of at least 5 minutes, with atDatetime as the first occurrence or omitted to start one interval from now " +
       "('every day at 18:30' → every 1 day, atDatetime the next 18:30). " +
       "Calendar rules ('every weekday', 'first Monday of the month', cron) are NOT supported: do not approximate, offer the nearest fixed interval. " +
