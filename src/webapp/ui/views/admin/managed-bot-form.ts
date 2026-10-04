@@ -26,3 +26,16 @@ export function revertFailed(
     systemPrompt: revert("systemPrompt"),
   };
 }
+
+// Telegram's "create a bot for this manager" deep link, with the owner's
+// suggested username and name filled in when they typed any.
+export function newBotLink(
+  manager: string,
+  username: string,
+  name: string,
+): string {
+  let link = `https://t.me/newbot/${manager}`;
+  if (username.trim()) link += `/${username.trim()}`;
+  if (name.trim()) link += `?name=${encodeURIComponent(name.trim())}`;
+  return link;
+}

@@ -18,13 +18,18 @@ import {
   OptimizePromptRow,
   useOptimizePrompt,
 } from "../../components/optimize-prompt-button";
-import { ActionRow, RowButton } from "../../components/controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
+import { ActionRow } from "../../components/controls";
+import { ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 import { SaveStatus } from "../../components/save-status";
 import { AreaRow, TextRow } from "../../components/text-row";
 import { useAutosave } from "../../lib/use-autosave";
 import { useFailureToast } from "../../lib/use-failure-toast";
-import { botForm, revertFailed, type BotForm } from "./managed-bot-form";
+import {
+  botForm,
+  newBotLink,
+  revertFailed,
+  type BotForm,
+} from "./managed-bot-form";
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -70,9 +75,7 @@ function CreateBotForm() {
 
   const open = () => {
     if (!info.username) return;
-    let link = `https://t.me/newbot/${info.username}`;
-    if (username.trim()) link += `/${username.trim()}`;
-    if (name.trim()) link += `?name=${encodeURIComponent(name.trim())}`;
+    const link = newBotLink(info.username, username, name);
     const tg = window.Telegram?.WebApp;
     if (tg?.openTelegramLink) tg.openTelegramLink(link);
     else if (tg?.openLink) tg.openLink(link);
@@ -82,48 +85,45 @@ function CreateBotForm() {
     <Stack>
       <SectionFooter>{s.ui_mbot_create_intro}</SectionFooter>
 
-      {!info.canManageBots && (
+      <div className="section-gap">
         <Card>
-          <div className={ROW_CLS}>
-            <span className={ROW_LABEL_CLS}>
-              {s.ui_mbot_create_need_manage}
-            </span>
-          </div>
-        </Card>
-      )}
-
-      <SectionHeader>{s.ui_mbot_create_name}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_mbot_create_name}</span>
-          <input
-            className={INPUT_CLS}
+          <TextRow
+            label={s.ui_mbot_create_name}
             placeholder={s.ui_mbot_create_name_placeholder}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={setName}
+            onCommit={() => {}}
             maxLength={64}
           />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_mbot_create_username}</span>
-          <input
-            className={INPUT_CLS}
+          <TextRow
+            label={s.ui_mbot_create_username}
             placeholder={s.ui_mbot_create_username_placeholder}
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={setUsername}
+            onCommit={() => {}}
             maxLength={32}
           />
-        </label>
-      </Card>
+        </Card>
+      </div>
 
-      <Card>
-        <RowButton
-          disabled={!info.canManageBots || !info.username}
-          onClick={open}
-        >
-          {s.ui_mbot_create_open}
-        </RowButton>
-      </Card>
+      <div className="section-gap">
+        <Card>
+          {!info.canManageBots && (
+            <div className={ROW_CLS}>
+              <span className={ROW_LABEL_CLS}>
+                {s.ui_mbot_create_need_manage}
+              </span>
+            </div>
+          )}
+          <ActionRow
+            bold
+            disabled={!info.canManageBots || !info.username}
+            onClick={open}
+          >
+            {s.ui_mbot_create_open}
+          </ActionRow>
+        </Card>
+      </div>
       <SectionFooter>{s.ui_mbot_create_footer}</SectionFooter>
     </Stack>
   );
