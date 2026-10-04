@@ -15,11 +15,21 @@ const TOKEN_RANDOM_CHARS = 9;
 // The last line of the message.
 const TRAILING_TOKEN = /(?:^|\n)[ \t]*(g[0-9A-Za-z]{9})\s*$/;
 
-export function newGuestToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(TOKEN_RANDOM_CHARS));
+const randomBytes = (count: number): Uint8Array =>
+  crypto.getRandomValues(new Uint8Array(count));
+
+// Each character takes the low six bits of a byte and redraws the two values
+// past the alphabet: `byte % 62` would make the first eight characters a
+// quarter likelier than the rest.
+export function newGuestToken(random = randomBytes): string {
   let token = "g";
-  for (const byte of bytes) {
-    token += TOKEN_ALPHABET[byte % TOKEN_ALPHABET.length];
+  while (token.length <= TOKEN_RANDOM_CHARS) {
+    for (const byte of random(TOKEN_RANDOM_CHARS)) {
+      const index = byte & 0b111111;
+      if (index >= TOKEN_ALPHABET.length) continue;
+      token += TOKEN_ALPHABET[index];
+      if (token.length > TOKEN_RANDOM_CHARS) break;
+    }
   }
   return token;
 }
