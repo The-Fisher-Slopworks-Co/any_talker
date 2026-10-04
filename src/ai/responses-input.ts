@@ -27,7 +27,7 @@ type ContentPart = EasyInputMessageContentUnion1;
 //
 // The system prompt is never an input item: it rides on the request's top-level
 // `instructions` field, which is what keeps the cacheable prefix stable.
-export function toResponsesInput(messages: AIMessage[]): Item[] {
+export function toResponsesInput(messages: readonly AIMessage[]): Item[] {
   // Call ids only have to be unique WITHIN a request, and not every provider
   // issues ids that are unique across responses — a `call_1`-per-response
   // scheme is enough to make a 20-turn chain emit the same id twice, which

@@ -17,7 +17,8 @@ import type {
 } from "@openrouter/agent";
 import { HTTPClient } from "@openrouter/sdk";
 import type { Fetcher } from "@openrouter/sdk";
-import type { AIClient, AIMessage, AskResult, RoutingOptions } from "./types";
+import type { AIClient, AskResult, RoutingOptions } from "./types";
+import type { Transcript } from "./transcript";
 import type { Tool, ToolCallContext } from "./tools/registry";
 import type {
   ProviderSort,
@@ -200,7 +201,7 @@ export class OpenRouterClient implements AIClient {
   async ask(opts: {
     models: string[];
     system: string;
-    messages: AIMessage[];
+    messages: Transcript;
     tools: Tool[];
     routing?: RoutingOptions | undefined;
     reasoningEffort?: ReasoningEffort | null | undefined;

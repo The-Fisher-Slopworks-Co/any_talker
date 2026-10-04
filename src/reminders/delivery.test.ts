@@ -13,7 +13,8 @@ import {
 import { t } from "../shared/i18n";
 import { createMainPersonaResolver } from "../managed-bots/persona";
 import type { Reminder } from "./types";
-import type { AIClient, AIMessage, AskResult } from "../ai/types";
+import type { AIClient, AskResult } from "../ai/types";
+import type { Transcript } from "../ai/transcript";
 import type { Tool, ToolCallContext } from "../ai/tools/registry";
 import { _resetRegistryForTest, registerTool } from "../ai/tools/registry";
 import { createReminderTools } from "../ai/tools/reminders";
@@ -29,7 +30,7 @@ function contentOf<T extends { role: string }>(m: T): unknown {
 type AskArgs = {
   models: string[];
   system: string;
-  messages: AIMessage[];
+  messages: Transcript;
   tools: Tool[];
   toolCallContext: ToolCallContext;
 };
