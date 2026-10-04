@@ -124,7 +124,7 @@ export function MainView({
           <Card>
             <NavRow
               title={s.ui_main_admin_panel}
-              icon={<SettingsIcon tint="gray" glyph="gear" />}
+              icon={<SettingsIcon tint="gray" glyph="sliders" />}
               onClick={onOpenAdmin}
             />
           </Card>
