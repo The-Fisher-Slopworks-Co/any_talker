@@ -11,9 +11,12 @@ import {
   type DateFormat,
 } from "../../../shared/date-format";
 import type { DisplayNameError } from "../../../shared/display-name";
+import type { Gender } from "../../../shared/types";
 import { DISPLAY_NAME_ERR_KEY, LANG_LABEL_KEY } from "../lib/labels";
-import { Card, SectionFooter } from "./layout";
+import { Card, SectionFooter, SectionHeader } from "./layout";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { GenderPickerRow } from "./gender-picker-row";
+import { TimezonePickerRow } from "./timezone-picker-row";
 import { ValueSelectRow } from "./value-select-row";
 
 export type ProfileChoices = {
@@ -24,42 +27,31 @@ export type ProfileChoices = {
 // `<select>` values are strings, so an unset (null) choice travels as "".
 const UNSET = "";
 
-// The caller's own profile as one compact card: each setting is a single row
-// showing its current value, and tapping it opens the picker. Saving is the
-// caller's concern — every pick is reported at once, the name only when the
-// input is left.
-export function ProfileSettingsCard({
+// The caller's own profile, grouped the way iOS Settings would: who you are
+// to the AI, then language and region. Each setting is one row showing its
+// current value. Saving is the caller's concern — every pick is reported at
+// once, the name only when the input is left.
+export function AboutYouSection({
   name,
   namePlaceholder,
   nameError,
   onNameChange,
   onNameCommit,
-  choices,
-  onChoice,
-  timezone,
+  gender,
+  onGender,
 }: {
   name: string;
   namePlaceholder: string;
   nameError: DisplayNameError | null;
   onNameChange: (v: string) => void;
   onNameCommit: () => void;
-  choices: ProfileChoices;
-  onChoice: (patch: Partial<ProfileChoices>) => void;
-  // The zone the date-format samples are rendered in (null: the device's).
-  timezone: string | null;
+  gender: Gender | null;
+  onGender: (g: Gender | null) => void;
 }) {
   const { t: s } = useI18n();
-
-  const footer = nameError ? (
-    <span className="text-tg-destructive">
-      {s[DISPLAY_NAME_ERR_KEY[nameError]]}
-    </span>
-  ) : (
-    s.ui_main_settings_footer
-  );
-
   return (
     <>
+      <SectionHeader>{s.ui_main_about_you}</SectionHeader>
       <Card>
         <label className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_main_name}</span>
@@ -74,7 +66,52 @@ export function ProfileSettingsCard({
             }}
           />
         </label>
+        <GenderPickerRow value={gender} onChange={onGender} />
+      </Card>
+      <SectionFooter>
+        {nameError ? (
+          <span className="text-tg-destructive">
+            {s[DISPLAY_NAME_ERR_KEY[nameError]]}
+          </span>
+        ) : (
+          s.ui_main_about_footer
+        )}
+      </SectionFooter>
+    </>
+  );
+}
 
+export function LanguageRegionSection({
+  choices,
+  onChoice,
+  timezone,
+  onTimezone,
+}: {
+  choices: ProfileChoices;
+  onChoice: (patch: Partial<ProfileChoices>) => void;
+  // Also the zone the date-format samples are rendered in (null: the device's).
+  timezone: string | null;
+  onTimezone: (tz: string | null) => void;
+}) {
+  const { t: s } = useI18n();
+  return (
+    <>
+      <SectionHeader>{s.ui_main_lang_region}</SectionHeader>
+      <Card>
+        <ValueSelectRow
+          label={s.ui_main_language}
+          value={choices.language}
+          onChange={(v) => {
+            if (isValidLang(v)) onChoice({ language: v });
+          }}
+        >
+          {SUPPORTED_LANGS.map((code) => (
+            <option key={code} value={code}>
+              {s[LANG_LABEL_KEY[code]]}
+            </option>
+          ))}
+        </ValueSelectRow>
+        <TimezonePickerRow value={timezone} onChange={onTimezone} />
         <ValueSelectRow
           label={s.ui_main_time_format}
           value={choices.dateFormat ?? UNSET}
@@ -89,22 +126,8 @@ export function ProfileSettingsCard({
             </option>
           ))}
         </ValueSelectRow>
-
-        <ValueSelectRow
-          label={s.ui_main_language}
-          value={choices.language}
-          onChange={(v) => {
-            if (isValidLang(v)) onChoice({ language: v });
-          }}
-        >
-          {SUPPORTED_LANGS.map((code) => (
-            <option key={code} value={code}>
-              {s[LANG_LABEL_KEY[code]]}
-            </option>
-          ))}
-        </ValueSelectRow>
       </Card>
-      <SectionFooter>{footer}</SectionFooter>
+      <SectionFooter>{s.ui_main_region_footer}</SectionFooter>
     </>
   );
 }
