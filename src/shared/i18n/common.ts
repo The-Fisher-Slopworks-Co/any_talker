@@ -29,6 +29,18 @@ export const commonMessages = {
     en: "Remove",
     ru: "Удалить",
   }),
+  ui_date_today: m({
+    en: "Today",
+    ru: "Сегодня",
+  }),
+  ui_date_yesterday: m({
+    en: "Yesterday",
+    ru: "Вчера",
+  }),
+  ui_date_tomorrow: m({
+    en: "Tomorrow",
+    ru: "Завтра",
+  }),
   ui_yes: m({
     en: "yes",
     ru: "да",
