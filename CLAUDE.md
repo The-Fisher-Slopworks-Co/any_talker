@@ -73,6 +73,7 @@ No workflow reacts to releases or tags. After the PR merges the release can go:
   - Subject: lowercase start, imperative, no trailing period.
   - The body follows `.github/pull_request_template.md`.
   - The body describes this PR alone. No links to the other PRs of a stack, no "this is the first/second/third PR", no "the next PR will…": GitHub already shows the base branch and the PRs stacked on it.
+- **No AI attribution.** No `Assisted-by:` / `Co-Authored-By: <LLM>` trailers in commits and no "Generated with …" lines in PR bodies — it's just free advertising for the LLM's provider. The PR body becomes the squash commit body on main, so `.github/workflows/pr-title.yml` fails a PR that carries one.
 - **Before opening:** `bun run check` green, then `gh pr create --fill`; report the PR URL as the final step of the task.
 - **Never merge locally.** Merging happens on GitHub, squash only.
 

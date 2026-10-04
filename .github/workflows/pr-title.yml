@@ -3,7 +3,8 @@
 
 # main only ever gains squashed pull requests, and GitHub uses the PR title as
 # the squash commit subject. So this — not a local commit message — is where
-# conventional-commit discipline actually has to hold.
+# conventional-commit discipline actually has to hold. The PR body becomes the
+# squash commit body, so it is checked here too.
 name: PR title
 
 on:
@@ -69,3 +70,39 @@ jobs:
             The subject "{subject}" of "{title}" is invalid: it must start with
             a lowercase letter, be phrased in the imperative ("add", not
             "Added"), and must not end with a period.
+
+  # An agent's "Generated with …" footer or co-author trailer in the body would
+  # land on main as part of the squash commit. That is just free advertising for the LLM's provider. Matches go by the agents' own emails,
+  # trailer keys and session links rather than product names, so a human
+  # co-author called Claude or a sentence about Copilot stays fine.
+  attribution:
+    name: No AI attribution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan title and body
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { title, body } = context.payload.pull_request;
+
+            const PATTERNS = [
+              // Co-author trailers, by the address each agent signs with.
+              /noreply@(anthropic\.com|openai\.com|aider\.chat|opencode\.ai|z\.ai)\b/i,
+              /\b(cursoragent@cursor\.com|amp@ampcode\.com|qwen-coder@alibabacloud\.com|copilot@github\.com)\b/i,
+              /\d+\+(copilot|copilot-swe-agent|devin-ai-integration|factory-droid|gemini-code-assist|google-labs-jules)(\[bot\])?@users\.noreply\.github\.com/i,
+              // Disclosure and session trailers, only at the start of a line.
+              /^\s*(assisted-by|generated-by|ai-assisted|claude-session|copilot-session|amp-thread(-id)?)\s*:/im,
+              // PR-body footers and links back to an agent's session.
+              /generated with \[?(claude code|codex|copilot|cursor|opencode)\b/i,
+              /claude\.ai\/code\/session_|ampcode\.com\/threads\/|app\.devin\.ai\/sessions\/|chatgpt\.com\/codex\/tasks\//i,
+            ];
+
+            const lines = `${title}\n${body ?? ""}`.split("\n");
+            const hits = lines.filter((line) => PATTERNS.some((re) => re.test(line)));
+
+            if (hits.length > 0) {
+              core.setFailed(
+                "Remove the AI attribution from the PR title/body (see CLAUDE.md → Definition of done):\n" +
+                  hits.map((line) => `  ${line.trim()}`).join("\n"),
+              );
+            }
