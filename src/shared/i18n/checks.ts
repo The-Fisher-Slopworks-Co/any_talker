@@ -190,7 +190,7 @@ export const checksMessages = {
     ru: "Включён",
   }),
   ui_check_delete: m({
-    en: "Delete check",
+    en: "Delete Check",
     ru: "Удалить чек",
   }),
   ui_check_delete_confirm: m({
@@ -202,7 +202,7 @@ export const checksMessages = {
     ru: "Чек не найден.",
   }),
   ui_check_last_fired: m({
-    en: "Last fired",
+    en: "Last Fired",
     ru: "Последний раз",
   }),
   ui_check_last_fired_never: m({
@@ -210,7 +210,7 @@ export const checksMessages = {
     ru: "Никогда",
   }),
   ui_check_pending: m({
-    en: "Pending reply",
+    en: "Pending Reply",
     ru: "Ждёт ответа",
   }),
   ui_check_pending_yes: m({
