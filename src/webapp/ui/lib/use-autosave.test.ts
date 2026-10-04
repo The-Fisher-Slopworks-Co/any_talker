@@ -30,6 +30,32 @@ function setup(send: (patch: string) => Promise<string>) {
 describe("createAutosaver", () => {
   // Two quick changes must not race: the second request only starts once the
   // first has answered, so its (newer) response is the one applied last.
+  test("flush waits for every patch queued so far, failed ones included", async () => {
+    const first = deferred<string>();
+    const { save, saved, failed } = setup((p) =>
+      p === "a" ? first.promise : Promise.reject(new Error("refused")),
+    );
+
+    void save("a");
+    void save("b");
+    let flushed = false;
+    const flushing = save.flush().then(() => {
+      flushed = true;
+    });
+    await Promise.resolve();
+    expect(flushed).toBe(false);
+
+    first.resolve("a");
+    await flushing;
+    expect(saved).toEqual(["a"]);
+    expect(failed).toEqual(["b"]);
+  });
+
+  test("flush settles at once when nothing is queued", async () => {
+    const { save } = setup((p) => Promise.resolve(p));
+    await save.flush();
+  });
+
   test("sends patches one at a time, in order", async () => {
     const first = deferred<string>();
     const sent: string[] = [];

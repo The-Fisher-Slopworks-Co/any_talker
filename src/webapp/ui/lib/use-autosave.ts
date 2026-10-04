@@ -13,6 +13,7 @@ const OUTCOME_SHOWN_MS = { saved: 500, failed: 5000 };
 // changes were made, so an older response can never land after a newer one and
 // roll the form back. The status describes the whole burst: "saving" while any
 // patch is queued, then "saved" — or "failed" if any patch in it was rejected.
+// `flush` settles once everything queued so far has been answered.
 export function createAutosaver<P, R>({
   send,
   onSaved,
@@ -23,11 +24,11 @@ export function createAutosaver<P, R>({
   onSaved: (result: R) => void;
   onFailed: (patch: P) => void;
   onStatus: (status: SaveStatus) => void;
-}): (patch: P) => Promise<void> {
+}): ((patch: P) => Promise<void>) & { flush: () => Promise<void> } {
   let tail: Promise<void> = Promise.resolve();
   let pending = 0;
   let failed = false;
-  return (patch) => {
+  const queue = (patch: P) => {
     if (pending === 0) failed = false;
     pending++;
     onStatus("saving");
@@ -43,13 +44,18 @@ export function createAutosaver<P, R>({
     });
     return tail;
   };
+  return Object.assign(queue, { flush: () => tail });
 }
 
 export function useAutosave<P, R>(handlers: {
   send: (patch: P) => Promise<R>;
   onSaved: (result: R) => void;
   onFailed: (patch: P) => void;
-}): { save: (patch: P) => void; status: SaveStatus } {
+}): {
+  save: (patch: P) => void;
+  flush: () => Promise<void>;
+  status: SaveStatus;
+} {
   const [status, setStatus] = useState<SaveStatus>("idle");
   // The saver is created once, so it reads the handlers through a ref to see
   // the latest closures rather than the first render's.
@@ -76,6 +82,7 @@ export function useAutosave<P, R>(handlers: {
     save: (patch) => {
       void save(patch);
     },
+    flush: () => save.flush(),
     status,
   };
 }
