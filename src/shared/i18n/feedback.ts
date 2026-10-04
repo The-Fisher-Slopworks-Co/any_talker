@@ -29,10 +29,6 @@ export const feedbackMessages = {
     en: "Feedback",
     ru: "Обратная связь",
   }),
-  ui_admin_feedback_desc: m({
-    en: "User reports from /feedback",
-    ru: "Отчёты пользователей из /feedback",
-  }),
   ui_feedback_empty: m({
     en: "No reports yet.",
     ru: "Пока нет отчётов.",
