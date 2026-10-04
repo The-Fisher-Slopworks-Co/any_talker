@@ -12,7 +12,6 @@ import {
 } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
 import { UserLimitsSection } from "../../components/user-limits-section";
-import { DEFAULT_LANG, type Lang } from "../../../../shared/i18n";
 import {
   Card,
   SectionFooter,
@@ -21,10 +20,7 @@ import {
 } from "../../components/layout";
 import { LargeTitle } from "../../components/large-title";
 import { LoadingState } from "../../components/states";
-import { SaveButton } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
-import { TimezoneField } from "../../components/timezone-field";
-import { LanguageField } from "../../components/language-field";
 import { UserAboutSection } from "../../components/user-about-section";
 import { AccessRows } from "../../components/access-rows";
 import { Hero } from "../../components/hero";
@@ -39,11 +35,6 @@ export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
-  const [tzOverride, setTzOverride] = useState(false);
-  const [tzValue, setTzValue] = useState("UTC");
-  const [langOn, setLangOn] = useState(false);
-  const [langValue, setLangValue] = useState<Lang>(DEFAULT_LANG);
-  const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
   const { data: botsData } = useLoadable(api.listMyBots, []);
@@ -60,13 +51,7 @@ export function UserEditView({ userId }: { userId: string }) {
   useEffect(() => {
     api
       .getAdminUser(userId)
-      .then((d) => {
-        setData(d);
-        setTzOverride(d.timezone !== null);
-        setTzValue(d.timezone ?? "UTC");
-        setLangOn(d.language !== null);
-        setLangValue(d.language ?? DEFAULT_LANG);
-      })
+      .then(setData)
       .catch(() => setNotFound(true));
     api.getUserSpending(userId).then((r) => setSpending(r.spending));
   }, [userId]);
@@ -94,27 +79,6 @@ export function UserEditView({ userId }: { userId: string }) {
   };
   const fallbackName = userDisplayName(user);
   const effectiveName = userDisplayName(user, data.displayName);
-  const desiredTz = tzOverride ? tzValue : null;
-  const desiredLang: Lang | null = langOn ? langValue : null;
-  const dirty = desiredTz !== data.timezone || desiredLang !== data.language;
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const next = await api.putAdminUser(userId, {
-        timezone: desiredTz,
-        language: desiredLang,
-      });
-      setData((prev) => (prev ? { ...prev, ...next } : null));
-      setTzOverride(next.timezone !== null);
-      setTzValue(next.timezone ?? "UTC");
-      setLangOn(next.language !== null);
-      setLangValue(next.language ?? DEFAULT_LANG);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <Stack>
       <Hero
@@ -158,27 +122,12 @@ export function UserEditView({ userId }: { userId: string }) {
       <UserAboutSection
         userId={user.id}
         fallbackName={fallbackName}
-        initial={{ displayName: data.displayName, gender: data.gender }}
-      />
-
-      <TimezoneField
-        enabled={tzOverride}
-        onEnabledChange={setTzOverride}
-        value={tzValue}
-        onChange={setTzValue}
-      />
-
-      <LanguageField
-        value={langValue}
-        onChange={setLangValue}
-        toggle={{ enabled: langOn, onEnabledChange: setLangOn }}
-      />
-
-      <SaveButton
-        saving={saving}
-        dirty={dirty}
-        disabled={saving || !dirty}
-        onClick={save}
+        initial={{
+          displayName: data.displayName,
+          timezone: data.timezone,
+          gender: data.gender,
+          language: data.language,
+        }}
       />
 
       {spending && <SpendingCard spending={spending} />}
