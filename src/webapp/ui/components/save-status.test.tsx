@@ -24,6 +24,16 @@ describe("SaveStatus", () => {
     expect(html).toContain("top-[");
   });
 
+  test("names a failure's cause when it is given one", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider lang="en">
+        <SaveStatus status="failed" message="Is the bot running?" />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Is the bot running?");
+    expect(html).not.toContain("Couldn&#x27;t save");
+  });
+
   test("is hidden while idle", () => {
     const html = render("idle");
     expect(html).toContain('aria-hidden="true"');

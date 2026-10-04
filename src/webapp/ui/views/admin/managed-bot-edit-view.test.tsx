@@ -100,6 +100,57 @@ async function mount() {
   };
 }
 
+describe("ManagedBotEditView avatar", () => {
+  // The picker returns a file; reading it needs a FileReader, which the DOM
+  // stand-in lacks.
+  class FakeReader {
+    result = "data:image/png;base64,AA==";
+    onload: () => void = () => {};
+    readAsDataURL() {
+      this.onload();
+    }
+  }
+
+  async function pick(container: Element) {
+    const input = container.querySelector('input[type="file"]')!;
+    const key = Object.keys(input).find((k) => k.startsWith("__reactProps"))!;
+    const props = (
+      input as unknown as Record<string, { onChange: (e: unknown) => unknown }>
+    )[key]!;
+    await act(async () => {
+      void props.onChange({ target: { files: [{}] } });
+    });
+  }
+
+  const editButton = (container: Element) =>
+    Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Edit",
+    )!;
+
+  test("greys the Edit link out while a picture uploads, and names a failure", async () => {
+    const { root, container } = await mount();
+    Object.assign(globalThis, { FileReader: FakeReader });
+    let refuse: () => void = () => {};
+    Object.assign(api, {
+      setManagedBotAvatar: () =>
+        new Promise((_, reject) => {
+          refuse = () => reject(new Error("is the bot running?"));
+        }),
+    });
+    await pick(container);
+    await until(() => editButton(container).hasAttribute("disabled"));
+    const toast = () =>
+      Array.from(container.querySelectorAll('[role="status"]')).find((n) =>
+        n.textContent!.includes("Couldn't set the avatar"),
+      )!;
+    expect(toast().getAttribute("aria-hidden")).toBe("true");
+    await act(async () => refuse());
+    await until(() => !editButton(container).hasAttribute("disabled"));
+    expect(toast().getAttribute("aria-hidden")).toBe("false");
+    await act(async () => root.unmount());
+  });
+});
+
 describe("ManagedBotEditView deleting", () => {
   // The server's save is read-modify-write, so a save still in flight when
   // the delete lands could resurrect the bot or find it gone.

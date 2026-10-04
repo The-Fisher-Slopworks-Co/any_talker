@@ -19,7 +19,8 @@ export function Hero({
   name: string;
   subtitle?: string | undefined;
   note?: string | undefined;
-  action?: { label: string; onClick: () => void } | undefined;
+  action?:
+    { label: string; onClick: () => void; disabled?: boolean } | undefined;
   // Puts the action under the avatar, like "Edit" under a contact's photo.
   actionUnderAvatar?: boolean | undefined;
 }) {
@@ -29,7 +30,8 @@ export function Hero({
       {action ? (
         <button
           type="button"
-          className={`mt-1.5 cursor-pointer border-0 bg-transparent p-0 text-[15px] text-tg-link ${actionUnderAvatar ? "" : "order-last"}`}
+          className={`mt-1.5 cursor-pointer border-0 bg-transparent p-0 text-[15px] text-tg-link disabled:opacity-50 ${actionUnderAvatar ? "" : "order-last"}`}
+          disabled={action.disabled}
           onClick={action.onClick}
         >
           {action.label}

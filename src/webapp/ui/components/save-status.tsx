@@ -27,7 +27,13 @@ function toastMotion(visible: boolean): string {
 // A toast for a failed autosave, seen wherever the form is scrolled. Saving
 // and success stay silent, as in iOS Settings: a change simply sticks. It
 // stays mounted while hidden and only fades out.
-export function SaveStatus({ status }: { status: Status }) {
+export function SaveStatus({
+  status,
+  message,
+}: {
+  status: Status;
+  message?: string;
+}) {
   const { t: s } = useI18n();
   const visible = status === "failed";
   return (
@@ -37,7 +43,7 @@ export function SaveStatus({ status }: { status: Status }) {
       aria-hidden={!visible}
       className={[TOAST_POSITION, TOAST_LOOK, toastMotion(visible)].join(" ")}
     >
-      {s.ui_main_save_failed}
+      {message ?? s.ui_main_save_failed}
     </div>
   );
 }
