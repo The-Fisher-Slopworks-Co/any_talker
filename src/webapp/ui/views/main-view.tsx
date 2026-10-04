@@ -10,10 +10,9 @@ import { Card, Stack } from "../components/layout";
 import { SaveStatus } from "../components/save-status";
 import { NavRow } from "../components/select-row";
 import { SettingsIcon } from "../components/settings-icon";
-import { GenderField } from "../components/gender-field";
-import { TimezoneField } from "../components/timezone-field";
 import {
-  ProfileSettingsCard,
+  AboutYouSection,
+  LanguageRegionSection,
   type ProfileChoices,
 } from "../components/profile-settings-card";
 import { useAutosave } from "../lib/use-autosave";
@@ -35,10 +34,8 @@ export function MainView({
 }) {
   const { t: s, lang: resolvedLang } = useI18n();
   const [name, setName] = useState(me.displayName ?? "");
-  const [tzOverride, setTzOverride] = useState(me.timezone !== null);
-  const [tzValue, setTzValue] = useState(me.timezone ?? "UTC");
-  const [genderOn, setGenderOn] = useState(me.gender !== null);
-  const [genderValue, setGenderValue] = useState<Gender>(me.gender ?? "male");
+  const [timezone, setTimezone] = useState<string | null>(me.timezone);
+  const [gender, setGender] = useState<Gender | null>(me.gender);
   const [choices, setChoices] = useState<ProfileChoices>({
     dateFormat: me.dateFormat,
     language: resolvedLang,
@@ -51,14 +48,8 @@ export function MainView({
     // A rejected field goes back to its last saved value.
     onFailed: (patch) => {
       if ("displayName" in patch) setName(me.displayName ?? "");
-      if ("gender" in patch) {
-        setGenderOn(me.gender !== null);
-        if (me.gender !== null) setGenderValue(me.gender);
-      }
-      if ("timezone" in patch) {
-        setTzOverride(me.timezone !== null);
-        if (me.timezone !== null) setTzValue(me.timezone);
-      }
+      if ("gender" in patch) setGender(me.gender);
+      if ("timezone" in patch) setTimezone(me.timezone);
       setChoices((c) => ({
         dateFormat: "dateFormat" in patch ? me.dateFormat : c.dateFormat,
         language: "language" in patch ? resolvedLang : c.language,
@@ -88,39 +79,25 @@ export function MainView({
 
   return (
     <Stack>
-      <ProfileSettingsCard
+      <AboutYouSection
         name={name}
         namePlaceholder={tgName || s.ui_main_your_name}
         nameError={nameError}
         onNameChange={setName}
         onNameCommit={commitName}
-        choices={choices}
-        onChoice={choose}
-        timezone={tzOverride ? tzValue : null}
-      />
-
-      <GenderField
-        enabled={genderOn}
-        onEnabledChange={(on) => {
-          setGenderOn(on);
-          save({ gender: on ? genderValue : null });
-        }}
-        value={genderValue}
-        onChange={(g) => {
-          setGenderValue(g);
+        gender={gender}
+        onGender={(g) => {
+          setGender(g);
           save({ gender: g });
         }}
       />
 
-      <TimezoneField
-        enabled={tzOverride}
-        onEnabledChange={(on) => {
-          setTzOverride(on);
-          save({ timezone: on ? tzValue : null });
-        }}
-        value={tzValue}
-        onChange={(tz) => {
-          setTzValue(tz);
+      <LanguageRegionSection
+        choices={choices}
+        onChoice={choose}
+        timezone={timezone}
+        onTimezone={(tz) => {
+          setTimezone(tz);
           save({ timezone: tz });
         }}
       />
