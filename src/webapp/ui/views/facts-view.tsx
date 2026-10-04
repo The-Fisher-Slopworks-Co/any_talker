@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from "react";
 import { useI18n } from "../i18n-context";
 import {
   api,
@@ -57,6 +64,20 @@ export function sheetMotion(closing: boolean): {
   };
 }
 
+// Whether letting go of a pulled-down sheet closes it rather than snapping it
+// back: pulled past a third of its height, or flicked down (px/ms).
+export function dragDismisses(
+  dy: number,
+  velocity: number,
+  height: number,
+): boolean {
+  return dy > height / 3 || (dy > 10 && velocity > 0.5);
+}
+
+// Pulling the sheet down by its grabber: how far it has moved, the sheet's
+// height, and whether the finger is still down.
+type Drag = { dy: number; height: number; live: boolean };
+
 function botScope(b: FactBot): string {
   return b.botId ?? MAIN_SCOPE;
 }
@@ -108,6 +129,11 @@ function FactSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pointer = useRef<{ startY: number; y: number; t: number; v: number }>(
+    null,
+  );
 
   // Slides the sheet out, then hands control back to the caller.
   const dismiss = useCallback((then: () => void) => {
@@ -129,6 +155,53 @@ function FactSheet({
       document.body.style.overflow = overflow;
     };
   }, [cancel]);
+
+  // Telegram would take a downward swipe as "minimize the app", so the
+  // sheet's own pull-down needs it off while the sheet is open.
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.isVerticalSwipesEnabled) return;
+    tg.disableVerticalSwipes?.();
+    return () => tg.enableVerticalSwipes?.();
+  }, []);
+
+  const grab = (e: PointerEvent<HTMLDivElement>) => {
+    if (busy || closing || (e.target as Element).closest("button")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pointer.current = { startY: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
+    setDrag({
+      dy: 0,
+      height: panelRef.current?.offsetHeight ?? window.innerHeight,
+      live: true,
+    });
+  };
+
+  const pull = (e: PointerEvent<HTMLDivElement>) => {
+    const p = pointer.current;
+    if (!p) return;
+    const dt = e.timeStamp - p.t;
+    if (dt > 0) p.v = (e.clientY - p.y) / dt;
+    p.y = e.clientY;
+    p.t = e.timeStamp;
+    const dy = Math.max(0, p.y - p.startY);
+    setDrag((d) => (d ? { ...d, dy } : d));
+  };
+
+  // On release the sheet either goes on down from where the finger left it
+  // or slides back up.
+  const release = (e: PointerEvent<HTMLDivElement>) => {
+    const p = pointer.current;
+    if (!p) return;
+    pointer.current = null;
+    const dy = Math.max(0, p.y - p.startY);
+    const height = drag?.height ?? window.innerHeight;
+    if (e.type === "pointerup" && dragDismisses(dy, p.v, height)) {
+      setDrag({ dy, height, live: false });
+      cancel();
+    } else {
+      setDrag(null);
+    }
+  };
 
   const normalizedKey = normalizeFactKey(key);
   const valid = normalizedKey !== null && normalizeFactValue(value) !== null;
@@ -167,6 +240,16 @@ function FactSheet({
   };
 
   const motion = sheetMotion(closing);
+  // While pulled, the sheet follows the finger and the dim thins out with it.
+  const panelStyle = drag
+    ? ({
+        "--sheet-drag": `${drag.dy}px`,
+        ...(drag.live ? { transitionDuration: "0s" } : {}),
+      } as CSSProperties)
+    : undefined;
+  const backdropStyle = drag?.live
+    ? { opacity: 1 - drag.dy / drag.height, transitionDuration: "0s" }
+    : undefined;
 
   return (
     <div
@@ -174,34 +257,45 @@ function FactSheet({
     >
       <div
         className={`absolute inset-0 bg-black/40 ${motion.backdrop}`}
+        style={backdropStyle}
         onClick={cancel}
       />
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative mt-12 flex-1 overflow-y-auto rounded-t-[14px] bg-tg-secondary px-3 pb-8 ${motion.panel}`}
+        ref={panelRef}
+        className={`relative mt-12 flex-1 overflow-y-auto rounded-t-[14px] bg-tg-secondary px-3 pb-8 ${drag ? "translate-y-(--sheet-drag)" : ""} ${motion.panel}`}
+        style={panelStyle}
       >
-        <div className="mx-auto mt-2 mb-3 h-[5px] w-9 rounded-full bg-tg-hint/40" />
-        <div className="mb-4 flex items-center px-1">
-          <button
-            type="button"
-            className={SHEET_BTN_CLS}
-            disabled={busy}
-            onClick={cancel}
-          >
-            {s.ui_facts_cancel}
-          </button>
-          <span className="flex-1 text-center text-[17px] font-semibold">
-            {fact ? s.ui_facts_edit_title : s.ui_facts_new_title}
-          </span>
-          <button
-            type="button"
-            className={`${SHEET_BTN_CLS} font-semibold`}
-            disabled={busy || !valid}
-            onClick={save}
-          >
-            {busy ? s.ui_saving : s.ui_save}
-          </button>
+        <div
+          className="-mx-3 touch-none px-3 pt-2 pb-4 cursor-grab active:cursor-grabbing"
+          onPointerDown={grab}
+          onPointerMove={pull}
+          onPointerUp={release}
+          onPointerCancel={release}
+        >
+          <div className="mx-auto mb-3 h-[5px] w-9 rounded-full bg-tg-hint/40" />
+          <div className="flex items-center px-1">
+            <button
+              type="button"
+              className={SHEET_BTN_CLS}
+              disabled={busy}
+              onClick={cancel}
+            >
+              {s.ui_facts_cancel}
+            </button>
+            <span className="flex-1 text-center text-[17px] font-semibold">
+              {fact ? s.ui_facts_edit_title : s.ui_facts_new_title}
+            </span>
+            <button
+              type="button"
+              className={`${SHEET_BTN_CLS} font-semibold`}
+              disabled={busy || !valid}
+              onClick={save}
+            >
+              {busy ? s.ui_saving : s.ui_save}
+            </button>
+          </div>
         </div>
         <Stack>
           <SectionHeader>{s.ui_facts_key_label}</SectionHeader>

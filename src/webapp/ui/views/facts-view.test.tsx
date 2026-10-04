@@ -8,7 +8,12 @@ import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
 import type { FactsResponse } from "../api-client";
-import { FactsEditor, sheetMotion, type FactsWriter } from "./facts-view";
+import {
+  dragDismisses,
+  FactsEditor,
+  sheetMotion,
+  type FactsWriter,
+} from "./facts-view";
 
 const unused = () => Promise.reject(new Error("not called"));
 const writer: FactsWriter = { add: unused, update: unused, remove: unused };
@@ -78,5 +83,23 @@ describe("fact sheet motion", () => {
           : "motion-reduce:starting:opacity-0",
       );
     }
+  });
+});
+
+describe("pulling the fact sheet down", () => {
+  const height = 600;
+
+  test("closes once pulled past a third of the sheet", () => {
+    expect(dragDismisses(150, 0, height)).toBe(false);
+    expect(dragDismisses(201, 0, height)).toBe(true);
+  });
+
+  test("closes on a short but fast flick", () => {
+    expect(dragDismisses(40, 1.2, height)).toBe(true);
+  });
+
+  test("snaps back from a slow nudge or a twitch", () => {
+    expect(dragDismisses(40, 0.2, height)).toBe(false);
+    expect(dragDismisses(5, 2, height)).toBe(false);
   });
 });

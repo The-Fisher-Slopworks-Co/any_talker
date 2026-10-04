@@ -20,6 +20,9 @@ declare global {
         expand: () => void;
         openTelegramLink?: (url: string) => void;
         openLink?: (url: string) => void;
+        isVerticalSwipesEnabled?: boolean;
+        disableVerticalSwipes?: () => void;
+        enableVerticalSwipes?: () => void;
         BackButton?: {
           show: () => void;
           hide: () => void;
