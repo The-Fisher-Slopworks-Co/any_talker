@@ -8,16 +8,13 @@ import type { Chat, User } from "../../../shared/types";
 import { Card } from "./layout";
 import { EmptyState } from "./states";
 import { reminderTargetLabel, reminderUserLabel } from "../lib/labels";
-import { ReminderEditForm } from "./reminder-edit-form";
 
 // The admin's hold on the listed rows. Absent on the user's own list, which
 // stays read-only.
 export type ReminderCardManage = {
-  editingId: string | null;
   // A delete is in flight, so the row actions stay out of reach until it settles.
   busy: boolean;
-  onEdit: (id: string | null) => void;
-  onSaved: (next: Reminder) => void;
+  onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 };
 
@@ -51,16 +48,6 @@ export function ReminderCard({
         <EmptyState>{emptyText}</EmptyState>
       ) : (
         reminders.map((r) => {
-          if (manage?.editingId === r.id) {
-            return (
-              <ReminderEditForm
-                key={r.id}
-                reminder={r}
-                onSaved={manage.onSaved}
-                onCancel={() => manage.onEdit(null)}
-              />
-            );
-          }
           const userLabel = showUserId
             ? reminderUserLabel(r, users, displayNames)
             : null;

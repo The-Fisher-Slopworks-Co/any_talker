@@ -39,8 +39,24 @@ export const remindersMessages = {
     ru: "Отмена",
   }),
   ui_reminders_fire_at_label: m({
-    en: "Fires at",
-    ru: "Сработает",
+    en: "Date & Time",
+    ru: "Дата и время",
+  }),
+  ui_reminders_sheet_title: m({
+    en: "Reminder",
+    ru: "Напоминание",
+  }),
+  ui_reminders_open_user: m({
+    en: "Open User",
+    ru: "Открыть пользователя",
+  }),
+  ui_reminders_delete_button: m({
+    en: "Delete Reminder",
+    ru: "Удалить напоминание",
+  }),
+  ui_reminders_delete_error: m({
+    en: "Could not delete the reminder.",
+    ru: "Не удалось удалить напоминание.",
   }),
   ui_reminders_delete_confirm: m({
     en: "Delete this reminder? The author isn't notified.",
