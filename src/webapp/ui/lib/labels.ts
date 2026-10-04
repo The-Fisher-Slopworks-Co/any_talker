@@ -2,7 +2,13 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Strings } from "./routes";
-import { composeFullName, type Chat, type User } from "../../../shared/types";
+import {
+  composeFullName,
+  type Chat,
+  type ChatType,
+  type User,
+  type WhitelistEntry,
+} from "../../../shared/types";
 import type { Reminder } from "../../../reminders/types";
 import type { ReminderParseFailureReason } from "../../../reminders/parse";
 import type { Lang } from "../../../shared/i18n";
@@ -27,8 +33,29 @@ export function chatTitle(s: Strings, c: Chat): string {
   return `id:${c.id}`;
 }
 
-export function chatSubtitle(c: Chat): string {
-  return c.username && c.title ? `${c.type} · @${c.username}` : c.type;
+const CHAT_TYPE_KEY = {
+  private: "ui_chat_type_private",
+  group: "ui_chat_type_group",
+  supergroup: "ui_chat_type_supergroup",
+  channel: "ui_chat_type_channel",
+} as const satisfies Record<ChatType, keyof Strings>;
+
+export function chatSubtitle(s: Strings, c: Chat): string {
+  const type = s[CHAT_TYPE_KEY[c.type]];
+  return c.username && c.title ? `${type} · @${c.username}` : type;
+}
+
+// Whether the bot talks to a chat; a chat on the blacklist is blocked whatever
+// the whitelist says, and one on neither list has no status to show.
+export function chatAccessLabel(
+  s: Strings,
+  id: string,
+  whitelist: WhitelistEntry[],
+  blacklist: WhitelistEntry[],
+): string | undefined {
+  if (blacklist.some((e) => e.id === id)) return s.ui_chat_access_blocked;
+  if (whitelist.some((e) => e.id === id)) return s.ui_chat_access_allowed;
+  return undefined;
 }
 
 export function userDisplayName(u: User, displayName?: string | null): string {

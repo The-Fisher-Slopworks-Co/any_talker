@@ -4,9 +4,9 @@
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import { Card, SectionHeader, Stack } from "../../components/layout";
+import { Avatar } from "../../components/avatar";
 import { EmptyState, LoadingState } from "../../components/states";
-import { SELECTABLE_ROW_CLS } from "../../components/row";
-import { DisclosureChevron, NavRow } from "../../components/select-row";
+import { NavRow } from "../../components/select-row";
 import { formatUsd, userDisplayName } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
@@ -24,14 +24,18 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
         <>
           <SectionHeader>{s.ui_limit_classes_header}</SectionHeader>
           <Card>
-            {classed.map((u) => (
-              <NavRow
-                key={u.id}
-                title={userDisplayName(u, displayNames[u.id])}
-                subtitle={s.ui_limit_class_name(limitClasses[u.id]!)}
-                onClick={() => onEdit(u.id)}
-              />
-            ))}
+            {classed.map((u) => {
+              const name = userDisplayName(u, displayNames[u.id]);
+              return (
+                <NavRow
+                  key={u.id}
+                  avatar={<Avatar id={u.id} name={name} />}
+                  title={name}
+                  value={s.ui_limit_class_name(limitClasses[u.id]!)}
+                  onClick={() => onEdit(u.id)}
+                />
+              );
+            })}
           </Card>
         </>
       ) : null}
@@ -41,29 +45,19 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
         {users.length === 0 ? (
           <EmptyState>{s.ui_users_empty}</EmptyState>
         ) : (
-          users.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              className={SELECTABLE_ROW_CLS}
-              onClick={() => onEdit(u.id)}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="truncate">
-                  {userDisplayName(u, displayNames[u.id])}
-                </div>
-                <div className="text-[13px] text-tg-hint truncate">
-                  {u.username ? `@${u.username}` : `id ${u.id}`}
-                </div>
-              </div>
-              <span className="shrink-0 text-[13px] text-tg-hint tabular-nums">
-                {s.ui_spending_month_short(
-                  formatUsd(spending[u.id]?.month ?? 0),
-                )}
-              </span>
-              <DisclosureChevron />
-            </button>
-          ))
+          users.map((u) => {
+            const name = userDisplayName(u, displayNames[u.id]);
+            return (
+              <NavRow
+                key={u.id}
+                avatar={<Avatar id={u.id} name={name} />}
+                title={name}
+                subtitle={u.username ? `@${u.username}` : `id ${u.id}`}
+                value={formatUsd(spending[u.id]?.month ?? 0)}
+                onClick={() => onEdit(u.id)}
+              />
+            );
+          })
         )}
       </Card>
     </Stack>

@@ -136,10 +136,6 @@ export const budgetMessages = {
     en: "Last 30 days",
     ru: "За 30 дней",
   }),
-  ui_spending_month_short: m({
-    en: (amount: string) => `30d: ${amount}`,
-    ru: (amount: string) => `30д: ${amount}`,
-  }),
   ui_spending_footer: m({
     en: "OpenRouter-reported USD; models without cost data are under-counted. UTC windows.",
     ru: "USD по данным OpenRouter; модели без данных о стоимости занижают сумму. Окна по UTC.",

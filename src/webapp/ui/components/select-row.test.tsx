@@ -3,7 +3,56 @@
 
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { t } from "../../../shared/i18n";
+import { chatSubtitle } from "../lib/labels";
+import { Avatar } from "./avatar";
 import { NavRow } from "./select-row";
+
+describe("NavRow with an avatar", () => {
+  const html = renderToStaticMarkup(
+    <NavRow
+      avatar={<Avatar id="1" name="Alex Morgan" />}
+      title="Alex Morgan"
+      subtitle="@alex_morgan"
+      value="$1.84"
+      onClick={() => {}}
+    />,
+  );
+
+  test("marks the row so its separator starts after the avatar", () => {
+    expect(html).toContain("row-avatar");
+    expect(html).not.toContain("row-icon");
+  });
+
+  test("shows the value between the text and the chevron", () => {
+    expect(html.indexOf("@alex_morgan")).toBeLessThan(html.indexOf("$1.84"));
+    expect(html.indexOf("$1.84")).toBeLessThan(html.indexOf("<svg", 10));
+  });
+});
+
+describe("chatSubtitle", () => {
+  test("names the capitalised type, with the handle when titled", () => {
+    const en = t("en");
+    const base = {
+      id: "-1",
+      title: null,
+      username: null,
+      firstSeenAt: 0,
+      lastSeenAt: 0,
+    };
+    expect(chatSubtitle(en, { ...base, type: "supergroup" })).toBe(
+      "Supergroup",
+    );
+    expect(
+      chatSubtitle(en, {
+        ...base,
+        type: "supergroup",
+        title: "Club",
+        username: "club",
+      }),
+    ).toBe("Supergroup · @club");
+  });
+});
 
 const render = (props: Partial<Parameters<typeof NavRow>[0]>) =>
   renderToStaticMarkup(<NavRow title="Users" onClick={() => {}} {...props} />);

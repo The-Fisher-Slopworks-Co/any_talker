@@ -3,24 +3,29 @@
 
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import { Card, SectionHeader, Stack } from "../../components/layout";
+import { Card, Stack } from "../../components/layout";
+import { Avatar } from "../../components/avatar";
 import { EmptyState, LoadingState } from "../../components/states";
 import { NavRow } from "../../components/select-row";
-import { chatSubtitle, chatTitle } from "../../lib/labels";
+import { chatAccessLabel, chatSubtitle, chatTitle } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
 export function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { t: s } = useI18n();
-  const { data: chats } = useLoadable(
-    () => api.listAdminChats().then((r) => r.chats),
-    [],
-  );
+  const { data } = useLoadable(async () => {
+    const [{ chats }, whitelist, blacklist] = await Promise.all([
+      api.listAdminChats(),
+      api.getWhitelist(),
+      api.getBlacklist(),
+    ]);
+    return { chats, whitelist: whitelist.chats, blacklist: blacklist.chats };
+  }, []);
 
-  if (chats === null) return <LoadingState />;
+  if (data === null) return <LoadingState />;
+  const { chats, whitelist, blacklist } = data;
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_chats_all}</SectionHeader>
       <Card>
         {chats.length === 0 ? (
           <EmptyState>{s.ui_chats_empty}</EmptyState>
@@ -28,8 +33,10 @@ export function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
           chats.map((c) => (
             <NavRow
               key={c.id}
+              avatar={<Avatar id={c.id} name={chatTitle(s, c)} />}
               title={chatTitle(s, c)}
-              subtitle={chatSubtitle(c)}
+              subtitle={chatSubtitle(s, c)}
+              value={chatAccessLabel(s, c.id, whitelist, blacklist)}
               onClick={() => onEdit(c.id)}
             />
           ))

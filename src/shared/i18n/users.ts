@@ -6,8 +6,8 @@ import { m } from "./message";
 // Users: the admin list and a single user's profile.
 export const usersMessages = {
   ui_users_all: m({
-    en: "All Users",
-    ru: "Все пользователи",
+    en: "All Users · Last 30 Days",
+    ru: "Все пользователи · 30 дней",
   }),
   ui_users_empty: m({
     en: "No users yet.",
