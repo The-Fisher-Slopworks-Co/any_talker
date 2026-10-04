@@ -14,7 +14,7 @@ export const factsMessages = {
     ru: "Персонаж",
   }),
   ui_facts_main_bot: m({
-    en: "Main bot",
+    en: "Main Bot",
     ru: "Основной бот",
   }),
   ui_facts_header: m({
@@ -26,7 +26,7 @@ export const factsMessages = {
     ru: "Пока ничего не сохранено.",
   }),
   ui_facts_add: m({
-    en: "Add fact",
+    en: "Add Fact",
     ru: "Добавить факт",
   }),
   ui_facts_key_label: m({
