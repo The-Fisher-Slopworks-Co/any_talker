@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { m } from "./message";
-import { etaEn, etaRu } from "./eta";
+import { pluralEn, pluralRu } from "./plural";
 
 // Reminders: the user's own list and the admin overview.
 export const remindersMessages = {
@@ -66,10 +66,6 @@ export const remindersMessages = {
     en: "Per user, across all characters. Lowering it keeps existing reminders.",
     ru: "На пользователя, по всем персонажам. Понижение не трогает существующие.",
   }),
-  ui_quarantine_header: m({
-    en: "Quarantined",
-    ru: "Карантин",
-  }),
   ui_quarantine_empty: m({
     en: "Nothing quarantined.",
     ru: "Карантин пуст.",
@@ -86,21 +82,27 @@ export const remindersMessages = {
     en: "Does not match the schema",
     ru: "Не соответствует схеме",
   }),
-  ui_quarantine_expires_in: m({
-    en: (ms: number) => `expires in ~${etaEn(ms)}`,
-    ru: (ms: number) => `истекает через ~${etaRu(ms)}`,
+  // What is left of the retention window, rounded up to whole days.
+  ui_quarantine_days_left: m({
+    en: (ms: number) => pluralEn(Math.ceil(ms / 86_400_000), "day", "days"),
+    ru: (ms: number) =>
+      pluralRu(Math.ceil(ms / 86_400_000), "день", "дня", "дней"),
   }),
   ui_quarantine_expired: m({
-    en: "expired",
-    ru: "истекло",
+    en: "Expired",
+    ru: "Истекло",
   }),
-  ui_quarantine_show_payload: m({
-    en: "Show payload",
-    ru: "Показать данные",
+  ui_quarantine_payload: m({
+    en: "Payload",
+    ru: "Данные",
   }),
-  ui_quarantine_hide_payload: m({
-    en: "Hide payload",
-    ru: "Скрыть данные",
+  ui_quarantine_id: m({
+    en: "ID",
+    ru: "ID",
+  }),
+  ui_quarantine_expires: m({
+    en: "Expires",
+    ru: "Истекает",
   }),
   ui_quarantine_copy: m({
     en: "Copy",
@@ -111,8 +113,8 @@ export const remindersMessages = {
     ru: "Скопировано",
   }),
   ui_quarantine_user: m({
-    en: (id: string) => `user ${id}`,
-    ru: (id: string) => `пользователь ${id}`,
+    en: "User",
+    ru: "Пользователь",
   }),
   ui_reminders_dm: m({
     en: "DM",

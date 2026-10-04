@@ -2,7 +2,11 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { peekQuarantinedPayload, quarantineTimeLeftMs } from "./quarantine";
+import {
+  peekQuarantinedPayload,
+  quarantineExpiresAtMs,
+  quarantineTimeLeftMs,
+} from "./quarantine";
 import { QUARANTINE_TTL_MS } from "../../../storage/types/reminders";
 
 describe("peekQuarantinedPayload", () => {
@@ -54,6 +58,12 @@ describe("peekQuarantinedPayload", () => {
     );
     expect(peek.userId).toBeNull();
     expect(peek.text).toBeNull();
+  });
+});
+
+describe("quarantineExpiresAtMs", () => {
+  test("is the quarantine instant plus the retention window", () => {
+    expect(quarantineExpiresAtMs(1_000)).toBe(1_000 + QUARANTINE_TTL_MS);
   });
 });
 

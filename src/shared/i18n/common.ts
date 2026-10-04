@@ -41,6 +41,10 @@ export const commonMessages = {
     en: "Tomorrow",
     ru: "Завтра",
   }),
+  ui_done: m({
+    en: "Done",
+    ru: "Готово",
+  }),
   ui_yes: m({
     en: "yes",
     ru: "да",

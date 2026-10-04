@@ -51,6 +51,11 @@ export function peekQuarantinedPayload(raw: string): QuarantinePeek {
   };
 }
 
+// When the backend drops the payload.
+export function quarantineExpiresAtMs(quarantinedAtMs: number): number {
+  return quarantinedAtMs + QUARANTINE_TTL_MS;
+}
+
 // How much of the retention window is left. Clamped at zero: the payload key
 // expires on its own, so a record whose window has run out is one the listing
 // caught mid-expiry, not one that will linger.
@@ -58,5 +63,5 @@ export function quarantineTimeLeftMs(
   quarantinedAtMs: number,
   nowMs: number,
 ): number {
-  return Math.max(0, quarantinedAtMs + QUARANTINE_TTL_MS - nowMs);
+  return Math.max(0, quarantineExpiresAtMs(quarantinedAtMs) - nowMs);
 }
