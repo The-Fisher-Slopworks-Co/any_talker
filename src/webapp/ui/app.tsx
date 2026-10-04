@@ -203,10 +203,18 @@ function AppShell({
 
   return (
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
+      {route.kind === "main" ? (
+        // iOS Large Title: the root screen names itself above everything else.
+        <h1 className="m-0 px-1 pb-3 text-[34px] leading-[41px] font-bold tracking-[0.37px]">
+          {title}
+        </h1>
+      ) : (
+        <div className="px-1 pb-4 text-xl font-semibold">{title}</div>
+      )}
       {showsUsageHeader(route) && <UsageHeader usage={usage} />}
-      <div className="px-1 pb-4 text-xl font-semibold">{title}</div>
       {renderRoute()}
-      <BuildInfoFooter />
+      {/* A commit hash means nothing to a regular user. */}
+      {me?.isOwner ? <BuildInfoFooter /> : null}
     </div>
   );
 }
