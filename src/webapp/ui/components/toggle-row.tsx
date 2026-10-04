@@ -21,7 +21,7 @@ export function ToggleRow({
       <div className={ROW_CLS}>
         <span className={ROW_LABEL_CLS}>{label}</span>
         <span className="flex-1" />
-        <Toggle value={value} onChange={onChange} />
+        <Toggle value={value} onChange={onChange} label={label} />
       </div>
     </Card>
   );

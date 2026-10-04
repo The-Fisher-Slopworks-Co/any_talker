@@ -5,30 +5,44 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { useI18n } from "../i18n-context";
 
+// The SF Symbol `chevron.up.chevron.down` iOS puts after a pop-up value.
 export function SelectChevron() {
   return (
-    <span
+    <svg
       aria-hidden
-      className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-tg-link text-[14px] leading-none"
+      viewBox="0 0 10 16"
+      className="pointer-events-none absolute right-0 top-1/2 h-[14px] w-[9px] -translate-y-1/2 text-tg-hint"
     >
-      ▼
-    </span>
+      <path
+        d="M1.5 6 5 2.5 8.5 6M1.5 10 5 13.5 8.5 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
 export function Toggle({
   value,
   onChange,
+  label,
 }: {
   value: boolean;
   onChange: (v: boolean) => void;
+  // What VoiceOver reads; the visible label sits outside the button.
+  label?: string;
 }) {
   return (
     <button
       type="button"
+      role="switch"
       className={`toggle ${value ? "on" : ""}`}
       onClick={() => onChange(!value)}
-      aria-pressed={value}
+      aria-checked={value}
+      aria-label={label}
     />
   );
 }
