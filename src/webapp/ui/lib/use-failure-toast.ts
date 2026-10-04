@@ -9,14 +9,18 @@ const FAILURE_SHOWN_MS = 5000;
 
 // For actions that are not an autosave but fail the same way — a swiped-away
 // row the server refused to delete. `status` feeds `SaveStatus`; `fail` raises
-// it and it hides itself again.
-export function useFailureToast(): { status: SaveStatus; fail: () => void } {
-  const [status, setStatus] = useState<SaveStatus>("idle");
+// it and it hides itself again. Each failure is counted, so a second one while
+// the toast is up keeps it for the full time again instead of the remainder.
+export function useFailureToast(shownMs = FAILURE_SHOWN_MS): {
+  status: SaveStatus;
+  fail: () => void;
+} {
+  const [failure, setFailure] = useState<number | null>(null);
   useEffect(() => {
-    if (status !== "failed") return;
-    const timer = setTimeout(() => setStatus("idle"), FAILURE_SHOWN_MS);
+    if (failure === null) return;
+    const timer = setTimeout(() => setFailure(null), shownMs);
     return () => clearTimeout(timer);
-  }, [status]);
-  const fail = useCallback(() => setStatus("failed"), []);
-  return { status, fail };
+  }, [failure, shownMs]);
+  const fail = useCallback(() => setFailure((n) => (n ?? 0) + 1), []);
+  return { status: failure === null ? "idle" : "failed", fail };
 }
