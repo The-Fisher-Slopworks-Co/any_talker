@@ -51,3 +51,17 @@ export function checkToDraft(c: RecurringCheck): CheckDraft {
     enabled: c.enabled,
   };
 }
+
+// The schedule's time of day as the "HH:MM" a time input shows.
+export function formatClock(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+// The hour and minute a time input holds, or null while it is cleared.
+export function parseClock(
+  text: string,
+): { hour: number; minute: number } | null {
+  const m = /^(\d{2}):(\d{2})/.exec(text);
+  if (!m) return null;
+  return { hour: Number(m[1]), minute: Number(m[2]) };
+}

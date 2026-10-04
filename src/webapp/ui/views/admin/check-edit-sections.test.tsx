@@ -5,13 +5,22 @@ import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../../i18n-context";
 import { DEFAULT_DRAFT } from "./check-edit-form";
-import { QuestionSection, RecipientSection } from "./check-edit-sections";
+import {
+  QuestionSection,
+  RecipientSection,
+  ScheduleSection,
+} from "./check-edit-sections";
 
 function render(node: React.ReactNode): string {
   return renderToStaticMarkup(<I18nProvider lang="en">{node}</I18nProvider>);
 }
 
-const props = { draft: DEFAULT_DRAFT, set: () => {}, commit: () => {} };
+const props = {
+  draft: DEFAULT_DRAFT,
+  set: () => {},
+  setNow: () => {},
+  commit: () => {},
+};
 
 describe("check editor groups", () => {
   test("the title and the question share the Question card", () => {
@@ -29,5 +38,20 @@ describe("check editor groups", () => {
       expect(html).toContain(`>${label}<`);
     }
     expect(html).toContain("Replaces {name}");
+  });
+
+  test("the schedule is one time row, one timezone picker and a timeout in min", () => {
+    const html = render(<ScheduleSection {...props} />);
+    expect(html).toContain(">Schedule<");
+    // The app-formatted time is the visible text; the native input lies over it.
+    expect(html).toContain(">23:30</span>");
+    expect(html).toContain('type="time"');
+    expect(html).toContain("opacity-0");
+    // One pop-up for the zone, with no "automatic" choice.
+    expect(html.match(/<select/g)?.length).toBe(1);
+    expect(html).toContain('<option value="Europe/Moscow" selected="">');
+    expect(html).not.toContain("Automatic");
+    expect(html).toContain(">Timeout<");
+    expect(html).toContain(">min<");
   });
 });

@@ -73,17 +73,21 @@ export const checksMessages = {
     en: "Replaces {name}. Mentions the user in the question; plain text in replies.",
     ru: "Заменяет {name}. В вопросе — упоминание, в ответах — текст.",
   }),
+  ui_check_schedule_header: m({
+    en: "Schedule",
+    ru: "Расписание",
+  }),
   ui_check_schedule: m({
     en: "Time",
     ru: "Время",
   }),
-  ui_check_timezone: m({
-    en: "Timezone",
-    ru: "Часовой пояс",
-  }),
   ui_check_timeout: m({
-    en: "Timeout (minutes)",
-    ru: "Таймаут (минуты)",
+    en: "Timeout",
+    ru: "Таймаут",
+  }),
+  ui_check_timeout_unit: m({
+    en: "min",
+    ru: "мин",
   }),
   ui_check_timeout_footer: m({
     en: "No answer by then counts as No.",
