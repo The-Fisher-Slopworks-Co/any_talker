@@ -105,14 +105,6 @@ export const profileMessages = {
     en: "Reminders",
     ru: "Напоминания",
   }),
-  ui_main_my_reminders: m({
-    en: "My reminders",
-    ru: "Мои напоминания",
-  }),
-  ui_main_bot_config: m({
-    en: "Bot Configuration",
-    ru: "Настройки бота",
-  }),
   ui_main_admin_panel: m({
     en: "Admin panel",
     ru: "Админ-панель",
