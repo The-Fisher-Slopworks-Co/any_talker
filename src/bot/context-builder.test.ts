@@ -345,9 +345,11 @@ describe("buildContext", () => {
     ]);
   });
 
-  test("depth cap honored", async () => {
+  // No window: dropping the oldest turn on every new one would move the start
+  // of every request and cost the prompt cache the whole history.
+  test("replays the whole chain, however long", async () => {
     const storage = new MemoryStorage();
-    const depth = 25;
+    const depth = 60;
     let prevId: number | null = null;
     for (let i = 1; i <= depth; i++) {
       await storage.conversations.save("c1", i, {
@@ -372,11 +374,40 @@ describe("buildContext", () => {
         images: [],
       },
       images: [],
-      maxDepth: 5,
     });
-    // (5 user + 5 assistant) + 1 current user = 11
-    expect(msgs.length).toBe(11);
-    expect(msgs[0]).toEqual({ role: "user", content: `Q${depth - 4}` });
+    expect(msgs.length).toBe(depth * 2 + 1);
+    expect(msgs[0]).toEqual({ role: "user", content: "Q1" });
+  });
+
+  test("a parent pointer that loops back ends the walk", async () => {
+    const storage = new MemoryStorage();
+    for (const [id, parent] of [
+      [1, 2],
+      [2, 1],
+    ] as const) {
+      await storage.conversations.save("c1", id, {
+        userQuestion: `Q${id}`,
+        botAnswer: `A${id}`,
+        parentBotMsgId: parent,
+        ts: id,
+      });
+    }
+    const msgs = await buildContext({
+      sentAt: null,
+      storage,
+      chatId: "c1",
+      sender: SENDER,
+      userText: "next",
+      quote: null,
+      replyTarget: {
+        messageId: 2,
+        text: "A2",
+        authorFirstName: "Bot",
+        images: [],
+      },
+      images: [],
+    });
+    expect(msgs.length).toBe(5);
   });
 
   test("attachments describe media the parts alone don't explain (video frames)", async () => {

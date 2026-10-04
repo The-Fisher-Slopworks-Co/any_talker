@@ -145,10 +145,6 @@ export type UserThreadRef =
 // entry in full, so the cap is also the snapshot's own thread budget.
 export const USER_THREAD_INDEX_MAX = 5;
 
-// Cap on how far back the conversation graph is walked when building LLM
-// context. Longer chains burn tokens disproportionately and yield diminishing
-// returns; 20 turns is enough to cover virtually all real reply threads.
-export const MAX_REPLY_CHAIN_DEPTH = 20;
 // Stored conversation nodes expire after this many seconds of inactivity.
 // 30 days lets a user resume a long-running thread weeks later, while
 // bounding the storage footprint of abandoned threads.
