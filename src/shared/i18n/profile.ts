@@ -93,9 +93,29 @@ export const profileMessages = {
     en: "Russian",
     ru: "Русский",
   }),
-  ui_main_settings_footer: m({
-    en: "The AI sees your name, gender and timezone. Saved automatically.",
-    ru: "Имя, пол и часовой пояс видит ИИ. Сохраняется автоматически.",
+  ui_main_about_you: m({
+    en: "About You",
+    ru: "О вас",
+  }),
+  ui_main_about_footer: m({
+    en: "The AI uses these to address you correctly.",
+    ru: "Так ИИ знает, как к вам обращаться.",
+  }),
+  ui_main_gender_unset: m({
+    en: "Not set",
+    ru: "Не указан",
+  }),
+  ui_main_lang_region: m({
+    en: "Language & Region",
+    ru: "Язык и регион",
+  }),
+  ui_main_tz_auto: m({
+    en: "Automatic",
+    ru: "Автоматически",
+  }),
+  ui_main_region_footer: m({
+    en: "Automatic timezone: the AI uses the chat's, this app uses your device's.",
+    ru: "Автоматический пояс: ИИ берёт пояс чата, а приложение — пояс устройства.",
   }),
   ui_main_save_failed: m({
     en: "Couldn't save. Try again.",
