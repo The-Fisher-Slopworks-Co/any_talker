@@ -4,31 +4,37 @@
 import { useI18n } from "../i18n-context";
 import { useDateFmt } from "../datetime-context";
 import type { FeedbackSummary } from "../api-client";
+import { ActionRow } from "./controls";
 import { Card } from "./layout";
+import { NavRow } from "./select-row";
 import { EmptyState } from "./states";
-import { FEEDBACK_STATUS_KEY } from "../lib/labels";
+import { SwipeToDelete } from "./swipe-row";
+import { feedbackAuthor } from "../lib/labels";
 
-// The listing sends each text whole — up to Telegram's 4096 — and one long
-// report would push every other row off the screen.
-const PREVIEW_MAX_CHARS = 400;
+// The listing sends each text whole — up to Telegram's 4096 — and a row shows
+// one line of it; the rest is only weight in the page.
+const TITLE_MAX_CHARS = 200;
 
 export function FeedbackCard({
   entries,
-  busy,
   onOpen,
   onDelete,
+  onLoadMore,
+  loadingMore,
   emptyText,
 }: {
   entries: FeedbackSummary[];
-  // A request is in flight, so the deletes stay out of reach until it settles.
-  busy: boolean;
-  // Opens the detail view: the full text, the thread snapshots, the status.
+  // Opens the report: the full text, the thread snapshots, the status.
   onOpen: (id: string) => void;
-  onDelete: (id: string) => void;
+  // Rejecting slides the row back; telling the user is up to the caller.
+  onDelete: (id: string) => Promise<void>;
+  // Only while there is another page.
+  onLoadMore: (() => void) | undefined;
+  loadingMore: boolean;
   emptyText: string;
 }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
+  const { short } = useDateFmt();
 
   return (
     <Card>
@@ -36,50 +42,32 @@ export function FeedbackCard({
         <EmptyState>{emptyText}</EmptyState>
       ) : (
         entries.map((e) => (
-          <div
+          <SwipeToDelete
             key={e.id}
-            className="row relative flex flex-col gap-1 px-4 py-[11px]"
+            label={s.ui_feedback_delete}
+            onDelete={() => onDelete(e.id)}
           >
-            <div className="flex items-center justify-between gap-3">
-              <span className="shrink-0 text-base font-medium">
-                {format(e.createdAt)}
-              </span>
-              <span className="text-[13px] text-tg-hint truncate">
-                {s[FEEDBACK_STATUS_KEY[e.status]]}
-              </span>
-            </div>
-            <div className="text-[15px] whitespace-pre-wrap break-words">
-              {e.text.length > PREVIEW_MAX_CHARS
-                ? `${e.text.slice(0, PREVIEW_MAX_CHARS)}…`
-                : e.text}
-            </div>
-            {/* Counts rather than the snapshot, and either can be zero: the
-                threads a report copied expire with the conversation graph. */}
-            <div className="text-[13px] text-tg-hint break-all">
-              {`id ${e.userId} · ${s.ui_feedback_counts(e.threadCount, e.turnCount)}`}
-            </div>
-            {/* Two taps side by side rather than a clickable row: the row
-                already carries the delete, and a button inside a button is not
-                a thing. */}
-            <div className="flex gap-4">
-              <button
-                type="button"
-                className="bg-transparent border-0 p-0 text-left text-[13px] text-tg-link cursor-pointer"
-                onClick={() => onOpen(e.id)}
-              >
-                {s.ui_feedback_open}
-              </button>
-              <button
-                type="button"
-                className="bg-transparent border-0 p-0 text-left text-[13px] text-tg-destructive cursor-pointer disabled:opacity-50"
-                disabled={busy}
-                onClick={() => onDelete(e.id)}
-              >
-                {s.ui_remove}
-              </button>
-            </div>
-          </div>
+            <NavRow
+              title={e.text.slice(0, TITLE_MAX_CHARS)}
+              subtitle={[
+                feedbackAuthor(s, e),
+                short(e.createdAt),
+                // Either count can be zero: the threads a report copied expire
+                // with the conversation graph.
+                s.ui_feedback_thread_count(e.threadCount),
+              ].join(" · ")}
+              dotLabel={
+                e.status === "new" ? s.ui_feedback_status_new : undefined
+              }
+              onClick={() => onOpen(e.id)}
+            />
+          </SwipeToDelete>
         ))
+      )}
+      {onLoadMore && (
+        <ActionRow disabled={loadingMore} onClick={onLoadMore}>
+          {loadingMore ? s.ui_loading : s.ui_feedback_load_more}
+        </ActionRow>
       )}
     </Card>
   );

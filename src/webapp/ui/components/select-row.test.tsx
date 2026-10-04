@@ -85,6 +85,14 @@ describe("NavRow", () => {
     expect(html).toMatch(/<span class="[^"]*bg-tg-destructive[^"]*">3<\/span>/);
   });
 
+  test("shows a labelled dot before the chevron", () => {
+    const html = render({ dotLabel: "New" });
+    expect(html).toContain('role="img"');
+    expect(html).toContain('aria-label="New"');
+    expect(html.indexOf("rounded-full")).toBeLessThan(html.indexOf("<svg"));
+    expect(render({})).not.toContain("rounded-full");
+  });
+
   test("hides a zero badge and an absent value", () => {
     expect(render({ badge: 0 })).not.toContain("bg-tg-destructive");
     expect(render({})).not.toContain("<span");

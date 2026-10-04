@@ -58,16 +58,14 @@ export const feedbackMessages = {
     en: "Closed",
     ru: "Закрыт",
   }),
-  // How much of a snapshot came with the report, declined: a row reads as a
-  // phrase rather than two labels, and Russian gets all three of its forms.
-  ui_feedback_counts: m({
-    en: (n: number, turns: number) =>
-      `${pluralEn(n, "thread", "threads")} · ${pluralEn(turns, "turn", "turns")}`,
-    ru: (n: number, turns: number) =>
-      `${pluralRu(n, "диалог", "диалога", "диалогов")} · ${pluralRu(turns, "ход", "хода", "ходов")}`,
+  // How many threads came with the report, declined: Russian gets all three of
+  // its forms.
+  ui_feedback_thread_count: m({
+    en: (n: number) => pluralEn(n, "thread", "threads"),
+    ru: (n: number) => pluralRu(n, "диалог", "диалога", "диалогов"),
   }),
   ui_feedback_load_more: m({
-    en: "Load more",
+    en: "Load More",
     ru: "Показать ещё",
   }),
   ui_feedback_delete_confirm: m({
@@ -75,12 +73,18 @@ export const feedbackMessages = {
     ru: "Удалить отчёт и снимок диалогов?",
   }),
 
+  // The red action behind a swiped row.
+  ui_feedback_delete: m({
+    en: "Delete",
+    ru: "Удалить",
+  }),
+
   // The detail view a row opens into. Deliberately plain: the record's fields,
   // the snapshot as the JSON it is stored as, and the generation ids as links
   // out to openrouter.ai.
-  ui_feedback_open: m({
-    en: "Open",
-    ru: "Открыть",
+  ui_feedback_delete_report: m({
+    en: "Delete Report",
+    ru: "Удалить отчёт",
   }),
   ui_route_feedback: m({
     en: "Report",

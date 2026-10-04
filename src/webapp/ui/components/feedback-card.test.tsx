@@ -36,15 +36,20 @@ function entry(over: Partial<FeedbackSummary> = {}): FeedbackSummary {
   };
 }
 
-function render(entries: FeedbackSummary[], lang: "en" | "ru" = "en"): string {
+function render(
+  entries: FeedbackSummary[],
+  lang: "en" | "ru" = "en",
+  onLoadMore?: () => void,
+): string {
   return renderToStaticMarkup(
     <I18nProvider lang={lang}>
       <DateFmtProvider dateFormat="iso" timezone="UTC">
         <FeedbackCard
           entries={entries}
-          busy={false}
           onOpen={() => {}}
-          onDelete={() => {}}
+          onDelete={async () => {}}
+          onLoadMore={onLoadMore}
+          loadingMore={false}
           emptyText="No reports."
         />
       </DateFmtProvider>
@@ -53,41 +58,55 @@ function render(entries: FeedbackSummary[], lang: "en" | "ru" = "en"): string {
 }
 
 describe("FeedbackCard", () => {
-  test("shows what identifies a report without opening it", () => {
-    const html = render([entry()]);
+  test("a row is the text, then author, date and thread count", () => {
+    const html = render([entry({ authorName: "Sam Rivera" })]);
     expect(html).toContain("the bot answered in the wrong language");
-    expect(html).toContain("id u42");
-    expect(html).toContain("2 threads · 7 turns");
-    expect(html).toContain("New");
-    expect(html).toContain("2026-01-02");
+    expect(html).toContain("Sam Rivera · ");
+    expect(html).toContain("2026");
+    expect(html).toContain("· 2 threads");
+    expect(html).not.toContain("turns");
+  });
+
+  test("falls back from the name to the @username to the id", () => {
+    expect(render([entry({ authorUsername: "sam" })])).toContain("@sam · ");
+    expect(render([entry()])).toContain("id u42 · ");
+    expect(render([entry({ isGuest: true })])).toContain("id u42 · guest");
+  });
+
+  test("marks only new reports, with a label a screen reader can say", () => {
+    expect(render([entry()])).toContain('aria-label="New"');
+    expect(render([entry({ status: "closed" })])).not.toContain("aria-label");
+  });
+
+  test("swipes to a Delete action and has no inline links", () => {
+    const html = render([entry()]);
+    expect(html).toContain("Delete");
+    expect(html).not.toContain(">Open<");
+    expect(html).not.toContain(">Remove<");
   });
 
   // The list route sends the text whole, up to Telegram's 4096 characters, and
   // an empty snapshot (the copied threads expired) is a normal state.
-  test("cuts a long text down to a preview and survives an empty snapshot", () => {
+  test("cuts a long text and survives an empty snapshot and an empty list", () => {
     const long = render([entry({ text: "x".repeat(5000) })]);
-    expect(long).toContain("…");
     expect(long).not.toContain("x".repeat(500));
-    expect(render([entry({ threadCount: 0, turnCount: 0 })])).toContain(
-      "0 threads · 0 turns",
-    );
+    expect(render([entry({ threadCount: 0 })])).toContain("0 threads");
     expect(render([])).toContain("No reports.");
   });
 
-  test("takes its labels from the catalogue, not from English literals", () => {
-    const html = render([entry({ status: "closed" })], "ru");
-    expect(html).toContain("2 диалога · 7 ходов");
-    expect(html).toContain("Закрыт");
-    expect(html).toContain("Удалить");
+  test("offers Load More only when there is another page", () => {
+    expect(render([entry()])).not.toContain("Load More");
+    expect(render([entry()], "en", () => {})).toContain("Load More");
   });
 
-  // The counts are declined, and Russian spends three forms on them: the row
-  // must not settle for the one that happens to fit the fixture.
-  test("declines both counts, in either locale", () => {
-    const one = entry({ threadCount: 1, turnCount: 1 });
-    expect(render([one])).toContain("1 thread · 1 turn");
-    expect(render([one], "ru")).toContain("1 диалог · 1 ход");
-    const teens = entry({ threadCount: 11, turnCount: 21 });
-    expect(render([teens], "ru")).toContain("11 диалогов · 21 ход");
+  // Russian spends three forms on the thread count: the row must not settle
+  // for the one that happens to fit the fixture.
+  test("takes its words from the catalogue and declines the count", () => {
+    const html = render([entry({ threadCount: 2 })], "ru", () => {});
+    expect(html).toContain("2 диалога");
+    expect(html).toContain("Удалить");
+    expect(html).toContain("Показать ещё");
+    expect(render([entry({ threadCount: 11 })], "ru")).toContain("11 диалогов");
+    expect(render([entry({ threadCount: 1 })], "ru")).toContain("1 диалог");
   });
 });

@@ -11,6 +11,7 @@ import {
   SectionHeader,
   Stack,
 } from "../../components/layout";
+import { ActionRow } from "../../components/controls";
 import { LoadingState } from "../../components/states";
 import { SegmentedField } from "../../components/segmented-field";
 import { FeedbackThreads } from "../../components/feedback-threads";
@@ -30,7 +31,14 @@ function Field({ label, value }: { label: string; value: string }) {
 // it to a preview — and the thread snapshots as the JSON they are stored as,
 // each carrying the generation ids the turn ran on. Plus `status`, which the
 // list deliberately leaves here: closing a report is what reading it concludes.
-export function FeedbackView({ feedbackId }: { feedbackId: string }) {
+export function FeedbackView({
+  feedbackId,
+  onDeleted,
+}: {
+  feedbackId: string;
+  // The report is gone, so there is nothing left to show.
+  onDeleted: () => void;
+}) {
   const { t: s } = useI18n();
   const { format } = useDateFmt();
   const [entry, setEntry] = useState<FeedbackEntry | null>(null);
@@ -58,6 +66,20 @@ export function FeedbackView({ feedbackId }: { feedbackId: string }) {
     } catch {
       // Nothing was written; the segmented control stays on the stored value.
     } finally {
+      setBusy(false);
+    }
+  };
+
+  // A report holds the only copy of its thread snapshot, hence the confirm.
+  // The list's swipe is the quick way; this is the one that needs no gesture.
+  const remove = async () => {
+    if (busy || !confirm(s.ui_feedback_delete_confirm)) return;
+    setBusy(true);
+    try {
+      await api.deleteFeedback(feedbackId);
+      onDeleted();
+    } catch {
+      // Nothing was deleted; the report stays, one tap from a retry.
       setBusy(false);
     }
   };
@@ -140,6 +162,14 @@ export function FeedbackView({ feedbackId }: { feedbackId: string }) {
         </pre>
       </Card>
       <SectionFooter>{s.ui_feedback_prompt_footer}</SectionFooter>
+
+      <div className="section-gap">
+        <Card>
+          <ActionRow destructive disabled={busy} onClick={() => void remove()}>
+            {s.ui_feedback_delete_report}
+          </ActionRow>
+        </Card>
+      </div>
     </Stack>
   );
 }

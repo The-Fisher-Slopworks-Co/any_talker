@@ -176,7 +176,14 @@ function AppShell({
           />
         );
       case "feedback-view":
-        return <FeedbackView feedbackId={route.feedbackId} />;
+        return (
+          <FeedbackView
+            feedbackId={route.feedbackId}
+            onDeleted={() =>
+              setRoute({ kind: "admin-section", section: "feedback" })
+            }
+          />
+        );
       case "my-reminders":
         return (
           <RemindersList

@@ -4,11 +4,12 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api, type FeedbackStatus } from "../../api-client";
-import { Card, Stack } from "../../components/layout";
+import { Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { RowButton } from "../../components/controls";
+import { SaveStatus } from "../../components/save-status";
 import { SegmentedField } from "../../components/segmented-field";
 import { FeedbackCard } from "../../components/feedback-card";
+import { useFailureToast } from "../../lib/use-failure-toast";
 import { useLoadable } from "../../lib/use-loadable";
 import { useSessionState } from "../../lib/session-state";
 
@@ -25,7 +26,8 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
     "all",
     parseFilter,
   );
-  const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const { status, fail } = useFailureToast();
   const statusParam = filter === "all" ? {} : { status: filter };
   // A `nextCursor` and no total, so this pages by "load more" rather than by
   // numbered pages: a page is appended to what is already listed.
@@ -36,7 +38,7 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
 
   const loadMore = async () => {
     if (data === null || data.nextCursor === null) return;
-    setBusy(true);
+    setLoadingMore(true);
     try {
       const page = await api.listFeedback({
         ...statusParam,
@@ -46,27 +48,25 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
         entries: [...(prev?.entries ?? []), ...page.entries],
         nextCursor: page.nextCursor,
       }));
+    } catch {
+      // Nothing was added; Load More stays, one tap from a retry.
     } finally {
-      setBusy(false);
+      setLoadingMore(false);
     }
   };
 
-  // A report holds the only copy of its thread snapshot, so a confirmation
-  // stands in front of the delete, as it does in the check and bot editors.
+  // Rethrows, so the swiped row still slides back.
   const remove = async (id: string) => {
-    if (!confirm(s.ui_feedback_delete_confirm)) return;
-    setBusy(true);
     try {
       await api.deleteFeedback(id);
-      setData(
-        (prev) =>
-          prev && { ...prev, entries: prev.entries.filter((e) => e.id !== id) },
-      );
-    } catch {
-      // Nothing to undo — the row stays, one tap from a retry.
-    } finally {
-      setBusy(false);
+    } catch (e) {
+      fail();
+      throw e;
     }
+    setData(
+      (prev) =>
+        prev && { ...prev, entries: prev.entries.filter((e) => e.id !== id) },
+    );
   };
 
   return (
@@ -83,23 +83,20 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
       {data === null ? (
         <LoadingState />
       ) : (
-        <>
+        <div className="mt-4">
           <FeedbackCard
             entries={data.entries}
-            busy={busy}
+            loadingMore={loadingMore}
             onOpen={onOpen}
             onDelete={remove}
+            onLoadMore={
+              data.nextCursor === null ? undefined : () => void loadMore()
+            }
             emptyText={s.ui_feedback_empty}
           />
-          {data.nextCursor !== null && (
-            <Card>
-              <RowButton disabled={busy} onClick={() => void loadMore()}>
-                {busy ? s.ui_loading : s.ui_feedback_load_more}
-              </RowButton>
-            </Card>
-          )}
-        </>
+        </div>
       )}
+      <SaveStatus status={status} />
     </Stack>
   );
 }
