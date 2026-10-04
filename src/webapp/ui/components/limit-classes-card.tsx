@@ -1,105 +1,62 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { useI18n } from "../i18n-context";
-import { api } from "../api-client";
-import {
-  LIMIT_CLASSES,
-  type LimitClassesConfig,
-  type Settings,
-} from "../../../shared/types";
+import { LIMIT_CLASSES, type LimitClassesConfig } from "../../../shared/types";
+import type { SettingsPatch } from "../api-client/settings";
 import { Card, SectionFooter, SectionHeader } from "./layout";
-import { NumberInput, SaveButton } from "./controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { NumberRow } from "./number-row";
 
 // What each limit class raises; who is in a class is set on the user's page.
 export function LimitClassesCard({
-  settings,
-  onSaved,
+  classes,
+  save,
 }: {
-  settings: Settings;
-  onSaved: (s: Settings) => void;
+  classes: LimitClassesConfig;
+  save: (patch: SettingsPatch) => void;
 }) {
   const { t: s } = useI18n();
-  const [config, setConfig] = useState<LimitClassesConfig>(
-    settings.limitClasses,
-  );
-  const [saving, setSaving] = useState(false);
-  const dirty =
-    JSON.stringify(config) !== JSON.stringify(settings.limitClasses);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      onSaved(await api.putSettings({ limitClasses: config }));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <>
       {LIMIT_CLASSES.map((c) => (
         <Fragment key={c}>
           <SectionHeader>{s.ui_limit_class_name(c)}</SectionHeader>
           <Card>
-            <label className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>
-                {s.ui_limit_class_multiplier}
-              </span>
-              <NumberInput
-                className={INPUT_CLS}
-                step="0.1"
-                min={1}
-                value={config[c].limitMultiplier}
-                onChange={(n) =>
-                  setConfig({
-                    ...config,
-                    [c]: { ...config[c], limitMultiplier: n },
-                  })
-                }
-              />
-            </label>
-            <label className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>
-                {s.ui_limit_class_reminders}
-              </span>
-              <NumberInput
-                className={INPUT_CLS}
-                integer
-                min={1}
-                value={config[c].maxReminders}
-                onChange={(n) =>
-                  setConfig({
-                    ...config,
-                    [c]: { ...config[c], maxReminders: n },
-                  })
-                }
-              />
-            </label>
-            <label className={ROW_CLS}>
-              <span className={ROW_LABEL_CLS}>
-                {s.ui_limit_class_allowance}
-              </span>
-              <NumberInput
-                className={INPUT_CLS}
-                step="0.01"
-                min={0}
-                value={config[c].monthlyAllowanceUsd}
-                onChange={(n) =>
-                  setConfig({
-                    ...config,
-                    [c]: { ...config[c], monthlyAllowanceUsd: n },
-                  })
-                }
-              />
-            </label>
+            <NumberRow
+              label={s.ui_limit_class_multiplier}
+              prefix="×"
+              step="0.1"
+              min={1}
+              value={classes[c].limitMultiplier}
+              onCommit={(limitMultiplier) =>
+                save({ limitClasses: { [c]: { limitMultiplier } } })
+              }
+            />
+            <NumberRow
+              label={s.ui_limit_class_reminders}
+              integer
+              min={1}
+              value={classes[c].maxReminders}
+              onCommit={(maxReminders) =>
+                save({ limitClasses: { [c]: { maxReminders } } })
+              }
+            />
+            <NumberRow
+              label={s.ui_limit_class_allowance}
+              prefix="$"
+              decimals={2}
+              step="0.01"
+              min={0}
+              value={classes[c].monthlyAllowanceUsd}
+              onCommit={(monthlyAllowanceUsd) =>
+                save({ limitClasses: { [c]: { monthlyAllowanceUsd } } })
+              }
+            />
           </Card>
         </Fragment>
       ))}
       <SectionFooter>{s.ui_limit_classes_footer}</SectionFooter>
-      <SaveButton saving={saving} dirty={dirty} onClick={save} />
     </>
   );
 }

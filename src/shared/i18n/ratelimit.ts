@@ -6,20 +6,16 @@ import { m } from "./message";
 
 // Rate-limit settings and the viewer's own usage bars.
 export const rateLimitMessages = {
-  ui_ratelimit_limits: m({
-    en: "Limits",
-    ru: "Лимиты",
-  }),
   ui_ratelimit_5h_usd: m({
-    en: "5-hour limit ($)",
-    ru: "Лимит за 5 часов ($)",
+    en: "5-Hour Limit",
+    ru: "Лимит за 5 часов",
   }),
   ui_ratelimit_weekly_usd: m({
-    en: "Weekly limit ($)",
-    ru: "Недельный лимит ($)",
+    en: "Weekly Limit",
+    ru: "Недельный лимит",
   }),
   ui_ratelimit_owner_exempt: m({
-    en: "Owner exempt",
+    en: "Owner Exempt",
     ru: "Владелец без лимита",
   }),
   ui_ratelimit_footer: m({
@@ -122,16 +118,16 @@ export const rateLimitMessages = {
     ru: "Нет",
   }),
   ui_limit_class_multiplier: m({
-    en: "Limit multiplier",
+    en: "Limit Multiplier",
     ru: "Множитель лимитов",
   }),
   ui_limit_class_reminders: m({
-    en: "Reminder cap",
+    en: "Reminder Cap",
     ru: "Лимит напоминаний",
   }),
   ui_limit_class_allowance: m({
-    en: "Monthly allowance, $",
-    ru: "Запас на месяц, $",
+    en: "Monthly Allowance",
+    ru: "Запас на месяц",
   }),
   ui_limit_class_allowance_spent: m({
     en: "Allowance used this month",

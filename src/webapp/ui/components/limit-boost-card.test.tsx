@@ -8,17 +8,14 @@ import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
 import { DateFmtProvider } from "../datetime-context";
-import { DEFAULT_SETTINGS, type Settings } from "../../../shared/types";
+import type { Settings } from "../../../shared/types";
 import { LimitBoostCard } from "./limit-boost-card";
 
 function render(limitBoost: Settings["limitBoost"]): string {
   return renderToStaticMarkup(
     <I18nProvider lang="en">
       <DateFmtProvider dateFormat="iso" timezone="UTC">
-        <LimitBoostCard
-          settings={{ ...DEFAULT_SETTINGS, limitBoost }}
-          onSaved={() => {}}
-        />
+        <LimitBoostCard boost={limitBoost} save={() => {}} />
       </DateFmtProvider>
     </I18nProvider>,
   );

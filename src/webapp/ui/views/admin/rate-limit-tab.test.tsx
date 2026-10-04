@@ -22,10 +22,28 @@ function render(): string {
 }
 
 describe("RateLimitTab markup", () => {
+  test("autosaves: no save button, units inside the values", () => {
+    const html = render();
+    expect(html).not.toContain("Save");
+    for (const text of [
+      "5-Hour Limit",
+      "Weekly Limit",
+      "Owner Exempt",
+      "Limit promo",
+      "Level 1",
+      "Level 2",
+      "Limit Multiplier",
+      "Reminder Cap",
+      "Monthly Allowance",
+    ])
+      expect(html).toContain(text);
+    expect(html).toContain('role="switch"');
+    expect(html).toContain(">×<");
+    expect(html).not.toContain("($)");
+  });
+
   test("shows the limit settings without the admin's own usage", () => {
     const html = render();
-    expect(html).toContain("5-hour limit ($)");
-    expect(html).toContain("Limit promo");
     expect(html).not.toContain("My Usage");
     expect(html).not.toContain("Reset usage");
   });
