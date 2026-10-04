@@ -70,16 +70,16 @@ export const chatsMessages = {
     ru: "Переопределить глобально",
   }),
   ui_chat_system_prompt: m({
-    en: "System Prompt",
-    ru: "Системный промпт",
+    en: "Own System Prompt",
+    ru: "Свой системный промпт",
   }),
   ui_chat_system_prompt_off_footer: m({
     en: (chars: number) => `Global (${chars} chars).`,
     ru: (chars: number) => `Глобальный (${chars} симв.).`,
   }),
   ui_chat_models: m({
-    en: "Models",
-    ru: "Модели",
+    en: "Own Models",
+    ru: "Свои модели",
   }),
   // Footer for the per-chat fallback-chain field.
   ui_chat_models_off_footer: m({

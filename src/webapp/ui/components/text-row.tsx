@@ -4,10 +4,33 @@
 import { useEffect, useRef } from "react";
 import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
 
+// Autosaving text fields commit when left, and when the screen goes away with
+// text still pending (Telegram's back button fires no blur).
+function useCommitOnLeave(onCommit: () => void) {
+  const pending = useRef(false);
+  const latest = useRef(onCommit);
+  useEffect(() => {
+    latest.current = onCommit;
+  });
+  useEffect(
+    () => () => {
+      if (pending.current) latest.current();
+    },
+    [],
+  );
+  return {
+    typed: () => {
+      pending.current = true;
+    },
+    left: () => {
+      pending.current = false;
+      onCommit();
+    },
+  };
+}
+
 // A labelled row with a right-aligned text field that reports `onCommit` when
-// it is left or Enter is pressed, not on every keystroke. Leaving the screen
-// with the field still focused (Telegram's back button fires no blur) counts
-// as leaving the field.
+// it is left or Enter is pressed, not on every keystroke.
 export function TextRow({
   label,
   placeholder,
@@ -23,19 +46,7 @@ export function TextRow({
   onCommit: () => void;
   maxLength?: number | undefined;
 }) {
-  // Whether text was typed since the last commit.
-  const pending = useRef(false);
-  const latest = useRef(onCommit);
-  useEffect(() => {
-    latest.current = onCommit;
-  });
-  useEffect(
-    () => () => {
-      if (pending.current) latest.current();
-    },
-    [],
-  );
-
+  const { typed, left } = useCommitOnLeave(onCommit);
   return (
     <label className={ROW_CLS}>
       <span className={ROW_LABEL_CLS}>{label}</span>
@@ -45,17 +56,51 @@ export function TextRow({
         maxLength={maxLength}
         value={value}
         onChange={(e) => {
-          pending.current = true;
+          typed();
           onChange(e.target.value);
         }}
-        onBlur={() => {
-          pending.current = false;
-          onCommit();
-        }}
+        onBlur={left}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
         }}
       />
     </label>
+  );
+}
+
+// A multi-line text field as a row of a card (a prompt, a list of words),
+// committing like `TextRow` when it is left. `label` names it for screen
+// readers; there is no visible one, so the card's other rows give the context.
+export function AreaRow({
+  label,
+  placeholder,
+  value,
+  onChange,
+  onCommit,
+  minHeight = "min-h-[110px]",
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  // A Tailwind min-height class.
+  minHeight?: string;
+}) {
+  const { typed, left } = useCommitOnLeave(onCommit);
+  return (
+    <div className="row relative">
+      <textarea
+        aria-label={label}
+        className={`block w-full box-border resize-none border-0 bg-transparent px-4 py-3 text-base text-tg-text ${minHeight}`}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => {
+          typed();
+          onChange(e.target.value);
+        }}
+        onBlur={left}
+      />
+    </div>
   );
 }

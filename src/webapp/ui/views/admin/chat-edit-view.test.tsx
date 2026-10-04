@@ -147,3 +147,35 @@ describe("ChatEditView autosave", () => {
     await act(async () => root.unmount());
   });
 });
+
+describe("ChatEditView own models", () => {
+  test("turning Own Models off sends one record without models and stays off", async () => {
+    const { root, container, puts, answer } = await mount();
+    const toggle = () => container.querySelector('[aria-label="Own Models"]')!;
+    const click = async () => {
+      const key = Object.keys(toggle()).find((k) =>
+        k.startsWith("__reactProps"),
+      )!;
+      const props = (
+        toggle() as unknown as Record<string, { onClick: () => void }>
+      )[key]!;
+      await act(async () => props.onClick());
+    };
+    await click();
+    await answer(0, true);
+    expect(puts[0]!.settings.models).toBeDefined();
+    expect(toggle().getAttribute("aria-checked")).toBe("true");
+
+    await click();
+    await answer(1, true);
+    // Hiding the model list must not save it again behind the switch's back.
+    for (let i = 0; i < 10; i++)
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+    expect(puts).toHaveLength(2);
+    expect(puts[1]!.settings).not.toHaveProperty("models");
+    expect(toggle().getAttribute("aria-checked")).toBe("false");
+    await act(async () => root.unmount());
+  });
+});
