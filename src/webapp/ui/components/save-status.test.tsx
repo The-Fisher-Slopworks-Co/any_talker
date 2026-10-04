@@ -19,7 +19,7 @@ describe("SaveStatus", () => {
   // A line at the bottom of the form went unnoticed: the status is a toast
   // pinned to the top of the viewport, visible however far the form scrolls.
   test("is a toast pinned to the top of the viewport", () => {
-    const html = render("saving");
+    const html = render("failed");
     expect(html).toContain("fixed");
     expect(html).toContain("top-[");
   });
@@ -30,17 +30,20 @@ describe("SaveStatus", () => {
     expect(html).toContain("opacity-0");
   });
 
-  test("reports saving and saved", () => {
-    const saving = render("saving");
-    expect(saving).toContain("Saving…");
-    expect(saving).toContain('aria-hidden="false"');
-    expect(render("saved")).toContain("Saved");
+  // iOS Settings keep quiet while a change saves and once it has.
+  test("stays hidden while saving and once saved", () => {
+    for (const status of ["saving", "saved"] as const) {
+      const html = render(status);
+      expect(html).toContain('aria-hidden="true"');
+      expect(html).toContain("opacity-0");
+    }
   });
 
   // A rejected change must not pass silently: with no save button, this toast
   // is the only sign the value was not stored.
   test("flags a failed save as an error", () => {
     const html = render("failed");
+    expect(html).toContain('aria-hidden="false"');
     expect(html).toContain("Couldn&#x27;t save");
     expect(html).toContain("text-tg-destructive");
   });

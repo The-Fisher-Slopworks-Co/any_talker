@@ -6,9 +6,10 @@ import { useI18n } from "../i18n-context";
 import { api, type MeResponse } from "../api-client";
 import { composeFullName, type Gender } from "../../../shared/types";
 import { validateDisplayName } from "../../../shared/display-name";
-import { Card, SectionHeader, Stack } from "../components/layout";
-import { RowButton } from "../components/controls";
+import { Card, Stack } from "../components/layout";
 import { SaveStatus } from "../components/save-status";
+import { NavRow } from "../components/select-row";
+import { SettingsIcon } from "../components/settings-icon";
 import { GenderField } from "../components/gender-field";
 import { TimezoneField } from "../components/timezone-field";
 import {
@@ -126,25 +127,31 @@ export function MainView({
 
       <SaveStatus status={status} />
 
-      <SectionHeader>{s.ui_main_reminders}</SectionHeader>
-      <Card>
-        <RowButton onClick={onOpenMyReminders}>
-          {s.ui_main_my_reminders}
-        </RowButton>
-      </Card>
-
-      <SectionHeader>{s.ui_main_memory}</SectionHeader>
-      <Card>
-        <RowButton onClick={onOpenMyFacts}>{s.ui_main_my_facts}</RowButton>
-      </Card>
+      <div className="section-gap">
+        <Card>
+          <NavRow
+            title={s.ui_main_reminders}
+            icon={<SettingsIcon tint="orange" glyph="bell" />}
+            onClick={onOpenMyReminders}
+          />
+          <NavRow
+            title={s.ui_route_my_facts}
+            icon={<SettingsIcon tint="purple" glyph="memory" />}
+            onClick={onOpenMyFacts}
+          />
+        </Card>
+      </div>
 
       {me.isOwner && (
-        <>
-          <SectionHeader>{s.ui_main_bot_config}</SectionHeader>
+        <div className="section-gap">
           <Card>
-            <RowButton onClick={onOpenAdmin}>{s.ui_main_admin_panel}</RowButton>
+            <NavRow
+              title={s.ui_main_admin_panel}
+              icon={<SettingsIcon tint="gray" glyph="gear" />}
+              onClick={onOpenAdmin}
+            />
           </Card>
-        </>
+        </div>
       )}
     </Stack>
   );

@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
 import { useI18n } from "../i18n-context";
 import type { SaveStatus as Status } from "../lib/use-autosave";
-
-type Outcome = Exclude<Status, "idle">;
 
 // Centered at the top of the viewport; the Telegram safe-area insets push it
 // below the client's own header in fullscreen.
@@ -15,6 +12,7 @@ const TOAST_POSITION =
 
 const TOAST_LOOK =
   "rounded-full bg-tg-section px-4 py-2 text-[14px] font-medium " +
+  "text-tg-destructive " +
   "shadow-[0_2px_12px_rgb(0_0_0/0.18)]";
 
 // Shown: fully opaque in place. Hidden: faded out and nudged up, and not
@@ -26,38 +24,20 @@ function toastMotion(visible: boolean): string {
     : `${base} opacity-0 -translate-y-2 pointer-events-none`;
 }
 
-function toastTone(outcome: Outcome): string {
-  return outcome === "failed" ? "text-tg-destructive" : "text-tg-text";
-}
-
-// A small toast that reports the autosave, seen wherever the form is scrolled.
-// It stays mounted while idle and only fades out, keeping the last message so
-// the text does not blank out mid-fade.
+// A toast for a failed autosave, seen wherever the form is scrolled. Saving
+// and success stay silent, as in iOS Settings: a change simply sticks. It
+// stays mounted while hidden and only fades out.
 export function SaveStatus({ status }: { status: Status }) {
   const { t: s } = useI18n();
-  const [shown, setShown] = useState<Outcome>("saving");
-  if (status !== "idle" && status !== shown) setShown(status);
-  const visible = status !== "idle";
-
-  const message = {
-    saving: s.ui_saving,
-    saved: s.ui_saved,
-    failed: s.ui_main_save_failed,
-  }[shown];
-
+  const visible = status === "failed";
   return (
     <div
       role="status"
       aria-live="polite"
       aria-hidden={!visible}
-      className={[
-        TOAST_POSITION,
-        TOAST_LOOK,
-        toastMotion(visible),
-        toastTone(shown),
-      ].join(" ")}
+      className={[TOAST_POSITION, TOAST_LOOK, toastMotion(visible)].join(" ")}
     >
-      {message}
+      {s.ui_main_save_failed}
     </div>
   );
 }
