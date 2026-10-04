@@ -17,20 +17,12 @@ export const managedBotsMessages = {
     en: "New Bot",
     ru: "Новый бот",
   }),
-  ui_mbots_all: m({
-    en: "Your character bots",
-    ru: "Ваши боты-персонажи",
-  }),
-  ui_mbots_empty: m({
-    en: "No character bots yet.",
-    ru: "Пока нет ботов-персонажей.",
-  }),
   ui_mbots_footer: m({
     en: "Each character is a separate Telegram bot, answering only to /ask@its_username.",
     ru: "Каждый персонаж — отдельный Telegram-бот, отвечает только на /ask@его_username.",
   }),
   ui_mbots_create: m({
-    en: "New character bot",
+    en: "New Character Bot",
     ru: "Новый бот-персонаж",
   }),
   ui_mbots_running: m({

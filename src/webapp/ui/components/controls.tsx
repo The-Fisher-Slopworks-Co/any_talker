@@ -165,6 +165,40 @@ export function NumberInput({
   );
 }
 
+// What every action row of a card shares: it follows a `.row` or another action
+// with the hairline separator, and presses to the separator colour.
+export const ACTION_ROW_CLS =
+  "action-row relative flex w-full items-center gap-3 bg-tg-section border-0 px-4 py-[11px] min-h-11 text-left text-base cursor-pointer active:not-disabled:bg-[var(--tg-separator)] disabled:opacity-50 disabled:cursor-not-allowed";
+
+// An iOS action row: a left-aligned link-coloured label that runs something
+// rather than opening a screen. `bold` marks the primary one of a form (Create),
+// `destructive` the one that deletes or revokes. Sits in a card of its own or
+// as the last row of the card it acts on.
+export function ActionRow({
+  onClick,
+  disabled,
+  bold,
+  destructive,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  bold?: boolean;
+  destructive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${ACTION_ROW_CLS} ${destructive ? "text-tg-destructive" : "text-tg-link"} ${bold ? "font-semibold" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function RowButton({
   disabled,
   onClick,

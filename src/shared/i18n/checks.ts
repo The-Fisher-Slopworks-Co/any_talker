@@ -17,21 +17,9 @@ export const checksMessages = {
     en: "New Check",
     ru: "Новый чек",
   }),
-  ui_checks_all: m({
-    en: "Recurring Checks",
-    ru: "Циклические чеки",
-  }),
-  ui_checks_empty: m({
-    en: "No checks yet.",
-    ru: "Чеков пока нет.",
-  }),
   ui_checks_footer: m({
     en: "Daily question; no answer counts as No.",
     ru: "Ежедневный вопрос; нет ответа — это «Нет».",
-  }),
-  ui_checks_create: m({
-    en: "New check",
-    ru: "Новый чек",
   }),
   ui_checks_enabled: m({
     en: "Enabled",
@@ -40,10 +28,6 @@ export const checksMessages = {
   ui_checks_disabled: m({
     en: "Paused",
     ru: "Пауза",
-  }),
-  ui_checks_paused_marker: m({
-    en: "paused",
-    ru: "пауза",
   }),
   ui_checks_status: m({
     en: "Status",

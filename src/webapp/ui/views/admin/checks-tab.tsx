@@ -22,20 +22,18 @@ export function ChecksTab({
   return (
     <ListTab
       items={checks}
-      header={s.ui_checks_all}
-      empty={s.ui_checks_empty}
       footer={s.ui_checks_footer}
-      createLabel={s.ui_checks_create}
+      createLabel={s.ui_route_check_create}
       onEdit={onEdit}
       onCreate={onCreate}
       renderRow={(c) => {
         const hh = String(c.scheduleHour).padStart(2, "0");
         const mm = String(c.scheduleMinute).padStart(2, "0");
-        const status = c.enabled ? "" : ` · ${s.ui_checks_paused_marker}`;
         return {
           id: c.id,
           title: c.title,
-          subtitle: `${hh}:${mm} · ${c.timezone}${status}`,
+          subtitle: `${hh}:${mm} · ${c.timezone}`,
+          ...(c.enabled ? {} : { value: s.ui_checks_disabled }),
         };
       }}
     />
