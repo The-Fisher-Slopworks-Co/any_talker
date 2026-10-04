@@ -26,6 +26,7 @@ import { EmptyState, LoadingState } from "../components/states";
 import { RowButton } from "../components/controls";
 import { NavRow, SelectRow } from "../components/select-row";
 import { INPUT_LEFT_CLS, ROW_CLS } from "../components/row";
+import { useBackButton } from "../lib/back-button";
 import { useLoadable } from "../lib/use-loadable";
 import { parseString, useSessionState } from "../lib/session-state";
 import { botLabel, FACT_ERR_KEY } from "../lib/labels";
@@ -141,6 +142,11 @@ function FactSheet({
     setTimeout(then, SHEET_MS);
   }, []);
   const cancel = useCallback(() => dismiss(onCancel), [dismiss, onCancel]);
+
+  // Telegram's back button, and Android's back gesture with it, closes the
+  // sheet instead of leaving the screen under it. While a save is in flight
+  // or the sheet is already sliding away, back does nothing at all.
+  useBackButton(busy || closing ? () => {} : cancel);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
