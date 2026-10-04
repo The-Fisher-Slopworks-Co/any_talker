@@ -41,6 +41,10 @@ export const checksMessages = {
     en: "e.g. Sport for Nikita",
     ru: "напр. Спорт для Никиты",
   }),
+  ui_check_recipient: m({
+    en: "Recipient",
+    ru: "Получатель",
+  }),
   ui_check_chat_id: m({
     en: "Chat ID",
     ru: "ID чата",
@@ -49,24 +53,16 @@ export const checksMessages = {
     en: "-100123456789",
     ru: "-100123456789",
   }),
-  ui_check_chat_id_footer: m({
-    en: "Where the question is posted. Supergroups start with -100.",
-    ru: "Куда отправляется вопрос. У супергрупп начинается с -100.",
-  }),
   ui_check_target_user_id: m({
-    en: "Target user ID",
+    en: "User ID",
     ru: "ID пользователя",
   }),
   ui_check_target_user_id_placeholder: m({
     en: "123456789",
     ru: "123456789",
   }),
-  ui_check_target_user_id_footer: m({
-    en: "Only this user's answers count.",
-    ru: "Засчитываются только ответы этого пользователя.",
-  }),
   ui_check_target_name: m({
-    en: "Name shown",
+    en: "Name Shown",
     ru: "Имя в сообщениях",
   }),
   ui_check_target_name_placeholder: m({

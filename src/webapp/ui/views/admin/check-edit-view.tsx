@@ -20,9 +20,8 @@ import {
   QuestionSection,
   RepliesSection,
   ScheduleSection,
-  TargetSection,
+  RecipientSection,
   TimezoneSection,
-  TitleSection,
 } from "./check-edit-sections";
 
 export function CheckEditView({
@@ -40,6 +39,8 @@ export function CheckEditView({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, set, resetDraft] = useFormReducer(DEFAULT_DRAFT);
+  // The Save button saves the whole form until it autosaves.
+  const commit = () => {};
 
   useEffect(() => {
     if (isNew) {
@@ -91,17 +92,16 @@ export function CheckEditView({
 
   return (
     <Stack>
-      <TitleSection draft={draft} set={set} />
-      <TargetSection draft={draft} set={set} />
-      <ScheduleSection draft={draft} set={set} />
-      <TimezoneSection draft={draft} set={set} />
-      <QuestionSection draft={draft} set={set} />
-      <ButtonsSection draft={draft} set={set} />
-      <RepliesSection draft={draft} set={set} />
-      <CounterSourceSection draft={draft} set={set} />
-      <CounterValueSection draft={draft} set={set} />
-      <CounterModeSection draft={draft} set={set} />
-      <EnabledSection draft={draft} set={set} />
+      <QuestionSection draft={draft} set={set} commit={commit} />
+      <RecipientSection draft={draft} set={set} commit={commit} />
+      <ScheduleSection draft={draft} set={set} commit={commit} />
+      <TimezoneSection draft={draft} set={set} commit={commit} />
+      <ButtonsSection draft={draft} set={set} commit={commit} />
+      <RepliesSection draft={draft} set={set} commit={commit} />
+      <CounterSourceSection draft={draft} set={set} commit={commit} />
+      <CounterValueSection draft={draft} set={set} commit={commit} />
+      <CounterModeSection draft={draft} set={set} commit={commit} />
+      <EnabledSection draft={draft} set={set} commit={commit} />
 
       {check && <CheckStatusCard check={check} />}
 

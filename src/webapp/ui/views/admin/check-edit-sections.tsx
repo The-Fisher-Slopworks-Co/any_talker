@@ -9,6 +9,7 @@ import { localDateString } from "../../../../shared/tz";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
 import { NumberInput, Toggle } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
+import { AreaRow, TextRow } from "../../components/text-row";
 import { TimezoneSelect } from "../../components/timezone-select";
 import {
   INPUT_CLS,
@@ -24,64 +25,69 @@ const TEXTAREA_CLS =
 const CLOCK_INPUT_CLS =
   "w-12 bg-transparent border-0 p-0 text-base text-tg-text text-right";
 
-// Every section edits the one draft through the one setter.
-type SectionProps = { draft: CheckDraft; set: FormSetter<CheckDraft> };
+// Every section edits the one draft through the one setter; `commit` is what a
+// text field does when it is left.
+type SectionProps = {
+  draft: CheckDraft;
+  set: FormSetter<CheckDraft>;
+  commit: () => void;
+};
 
-export function TitleSection({ draft, set }: SectionProps) {
+export function QuestionSection({ draft, set, commit }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_check_title}</SectionHeader>
+      <SectionHeader>{s.ui_check_question}</SectionHeader>
       <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_title}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_title_placeholder}
-            value={draft.title}
-            onChange={(e) => set("title", e.target.value)}
-            maxLength={120}
-          />
-        </label>
+        <TextRow
+          label={s.ui_check_title}
+          placeholder={s.ui_check_title_placeholder}
+          value={draft.title}
+          onChange={(v) => set("title", v)}
+          onCommit={commit}
+          maxLength={120}
+        />
+        <AreaRow
+          label={s.ui_check_question}
+          placeholder={s.ui_check_question_placeholder}
+          value={draft.question}
+          onChange={(v) => set("question", v)}
+          onCommit={commit}
+        />
       </Card>
+      <SectionFooter>{s.ui_check_question_footer}</SectionFooter>
     </>
   );
 }
 
-export function TargetSection({ draft, set }: SectionProps) {
+export function RecipientSection({ draft, set, commit }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_check_chat_id}</SectionHeader>
+      <SectionHeader>{s.ui_check_recipient}</SectionHeader>
       <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_chat_id}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_chat_id_placeholder}
-            value={draft.chatId}
-            onChange={(e) => set("chatId", e.target.value)}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_target_user_id}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_target_user_id_placeholder}
-            value={draft.targetUserId}
-            onChange={(e) => set("targetUserId", e.target.value)}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_target_name}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_check_target_name_placeholder}
-            value={draft.targetName}
-            onChange={(e) => set("targetName", e.target.value)}
-            maxLength={64}
-          />
-        </label>
+        <TextRow
+          label={s.ui_check_chat_id}
+          placeholder={s.ui_check_chat_id_placeholder}
+          value={draft.chatId}
+          onChange={(v) => set("chatId", v)}
+          onCommit={commit}
+        />
+        <TextRow
+          label={s.ui_check_target_user_id}
+          placeholder={s.ui_check_target_user_id_placeholder}
+          value={draft.targetUserId}
+          onChange={(v) => set("targetUserId", v)}
+          onCommit={commit}
+        />
+        <TextRow
+          label={s.ui_check_target_name}
+          placeholder={s.ui_check_target_name_placeholder}
+          value={draft.targetName}
+          onChange={(v) => set("targetName", v)}
+          onCommit={commit}
+          maxLength={64}
+        />
       </Card>
       <SectionFooter>{s.ui_check_target_name_footer}</SectionFooter>
     </>
@@ -140,24 +146,6 @@ export function TimezoneSection({ draft, set }: SectionProps) {
         value={draft.timezone}
         onChange={(tz) => set("timezone", tz)}
       />
-    </>
-  );
-}
-
-export function QuestionSection({ draft, set }: SectionProps) {
-  const { t: s } = useI18n();
-  return (
-    <>
-      <SectionHeader>{s.ui_check_question}</SectionHeader>
-      <Card>
-        <textarea
-          className={TEXTAREA_CLS}
-          placeholder={s.ui_check_question_placeholder}
-          value={draft.question}
-          onChange={(e) => set("question", e.target.value)}
-        />
-      </Card>
-      <SectionFooter>{s.ui_check_question_footer}</SectionFooter>
     </>
   );
 }
