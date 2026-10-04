@@ -52,7 +52,7 @@ export function supportsCaching(m: ModelInfo): boolean | undefined {
   return m.capabilities?.caching;
 }
 
-// Pricing is USD per token; render as "$X.XX / 1M". Returns null when unpriced.
+// Pricing is USD per token; render as "$3/M". Returns null when unpriced.
 export function formatPricePerMillion(
   pricePerToken: number | undefined,
 ): string | null {
@@ -61,7 +61,7 @@ export function formatPricePerMillion(
   }
   if (pricePerToken === 0) return "Free";
   const perMillion = pricePerToken * 1_000_000;
-  if (perMillion >= 1) return `$${perMillion.toFixed(2)} / 1M`;
-  if (perMillion >= 0.01) return `$${perMillion.toFixed(3)} / 1M`;
-  return `$${perMillion.toFixed(4)} / 1M`;
+  // Cents for dollars, more places the cheaper it gets; no trailing zeros.
+  const places = perMillion >= 1 ? 2 : perMillion >= 0.01 ? 3 : 4;
+  return `$${Number(perMillion.toFixed(places))}/M`;
 }

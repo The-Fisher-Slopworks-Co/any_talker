@@ -45,7 +45,10 @@ export const promptMessages = {
     en: "Collapse Replies Over",
     ru: "Сворачивать ответы длиннее",
   }),
-  // Footer for the fallback-chain field.
+  ui_prompt_models_footer: m({
+    en: "Tried in order. Changes are saved once every row matches a listed model.",
+    ru: "Пробуются по порядку. Изменения сохраняются, когда все модели есть в списке.",
+  }),
   ui_prompt_provider_routing: m({
     en: "Routing",
     ru: "Маршрутизация",
@@ -67,15 +70,15 @@ export const promptMessages = {
     ru: "Этой модели нет в списке моделей OpenRouter.",
   }),
   ui_models_fallback_n: m({
-    en: (n: number) => `#${n}`,
-    ru: (n: number) => `#${n}`,
+    en: (n: number) => `${n}`,
+    ru: (n: number) => `${n}`,
   }),
-  ui_models_remove_fallback: m({
-    en: "Remove fallback",
-    ru: "Удалить запасную",
+  ui_models_delete_fallback: m({
+    en: "Delete",
+    ru: "Удалить",
   }),
   ui_models_add_fallback: m({
-    en: "Add fallback",
+    en: "Add Fallback",
     ru: "Добавить запасную",
   }),
   ui_sort_label: m({
@@ -177,10 +180,6 @@ export const promptMessages = {
   ui_modelinfo_image: m({
     en: "Image",
     ru: "Изображение",
-  }),
-  ui_modelinfo_modalities: m({
-    en: "Modalities",
-    ru: "Модальности",
   }),
   ui_modelinfo_tools: m({
     en: "Tools",

@@ -45,7 +45,7 @@ describe("ModelsCard markup", () => {
       <ModelsCard models={["a", "b", "c"]} onChange={() => {}} />,
     );
     expect((html.match(/<input/g) ?? []).length).toBe(1);
-    expect(html).not.toContain("Add fallback");
+    expect(html).not.toContain("Add Fallback");
   });
 
   test("renders every row plus the add control when fallback is on", () => {
@@ -53,9 +53,9 @@ describe("ModelsCard markup", () => {
       <ModelsCard models={["a", "b"]} onChange={() => {}} fallback />,
     );
     expect((html.match(/<input/g) ?? []).length).toBe(2);
-    expect(html).toContain("Add fallback");
-    expect(html).toContain("#1");
-    expect(html).toContain("#2");
+    expect(html).toContain("Add Fallback");
+    expect(html).toContain(">1</span>");
+    expect(html).toContain(">2</span>");
   });
 
   // styles.css draws row separators with `.row + .row` / `.row + .action-row`,
@@ -69,17 +69,26 @@ describe("ModelsCard markup", () => {
     expect(html).not.toMatch(/<datalist[\s\S]*action-row/);
   });
 
-  test("indents a row's detail block to line up with its input", () => {
+  test("the primary row is fixed, every fallback can be swiped away", () => {
+    const html = render(
+      <ModelsCard models={["a", "b", "c"]} onChange={() => {}} fallback />,
+    );
+    expect((html.match(/swipe-row/g) ?? []).length).toBe(2);
+    expect(html.indexOf("swipe-row")).toBeGreaterThan(
+      html.indexOf('value="a"'),
+    );
+    expect(html).toContain(">Delete</button>");
+    expect(html).not.toContain("Remove");
+  });
+
+  test("the details line up under the input, not under the marker", () => {
     const withChain = render(
       <ModelsCard models={["a"]} onChange={() => {}} fallback />,
     );
-    // The `#N` marker plus its gap offsets the input by 36px; the detail text
-    // below has to clear the same distance or it reads as a second column.
-    expect(withChain).toContain("pl-[36px]");
-
+    expect(withChain).toContain("grid-cols-[14px_1fr]");
     const single = render(<ModelsCard models={["a"]} onChange={() => {}} />);
-    // No marker without a chain, so no indent to match.
-    expect(single).not.toContain("pl-[36px]");
+    expect(single).not.toContain("grid-cols-[14px_1fr]");
+    expect(single).not.toContain("swipe-row");
   });
 
   test("shows the invalid-model warning only once a catalogue can judge", () => {
