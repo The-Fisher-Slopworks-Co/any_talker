@@ -17,10 +17,6 @@ export const commonMessages = {
     en: "Save",
     ru: "Сохранить",
   }),
-  ui_saved: m({
-    en: "Saved",
-    ru: "Сохранено",
-  }),
   ui_remove: m({
     en: "Remove",
     ru: "Удалить",

@@ -2,7 +2,6 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { ReactNode } from "react";
-import { useI18n } from "../i18n-context";
 
 // The SF Symbol `chevron.up.chevron.down` iOS puts after a pop-up value.
 export function SelectChevron() {
@@ -46,47 +45,6 @@ export function Toggle({
       aria-label={label}
       disabled={disabled}
     />
-  );
-}
-
-function PrimaryButton({
-  disabled,
-  onClick,
-  children,
-}: {
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="action mt-4">
-      <button
-        className="w-full bg-tg-button text-tg-button-text rounded-xl py-[14px] text-base font-semibold cursor-pointer transition-opacity active:not-disabled:opacity-75 disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={disabled}
-        onClick={onClick}
-      >
-        {children}
-      </button>
-    </div>
-  );
-}
-
-export function SaveButton({
-  saving,
-  dirty,
-  disabled,
-  onClick,
-}: {
-  saving: boolean;
-  dirty: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  const { t: s } = useI18n();
-  return (
-    <PrimaryButton disabled={disabled ?? (saving || !dirty)} onClick={onClick}>
-      {saving ? s.ui_saving : dirty ? s.ui_save : s.ui_saved}
-    </PrimaryButton>
   );
 }
 

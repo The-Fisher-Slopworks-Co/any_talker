@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import type { RecurringCheck } from "../../../../checks/types";
+import type { RecurringCheck, ValidationError } from "../../../../checks/types";
 import { Card, SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { ActionRow, SaveButton } from "../../components/controls";
-import { useFormReducer } from "../../lib/use-form-reducer";
-import { checkToDraft, DEFAULT_DRAFT } from "./check-edit-form";
+import { ActionRow } from "../../components/controls";
+import { SaveStatus } from "../../components/save-status";
+import { useAutosave } from "../../lib/use-autosave";
+import { useFormReducer, type FormSetter } from "../../lib/use-form-reducer";
+import {
+  checkToDraft,
+  DEFAULT_DRAFT,
+  planSave,
+  revertDraft,
+  type CheckDraft,
+} from "./check-edit-form";
 import {
   ButtonsSection,
   CheckStatusCard,
@@ -32,45 +40,99 @@ export function CheckEditView({
   const isNew = checkId === null;
   const [check, setCheck] = useState<RecurringCheck | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [draft, set, resetDraft] = useFormReducer(DEFAULT_DRAFT);
+  // The form's first field the server would refuse.
+  const [error, setError] = useState<ValidationError | null>(null);
+  const [draft, , resetDraft] = useFormReducer(DEFAULT_DRAFT);
+
+  // The form as the last edit left it, ahead of what has rendered, so edits
+  // made in the same event (a time's hour and minute) build on each other.
+  const latest = useRef(draft);
+  const apply = useCallback(
+    (next: CheckDraft) => {
+      latest.current = next;
+      resetDraft(next);
+    },
+    [resetDraft],
+  );
+  const queued = useRef(false);
+  // The form last sent: changes are compared with it, not with the server's
+  // reply, which can be behind (on, then off again before the first reply).
+  const lastSent = useRef<CheckDraft | null>(null);
+
+  // A saved check saves itself: each change sends the whole form, one request
+  // at a time. A new one is created by its Create row, through the same queue.
+  const { save, flush, status } = useAutosave<CheckDraft, RecurringCheck>({
+    send: async (payload) =>
+      (check
+        ? await api.updateCheck(check.id, payload)
+        : await api.createCheck(payload)
+      ).check,
+    onSaved: (saved) => {
+      if (!check) return onClose();
+      setCheck(saved);
+    },
+    onFailed: (failed) => {
+      lastSent.current = null;
+      if (check)
+        apply(revertDraft(latest.current, checkToDraft(check), failed));
+    },
+  });
 
   useEffect(() => {
+    lastSent.current = null;
     if (isNew) {
       setCheck(null);
-      resetDraft(DEFAULT_DRAFT);
+      apply(DEFAULT_DRAFT);
       return;
     }
     api
       .getCheck(checkId)
       .then((r) => {
         setCheck(r.check);
-        resetDraft(checkToDraft(r.check));
+        apply(checkToDraft(r.check));
       })
       .catch(() => setNotFound(true));
-  }, [checkId, isNew, resetDraft]);
+  }, [checkId, isNew, apply]);
 
   if (notFound) return <LoadingState text={s.ui_check_not_found} />;
   if (!isNew && !check) return <LoadingState />;
 
-  const submit = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      if (isNew) {
-        await api.createCheck(draft);
-      } else if (check) {
-        await api.updateCheck(check.id, draft);
-      }
-      onClose();
-    } catch (err) {
-      const code = (err as { code?: string | null }).code ?? null;
-      setError(code ?? "save_failed");
-    } finally {
-      setSaving(false);
+  // Validates and sends the form, once after the edits of one event.
+  const run = () => {
+    queued.current = false;
+    if (!check) {
+      // Nothing is saved until Create; an error shown clears once fixed.
+      if (error) setError(planSave(latest.current, null).error);
+      return;
     }
+    const plan = planSave(
+      latest.current,
+      lastSent.current ?? checkToDraft(check),
+    );
+    apply(plan.draft);
+    setError(plan.error);
+    if (plan.payload) {
+      lastSent.current = plan.payload;
+      save(plan.payload);
+    }
+  };
+  const commit = () => {
+    if (queued.current) return;
+    queued.current = true;
+    queueMicrotask(run);
+  };
+  const set: FormSetter<CheckDraft> = (key, value) =>
+    apply({ ...latest.current, [key]: value });
+  const setNow: FormSetter<CheckDraft> = (key, value) => {
+    set(key, value);
+    commit();
+  };
+
+  const create = () => {
+    const plan = planSave(latest.current, null);
+    setError(plan.error);
+    if (plan.payload) save(plan.payload);
   };
 
   const remove = async () => {
@@ -78,6 +140,8 @@ export function CheckEditView({
     if (!confirm(s.ui_check_delete_confirm)) return;
     setDeleting(true);
     try {
+      // A save still on its way must land first, or it could undo the delete.
+      await flush();
       await api.deleteCheck(check.id);
       onClose();
     } catch {
@@ -85,8 +149,7 @@ export function CheckEditView({
     }
   };
 
-  // The Save button saves the whole form until it autosaves.
-  const sectionProps = { draft, set, setNow: set, commit: () => {} };
+  const sectionProps = { draft, set, setNow, commit };
   return (
     <Stack>
       <EnabledSection {...sectionProps} />
@@ -98,26 +161,29 @@ export function CheckEditView({
       <CounterSection {...sectionProps} />
 
       {check && <CheckStatusCard check={check} />}
-
+      <SaveStatus status={status} />
       {error && (
-        <SectionFooter>{s.ui_check_save_validation_error(error)}</SectionFooter>
+        <SectionFooter>
+          <span className="text-tg-destructive">
+            {s.ui_check_save_validation_error(error)}
+          </span>
+        </SectionFooter>
       )}
 
-      <SaveButton
-        saving={saving}
-        dirty={true}
-        disabled={saving || deleting}
-        onClick={submit}
-      />
+      {!check && (
+        <div className="section-gap">
+          <Card>
+            <ActionRow bold disabled={status === "saving"} onClick={create}>
+              {s.ui_check_create}
+            </ActionRow>
+          </Card>
+        </div>
+      )}
 
       {check && (
         <div className="section-gap">
           <Card>
-            <ActionRow
-              destructive
-              disabled={saving || deleting}
-              onClick={remove}
-            >
+            <ActionRow destructive disabled={deleting} onClick={remove}>
               {s.ui_check_delete}
             </ActionRow>
           </Card>
