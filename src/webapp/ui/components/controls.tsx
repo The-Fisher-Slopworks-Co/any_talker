@@ -29,20 +29,23 @@ export function Toggle({
   value,
   onChange,
   label,
+  disabled,
 }: {
   value: boolean;
   onChange: (v: boolean) => void;
   // What VoiceOver reads; the visible label sits outside the button.
   label?: string;
+  disabled?: boolean | undefined;
 }) {
   return (
     <button
       type="button"
       role="switch"
-      className={`toggle ${value ? "on" : ""}`}
+      className={`toggle ${value ? "on" : ""} disabled:opacity-50 disabled:cursor-not-allowed`}
       onClick={() => onChange(!value)}
       aria-checked={value}
       aria-label={label}
+      disabled={disabled}
     />
   );
 }
