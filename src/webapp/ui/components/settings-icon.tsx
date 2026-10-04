@@ -96,7 +96,7 @@ export const GLYPHS = {
   shieldCheck: (
     <Glyph>
       <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" fill="#fff" />
-      <path d="M8.8 12l2.3 2.3 4.3-4.6" stroke="#007aff" strokeWidth="2.2" />
+      <path d="M8.8 12l2.3 2.3 4.3-4.6" stroke={TINTS.blue} strokeWidth="2.2" />
     </Glyph>
   ),
   bubbles: (
@@ -111,8 +111,8 @@ export const GLYPHS = {
   warning: (
     <Glyph>
       <path d="M12 3.5L21 19H3z" fill="#fff" />
-      <path d="M12 9.5v4" stroke="#ff3b30" strokeWidth="2.2" />
-      <circle cx="12" cy="16.3" r=".6" fill="#ff3b30" stroke="#ff3b30" />
+      <path d="M12 9.5v4" stroke={TINTS.red} strokeWidth="2.2" />
+      <circle cx="12" cy="16.3" r=".6" fill={TINTS.red} stroke={TINTS.red} />
     </Glyph>
   ),
   checkmark: (
@@ -131,7 +131,7 @@ export const GLYPHS = {
         fill="#fff"
         stroke="none"
       />
-      <path d="M4 7l8 6 8-6" stroke="#ff2d55" />
+      <path d="M4 7l8 6 8-6" stroke={TINTS.pink} />
     </Glyph>
   ),
   key: (
