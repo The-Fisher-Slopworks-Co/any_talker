@@ -147,8 +147,8 @@ export const feedbackMessages = {
     ru: "Сообщения нет в снимке: его диалог истёк.",
   }),
   ui_feedback_pointed_here: m({
-    en: "pointed at",
-    ru: "указан",
+    en: "Pointed At",
+    ru: "Указан",
   }),
   ui_feedback_status_header: m({
     en: "Status",
@@ -171,28 +171,29 @@ export const feedbackMessages = {
     ru: "Диалогов нет: они истекли.",
   }),
   ui_feedback_thread_chain: m({
-    en: "chain",
-    ru: "цепочка",
+    en: "Chain",
+    ru: "Цепочка",
   }),
   ui_feedback_thread_guest: m({
-    en: "guest",
-    ru: "гостевой",
+    en: "Guest",
+    ru: "Гостевой",
   }),
+  // `chat` is the chat's title, or its id when the directory has no title.
   ui_feedback_thread_meta: m({
-    en: (index: number, chatId: string, turns: number) =>
-      `#${index} · chat ${chatId} · turns: ${turns}`,
-    ru: (index: number, chatId: string, turns: number) =>
-      `#${index} · чат ${chatId} · ходов: ${turns}`,
+    en: (index: number, chat: string, turns: number) =>
+      `#${index} · ${chat} · ${pluralEn(turns, "turn", "turns")}`,
+    ru: (index: number, chat: string, turns: number) =>
+      `#${index} · ${chat} · ${pluralRu(turns, "ход", "хода", "ходов")}`,
   }),
   ui_feedback_gens: m({
-    en: "Generations:",
-    ru: "Генерации:",
+    en: "Generations",
+    ru: "Генерации",
   }),
   // Turns written before run metadata existed, and turns that never reached the
   // model, carry no ids.
   ui_feedback_gens_empty: m({
-    en: "no generation ids",
-    ru: "нет id генераций",
+    en: "None",
+    ru: "Нет",
   }),
   ui_feedback_prompt_header: m({
     en: "System prompt",

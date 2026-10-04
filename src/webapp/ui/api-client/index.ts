@@ -51,7 +51,10 @@ export type {
   ThreadSnapshot,
   ThreadSnapshotTurn,
 } from "../../../shared/types/feedback";
-export type { FeedbackSummary } from "../../routes/admin-feedback";
+export type {
+  FeedbackNames,
+  FeedbackSummary,
+} from "../../routes/admin-feedback";
 export type { SpendSummary } from "../../../spending/window";
 export type { UsageStatus } from "../../../ratelimit/window";
 export type { UsageShare } from "../../../ratelimit/share";

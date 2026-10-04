@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { ReactNode } from "react";
 import { useI18n } from "../i18n-context";
 import { useDateFmt } from "../datetime-context";
 import type { ThreadSnapshot, ThreadSnapshotTurn } from "../api-client";
 import { Card } from "./layout";
+import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
 import { EmptyState } from "./states";
 
 // OpenRouter publishes no per-generation permalink: `/api/v1/generation?id=`
@@ -49,18 +51,41 @@ function GenerationLink({ gen }: { gen: string }) {
   );
 }
 
-function ThreadRow({
+// Text inset in a card, on the page background: the snapshot as stored, not a
+// reading of it, and the system prompt. `select-all` is what gets the blob out
+// of Telegram in one tap.
+export function CodeBlock({
+  wrap,
+  children,
+}: {
+  // Prose wraps; JSON keeps its indentation and scrolls.
+  wrap?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <pre
+      className={`mx-4 mb-[11px] max-h-80 overflow-auto rounded-lg bg-tg-secondary px-3 py-2.5 font-mono text-[13px] leading-[18px] select-all ${wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"}`}
+    >
+      {children}
+    </pre>
+  );
+}
+
+function ThreadCard({
   thread,
   index,
+  chat,
   pointed,
 }: {
   thread: ThreadSnapshot;
   index: number;
+  // The chat's title, or its id when there is none.
+  chat: string;
   // This is the thread the report's `pointedAt` refers to.
   pointed: boolean;
 }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
+  const { short } = useDateFmt();
   const gens = threadGenerations(thread);
   const kind =
     thread.kind === "guest"
@@ -68,44 +93,49 @@ function ThreadRow({
       : s.ui_feedback_thread_chain;
 
   return (
-    <div className="row relative flex flex-col gap-1 px-4 py-[11px]">
-      <div className="flex items-center justify-between gap-3">
-        <span className="shrink-0 text-base font-medium">
-          {format(thread.ts)}
-        </span>
-        <span className="text-[13px] text-tg-hint truncate">
-          {pointed ? `${kind} · ${s.ui_feedback_pointed_here}` : kind}
+    <Card>
+      <div className={ROW_CLS}>
+        <div className="flex-1 min-w-0">
+          <div className="truncate">{short(thread.ts)}</div>
+          <div className="text-[13px] text-tg-hint truncate">
+            {s.ui_feedback_thread_meta(index, chat, thread.turns.length)}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full bg-tg-text/10 px-2.5 py-0.5 text-[13px] text-tg-hint">
+          {pointed ? s.ui_feedback_pointed_here : kind}
         </span>
       </div>
-      <div className="text-[13px] text-tg-hint break-all">
-        {s.ui_feedback_thread_meta(index, thread.chatId, thread.turns.length)}
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[12px]">
-        <span className="text-tg-hint">{s.ui_feedback_gens}</span>
-        {gens.length === 0 ? (
-          <span className="text-tg-hint">{s.ui_feedback_gens_empty}</span>
-        ) : (
-          gens.map((gen) => <GenerationLink key={gen} gen={gen} />)
+      <div className={ROW_CLS}>
+        <span className={ROW_LABEL_CLS}>{s.ui_feedback_gens}</span>
+        {gens.length === 0 && (
+          <span className={ROW_VALUE_CLS}>{s.ui_feedback_gens_empty}</span>
         )}
       </div>
-      {/* The snapshot as stored, not a reading of it: a turn-by-turn render
-          comes after someone has actually used this. `select-all` is what gets
-          the blob out of Telegram in one tap. */}
-      <pre className="mt-1 max-h-80 overflow-auto rounded-lg bg-tg-secondary p-2 text-[12px] leading-[1.4] whitespace-pre select-all">
-        {JSON.stringify(thread, null, 2)}
-      </pre>
-    </div>
+      {gens.map((gen) => (
+        <div key={gen} className={ROW_CLS}>
+          <GenerationLink gen={gen} />
+        </div>
+      ))}
+      <CodeBlock>{JSON.stringify(thread, null, 2)}</CodeBlock>
+    </Card>
   );
 }
 
+// One card per thread. Empty is a normal state: the copied threads expire with
+// the conversation graph.
 export function FeedbackThreads({
   threads,
   pointedAt,
+  chatId,
+  chatTitle,
 }: {
-  // Newest thread first, as the record stores them. Empty is a normal state:
-  // the copied threads expire with the conversation graph.
+  // Newest thread first, as the record stores them.
   threads: ThreadSnapshot[];
   pointedAt: { chatId: string; botMsgId: number } | null;
+  // The chat the report was sent from, which is all the directory was asked
+  // about: other chats show their id.
+  chatId: string;
+  chatTitle: string | null;
 }) {
   const { t: s } = useI18n();
   // The snapshot is "recent threads" regardless, so the target may well be in
@@ -118,25 +148,32 @@ export function FeedbackThreads({
       )
     : -1;
 
-  return (
-    <Card>
-      {threads.length === 0 ? (
+  if (threads.length === 0) {
+    return (
+      <Card>
         <EmptyState>{s.ui_feedback_threads_empty}</EmptyState>
-      ) : (
-        <>
-          {pointedAt !== null && pointedIndex === -1 && (
-            <EmptyState>{s.ui_feedback_pointed_missing}</EmptyState>
-          )}
-          {threads.map((thread, i) => (
-            <ThreadRow
-              key={`${thread.chatId}:${thread.ts}:${i}`}
-              thread={thread}
-              index={i + 1}
-              pointed={i === pointedIndex}
-            />
-          ))}
-        </>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      {pointedAt !== null && pointedIndex === -1 && (
+        <Card>
+          <EmptyState>{s.ui_feedback_pointed_missing}</EmptyState>
+        </Card>
       )}
-    </Card>
+      {threads.map((thread, i) => (
+        <ThreadCard
+          key={`${thread.chatId}:${thread.ts}:${i}`}
+          thread={thread}
+          index={i + 1}
+          chat={
+            thread.chatId === chatId && chatTitle ? chatTitle : thread.chatId
+          }
+          pointed={i === pointedIndex}
+        />
+      ))}
+    </>
   );
 }

@@ -4,7 +4,12 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
-import { api, type FeedbackEntry, type FeedbackStatus } from "../../api-client";
+import {
+  api,
+  type FeedbackEntry,
+  type FeedbackNames,
+  type FeedbackStatus,
+} from "../../api-client";
 import {
   Card,
   SectionFooter,
@@ -13,8 +18,8 @@ import {
 } from "../../components/layout";
 import { ActionRow } from "../../components/controls";
 import { LoadingState } from "../../components/states";
+import { CodeBlock, FeedbackThreads } from "../../components/feedback-threads";
 import { SegmentedField } from "../../components/segmented-field";
-import { FeedbackThreads } from "../../components/feedback-threads";
 import { TimeNote } from "../../components/time-note";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 
@@ -42,18 +47,22 @@ export function FeedbackView({
   const { t: s } = useI18n();
   const { format } = useDateFmt();
   const [entry, setEntry] = useState<FeedbackEntry | null>(null);
+  const [names, setNames] = useState<FeedbackNames | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api
       .getFeedback(feedbackId)
-      .then((r) => setEntry(r.entry))
+      .then((r) => {
+        setEntry(r.entry);
+        setNames(r.names);
+      })
       .catch(() => setNotFound(true));
   }, [feedbackId]);
 
   if (notFound) return <LoadingState text={s.ui_feedback_not_found} />;
-  if (!entry) return <LoadingState />;
+  if (!entry || !names) return <LoadingState />;
 
   // The control reads from the stored record, so a rejected write simply leaves
   // it where it was — there is nothing half-applied to undo.
@@ -152,14 +161,16 @@ export function FeedbackView({
       <FeedbackThreads
         threads={entry.threads}
         pointedAt={entry.pointedAt ?? null}
+        chatId={entry.chatId}
+        chatTitle={names.chatTitle}
       />
       <SectionFooter>{s.ui_feedback_threads_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_feedback_prompt_header}</SectionHeader>
       <Card>
-        <pre className="max-h-80 overflow-auto p-4 text-[12px] leading-[1.4] whitespace-pre-wrap break-words select-all">
-          {entry.systemPrompt}
-        </pre>
+        <div className="pt-[11px]">
+          <CodeBlock wrap>{entry.systemPrompt}</CodeBlock>
+        </div>
       </Card>
       <SectionFooter>{s.ui_feedback_prompt_footer}</SectionFooter>
 
