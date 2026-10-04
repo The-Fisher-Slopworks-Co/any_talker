@@ -15,10 +15,6 @@ bun run dev
 
 To work on the Web App without Telegram, run `bun run webapp:demo` and open <http://localhost:3000/webapp>.
 
-## Contributing
-
-Read [CLAUDE.md](CLAUDE.md) first: layout, conventions, and what a pull request needs.
-
 ## License
 
 [AGPL-3.0-or-later](LICENSE)
