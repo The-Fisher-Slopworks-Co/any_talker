@@ -213,23 +213,31 @@ export function ModelsCard({
   // the whole list. Otherwise ids left over from a gateway that *did* support
   // fallbacks would stay hidden below the fold and still be saved — and still be
   // rejected by the catalogue check the admin can't see.
-  const updateAt = (idx: number, value: string) =>
+  // Whether an id was typed since the last commit.
+  const edited = useRef(false);
+  const updateAt = (idx: number, value: string) => {
+    edited.current = true;
     onChange(
       fallback ? models.map((m, i) => (i === idx ? value : m)) : [value],
     );
+  };
   const commit = (list: string[]) => {
+    edited.current = false;
     const ids = committableModels(list, (id) => !canValidate || !!resolve(id));
     if (ids) onCommit?.(ids);
   };
-  // Telegram's back button unmounts the card without a blur, so what is still
-  // being edited is offered for saving on unmount, as NumberRow does.
+  // Telegram's back button unmounts the card without a blur, so an edit still
+  // pending is offered for saving on unmount, as NumberRow does. Only a real
+  // edit: the card is also removed by whatever hides it (a switch turned off),
+  // and a snapshot of its rows must not be saved then.
   const latest = useRef({ rows, commit });
   useEffect(() => {
     latest.current = { rows, commit };
   });
   useEffect(
     () => () => {
-      if (onCommit) latest.current.commit(latest.current.rows);
+      if (onCommit && edited.current)
+        latest.current.commit(latest.current.rows);
     },
     [],
   );

@@ -6,7 +6,10 @@
 // see: markup that is silently dropped or wired to an element that isn't there.
 
 import { test, expect, describe } from "bun:test";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
+import { parseHTML } from "linkedom";
 import { I18nProvider } from "../i18n-context";
 import { ModelsCard, committableModels } from "./models-card";
 
@@ -111,5 +114,51 @@ describe("committableModels", () => {
   test("offers nothing while a row is unknown or all rows are blank", () => {
     expect(committableModels(["a", "bad"], known)).toBeNull();
     expect(committableModels(["", "  "], known)).toBeNull();
+  });
+});
+
+// Taking the card away needs a DOM. linkedom does not feed React's event
+// plumbing, so the handler React attached to the input is called directly.
+describe("ModelsCard commit on unmount", () => {
+  const { window, document } = parseHTML(
+    "<!doctype html><html><body></body></html>",
+  );
+  Object.assign(globalThis, { window, document });
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+
+  async function mountAndUnmount(typeFirst: boolean) {
+    const commits: string[][] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () =>
+      root.render(
+        <I18nProvider lang="en">
+          <ModelsCard
+            models={["a/b"]}
+            onChange={() => {}}
+            onCommit={(ids) => commits.push(ids)}
+          />
+        </I18nProvider>,
+      ),
+    );
+    if (typeFirst) {
+      const input = container.querySelector("input")!;
+      const key = Object.keys(input).find((k) => k.startsWith("__reactProps"))!;
+      const props = (
+        input as unknown as Record<string, { onChange: Function }>
+      )[key]!;
+      await act(async () => props.onChange({ target: { value: "c/d" } }));
+    }
+    await act(async () => root.unmount());
+    return commits;
+  }
+
+  test("an edit still pending is committed when the card goes away", async () => {
+    expect(await mountAndUnmount(true)).toHaveLength(1);
+  });
+
+  test("a card that was only shown and hidden commits nothing", async () => {
+    expect(await mountAndUnmount(false)).toEqual([]);
   });
 });

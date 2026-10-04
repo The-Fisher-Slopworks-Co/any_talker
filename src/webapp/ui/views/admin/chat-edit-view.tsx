@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type { Chat, ChatSettings, Settings } from "../../../../shared/types";
 import { Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { SaveButton } from "../../components/controls";
+import { SaveStatus } from "../../components/save-status";
+import { useAutosave } from "../../lib/use-autosave";
 import { useFormReducer } from "../../lib/use-form-reducer";
 import {
   EMPTY_CHAT_FORM,
   chatFormFromSettings,
-  chatFormPayload,
-  isChatFormDirty,
-  isChatFormValid,
+  chatFormToSave,
+  revertFailed,
+  type ChatForm,
 } from "./chat-edit-form";
 import {
   BotNameSection,
@@ -28,12 +29,10 @@ import {
   TimezoneOverrideSection,
 } from "./chat-edit-sections";
 
-// The chat plus the global settings it inherits from. `settings` is the stored
-// record the form is diffed against, so a save replaces it.
+// The chat plus the global settings it inherits from.
 type Loaded = {
   global: Settings;
   chat: Chat;
-  settings: ChatSettings;
   whitelisted: boolean;
   blacklisted: boolean;
 };
@@ -41,17 +40,51 @@ type Loaded = {
 export function ChatEditView({ chatId }: { chatId: string }) {
   const { t: s } = useI18n();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [form, set, resetForm] = useFormReducer(EMPTY_CHAT_FORM);
+
+  // The server takes the whole record, so every change sends all of it, one
+  // request at a time. `base` is the record last sent (what the next change is
+  // diffed against, so a change back to an in-flight value is not lost) and
+  // `confirmed` the one the server last answered with.
+  const base = useRef<ChatSettings>({});
+  const confirmed = useRef<ChatSettings>({});
+  const latestForm = useRef(form);
+  useEffect(() => {
+    latestForm.current = form;
+  });
+  const { save, status } = useAutosave<
+    ChatSettings,
+    { settings: ChatSettings }
+  >({
+    send: (payload) => api.putAdminChat(chatId, payload),
+    onSaved: ({ settings }) => {
+      confirmed.current = settings;
+    },
+    onFailed: (payload) => {
+      // A newer change was sent after this one; if that one also fails it
+      // takes this one's fields back with its own.
+      if (payload !== base.current || !loaded) return;
+      base.current = confirmed.current;
+      resetForm(
+        revertFailed(
+          latestForm.current,
+          payload,
+          confirmed.current,
+          loaded.global,
+        ),
+      );
+    },
+  });
 
   useEffect(() => {
     Promise.all([api.getSettings(), api.getAdminChat(chatId)])
       .then(([global, d]) => {
+        base.current = d.settings;
+        confirmed.current = d.settings;
         setLoaded({
           global,
           chat: d.chat,
-          settings: d.settings,
           whitelisted: d.whitelisted,
           blacklisted: d.blacklisted,
         });
@@ -60,25 +93,28 @@ export function ChatEditView({ chatId }: { chatId: string }) {
       .catch(() => setNotFound(true));
   }, [chatId, resetForm]);
 
+  // Applies `patch` to the form and sends the result, unless that is nothing
+  // new for the server.
+  const commit = (patch: Partial<ChatForm>) => {
+    const next = { ...form, ...patch };
+    resetForm(next);
+    const payload = chatFormToSave(next, base.current);
+    if (payload) {
+      base.current = payload;
+      save(payload);
+    }
+  };
+  // Telegram's back button leaves the screen without a blur, so whatever is
+  // still being typed (prompt, keywords, model ids, bot name) is saved then.
+  const leave = useRef(() => {});
+  leave.current = () => commit({});
+  useEffect(() => () => leave.current(), []);
+
   if (notFound) return <LoadingState text={s.ui_chat_not_found} />;
   if (!loaded) return <LoadingState />;
 
-  const { global, settings: original } = loaded;
-  const dirty = isChatFormDirty(form, original);
-  const canSave = dirty && isChatFormValid(form);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const result = await api.putAdminChat(chatId, chatFormPayload(form));
-      setLoaded((prev) =>
-        prev ? { ...prev, settings: result.settings } : prev,
-      );
-      resetForm(chatFormFromSettings(result.settings, global));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { global } = loaded;
+  const sections = { form, set, commit, global };
 
   return (
     <Stack>
@@ -87,20 +123,15 @@ export function ChatEditView({ chatId }: { chatId: string }) {
         whitelisted={loaded.whitelisted}
         blacklisted={loaded.blacklisted}
       />
-      <BotNameSection form={form} set={set} />
-      <SystemPromptSection form={form} set={set} global={global} />
-      <ModelsSection form={form} set={set} global={global} />
-      <TimezoneOverrideSection form={form} set={set} global={global} />
-      <ProviderRoutingSection form={form} set={set} global={global} />
-      <ProviderSection form={form} set={set} global={global} />
-      <ServiceTierSection form={form} set={set} global={global} />
-      <KeywordFilterSection form={form} set={set} />
-      <SaveButton
-        saving={saving}
-        dirty={dirty}
-        disabled={saving || !canSave}
-        onClick={save}
-      />
+      <BotNameSection {...sections} />
+      <SystemPromptSection {...sections} />
+      <ModelsSection {...sections} />
+      <TimezoneOverrideSection {...sections} />
+      <ProviderRoutingSection {...sections} />
+      <ProviderSection {...sections} />
+      <ServiceTierSection {...sections} />
+      <KeywordFilterSection {...sections} />
+      <SaveStatus status={status} />
     </Stack>
   );
 }

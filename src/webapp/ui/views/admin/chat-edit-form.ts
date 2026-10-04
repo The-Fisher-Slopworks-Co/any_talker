@@ -97,7 +97,7 @@ function parsedKeywords(form: ChatForm): string[] {
     .filter((k) => k.length > 0);
 }
 
-export function chatFormPayload(form: ChatForm): ChatSettings {
+function chatFormPayload(form: ChatForm): ChatSettings {
   return buildChatSettingsPayload({
     promptOverride: form.promptOverride,
     promptValue: form.promptValue,
@@ -120,10 +120,7 @@ export function chatFormPayload(form: ChatForm): ChatSettings {
 // Dirty means "differs from the stored record" — either a toggle flipped, or an
 // enabled override now carries a different value. A value edited under a
 // toggled-off override is not a change: it is never sent.
-export function isChatFormDirty(
-  form: ChatForm,
-  original: ChatSettings,
-): boolean {
+function isChatFormDirty(form: ChatForm, original: ChatSettings): boolean {
   const payload = chatFormPayload(form);
   const wasOverridden = (key: keyof ChatSettings) =>
     original[key] !== undefined;
@@ -149,8 +146,46 @@ export function isChatFormDirty(
 
 // A models override with no usable id (or one ModelsCard rejects) would save an
 // empty chain, so Save stays disabled until it is fixed.
-export function isChatFormValid(form: ChatForm): boolean {
+function isChatFormValid(form: ChatForm): boolean {
   return (
     !form.modelsOverride || (trimmedModels(form).length > 0 && form.modelsValid)
   );
+}
+// What to send after the form became `form`, given the record `base` the
+// server has (or is about to have): the whole record, or null when that is
+// what it holds already. While the own-models list is unusable it stays as it
+// was in `base`, so the other edits still go out.
+export function chatFormToSave(
+  form: ChatForm,
+  base: ChatSettings,
+): ChatSettings | null {
+  const effective = isChatFormValid(form)
+    ? form
+    : {
+        ...form,
+        modelsOverride: base.models !== undefined,
+        models: base.models ?? form.models,
+      };
+  return isChatFormDirty(effective, base) ? chatFormPayload(effective) : null;
+}
+
+// `form` after saving `failed` was refused: the fields `failed` changed go
+// back to what `saved` holds, unless they were edited again since; every other
+// field keeps its current value, so edits made since stay.
+export function revertFailed(
+  form: ChatForm,
+  failed: ChatSettings,
+  saved: ChatSettings,
+  global: Settings,
+): ChatForm {
+  const tried = chatFormFromSettings(failed, global);
+  const back = chatFormFromSettings(saved, global);
+  const next: ChatForm = { ...form };
+  for (const key of Object.keys(tried) as (keyof ChatForm)[]) {
+    const same = (a: unknown, b: unknown) =>
+      JSON.stringify(a) === JSON.stringify(b);
+    if (!same(tried[key], back[key]) && same(form[key], tried[key]))
+      Object.assign(next, { [key]: back[key] });
+  }
+  return next;
 }
