@@ -26,12 +26,12 @@ export const managedBotsMessages = {
     ru: "Новый бот-персонаж",
   }),
   ui_mbots_running: m({
-    en: "running",
-    ru: "запущен",
+    en: "Running",
+    ru: "Запущен",
   }),
   ui_mbots_stopped: m({
-    en: "stopped",
-    ru: "остановлен",
+    en: "Stopped",
+    ru: "Остановлен",
   }),
   ui_mbot_display_name: m({
     en: "Display name",

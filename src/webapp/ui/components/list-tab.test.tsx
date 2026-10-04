@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
 import { ListTab } from "./list-tab";
 
-type Item = { id: string; name: string; paused?: boolean };
+type Item = { id: string; name: string; paused?: boolean; avatar?: boolean };
 
 function render(items: Item[] | null): string {
   return renderToStaticMarkup(
@@ -22,6 +22,7 @@ function render(items: Item[] | null): string {
           title: i.name,
           subtitle: "08:30",
           ...(i.paused ? { value: "Paused" } : {}),
+          ...(i.avatar ? { avatar: <span>{`avatar-${i.id}`}</span> } : {}),
         })}
       />
     </I18nProvider>,
@@ -37,6 +38,7 @@ describe("ListTab", () => {
     );
     expect(html).toContain("Daily question.");
     expect(html).not.toContain("section-header");
+    expect(html).not.toContain("add-row-avatar");
   });
 
   test("shows a row's state before its chevron", () => {
@@ -47,6 +49,15 @@ describe("ListTab", () => {
     expect(html.match(/>Paused</g)).toHaveLength(1);
     expect(html.indexOf("Evening reading")).toBeLessThan(
       html.indexOf("Paused"),
+    );
+  });
+
+  test("leads each row with its avatar", () => {
+    const html = render([{ id: "a", name: "Morning stretch", avatar: true }]);
+    expect(html).toContain("row-avatar");
+    expect(html).toContain("add-row-avatar");
+    expect(html.indexOf("avatar-a")).toBeLessThan(
+      html.indexOf("Morning stretch"),
     );
   });
 
