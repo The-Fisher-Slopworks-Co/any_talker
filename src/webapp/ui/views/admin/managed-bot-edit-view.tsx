@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api, type ManagedBotDetail } from "../../api-client";
+import { Hero } from "../../components/hero";
+import { LargeTitle } from "../../components/large-title";
 import {
   Card,
   SectionFooter,
@@ -11,17 +13,18 @@ import {
   Stack,
 } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { OptimizePromptButton } from "../../components/optimize-prompt-button";
-import { DeleteButton, RowButton, SaveButton } from "../../components/controls";
 import {
-  INPUT_CLS,
-  ROW_CLS,
-  ROW_LABEL_CLS,
-  ROW_VALUE_CLS,
-} from "../../components/row";
-
-const TEXTAREA_CLS =
-  "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[140px]";
+  OptimizePromptFooter,
+  OptimizePromptRow,
+  useOptimizePrompt,
+} from "../../components/optimize-prompt-button";
+import { ActionRow, RowButton } from "../../components/controls";
+import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
+import { SaveStatus } from "../../components/save-status";
+import { AreaRow, TextRow } from "../../components/text-row";
+import { useAutosave } from "../../lib/use-autosave";
+import { useFailureToast } from "../../lib/use-failure-toast";
+import { botForm, revertFailed, type BotForm } from "./managed-bot-form";
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -135,41 +138,72 @@ function EditBotForm({
 }) {
   const { t: s } = useI18n();
   const [detail, setDetail] = useState<ManagedBotDetail | null>(null);
-  const [displayName, setDisplayName] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
   const [notFound, setNotFound] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
       .getManagedBot(botId)
-      .then((d) => {
-        setDetail(d);
-        setDisplayName(d.bot.displayName);
-        setSystemPrompt(d.bot.systemPrompt);
-      })
+      .then(setDetail)
       .catch(() => setNotFound(true));
   }, [botId]);
 
-  if (notFound) return <LoadingState text={s.ui_mbot_not_found} />;
-  if (!detail) return <LoadingState />;
+  // Until the hero can name the bot, the page is titled like any other.
+  if (notFound || !detail)
+    return (
+      <>
+        <LargeTitle>{s.ui_route_bot_edit}</LargeTitle>
+        {notFound ? (
+          <LoadingState text={s.ui_mbot_not_found} />
+        ) : (
+          <LoadingState />
+        )}
+      </>
+    );
+  return <BotEditor botId={botId} detail={detail} onClose={onClose} />;
+}
 
-  const submit = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await api.updateManagedBot(botId, { displayName, systemPrompt });
-      onClose();
-    } catch (err) {
-      const code = (err as { code?: string | null }).code ?? "save_failed";
-      setError(code ?? "save_failed");
-    } finally {
-      setSaving(false);
-    }
+// The name and prompt save when their field is left or the screen goes away.
+function BotEditor({
+  botId,
+  detail,
+  onClose,
+}: {
+  botId: string;
+  detail: ManagedBotDetail;
+  onClose: () => void;
+}) {
+  const { t: s } = useI18n();
+  const { bot } = detail;
+  const [form, setForm] = useState(() => botForm(bot));
+  // Both fields go every time. `queued` is what was last sent (the next
+  // change is compared with it) and `confirmed` what the server last kept.
+  const queued = useRef<BotForm>(form);
+  const confirmed = useRef<BotForm>(form);
+  const optimize = useOptimizePrompt(form.systemPrompt);
+  const { save, status } = useAutosave<BotForm, ManagedBotDetail>({
+    send: (payload) => api.updateManagedBot(botId, payload),
+    onSaved: (saved) => {
+      confirmed.current = botForm(saved.bot);
+    },
+    onFailed: (payload) => {
+      // A newer payload was queued after this one and carries its fields on.
+      if (payload !== queued.current) return;
+      queued.current = confirmed.current;
+      setForm((f) => revertFailed(f, payload, confirmed.current));
+    },
+  });
+  const failure = useFailureToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const commit = () => {
+    if (
+      form.displayName === queued.current.displayName &&
+      form.systemPrompt === queued.current.systemPrompt
+    )
+      return;
+    queued.current = form;
+    save(form);
   };
 
   const remove = async () => {
@@ -179,6 +213,7 @@ function EditBotForm({
       await api.deleteManagedBot(botId);
       onClose();
     } catch {
+      failure.fail();
       setDeleting(false);
     }
   };
@@ -186,85 +221,71 @@ function EditBotForm({
   const onPickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setAvatarMsg(null);
     try {
-      const dataUrl = await fileToDataUrl(file);
-      await api.setManagedBotAvatar(botId, dataUrl);
-      setAvatarMsg(s.ui_mbot_avatar_saved);
+      await api.setManagedBotAvatar(botId, await fileToDataUrl(file));
     } catch {
-      setAvatarMsg(s.ui_mbot_avatar_failed);
+      failure.fail();
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
   };
 
-  const status = detail.running ? s.ui_mbots_running : s.ui_mbots_stopped;
-
   return (
     <Stack>
-      <SectionHeader>{s.ui_mbot_display_name}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_mbot_display_name}</span>
-          <input
-            className={INPUT_CLS}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        className="hidden"
+        onChange={onPickAvatar}
+      />
+      <Hero
+        id={bot.botId}
+        name={form.displayName.trim() || bot.displayName}
+        subtitle={`@${bot.username}`}
+        note={detail.running ? s.ui_mbots_running : s.ui_mbots_stopped}
+        action={{
+          label: s.ui_mbot_avatar_edit,
+          onClick: () => fileRef.current?.click(),
+        }}
+        actionUnderAvatar
+      />
+
+      <div className="section-gap">
+        <Card>
+          <TextRow
+            label={s.ui_mbot_display_name}
             placeholder={s.ui_mbot_display_name_placeholder}
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            value={form.displayName}
+            onChange={(displayName) => setForm({ ...form, displayName })}
+            onCommit={commit}
             maxLength={64}
           />
-        </label>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_mbot_username}</span>
-          <span className={ROW_VALUE_CLS}>@{detail.bot.username}</span>
-        </div>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_mbot_status}</span>
-          <span className={ROW_VALUE_CLS}>{status}</span>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       <SectionHeader>{s.ui_mbot_system_prompt}</SectionHeader>
       <Card>
-        <textarea
-          className={TEXTAREA_CLS}
+        <AreaRow
+          label={s.ui_mbot_system_prompt}
           placeholder={s.ui_mbot_system_prompt_placeholder}
-          value={systemPrompt}
-          onChange={(e) => setSystemPrompt(e.target.value)}
+          value={form.systemPrompt}
+          onChange={(systemPrompt) => setForm({ ...form, systemPrompt })}
+          onCommit={commit}
         />
+        <OptimizePromptRow optimize={optimize} />
       </Card>
       <SectionFooter>{s.ui_mbot_system_prompt_footer}</SectionFooter>
-      <OptimizePromptButton prompt={systemPrompt} />
+      <OptimizePromptFooter optimize={optimize} autosaves />
 
-      <SectionHeader>{s.ui_mbot_avatar}</SectionHeader>
-      <Card>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png"
-          className="hidden"
-          onChange={onPickAvatar}
-        />
-        <RowButton onClick={() => fileRef.current?.click()}>
-          {s.ui_mbot_avatar_upload}
-        </RowButton>
-      </Card>
-      <SectionFooter>{avatarMsg ?? s.ui_mbot_avatar_footer}</SectionFooter>
-
-      {error && <SectionFooter>{s.ui_mbot_save_error(error)}</SectionFooter>}
-
-      <SaveButton
-        saving={saving}
-        dirty={true}
-        disabled={saving || deleting}
-        onClick={submit}
-      />
-
-      <Card>
-        <DeleteButton disabled={saving || deleting} onClick={remove}>
-          {s.ui_mbot_delete}
-        </DeleteButton>
-      </Card>
+      <div className="section-gap">
+        <Card>
+          <ActionRow destructive disabled={deleting} onClick={remove}>
+            {s.ui_mbot_delete}
+          </ActionRow>
+        </Card>
+      </div>
+      <SaveStatus status={failure.status === "failed" ? "failed" : status} />
     </Stack>
   );
 }

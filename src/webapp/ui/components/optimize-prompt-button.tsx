@@ -6,7 +6,7 @@ import { useI18n } from "../i18n-context";
 import { api } from "../api-client";
 import { fillOptimizationTemplate } from "../../../shared/prompt-optimization";
 import { ActionRow } from "./controls";
-import { Card, SectionFooter } from "./layout";
+import { SectionFooter } from "./layout";
 
 type Optimize = {
   ready: boolean;
@@ -74,18 +74,5 @@ export function OptimizePromptFooter({
           ? s.ui_prompt_optimize_autosave_footer
           : s.ui_prompt_optimize_footer}
     </SectionFooter>
-  );
-}
-
-// The action in a card of its own, under a prompt field.
-export function OptimizePromptButton({ prompt }: { prompt: string }) {
-  const optimize = useOptimizePrompt(prompt);
-  return (
-    <>
-      <Card>
-        <OptimizePromptRow optimize={optimize} />
-      </Card>
-      <OptimizePromptFooter optimize={optimize} />
-    </>
   );
 }

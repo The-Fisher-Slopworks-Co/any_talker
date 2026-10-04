@@ -4,17 +4,31 @@
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
-import { OptimizePromptButton } from "./optimize-prompt-button";
+import { OptimizePromptFooter } from "./optimize-prompt-button";
 
-describe("OptimizePromptButton", () => {
-  // Screens with a Save button tell the admin to save the pasted prompt.
-  test("its own card and a footer that mentions saving", () => {
+describe("OptimizePromptFooter", () => {
+  // Every prompt screen autosaves, so the instruction never mentions saving.
+  test("tells the admin to paste the shortened prompt back, without saving", () => {
     const html = renderToStaticMarkup(
       <I18nProvider lang="en">
-        <OptimizePromptButton prompt="p" />
+        <OptimizePromptFooter
+          optimize={{ ready: true, status: "idle", copy: () => {} }}
+          autosaves
+        />
       </I18nProvider>,
     );
-    expect(html).toContain("Copy for Optimization");
-    expect(html).toContain("back and save.");
+    expect(html).toContain("paste the shortened prompt back here.");
+    expect(html).not.toContain("save");
+  });
+
+  test("reports a clipboard failure instead", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider lang="en">
+        <OptimizePromptFooter
+          optimize={{ ready: true, status: "failed", copy: () => {} }}
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Could not copy to the clipboard.");
   });
 });

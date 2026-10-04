@@ -12,13 +12,29 @@ describe("Hero", () => {
         id="1000002"
         name="Sam Rivera"
         subtitle="@samrivera"
+        note="Running"
         action={{ label: "Open in Telegram", onClick: () => {} }}
       />,
     );
     expect(html).toContain("SR");
     expect(html).toMatch(/<h1[^>]*>Sam Rivera<\/h1>/);
     expect(html).toContain("@samrivera");
+    expect(html.indexOf("Running")).toBeGreaterThan(html.indexOf("@samrivera"));
     expect(html).toContain("Open in Telegram");
+  });
+
+  test("keeps the action last unless it is meant to sit under the avatar", () => {
+    const render = (under: boolean) =>
+      renderToStaticMarkup(
+        <Hero
+          id="1"
+          name="Sam Rivera"
+          action={{ label: "Edit", onClick: () => {} }}
+          actionUnderAvatar={under}
+        />,
+      );
+    expect(render(false)).toContain("order-last");
+    expect(render(true)).not.toContain("order-last");
   });
 
   test("leaves out what it is not given", () => {
