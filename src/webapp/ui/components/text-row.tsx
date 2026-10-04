@@ -70,7 +70,8 @@ export function TextRow({
 
 // A multi-line text field as a row of a card (a prompt, a list of words),
 // committing like `TextRow` when it is left. `label` names it for screen
-// readers; there is no visible one, so the card's other rows give the context.
+// readers; it is only shown (`showLabel`) where several areas share a card, so
+// otherwise the card's other rows give the context.
 export function AreaRow({
   label,
   placeholder,
@@ -78,6 +79,7 @@ export function AreaRow({
   onChange,
   onCommit,
   minHeight = "min-h-[110px]",
+  showLabel,
 }: {
   label: string;
   placeholder: string;
@@ -86,13 +88,20 @@ export function AreaRow({
   onCommit: () => void;
   // A Tailwind min-height class.
   minHeight?: string;
+  // Also show the label, as a small caption, when several areas share a card.
+  showLabel?: boolean;
 }) {
   const { typed, left } = useCommitOnLeave(onCommit);
   return (
     <div className="row relative">
+      {showLabel && (
+        <div className="px-4 pt-3 text-[13px] leading-[18px] text-tg-hint">
+          {label}
+        </div>
+      )}
       <textarea
         aria-label={label}
-        className={`block w-full box-border resize-none border-0 bg-transparent px-4 py-3 text-base text-tg-text ${minHeight}`}
+        className={`block w-full box-border resize-none border-0 bg-transparent px-4 ${showLabel ? "pb-3 pt-1" : "py-3"} text-base text-tg-text ${minHeight}`}
         placeholder={placeholder}
         value={value}
         onChange={(e) => {

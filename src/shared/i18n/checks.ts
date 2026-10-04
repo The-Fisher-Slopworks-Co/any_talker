@@ -105,25 +105,33 @@ export const checksMessages = {
     en: "{name} mentions the user; {count} is the counter.",
     ru: "{name} — упоминание; {count} — счётчик.",
   }),
+  ui_check_buttons: m({
+    en: "Buttons",
+    ru: "Кнопки",
+  }),
   ui_check_yes_button: m({
-    en: '"Yes" button label',
-    ru: "Подпись кнопки «Да»",
+    en: "Yes Label",
+    ru: "Подпись «Да»",
   }),
   ui_check_no_button: m({
-    en: '"No" button label',
-    ru: "Подпись кнопки «Нет»",
+    en: "No Label",
+    ru: "Подпись «Нет»",
+  }),
+  ui_check_replies: m({
+    en: "Replies",
+    ru: "Ответы",
   }),
   ui_check_yes_reply: m({
-    en: "Reply when Yes",
-    ru: "Ответ при «Да»",
+    en: "When Yes",
+    ru: "При «Да»",
   }),
   ui_check_yes_reply_placeholder: m({
     en: "{name}, at least don't lie to yourself. Day without sport {count}",
     ru: "{name}, хотя бы себе не ври. День без спорта {count}",
   }),
   ui_check_no_reply: m({
-    en: "Reply when No / timeout",
-    ru: "Ответ при «Нет» / таймауте",
+    en: "When No / Timeout",
+    ru: "При «Нет» / таймауте",
   }),
   ui_check_no_reply_placeholder: m({
     en: "{name}. Day without sport {count}",
