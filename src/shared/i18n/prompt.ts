@@ -51,12 +51,12 @@ export const promptMessages = {
   }),
   // Footer for the fallback-chain field.
   ui_prompt_provider_routing: m({
-    en: "Provider Routing",
-    ru: "Маршрутизация провайдеров",
+    en: "Routing",
+    ru: "Маршрутизация",
   }),
   ui_prompt_provider_routing_footer: m({
-    en: "Pinning a provider disables fallback.",
-    ru: "Закреплённый провайдер отключает резервные модели.",
+    en: "Pinning a provider disables fallback. Not every model supports every thinking level.",
+    ru: "Закреплённый провайдер отключает резервные модели. Не все модели поддерживают все уровни размышлений.",
   }),
   ui_prompt_service_tier: m({
     en: "Service Tier",
@@ -82,6 +82,10 @@ export const promptMessages = {
     en: "Add fallback",
     ru: "Добавить запасную",
   }),
+  ui_sort_label: m({
+    en: "Sort Providers By",
+    ru: "Сортировка провайдеров",
+  }),
   ui_sort_default: m({
     en: "Auto",
     ru: "Авто",
@@ -103,8 +107,8 @@ export const promptMessages = {
     ru: "Провайдер",
   }),
   ui_provider_auto: m({
-    en: "Auto (use sort)",
-    ru: "Авто (по сортировке)",
+    en: "Auto",
+    ru: "Авто",
   }),
   ui_provider_loading: m({
     en: "Loading providers…",
@@ -113,10 +117,6 @@ export const promptMessages = {
   ui_prompt_reasoning_effort: m({
     en: "Thinking Level",
     ru: "Уровень размышлений",
-  }),
-  ui_prompt_reasoning_effort_footer: m({
-    en: "Not every model supports every level.",
-    ru: "Не все модели поддерживают все уровни.",
   }),
   ui_effort_default: m({
     en: "Default",
@@ -149,10 +149,6 @@ export const promptMessages = {
   ui_effort_max: m({
     en: "Max",
     ru: "Максимальный",
-  }),
-  ui_effort_short: m({
-    en: "/ask",
-    ru: "/ask",
   }),
   ui_tier_default: m({
     en: "Default",

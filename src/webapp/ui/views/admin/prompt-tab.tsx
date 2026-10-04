@@ -115,31 +115,25 @@ export function PromptTab({
       />
 
       <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
-      <ProviderSortField value={providerSort} onChange={setProviderSort} />
-      <ProviderSelectField
-        // The first *non-empty* id, not the first row: with a chain, an emptied
-        // primary row would otherwise disable the picker even though a real
-        // model is configured below it.
-        modelId={trimmed[0] ?? ""}
-        value={provider}
-        onChange={setProvider}
-      />
-      <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
-
-      <SectionHeader>{s.ui_prompt_service_tier}</SectionHeader>
-      <ServiceTierField value={serviceTier} onChange={setServiceTier} />
-
-      <SectionHeader>{s.ui_prompt_reasoning_effort}</SectionHeader>
       <Card>
+        <ProviderSortField value={providerSort} onChange={setProviderSort} />
+        <ProviderSelectField
+          // The first *non-empty* id, not the first row: with a chain, an emptied
+          // primary row would otherwise disable the picker even though a real
+          // model is configured below it.
+          modelId={trimmed[0] ?? ""}
+          value={provider}
+          onChange={setProvider}
+        />
+        <ServiceTierField value={serviceTier} onChange={setServiceTier} />
         <ReasoningEffortField
-          label={s.ui_effort_short}
           value={reasoningEffort.short}
           onChange={(short) =>
             setReasoningEffort({ ...reasoningEffort, short })
           }
         />
       </Card>
-      <SectionFooter>{s.ui_prompt_reasoning_effort_footer}</SectionFooter>
+      <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_system_prompt}</SectionHeader>
       <Card>
