@@ -17,10 +17,6 @@ export const usersMessages = {
     en: "User not found.",
     ru: "Пользователь не найден.",
   }),
-  ui_user_name: m({
-    en: "Name",
-    ru: "Имя",
-  }),
   ui_user_id: m({
     en: "ID",
     ru: "ID",

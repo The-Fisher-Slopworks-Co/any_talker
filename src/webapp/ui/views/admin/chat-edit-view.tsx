@@ -3,11 +3,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
+import { useDateFmt } from "../../datetime-context";
 import { api } from "../../api-client";
 import type { Chat, ChatSettings, Settings } from "../../../../shared/types";
-import { Stack } from "../../components/layout";
+import { AccessRows } from "../../components/access-rows";
+import { Hero } from "../../components/hero";
+import { LargeTitle } from "../../components/large-title";
+import { Card, SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
+import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { SaveStatus } from "../../components/save-status";
+import { TextRow } from "../../components/text-row";
+import { TimeNote } from "../../components/time-note";
+import { chatSubtitle, chatTitle } from "../../lib/labels";
 import { useAutosave } from "../../lib/use-autosave";
 import { useFormReducer } from "../../lib/use-form-reducer";
 import {
@@ -18,8 +26,6 @@ import {
   type ChatForm,
 } from "./chat-edit-form";
 import {
-  BotNameSection,
-  ChatInfoCard,
   KeywordFilterSection,
   ModelsSection,
   ProviderRoutingSection,
@@ -39,6 +45,7 @@ type Loaded = {
 
 export function ChatEditView({ chatId }: { chatId: string }) {
   const { t: s } = useI18n();
+  const { short } = useDateFmt();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [form, set, resetForm] = useFormReducer(EMPTY_CHAT_FORM);
@@ -110,20 +117,63 @@ export function ChatEditView({ chatId }: { chatId: string }) {
   leave.current = () => commit({});
   useEffect(() => () => leave.current(), []);
 
-  if (notFound) return <LoadingState text={s.ui_chat_not_found} />;
-  if (!loaded) return <LoadingState />;
+  // Until the hero can name the chat, the page is titled like any other.
+  if (notFound || !loaded)
+    return (
+      <>
+        <LargeTitle>{s.ui_route_chat_settings}</LargeTitle>
+        {notFound ? (
+          <LoadingState text={s.ui_chat_not_found} />
+        ) : (
+          <LoadingState />
+        )}
+      </>
+    );
 
-  const { global } = loaded;
+  const { global, chat } = loaded;
+  const title = chatTitle(s, chat);
   const sections = { form, set, commit, global };
 
   return (
     <Stack>
-      <ChatInfoCard
-        chat={loaded.chat}
+      <Hero id={chat.id} name={title} subtitle={chatSubtitle(s, chat)} />
+      <Card>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_id}</span>
+          <span className={ROW_VALUE_CLS}>{chat.id}</span>
+        </div>
+        <div className={ROW_CLS}>
+          <span className={ROW_LABEL_CLS}>{s.ui_chat_last_seen}</span>
+          <span className={ROW_VALUE_CLS}>{short(chat.lastSeenAt)}</span>
+        </div>
+      </Card>
+      <SectionFooter>
+        <TimeNote />
+      </SectionFooter>
+
+      <AccessRows
+        kind="chats"
+        id={chat.id}
+        label={title}
         whitelisted={loaded.whitelisted}
         blacklisted={loaded.blacklisted}
+        footer={s.ui_access_footer_chat}
       />
-      <BotNameSection {...sections} />
+
+      <div className="section-gap">
+        <Card>
+          <TextRow
+            label={s.ui_chat_bot_name}
+            placeholder={s.ui_chat_bot_name_placeholder}
+            value={form.botName}
+            onChange={(v) => set("botName", v)}
+            onCommit={() => commit({})}
+            maxLength={64}
+          />
+        </Card>
+      </div>
+      <SectionFooter>{s.ui_chat_bot_name_footer}</SectionFooter>
+
       <SystemPromptSection {...sections} />
       <ModelsSection {...sections} />
       <TimezoneOverrideSection {...sections} />
