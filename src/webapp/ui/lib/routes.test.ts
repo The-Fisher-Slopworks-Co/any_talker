@@ -8,6 +8,7 @@ import {
   adminSectionLabel,
   fromRoute,
   parseRoute,
+  showsLargeTitle,
   showsUsageHeader,
   type Route,
 } from "./routes";
@@ -130,5 +131,26 @@ describe("adminSectionLabel", () => {
 
   test("calls the spend screen Spending", () => {
     expect(adminSectionLabel(t("en"), "spend")).toBe("Spending");
+  });
+});
+
+describe("showsLargeTitle", () => {
+  test("hands the title over to the hero of a user or chat page", () => {
+    expect(
+      showsLargeTitle({ kind: "user-edit", userId: "1", from: "users" }),
+    ).toBe(false);
+    expect(
+      showsLargeTitle({ kind: "chat-edit", chatId: "1", from: "chats" }),
+    ).toBe(false);
+  });
+
+  test("keeps it everywhere else", () => {
+    expect(showsLargeTitle({ kind: "main" })).toBe(true);
+    expect(showsLargeTitle({ kind: "admin-section", section: "users" })).toBe(
+      true,
+    );
+    expect(showsLargeTitle({ kind: "managed-bot-edit", botId: null })).toBe(
+      true,
+    );
   });
 });
