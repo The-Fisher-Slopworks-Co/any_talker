@@ -16,6 +16,15 @@ describe("guest thread token", () => {
     expect(newGuestToken()).not.toBe(a);
   });
 
+  test("bytes past the alphabet are drawn again instead of wrapping", () => {
+    const draws = [
+      [62, 63, 126, 127, 254, 255, 0, 1, 2],
+      [61, 64, 65, 66, 67, 68, 69, 70, 71],
+    ];
+    const token = newGuestToken(() => new Uint8Array(draws.shift() ?? []));
+    expect(token).toBe("g012z01234");
+  });
+
   test("the token is read back off the last line of the rendered text", () => {
     const token = newGuestToken();
     expect(splitGuestToken(`Helper\n\nThe answer.\n\n${token}`)).toEqual({
