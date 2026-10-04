@@ -45,24 +45,24 @@ export const rateLimitMessages = {
   // Web App header (`components/usage-header.tsx`): the viewer's own budget as
   // two progress bars. Percentage-only, exactly like the `/usage` command.
   ui_usage_header_title: m({
-    en: "Your limits",
-    ru: "Твои лимиты",
+    en: "Limits",
+    ru: "Лимиты",
   }),
   ui_usage_header_5h: m({
-    en: "5 h",
-    ru: "5 ч",
+    en: "5 hours",
+    ru: "5 часов",
   }),
   ui_usage_header_weekly: m({
-    en: "7 d",
-    ru: "7 дн",
+    en: "Week",
+    ru: "Неделя",
   }),
   ui_usage_header_left: m({
     en: (left: number) => `${left}% left`,
     ru: (left: number) => `осталось ${left}%`,
   }),
   ui_usage_header_resets: m({
-    en: (ms: number) => `~${etaEn(ms)} until reset`,
-    ru: (ms: number) => `~${etaRu(ms)} до сброса`,
+    en: (ms: number) => `Resets in ~${etaEn(ms)}`,
+    ru: (ms: number) => `Сброс через ~${etaRu(ms)}`,
   }),
   ui_usage_header_boost: m({
     en: (percent: number, until: string) =>

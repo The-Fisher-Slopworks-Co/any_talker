@@ -54,16 +54,16 @@ describe("UsageHeader markup", () => {
 
   test("labels both windows and shows what's left", () => {
     const html = render(share());
-    expect(html).toContain("5 h");
-    expect(html).toContain("7 d");
+    expect(html).toContain("5 hours");
+    expect(html).toContain("Week");
     expect(html).toContain("75% left");
     expect(html).toContain("40% left");
   });
 
   test("says when each window resets", () => {
     const html = render(share());
-    expect(html).toContain("~2 h until reset");
-    expect(html).toContain("~3 d until reset");
+    expect(html).toContain("Resets in ~2 h");
+    expect(html).toContain("Resets in ~3 d");
   });
 
   test("exposes the share to assistive tech as a progressbar", () => {
@@ -83,7 +83,8 @@ describe("UsageHeader markup", () => {
 
   test("translates", () => {
     const html = render(share(), "ru");
-    expect(html).toContain("Твои лимиты");
+    expect(html).toContain("Лимиты");
+    expect(html).toContain("Сброс через");
     expect(html).toContain("осталось 75%");
   });
 
