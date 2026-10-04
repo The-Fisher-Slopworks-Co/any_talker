@@ -97,7 +97,11 @@
 
 /* Hairline separator between consecutive rows within a card. */
 .row + .row::before,
-.row + .action-row::before {
+.row + .action-row::before,
+.row + .swipe-row::before,
+.swipe-row + .row::before,
+.swipe-row + .action-row::before,
+.swipe-row + .swipe-row::before {
   content: "";
   position: absolute;
   top: 0;
@@ -113,8 +117,20 @@
 }
 
 /* Likewise past a 36px avatar. */
-.row-avatar + .row-avatar::before {
+.row-avatar + .row-avatar::before,
+.swipe-row:has(.row-avatar)::before {
   left: 64px;
+}
+
+/* A swipe row's separator belongs to its root, above the sliding content, so
+   it stays put while the row moves, as in iOS. */
+.swipe-row::before {
+  z-index: 1;
+}
+
+/* No pressed highlight on a row that is being dragged or is held open. */
+.swipe-row[data-active] .row:active {
+  background-color: transparent;
 }
 
 /* iOS inset-grouped rhythm: ~35pt between sections, whatever closed the
