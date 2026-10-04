@@ -19,7 +19,7 @@ import type { ScopedKey, ScopedKeyFor } from "./shared";
 const FETCH_DUE_LIMIT = 100;
 
 // The TTL is declared with the quarantine type — a reader needs it as much as
-// this writer does. Long enough to notice the parse-failure metric, ship a
+// this writer does. Long enough to notice the parse-failure log line, ship a
 // parser fix and replay the record; bounded so a parser bug that trips on
 // every reminder cannot fill the store.
 const QUARANTINE_TTL_SECONDS = QUARANTINE_TTL_MS / 1000;

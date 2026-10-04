@@ -69,7 +69,7 @@ export type AskOutcome =
   | { kind: "denied"; reason: AccessDenyReason }
   | { kind: "usage" }
   | {
-      // Denied by a hard USD budget cap. `reason` is for metrics/alerting only;
+      // Denied by a hard USD budget cap. `reason` is for alerting only;
       // the user sees a generic "try later" (never the financial detail).
       kind: "budgetLimited";
       reason: BudgetDenyReason;
