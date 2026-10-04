@@ -164,3 +164,19 @@ export function revertDraft(
     ]),
   ) as CheckDraft;
 }
+
+// `form` with the counter (and its start date) the server holds for `check`,
+// unless the admin has edited them and that is not saved yet: the runner moves
+// the counter on its own, and a whole-form save would write a stale one back.
+export function withServerCounter(
+  form: CheckDraft,
+  check: RecurringCheck,
+  edited: boolean,
+): CheckDraft {
+  if (edited) return form;
+  return {
+    ...form,
+    counter: check.counter,
+    counterAnchorDate: check.counterAnchorDate ?? null,
+  };
+}
