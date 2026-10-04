@@ -51,7 +51,7 @@ export const commonMessages = {
   }),
   ui_route_user_settings: m({
     en: "User Settings",
-    ru: "Настройки пользователя",
+    ru: "Пользователь",
   }),
   ui_route_chat_settings: m({
     en: "Chat Settings",

@@ -2,7 +2,14 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { parseRoute, showsUsageHeader, type Route } from "./routes";
+import { t } from "../../../shared/i18n";
+import {
+  ADMIN_SECTION_IDS,
+  adminSectionLabel,
+  parseRoute,
+  showsUsageHeader,
+  type Route,
+} from "./routes";
 
 const ALL_ROUTES: Route[] = [
   { kind: "main" },
@@ -76,5 +83,23 @@ describe("showsUsageHeader", () => {
     for (const route of others) {
       expect(showsUsageHeader(route)).toBe(false);
     }
+  });
+});
+
+describe("adminSectionLabel", () => {
+  // The label is both the admin home row and the section's large title, so
+  // two sections sharing one would be indistinguishable in either place.
+  test("names every section distinctly in both languages", () => {
+    for (const lang of ["en", "ru"] as const) {
+      const labels = ADMIN_SECTION_IDS.map((id) =>
+        adminSectionLabel(t(lang), id),
+      );
+      expect(labels.every((l) => l.length > 0)).toBe(true);
+      expect(new Set(labels).size).toBe(labels.length);
+    }
+  });
+
+  test("calls the spend screen Spending", () => {
+    expect(adminSectionLabel(t("en"), "spend")).toBe("Spending");
   });
 });

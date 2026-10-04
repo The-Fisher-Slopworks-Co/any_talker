@@ -11,7 +11,7 @@ export const managedBotsMessages = {
   }),
   ui_route_bot_edit: m({
     en: "Edit Bot",
-    ru: "Редактирование бота",
+    ru: "Бот",
   }),
   ui_route_bot_create: m({
     en: "New Bot",
