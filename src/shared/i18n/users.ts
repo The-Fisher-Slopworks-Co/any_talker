@@ -41,8 +41,4 @@ export const usersMessages = {
     en: "Set language",
     ru: "Задать язык",
   }),
-  ui_user_usage: m({
-    en: "Rate Limit Usage",
-    ru: "Использование лимита",
-  }),
 };

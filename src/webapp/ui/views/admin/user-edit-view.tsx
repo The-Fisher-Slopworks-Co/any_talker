@@ -12,7 +12,7 @@ import {
   type UserSettingsResponse,
 } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
-import { UsageCard } from "../../components/usage-card";
+import { UserLimitsSection } from "../../components/user-limits-section";
 import { LimitClassCard } from "../../components/limit-class-card";
 import type { Gender } from "../../../../shared/types";
 import { DEFAULT_LANG, type Lang } from "../../../../shared/i18n";
@@ -24,7 +24,7 @@ import {
 } from "../../components/layout";
 import { LargeTitle } from "../../components/large-title";
 import { LoadingState } from "../../components/states";
-import { RowButton, SaveButton } from "../../components/controls";
+import { SaveButton } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
 import { DisplayNameField } from "../../components/display-name-field";
 import { GenderField } from "../../components/gender-field";
@@ -83,11 +83,6 @@ export function UserEditView({ userId }: { userId: string }) {
     api.getUserUsage(userId).then((r) => setUsage(r.usage));
     api.getUserSpending(userId).then((r) => setSpending(r.spending));
   }, [userId]);
-
-  const resetUsage = async () => {
-    const r = await api.resetUserUsage(userId);
-    setUsage(r.usage);
-  };
 
   // Until the hero can name the user, the page is titled like any other.
   if (notFound || !data)
@@ -179,15 +174,7 @@ export function UserEditView({ userId }: { userId: string }) {
         footer={s.ui_access_footer_user}
       />
 
-      <SectionHeader>{s.ui_user_usage}</SectionHeader>
-      {usage ? (
-        <>
-          <UsageCard usage={usage} percent />
-          <Card>
-            <RowButton onClick={resetUsage}>{s.ui_ratelimit_reset}</RowButton>
-          </Card>
-        </>
-      ) : null}
+      <UserLimitsSection userId={user.id} usage={usage} onUsage={setUsage} />
 
       <DisplayNameField
         label={s.ui_user_name}
