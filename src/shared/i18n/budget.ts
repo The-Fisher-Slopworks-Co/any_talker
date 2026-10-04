@@ -5,75 +5,84 @@ import { m } from "./message";
 
 // Budget caps, anomaly thresholds and the spend dashboard.
 export const budgetMessages = {
-  // Budget settings tab (caps + anomaly thresholds)
-  ui_budget_caps_header: m({
-    en: "Hard USD caps",
-    ru: "Жёсткие потолки в USD",
-  }),
-  ui_budget_caps_footer: m({
-    en: "Monthly is the real ceiling; the others limit burn rate. Owner is never blocked.",
-    ru: "Месячный — реальный потолок, остальные ограничивают скорость расхода. Владелец не блокируется.",
-  }),
+  // Budget settings tab (caps + digest + spike alerts)
   ui_budget_enabled: m({
-    en: "Enforce budget caps",
+    en: "Enforce Budget Caps",
     ru: "Применять лимиты бюджета",
   }),
   ui_budget_owner_exempt: m({
-    en: "Exempt owner",
+    en: "Exempt Owner",
     ru: "Исключить владельца",
   }),
+  ui_budget_caps_header: m({
+    en: "Hard Caps",
+    ru: "Жёсткие лимиты",
+  }),
+  ui_budget_caps_footer: m({
+    en: "Monthly is the real ceiling; the others limit burn rate.",
+    ru: "Месячный — реальный потолок, остальные ограничивают скорость расхода.",
+  }),
   ui_budget_global_monthly: m({
-    en: "Global / month ($)",
-    ru: "Глобально / месяц ($)",
+    en: "Global per Month",
+    ru: "Всего за месяц",
   }),
   ui_budget_global_daily: m({
-    en: "Global / day ($)",
-    ru: "Глобально / день ($)",
+    en: "Global per Day",
+    ru: "Всего за день",
   }),
   ui_budget_per_chat_daily: m({
-    en: "Per chat / day ($)",
-    ru: "На чат / день ($)",
+    en: "Per Chat per Day",
+    ru: "На чат за день",
   }),
   ui_budget_new_user_daily: m({
-    en: "New user / day ($)",
-    ru: "Новый юзер / день ($)",
+    en: "New User per Day",
+    ru: "Новый юзер за день",
   }),
   ui_budget_new_user_window: m({
-    en: "New-user window (days)",
-    ru: "Окно новизны (дни)",
+    en: "New-User Window",
+    ru: "Окно новизны",
+  }),
+  ui_budget_digest_header: m({
+    en: "Digest",
+    ru: "Дайджест",
+  }),
+  ui_budget_digest_enabled: m({
+    en: "Regular Digest",
+    ru: "Регулярный дайджест",
+  }),
+  ui_budget_digest_interval: m({
+    en: "Send Every",
+    ru: "Отправлять каждые",
   }),
   ui_budget_anomaly_header: m({
-    en: "Spike alerts & digest",
-    ru: "Алерты скачков и дайджест",
+    en: "Spike Alerts",
+    ru: "Всплески расходов",
   }),
   ui_budget_anomaly_footer: m({
     en: "Alerts only, never block requests.",
     ru: "Только уведомления, запросы не блокируются.",
   }),
-  ui_budget_digest_enabled: m({
-    en: "Regular digest",
-    ru: "Регулярный дайджест",
-  }),
-  ui_budget_digest_interval: m({
-    en: "Digest every (hours)",
-    ru: "Дайджест каждые (часов)",
-  }),
   ui_budget_spike_user_abs: m({
-    en: "User spike ($/day)",
-    ru: "Скачок юзера ($/день)",
+    en: "User Spike",
+    ru: "Всплеск юзера",
   }),
   ui_budget_spike_chat_abs: m({
-    en: "Chat spike ($/day)",
-    ru: "Скачок чата ($/день)",
+    en: "Chat Spike",
+    ru: "Всплеск чата",
   }),
   ui_budget_spike_velocity: m({
-    en: "Velocity (× baseline)",
-    ru: "Скорость (× базы)",
+    en: "Velocity",
+    ru: "Скорость",
   }),
   ui_budget_spike_min_baseline: m({
-    en: "Min baseline ($)",
-    ru: "Мин. база ($)",
+    en: "Min Baseline",
+    ru: "Мин. база",
   }),
+  // Units shown beside the numbers; a word unit gets a space, a symbol hugs.
+  ui_budget_unit_days: m({ en: "days", ru: "дн." }),
+  ui_budget_unit_hours: m({ en: "h", ru: "ч" }),
+  ui_budget_unit_per_day: m({ en: "/day", ru: "/день" }),
+  ui_budget_unit_baseline: m({ en: "× baseline", ru: "× базы" }),
   // Spend dashboard tab
   ui_spend_global_header: m({
     en: "Total spend (everyone)",

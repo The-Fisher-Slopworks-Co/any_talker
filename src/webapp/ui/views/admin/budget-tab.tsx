@@ -1,70 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
 import { useI18n } from "../../i18n-context";
-import { api } from "../../api-client";
-import type {
-  AnomalyConfig,
-  BudgetConfig,
-  Settings,
-} from "../../../../shared/types";
+import type { Settings } from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { NumberInput, SaveButton, Toggle } from "../../components/controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
-
-function NumRow({
-  label,
-  value,
-  onChange,
-  step,
-  min = 0,
-  integer,
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  step?: string;
-  min?: number;
-  integer?: boolean;
-}) {
-  return (
-    <label className={ROW_CLS}>
-      <span className={ROW_LABEL_CLS}>{label}</span>
-      <NumberInput
-        className={INPUT_CLS}
-        integer={integer}
-        step={step}
-        min={min}
-        value={value}
-        onChange={onChange}
-      />
-    </label>
-  );
-}
-
-function ToggleRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className={ROW_CLS}>
-      <span className={ROW_LABEL_CLS}>{label}</span>
-      <span className="flex-1" />
-      <Toggle value={value} onChange={onChange} />
-    </div>
-  );
-}
+import { NumberRow } from "../../components/number-row";
+import { SaveStatus } from "../../components/save-status";
+import { SwitchRow } from "../../components/switch-row";
+import { useSettingsAutosave } from "../../lib/use-settings-autosave";
 
 export function BudgetTab({
   settings,
@@ -74,119 +22,155 @@ export function BudgetTab({
   onSaved: (s: Settings) => void;
 }) {
   const { t: s } = useI18n();
-  const [budget, setBudget] = useState<BudgetConfig>(settings.budget);
-  const [anomaly, setAnomaly] = useState<AnomalyConfig>(settings.anomaly);
-  const [saving, setSaving] = useState(false);
-
-  const dirty =
-    JSON.stringify(budget) !== JSON.stringify(settings.budget) ||
-    JSON.stringify(anomaly) !== JSON.stringify(settings.anomaly);
-
-  const save = async () => {
-    setSaving(true);
-    const next = await api.putSettings({ budget, anomaly });
-    onSaved(next);
-    setSaving(false);
-  };
-
-  const b = (patch: Partial<BudgetConfig>) =>
-    setBudget({ ...budget, ...patch });
-  const a = (patch: Partial<AnomalyConfig>) =>
-    setAnomaly({ ...anomaly, ...patch });
+  const { draft, save, status } = useSettingsAutosave({ settings, onSaved });
+  const { budget, anomaly } = draft;
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_budget_caps_header}</SectionHeader>
       <Card>
-        <ToggleRow
+        <SwitchRow
           label={s.ui_budget_enabled}
           value={budget.enabled}
-          onChange={(v) => b({ enabled: v })}
+          onChange={(enabled) => save({ budget: { enabled } })}
         />
-        <ToggleRow
+        <SwitchRow
           label={s.ui_budget_owner_exempt}
           value={budget.ownerExempt}
-          onChange={(v) => b({ ownerExempt: v })}
+          onChange={(ownerExempt) => save({ budget: { ownerExempt } })}
         />
-        <NumRow
+      </Card>
+
+      <SectionHeader>{s.ui_budget_caps_header}</SectionHeader>
+      <Card>
+        <NumberRow
           label={s.ui_budget_global_monthly}
+          prefix="$"
+          decimals={2}
           step="0.5"
+          min={0}
           value={budget.globalMonthlyCapUsd}
-          onChange={(n) => b({ globalMonthlyCapUsd: n })}
+          onCommit={(globalMonthlyCapUsd) =>
+            save({ budget: { globalMonthlyCapUsd } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_global_daily}
+          prefix="$"
+          decimals={2}
           step="0.5"
+          min={0}
           value={budget.globalDailyCapUsd}
-          onChange={(n) => b({ globalDailyCapUsd: n })}
+          onCommit={(globalDailyCapUsd) =>
+            save({ budget: { globalDailyCapUsd } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_per_chat_daily}
+          prefix="$"
+          decimals={2}
           step="0.5"
+          min={0}
           value={budget.perChatDailyCapUsd}
-          onChange={(n) => b({ perChatDailyCapUsd: n })}
+          onCommit={(perChatDailyCapUsd) =>
+            save({ budget: { perChatDailyCapUsd } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_new_user_daily}
+          prefix="$"
+          decimals={2}
           step="0.05"
+          min={0}
           value={budget.newUserDailyCapUsd}
-          onChange={(n) => b({ newUserDailyCapUsd: n })}
+          onCommit={(newUserDailyCapUsd) =>
+            save({ budget: { newUserDailyCapUsd } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_new_user_window}
+          suffix={s.ui_budget_unit_days}
           integer
           min={1}
           value={budget.newUserWindowDays}
-          onChange={(n) => b({ newUserWindowDays: n })}
+          onCommit={(newUserWindowDays) =>
+            save({ budget: { newUserWindowDays } })
+          }
         />
       </Card>
       <SectionFooter>{s.ui_budget_caps_footer}</SectionFooter>
 
-      <SectionHeader>{s.ui_budget_anomaly_header}</SectionHeader>
+      <SectionHeader>{s.ui_budget_digest_header}</SectionHeader>
       <Card>
-        <ToggleRow
+        <SwitchRow
           label={s.ui_budget_digest_enabled}
           value={anomaly.digestEnabled}
-          onChange={(v) => a({ digestEnabled: v })}
+          onChange={(digestEnabled) => save({ anomaly: { digestEnabled } })}
         />
         {anomaly.digestEnabled && (
-          <NumRow
+          <NumberRow
             label={s.ui_budget_digest_interval}
+            suffix={s.ui_budget_unit_hours}
             integer
             min={1}
             value={anomaly.digestIntervalHours}
-            onChange={(n) => a({ digestIntervalHours: n })}
+            onCommit={(digestIntervalHours) =>
+              save({ anomaly: { digestIntervalHours } })
+            }
           />
         )}
-        <NumRow
+      </Card>
+
+      <SectionHeader>{s.ui_budget_anomaly_header}</SectionHeader>
+      <Card>
+        <NumberRow
           label={s.ui_budget_spike_user_abs}
+          prefix="$"
+          suffix={s.ui_budget_unit_per_day}
+          decimals={2}
           step="0.1"
+          min={0}
           value={anomaly.spikeUserAbsoluteUsd}
-          onChange={(n) => a({ spikeUserAbsoluteUsd: n })}
+          onCommit={(spikeUserAbsoluteUsd) =>
+            save({ anomaly: { spikeUserAbsoluteUsd } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_spike_chat_abs}
+          prefix="$"
+          suffix={s.ui_budget_unit_per_day}
+          decimals={2}
           step="0.1"
+          min={0}
           value={anomaly.spikeChatAbsoluteUsd}
-          onChange={(n) => a({ spikeChatAbsoluteUsd: n })}
+          onCommit={(spikeChatAbsoluteUsd) =>
+            save({ anomaly: { spikeChatAbsoluteUsd } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_spike_velocity}
+          suffix={s.ui_budget_unit_baseline}
           step="0.5"
           min={1}
           value={anomaly.spikeVelocityMultiplier}
-          onChange={(n) => a({ spikeVelocityMultiplier: n })}
+          onCommit={(spikeVelocityMultiplier) =>
+            save({ anomaly: { spikeVelocityMultiplier } })
+          }
         />
-        <NumRow
+        <NumberRow
           label={s.ui_budget_spike_min_baseline}
+          prefix="$"
+          decimals={2}
           step="0.01"
+          min={0}
           value={anomaly.spikeMinBaselineUsd}
-          onChange={(n) => a({ spikeMinBaselineUsd: n })}
+          onCommit={(spikeMinBaselineUsd) =>
+            save({ anomaly: { spikeMinBaselineUsd } })
+          }
         />
       </Card>
       <SectionFooter>{s.ui_budget_anomaly_footer}</SectionFooter>
 
-      <SaveButton saving={saving} dirty={dirty} onClick={save} />
+      <SaveStatus status={status} />
     </Stack>
   );
 }
