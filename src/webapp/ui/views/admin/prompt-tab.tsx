@@ -1,30 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
-import { api } from "../../api-client";
-import type {
-  ProviderSort,
-  ReasoningEffortConfig,
-  ServiceTier,
-  Settings,
-} from "../../../../shared/types";
+import type { Settings } from "../../../../shared/types";
 import {
   Card,
   SectionFooter,
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { SaveButton } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
-import { ProviderSortField } from "../../components/provider-sort-field";
-import { ProviderSelectField } from "../../components/provider-select-field";
-import { ServiceTierField } from "../../components/service-tier-field";
-import { ReasoningEffortField } from "../../components/reasoning-effort-field";
-import { TimezoneSelect } from "../../components/timezone-select";
+import { NumberRow } from "../../components/number-row";
 import { OptimizePromptButton } from "../../components/optimize-prompt-button";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
+import { ProviderSelectField } from "../../components/provider-select-field";
+import { ProviderSortField } from "../../components/provider-sort-field";
+import { ReasoningEffortField } from "../../components/reasoning-effort-field";
+import { SaveStatus } from "../../components/save-status";
+import { ServiceTierField } from "../../components/service-tier-field";
+import { TimezonePickerRow } from "../../components/timezone-picker-row";
+import { useSettingsAutosave } from "../../lib/use-settings-autosave";
+
+const sameList = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((m, i) => m === b[i]);
 
 export function PromptTab({
   settings,
@@ -34,74 +32,42 @@ export function PromptTab({
   onSaved: (s: Settings) => void;
 }) {
   const { t: s } = useI18n();
-  const [models, setModels] = useState<string[]>(settings.models);
-  const [modelsValid, setModelsValid] = useState(true);
-  const [prompt, setPrompt] = useState(settings.systemPrompt);
-  const [timezone, setTimezone] = useState(settings.timezone);
-  const [providerSort, setProviderSort] = useState<ProviderSort | null>(
-    settings.providerSort,
-  );
-  const [provider, setProvider] = useState<string | null>(settings.provider);
-  const [serviceTier, setServiceTier] = useState<ServiceTier | null>(
-    settings.serviceTier,
-  );
-  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortConfig>(
-    settings.reasoningEffort,
-  );
-  const [thresholdInput, setThresholdInput] = useState(
-    String(settings.expandableBlockquoteThreshold),
-  );
-  const [saving, setSaving] = useState(false);
+  const { draft, save, status } = useSettingsAutosave({ settings, onSaved });
 
-  // Save exactly what the card shows.
-  const trimmed = models.map((m) => m.trim()).filter((m) => m.length > 0);
-  const modelsDirty =
-    trimmed.length !== settings.models.length ||
-    trimmed.some((m, i) => m !== settings.models[i]);
-  const parsedThreshold = Number(thresholdInput);
-  const thresholdValid =
-    thresholdInput.trim() !== "" &&
-    Number.isInteger(parsedThreshold) &&
-    parsedThreshold >= 0;
-  const thresholdDirty =
-    thresholdValid &&
-    parsedThreshold !== settings.expandableBlockquoteThreshold;
-  const dirty =
-    modelsDirty ||
-    prompt !== settings.systemPrompt ||
-    timezone !== settings.timezone ||
-    providerSort !== settings.providerSort ||
-    provider !== settings.provider ||
-    serviceTier !== settings.serviceTier ||
-    reasoningEffort.short !== settings.reasoningEffort.short ||
-    thresholdDirty;
-  const canSave = dirty && trimmed.length > 0 && thresholdValid && modelsValid;
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const next = await api.putSettings({
-        models: trimmed,
-        systemPrompt: prompt,
-        timezone,
-        providerSort,
-        provider,
-        serviceTier,
-        reasoningEffort,
-        expandableBlockquoteThreshold: parsedThreshold,
-      });
-      onSaved(next);
-      setModels(next.models);
-      setTimezone(next.timezone);
-      setProviderSort(next.providerSort);
-      setProvider(next.provider);
-      setServiceTier(next.serviceTier);
-      setReasoningEffort(next.reasoningEffort);
-      setThresholdInput(String(next.expandableBlockquoteThreshold));
-    } finally {
-      setSaving(false);
-    }
+  // Text being typed lives here until it is committed; a change to the saved
+  // value (a revert after a failed save) replaces it.
+  const [prompt, setPrompt] = useState(draft.systemPrompt);
+  const [seenPrompt, setSeenPrompt] = useState(draft.systemPrompt);
+  if (draft.systemPrompt !== seenPrompt) {
+    setSeenPrompt(draft.systemPrompt);
+    setPrompt(draft.systemPrompt);
+  }
+  const commitPrompt = () => {
+    if (prompt !== draft.systemPrompt) save({ systemPrompt: prompt });
   };
+  // Leaving the screen (Telegram's back button) blurs nothing, so what is
+  // still pending is committed on unmount.
+  const latest = useRef({ prompt, draft, save });
+  useEffect(() => {
+    latest.current = { prompt, draft, save };
+  });
+  useEffect(
+    () => () => {
+      const l = latest.current;
+      if (l.prompt !== l.draft.systemPrompt) l.save({ systemPrompt: l.prompt });
+    },
+    [],
+  );
+
+  // The model rows as edited: a blank fallback or an id the catalogue rejects
+  // stays on screen without being saved.
+  const [models, setModels] = useState(draft.models);
+  const [seenModels, setSeenModels] = useState(draft.models);
+  if (!sameList(draft.models, seenModels)) {
+    setSeenModels(draft.models);
+    const shown = models.map((m) => m.trim()).filter((m) => m.length > 0);
+    if (!sameList(draft.models, shown)) setModels(draft.models);
+  }
 
   return (
     <Stack>
@@ -109,28 +75,34 @@ export function PromptTab({
       <ModelsCard
         models={models}
         onChange={setModels}
-        onValidityChange={setModelsValid}
+        onCommit={(ids) => {
+          if (!sameList(ids, draft.models)) save({ models: ids });
+        }}
         fallback={true}
-        providerSort={providerSort}
+        providerSort={draft.providerSort}
       />
 
       <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
       <Card>
-        <ProviderSortField value={providerSort} onChange={setProviderSort} />
+        <ProviderSortField
+          value={draft.providerSort}
+          onChange={(providerSort) => save({ providerSort })}
+        />
         <ProviderSelectField
           // The first *non-empty* id, not the first row: with a chain, an emptied
           // primary row would otherwise disable the picker even though a real
           // model is configured below it.
-          modelId={trimmed[0] ?? ""}
-          value={provider}
-          onChange={setProvider}
+          modelId={models.find((m) => m.trim() !== "") ?? ""}
+          value={draft.provider}
+          onChange={(provider) => save({ provider })}
         />
-        <ServiceTierField value={serviceTier} onChange={setServiceTier} />
+        <ServiceTierField
+          value={draft.serviceTier}
+          onChange={(serviceTier) => save({ serviceTier })}
+        />
         <ReasoningEffortField
-          value={reasoningEffort.short}
-          onChange={(short) =>
-            setReasoningEffort({ ...reasoningEffort, short })
-          }
+          value={draft.reasoningEffort.short}
+          onChange={(short) => save({ reasoningEffort: { short } })}
         />
       </Card>
       <SectionFooter>{s.ui_prompt_provider_routing_footer}</SectionFooter>
@@ -141,39 +113,37 @@ export function PromptTab({
           className="block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          onBlur={commitPrompt}
           placeholder={s.ui_prompt_placeholder}
         />
       </Card>
       <OptimizePromptButton prompt={prompt} />
 
-      <SectionHeader>{s.ui_prompt_timezone}</SectionHeader>
-      <TimezoneSelect value={timezone} onChange={setTimezone} />
+      <div className="section-gap">
+        <Card>
+          <TimezonePickerRow
+            value={draft.timezone}
+            emptyLabel={null}
+            onChange={(timezone) => {
+              if (timezone !== null) save({ timezone });
+            }}
+          />
+          <NumberRow
+            label={s.ui_prompt_expandable_threshold}
+            suffix={s.ui_prompt_chars_suffix}
+            min={0}
+            step={1}
+            integer
+            value={draft.expandableBlockquoteThreshold}
+            onCommit={(expandableBlockquoteThreshold) =>
+              save({ expandableBlockquoteThreshold })
+            }
+          />
+        </Card>
+      </div>
       <SectionFooter>{s.ui_prompt_timezone_footer}</SectionFooter>
 
-      <SectionHeader>{s.ui_prompt_expandable_threshold}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>
-            {s.ui_prompt_expandable_threshold}
-          </span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            className={INPUT_CLS}
-            value={thresholdInput}
-            onChange={(e) => setThresholdInput(e.target.value)}
-          />
-        </label>
-      </Card>
-      <SectionFooter>{s.ui_prompt_expandable_threshold_footer}</SectionFooter>
-
-      <SaveButton
-        saving={saving}
-        dirty={dirty}
-        disabled={saving || !canSave}
-        onClick={save}
-      />
+      <SaveStatus status={status} />
     </Stack>
   );
 }

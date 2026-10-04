@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n-context";
 import {
   fetchModelCatalog,
@@ -155,6 +155,16 @@ function ModelInfo({
   );
 }
 
+// The ids to save for `list`: trimmed, blank rows dropped. Null when nothing is
+// left or some id is not `known`, so a half-typed chain never reaches the server.
+export function committableModels(
+  list: string[],
+  known: (id: string) => boolean,
+): string[] | null {
+  const ids = list.map((m) => m.trim()).filter((m) => m.length > 0);
+  return ids.length > 0 && ids.every(known) ? ids : null;
+}
+
 // The model picker. With `fallback` off it edits a single id — a plain
 // OpenAI-compatible endpoint has no server-side fallback chain, so extra ids
 // would never be sent. With it on, the trailing rows are the chain the gateway
@@ -169,12 +179,17 @@ export function ModelsCard({
   models,
   onChange,
   onValidityChange,
+  onCommit,
   fallback = false,
   providerSort = null,
 }: {
   models: string[];
   onChange: (next: string[]) => void;
   onValidityChange?: (valid: boolean) => void;
+  // For autosaving callers: the list to save, trimmed and without blank rows,
+  // offered when an input loses focus or a row is removed. Never called with an
+  // empty list or one holding an id the catalogue rejects.
+  onCommit?: (ids: string[]) => void;
   fallback?: boolean;
   providerSort?: ProviderSort | null;
 }) {
@@ -218,8 +233,27 @@ export function ModelsCard({
     onChange(
       fallback ? models.map((m, i) => (i === idx ? value : m)) : [value],
     );
-  const removeAt = (idx: number) =>
-    onChange(models.filter((_, i) => i !== idx));
+  const commit = (list: string[]) => {
+    const ids = committableModels(list, (id) => !canValidate || !!resolve(id));
+    if (ids) onCommit?.(ids);
+  };
+  // Telegram's back button unmounts the card without a blur, so what is still
+  // being edited is offered for saving on unmount, as NumberRow does.
+  const latest = useRef({ rows, commit });
+  useEffect(() => {
+    latest.current = { rows, commit };
+  });
+  useEffect(
+    () => () => {
+      if (onCommit) latest.current.commit(latest.current.rows);
+    },
+    [],
+  );
+  const removeAt = (idx: number) => {
+    const next = models.filter((_, i) => i !== idx);
+    onChange(next);
+    commit(next);
+  };
 
   return (
     <Card>
@@ -242,6 +276,7 @@ export function ModelsCard({
                 className={INPUT_LEFT_CLS}
                 value={m}
                 onChange={(e) => updateAt(idx, e.target.value)}
+                onBlur={() => commit(rows)}
                 placeholder={s.ui_models_model_id}
                 list={listId}
                 autoComplete="off"
