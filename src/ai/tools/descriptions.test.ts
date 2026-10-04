@@ -68,4 +68,10 @@ describe("tool descriptions", () => {
     expect(tool?.description).toContain("ONLY when the user explicitly names");
     expect(tool?.description).toContain("set the timezone FIRST");
   });
+
+  test("schedule_reminder takes a bare request's details from the thread", () => {
+    const tool = allTools().find((t) => t.name === "schedule_reminder");
+    expect(tool?.description).toContain("subject and time from the thread");
+    expect(tool?.description).toContain("ask ONLY what the thread leaves");
+  });
 });
