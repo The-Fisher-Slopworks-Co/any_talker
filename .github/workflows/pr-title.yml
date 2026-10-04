@@ -49,7 +49,6 @@ jobs:
             budget
             checks
             managed-bots
-            metrics
             observability
             ratelimit
             reminders

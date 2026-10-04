@@ -2,7 +2,7 @@
 
 Telegram bot with AI integration via OpenRouter (grammY + Bun + KeyDB).
 See `README.md` for setup, running, deployment, observability, and the
-user-facing feature/metrics catalog. This file covers how to work in the code.
+user-facing feature catalog. This file covers how to work in the code.
 
 ### Commands
 
@@ -47,7 +47,7 @@ No workflow reacts to releases or tags. After the PR merges the release can go:
 - `webapp/` — admin Web App: HTTP API (`api.ts`, `auth.ts`) + React UI (`ui/`).
 - `managed-bots/` — user-created child bots (manager, polling supervisor, persona).
 - `budget/`, `spending/`, `ratelimit/` — spend guard, spend accounting, rate limits.
-- `observability/` — digest + spike alerts; `metrics/` — instruments/registry.
+- `observability/` — digest + spike alerts.
 - `reminders/`, `checks/`, `shared/` (i18n, shared types, tz), `types/` (ambient `.d.ts`) — supporting subsystems.
 
 ### Conventions
@@ -70,7 +70,7 @@ No workflow reacts to releases or tags. After the PR merges the release can go:
 - **One task = one branch = one PR.** Past ~300 changed lines, split it into several PRs. `pr-size.yml` labels every PR `size:XS`…`size:XXL` from additions + deletions minus tests, `bun.lock` and generated files; **`size:XL` or `size:XXL` means split the PR**, not "explain why it is large".
 - **PR title is the squash commit subject:** conventional commit with a scope, enforced by `.github/workflows/pr-title.yml`.
   - Type: `feat` `fix` `refactor` `chore` `docs` `test` `ci` `perf` `revert`.
-  - Scope (required): a top-level `src/` module — `ai` `bot` `budget` `checks` `managed-bots` `metrics` `observability` `ratelimit` `reminders` `shared` `spending` `storage` `types` `webapp` — or `deps` `github` `release` `docker`. A new module means adding it to the `scopes:` list in that workflow.
+  - Scope (required): a top-level `src/` module — `ai` `bot` `budget` `checks` `managed-bots` `observability` `ratelimit` `reminders` `shared` `spending` `storage` `types` `webapp` — or `deps` `github` `release` `docker`. A new module means adding it to the `scopes:` list in that workflow.
   - Subject: lowercase start, imperative, no trailing period.
   - The body follows `.github/pull_request_template.md`.
   - The body describes this PR alone. No links to the other PRs of a stack, no "this is the first/second/third PR", no "the next PR will…": GitHub already shows the base branch and the PRs stacked on it.

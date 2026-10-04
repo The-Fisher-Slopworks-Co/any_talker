@@ -14,7 +14,6 @@ import {
   ReminderParseError,
   type ReminderParseFailureReason,
 } from "../../reminders/parse";
-import { remindersParseFailuresTotal } from "../../metrics";
 import type { ScopedKey, ScopedKeyFor } from "./shared";
 
 const FETCH_DUE_LIMIT = 100;
@@ -145,7 +144,6 @@ export class KeyDBRemindersStore implements RemindersStore {
         reminders.push(parseStoredReminder(raw));
       } catch (err) {
         if (!(err instanceof ReminderParseError)) throw err;
-        remindersParseFailuresTotal.inc({ reason: err.reason });
         const verb = onCorrupt === "quarantine" ? "quarantining" : "skipping";
         console.error(
           `[reminders] ${verb} corrupted reminder id=${id} reason=${err.reason}:`,
@@ -297,7 +295,6 @@ export class KeyDBRemindersStore implements RemindersStore {
       return parseStoredReminder(raw);
     } catch (err) {
       if (err instanceof ReminderParseError) {
-        remindersParseFailuresTotal.inc({ reason: err.reason });
         console.error(
           `[reminders] skipping corrupted reminder id=${id} reason=${err.reason}:`,
           err.cause,

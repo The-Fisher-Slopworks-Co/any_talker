@@ -5,12 +5,11 @@ import type { Storage } from "../storage/types";
 import type { RateLimiter, CheckResult } from "./types";
 import type { RateLimitConfig } from "../shared/types";
 import { summarizeUsage, currentWindowStarts } from "./window";
-import { rateLimitChecksTotal, rateLimitUsdDeductedTotal } from "../metrics";
 
 // Per-user dual fixed-window limiter (5-hour + weekly). `check` is read-only —
 // the window math is deterministic, so the only persisted state is the spent
 // total, written by `deduct` after the AI responds. All windowing lives in the
-// pure `./window` module; this class is the thin Storage/metrics adapter.
+// pure `./window` module; this class is the thin Storage adapter.
 export class DualWindowLimiter implements RateLimiter {
   constructor(private readonly storage: Storage) {}
 
@@ -24,7 +23,6 @@ export class DualWindowLimiter implements RateLimiter {
     const weeklyExhausted = status.weekly.remaining <= 0;
     const fiveExhausted = status.fiveHour.remaining <= 0;
     if (weeklyExhausted || fiveExhausted) {
-      rateLimitChecksTotal.inc({ result: "denied" });
       // The request is allowed again only once EVERY exhausted window has rolled
       // over, so the binding constraint is the exhausted window that resets
       // LAST. The two windows are phase-shifted by independent per-user offsets,
@@ -40,12 +38,10 @@ export class DualWindowLimiter implements RateLimiter {
         msUntilReset: binding.resetMs - now,
       };
     }
-    rateLimitChecksTotal.inc({ result: "allowed" });
     return { allowed: true };
   }
 
   async deduct(userId: string, usd: number, now: number): Promise<void> {
-    if (usd > 0) rateLimitUsdDeductedTotal.inc(usd);
     const starts = currentWindowStarts(userId, now);
     await this.storage.usage.add(userId, usd, starts.fiveHour, starts.weekly);
   }

@@ -3,7 +3,6 @@
 
 import type { Bot } from "grammy";
 import { CHECK_CALLBACK_RE } from "../../checks/callback-data";
-import { checksProcessedTotal } from "../../metrics";
 import { migrateChatData } from "../../storage/migrate-chat";
 import { dropChatMenu } from "../chat-commands";
 import { handleCheckCallback } from "../handlers/check-callback";
@@ -157,11 +156,6 @@ export function registerChatEventListeners(
         .answerCallbackQuery({ text: ctx.t.bot_check_wrong_user })
         .catch(() => {});
       return;
-    }
-    if (outcome.kind === "resolved") {
-      checksProcessedTotal.inc({
-        outcome: answer === "yes" ? "answered_yes" : "answered_no",
-      });
     }
     await ctx.answerCallbackQuery().catch(() => {});
   });

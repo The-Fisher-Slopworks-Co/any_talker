@@ -15,7 +15,6 @@ import type {
   VideoKind,
   VideoMessageLike,
 } from "./types";
-import { videoExtractionsTotal } from "../../metrics";
 
 // Telegram's getFile ceiling: bots cannot download a file larger than this, so
 // an oversized clip is rejected before the request is even made.
@@ -92,11 +91,9 @@ export async function fetchVideoParts(args: {
 }): Promise<VideoFetchOutcome> {
   const { video } = args;
   if (video.durationSec > MAX_VIDEO_SECONDS) {
-    videoExtractionsTotal.inc({ outcome: "too_long" });
     return { ok: false, reason: "too_long" };
   }
   if (video.fileSize !== null && video.fileSize > MAX_VIDEO_BYTES) {
-    videoExtractionsTotal.inc({ outcome: "too_large" });
     return { ok: false, reason: "too_large" };
   }
 
@@ -111,14 +108,10 @@ export async function fetchVideoParts(args: {
     // Fallback for a clip that arrived without `file_size`: getFile rejects an
     // oversized file by description, so keep the honest message in that case.
     const tooBig = /too big/i.test(err instanceof Error ? err.message : "");
-    videoExtractionsTotal.inc({
-      outcome: tooBig ? "too_large" : "download_failed",
-    });
     return { ok: false, reason: tooBig ? "too_large" : "unavailable" };
   }
 
   if (args.mode === "native") {
-    videoExtractionsTotal.inc({ outcome: "native" });
     return {
       ok: true,
       mode: "native",
@@ -137,9 +130,7 @@ export async function fetchVideoParts(args: {
   });
 
   if (frames.length === 0) {
-    videoExtractionsTotal.inc({ outcome: "extract_failed" });
     return { ok: false, reason: "unavailable" };
   }
-  videoExtractionsTotal.inc({ outcome: "frames" });
   return { ok: true, mode: "frames", frames, audio };
 }

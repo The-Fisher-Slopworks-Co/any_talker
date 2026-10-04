@@ -52,38 +52,6 @@ How to work in this code — layout, conventions, and the Definition of done for
 pull request — is in `CLAUDE.md`, which `AGENTS.md` symlinks to so every coding
 agent reads the same file.
 
-## Observability
-
-The bot exposes Prometheus metrics on `GET /metrics` (port 8080) and writes
-logs as JSON lines when `LOG_FORMAT=json` (the default under
-`NODE_ENV=production`). `/metrics` is unauthenticated and shares the port with
-the Web App, so block that path at whatever proxy fronts the bot publicly. The
-bot publishes the following metric families:
-
-| Metric | Type | Labels | Purpose |
-|---|---|---|---|
-| `bot_updates_total` | counter | `type` | Telegram updates received |
-| `bot_commands_total` | counter | `command` | Bot commands seen (allowlisted) |
-| `bot_ask_total` | counter | `source`, `outcome` | `/ask` and guest-mode outcomes |
-| `bot_ask_duration_seconds` | histogram | `source`, `outcome` | End-to-end handler latency |
-| `bot_ask_tokens_total` | counter | `source` | Tokens billed by the provider |
-| `bot_ai_requests_total` | counter | `outcome` | AI endpoint call success/error |
-| `bot_ai_request_duration_seconds` | histogram | `outcome` | AI endpoint call latency |
-| `bot_tool_calls_total` | counter | `tool`, `outcome` | Tool invocations by the model |
-| `bot_tool_call_duration_seconds` | histogram | `tool` | Tool execution latency |
-| `bot_rate_limit_checks_total` | counter | `result` | Rate-limit allow/deny |
-| `bot_rate_limit_usd_deducted_total` | counter | — | Total USD charged to usage windows |
-| `bot_budget_denied_total` | counter | `reason` | Requests denied by a USD budget cap (global/chat/new-user) |
-| `bot_reminders_delivered_total` | counter | `outcome` | Reminder scheduler results |
-| `bot_checks_processed_total` | counter | `outcome` | Recurring-check fires/timeouts/answers |
-| `bot_video_extractions_total` | counter | `outcome` | Video attachments turned into model input (native / frames / too long / too large / failed) |
-| `http_requests_total` | counter | `method`, `route`, `status` | Web App / API traffic |
-| `http_request_duration_seconds` | histogram | `method`, `route` | Web App / API latency |
-| `process_uptime_seconds` | gauge | — | Process uptime |
-| `process_resident_memory_bytes` | gauge | — | RSS |
-| `process_heap_used_bytes` | gauge | — | V8 heap in use |
-| `bot_build_info` | gauge | `version`, `bun` | Always 1, carries metadata |
-
 ## HTTP proxy
 
 The bot honours the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`

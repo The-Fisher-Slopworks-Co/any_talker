@@ -7,7 +7,6 @@ import {
   CONVERSATION_TTL_SECONDS,
   PHOTO_CACHE_TTL_SECONDS,
 } from "../../shared/types";
-import { photoCacheErrorsTotal } from "../../metrics";
 import { PREFIX, type ScopedKey } from "./shared";
 
 // Mixed scoping on purpose: the file-bytes cache is keyed by Telegram's global
@@ -25,11 +24,10 @@ export class KeyDBPhotosStore implements PhotosStore {
     if (raw === null) return null;
     // Renew TTL on access so hot photos stay cached longer than the original
     // 7-day window if the conversation chain keeps referencing them. A
-    // renewal failure is logged and counted, not raised: the photo bytes
+    // renewal failure is logged, not raised: the photo bytes
     // are already in hand, premature eviction is the worst case.
     await this.client.expire(key, PHOTO_CACHE_TTL_SECONDS).catch((err) => {
       console.error("photo cache expire renewal failed:", err);
-      photoCacheErrorsTotal.inc({ op: "ttl" });
     });
     return new Uint8Array(Buffer.from(raw, "base64"));
   }
