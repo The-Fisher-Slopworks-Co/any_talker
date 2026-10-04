@@ -45,9 +45,17 @@ describe("buildInstruction", () => {
   test("separates sections with a blank line", () => {
     const out = buildInstruction("X");
     const sectionStarts = (out.match(/^# /gm) ?? []).length;
-    expect(sectionStarts).toBe(3);
+    expect(sectionStarts).toBe(4);
     expect(out).toMatch(/\n\n# Формат ответа/);
     expect(out).toMatch(/\n\n# Персонаж/);
+  });
+
+  test("documents the profile field and pins fact values as data", () => {
+    const out = buildInstruction("X");
+    expect(out).toContain("`profile`");
+    expect(out).toContain("# Профиль автора");
+    expect(out).toContain("До следующего `profile` того же автора");
+    expect(out).toContain("ДАННЫЕ");
   });
 
   test("appends a time section naming the timezone when one is provided", () => {

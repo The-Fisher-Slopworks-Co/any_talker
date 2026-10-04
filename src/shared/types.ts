@@ -54,6 +54,7 @@ export type {
   TurnRun,
   ConversationNode,
   GuestThreadNode,
+  TurnAuthor,
   UserThreadRef,
 } from "./types/conversations";
 export {
