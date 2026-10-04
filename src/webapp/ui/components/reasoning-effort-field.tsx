@@ -4,7 +4,7 @@
 import { useI18n } from "../i18n-context";
 import { REASONING_EFFORTS, type ReasoningEffort } from "../../../shared/types";
 import { SelectChevron } from "./controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { ROW_CLS, ROW_LABEL_CLS, VALUE_INPUT_CLS } from "./row";
 
 // The "no effort sent" choice, encoded as an option value the <select> can hold.
 const DEFAULT_VALUE = "";
@@ -37,7 +37,7 @@ export function ReasoningEffortField({
       <span className={ROW_LABEL_CLS}>{label}</span>
       <span className="relative flex flex-1 min-w-0 items-center">
         <select
-          className={`${INPUT_CLS} w-full pr-5`}
+          className={`${VALUE_INPUT_CLS} w-full pr-4`}
           value={value ?? DEFAULT_VALUE}
           onChange={(e) =>
             onChange(

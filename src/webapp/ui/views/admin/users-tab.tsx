@@ -6,7 +6,7 @@ import { api } from "../../api-client";
 import { Card, SectionHeader, Stack } from "../../components/layout";
 import { EmptyState, LoadingState } from "../../components/states";
 import { SELECTABLE_ROW_CLS } from "../../components/row";
-import { NavRow } from "../../components/select-row";
+import { DisclosureChevron, NavRow } from "../../components/select-row";
 import { formatUsd, userDisplayName } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
@@ -61,7 +61,7 @@ export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
                   formatUsd(spending[u.id]?.month ?? 0),
                 )}
               </span>
-              <span className="shrink-0 text-tg-hint text-[15px]">›</span>
+              <DisclosureChevron />
             </button>
           ))
         )}

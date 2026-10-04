@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 export function SectionHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="section-header px-4 pb-1.5 text-[14px] font-medium text-tg-section-header">
+    <div className="section-header px-4 pb-0.5 text-[13px] leading-[18px] tracking-[-0.08px] uppercase text-tg-section-header">
       {children}
     </div>
   );
@@ -13,7 +13,7 @@ export function SectionHeader({ children }: { children: ReactNode }) {
 
 export function SectionFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="px-4 pt-1.5 text-[13px] leading-[1.35] text-tg-hint">
+    <div className="px-4 pt-0.5 text-[13px] leading-[18px] tracking-[-0.08px] text-tg-hint">
       {children}
     </div>
   );
