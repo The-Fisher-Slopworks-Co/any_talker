@@ -22,6 +22,7 @@ import { adminCheckRoutes } from "./routes/admin-checks";
 import { adminFeedbackRoutes } from "./routes/admin-feedback";
 import { adminManagedBotRoutes } from "./routes/admin-managed-bots";
 import { adminApiTokenRoutes } from "./routes/admin-api-token";
+import { adminSummaryRoutes } from "./routes/admin-summary";
 
 export type {
   ApiRequest,
@@ -59,6 +60,7 @@ const ADMIN_ROUTES: Route[] = [
   ...adminFeedbackRoutes,
   ...adminManagedBotRoutes,
   ...adminApiTokenRoutes,
+  ...adminSummaryRoutes,
 ];
 
 // The capture groups of a matching route, or null when this route is not the

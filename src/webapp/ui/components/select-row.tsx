@@ -46,12 +46,22 @@ export function NavRow({
   title,
   subtitle,
   icon,
+  value,
+  badge,
+  badgeLabel,
   onClick,
 }: {
   title: string;
   subtitle?: string;
   // A `SettingsIcon`; rows with one indent their separator past it.
   icon?: ReactNode;
+  // The row's current state in the hint colour, before the chevron.
+  value?: string;
+  // A red count pill, like an app-icon badge; for what wants attention.
+  // Hidden at 0.
+  badge?: number;
+  // What a screen reader says for the badge: a bare number means nothing.
+  badgeLabel?: string;
   onClick: () => void;
 }) {
   return (
@@ -67,6 +77,15 @@ export function NavRow({
           <div className="text-[13px] text-tg-hint truncate">{subtitle}</div>
         ) : null}
       </div>
+      {value ? <span className="shrink-0 text-tg-hint">{value}</span> : null}
+      {badge ? (
+        <span
+          aria-label={badgeLabel}
+          className="shrink-0 min-w-[22px] rounded-full bg-tg-destructive px-[7px] text-center text-[15px] leading-[22px] text-white"
+        >
+          {badge}
+        </span>
+      ) : null}
       <DisclosureChevron />
     </button>
   );

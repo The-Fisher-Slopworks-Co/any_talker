@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { m } from "./message";
+import { pluralRu } from "./plural";
 
 // Admin panel chrome: the section titles and the home screen's groups.
 export const adminMessages = {
@@ -56,6 +57,30 @@ export const adminMessages = {
   ui_admin_group_automation: m({
     en: "Automation",
     ru: "Автоматизация",
+  }),
+
+  // Values beside the home's rows.
+  ui_admin_value_on: m({
+    en: "On",
+    ru: "Вкл.",
+  }),
+  ui_admin_value_off: m({
+    en: "Off",
+    ru: "Выкл.",
+  }),
+  ui_admin_value_not_created: m({
+    en: "Not Created",
+    ru: "Не создан",
+  }),
+  ui_admin_value_created: m({
+    en: "Created",
+    ru: "Создан",
+  }),
+
+  // Spoken for the red count on the Feedback row.
+  ui_admin_new_count: m({
+    en: (n: number) => `${n} new`,
+    ru: (n: number) => pluralRu(n, "новый", "новых", "новых"),
   }),
 
   // The admin API token: a bearer that opens the admin API without Telegram.

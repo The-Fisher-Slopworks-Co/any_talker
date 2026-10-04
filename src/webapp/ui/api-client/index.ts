@@ -12,6 +12,7 @@ import { adminFeedbackApi } from "./admin-feedback";
 import { adminManagedBotsApi } from "./admin-managed-bots";
 import { adminApiTokenApi } from "./admin-api-token";
 import { adminSpendApi } from "./admin-spend";
+import { adminSummaryApi } from "./admin-summary";
 import { adminUsersApi } from "./admin-users";
 import { buildInfoApi } from "./build-info";
 import { meApi } from "./me";
@@ -70,5 +71,6 @@ export const api = {
   ...adminFeedbackApi,
   ...adminManagedBotsApi,
   ...adminApiTokenApi,
+  ...adminSummaryApi,
   ...buildInfoApi,
 };

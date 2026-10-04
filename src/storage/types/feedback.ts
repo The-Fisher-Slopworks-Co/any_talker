@@ -44,6 +44,8 @@ export interface FeedbackStore {
   get(id: string): Promise<FeedbackEntry | null>;
   list(query?: FeedbackListQuery): Promise<FeedbackPage>;
   delete(id: string): Promise<void>;
+  // How many records are in `status`, without reading any of them.
+  count(status: FeedbackStatus): Promise<number>;
 
   // Anti-spam: counts one submission against the reporter's UTC day, returning
   // the new count for the caller to compare with its own cap. Not the token

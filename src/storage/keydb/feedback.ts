@@ -107,6 +107,10 @@ export class KeyDBFeedbackStore implements FeedbackStore {
     return { entries, nextCursor };
   }
 
+  async count(status: FeedbackStatus): Promise<number> {
+    return this.client.zcard(statusIndex(status));
+  }
+
   // One key per reporter per UTC day. `INCR` creates it at 1, and `EXPIRE` is
   // re-armed on every hit: conditional would cost a round trip to learn what
   // the key's own date already says.
