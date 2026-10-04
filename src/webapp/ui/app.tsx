@@ -19,6 +19,7 @@ import {
   type Route,
 } from "./lib/routes";
 import { useSessionState } from "./lib/session-state";
+import { useBackButton } from "./lib/back-button";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
@@ -58,42 +59,32 @@ function AppShell({
       .catch(() => setUsage(null));
   }, []);
 
-  useEffect(() => {
-    const btn = window.Telegram?.WebApp?.BackButton;
-    if (!btn) return;
-    if (route.kind === "main") {
-      btn.hide();
-      return;
-    }
-    const handler = () => {
-      setRoute((r) => {
-        switch (r.kind) {
-          case "user-edit":
-          case "chat-edit":
-            return { kind: "admin-section", section: r.from };
-          case "check-edit":
-            return { kind: "admin-section", section: "checks" };
-          case "managed-bot-edit":
-            return { kind: "admin-section", section: "bots" };
-          case "feedback-view":
-            return { kind: "admin-section", section: "feedback" };
-          case "admin-section":
-            return { kind: "admin" };
-          case "admin":
-          case "my-reminders":
-          case "my-facts":
-          case "main":
-            return { kind: "main" };
-        }
-      });
-    };
-    btn.show();
-    btn.onClick(handler);
-    return () => {
-      btn.offClick(handler);
-      btn.hide();
-    };
-  }, [route.kind]);
+  // Back goes one level up the route tree; the root screen has no back.
+  useBackButton(
+    route.kind === "main"
+      ? null
+      : () =>
+          setRoute((r) => {
+            switch (r.kind) {
+              case "user-edit":
+              case "chat-edit":
+                return { kind: "admin-section", section: r.from };
+              case "check-edit":
+                return { kind: "admin-section", section: "checks" };
+              case "managed-bot-edit":
+                return { kind: "admin-section", section: "bots" };
+              case "feedback-view":
+                return { kind: "admin-section", section: "feedback" };
+              case "admin-section":
+                return { kind: "admin" };
+              case "admin":
+              case "my-reminders":
+              case "my-facts":
+              case "main":
+                return { kind: "main" };
+            }
+          }),
+  );
 
   const title = (() => {
     switch (route.kind) {
