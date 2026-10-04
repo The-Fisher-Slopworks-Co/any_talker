@@ -9,14 +9,6 @@ export const factsMessages = {
     en: "Memory",
     ru: "Память",
   }),
-  ui_main_memory: m({
-    en: "Memory",
-    ru: "Память",
-  }),
-  ui_main_my_facts: m({
-    en: "What the bot remembers about me",
-    ru: "Что бот помнит обо мне",
-  }),
   ui_facts_character: m({
     en: "Character",
     ru: "Персонаж",
