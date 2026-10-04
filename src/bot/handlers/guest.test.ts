@@ -40,7 +40,7 @@ class FakeAI implements AIClient {
 // Every envelope carries the moment its turn was sent (that stamp lives in the
 // message, not in the system prompt, so the prompt stays cacheable). The
 // fixtures sit a few ms past the epoch in the default UTC timezone.
-const SENT_AT = "1970-01-01 00:00";
+const SENT_AT = "1970-01-01 00:00 +00:00";
 
 // What the guest's first turn in a thread carries about them
 // (`bot/profile.ts`): the default timezone, the fixture language, no facts.

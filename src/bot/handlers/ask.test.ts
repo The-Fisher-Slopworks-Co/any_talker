@@ -43,7 +43,7 @@ class FakeAI implements AIClient {
 // Every envelope carries the moment its turn was sent (that stamp lives in the
 // message, not in the system prompt, so the prompt stays cacheable). The
 // fixtures sit a few ms past the epoch in the default UTC timezone.
-const SENT_AT = "1970-01-01 00:00";
+const SENT_AT = "1970-01-01 00:00 +00:00";
 
 // What user 42's first turn in a chain carries about them (`bot/profile.ts`):
 // the default timezone, the fixture language, no facts. A later turn of theirs
@@ -471,7 +471,9 @@ describe("askHandler", () => {
     const stored = await storage.conversations.get("c1", 999);
     expect(stored!.userQuestion).toBe(sent.at(-1)!.content as string);
     // Stamped in the chat's timezone, not UTC.
-    expect(JSON.parse(stored!.userQuestion).time).toBe("2026-05-08 18:42");
+    expect(JSON.parse(stored!.userQuestion).time).toBe(
+      "2026-05-08 18:42 +03:00",
+    );
   });
 
   test("answered: persistConversation links parent when reply was to existing bot msg", async () => {
