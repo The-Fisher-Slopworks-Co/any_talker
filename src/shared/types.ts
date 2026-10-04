@@ -58,7 +58,6 @@ export type {
   UserThreadRef,
 } from "./types/conversations";
 export {
-  MAX_REPLY_CHAIN_DEPTH,
   CONVERSATION_TTL_SECONDS,
   USER_THREAD_INDEX_MAX,
 } from "./types/conversations";
