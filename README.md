@@ -1,161 +1,24 @@
 # any_talker
 
-Telegram bot with AI integration via OpenRouter.
+A Telegram bot that answers `/ask` with any model on [OpenRouter](https://openrouter.ai), with an admin Web App to run it.
 
-## Setup
+## Run it
 
-1. Copy `.env.example` to `.env` and fill required vars:
-   - `BOT_TOKEN` — from @BotFather
-   - `OPENROUTER_API_KEY` — from https://openrouter.ai/keys
-   - `BOT_OWNER_ID` — your Telegram user ID
-
-   `OPENROUTER_BASE_URL` is optional and defaults to
-   `https://openrouter.ai/api/v1`; set it only when a proxy or a self-hosted
-   gateway fronts OpenRouter under its own hostname (include the version
-   segment). Per-request USD cost is the figure OpenRouter reports for the whole
-   tool-calling loop; a model it reports no cost for is flagged as
-   under-counted rather than priced from a local table.
-
-   The bot uses OpenRouter's model fallback chain, provider routing, service
-   tiers, per-provider stats in the admin model picker, and sticky
-   per-conversation routing so a chat keeps hitting the same provider's warm
-   prompt cache.
-2. Start KeyDB: `docker compose up -d`
-3. `bun install`
-4. Install [uv](https://docs.astral.sh/uv/): `bun run check` and the
-   pre-commit hook run `uvx reuse lint`, which fetches
-   [REUSE](https://reuse.software/) on first use.
-
-> Voice notes require `ffmpeg` on the host (the Docker image installs it):
-> Telegram ogg/opus is transcoded to mp3 before being sent. ffmpeg is also what
-> reduces a video to frames + soundtrack on models that don't take video input;
-> models that do get the clip whole and need no ffmpeg at all.
-
-## Run
+Needs [Bun](https://bun.sh), Docker, and [uv](https://docs.astral.sh/uv/) for `bun run check`.
 
 ```bash
-bun run dev      # long polling mode with hot reload
-bun run start    # production mode (long polling)
-bun test         # unit tests
-bun run typecheck
-bun run check    # typecheck + lint + format + knip + reuse + tests, the pre-commit gate
+cp .env.example .env   # BOT_TOKEN, OPENROUTER_API_KEY, BOT_OWNER_ID
+docker compose up -d   # KeyDB
+bun install
+bun run dev
 ```
 
-To open the admin Web App in a plain browser — no Telegram, bot, KeyDB or
-`.env` — run `bun run webapp:demo` and go to `http://localhost:3000/webapp`.
-It serves throwaway in-memory demo data (users, chats, reminders, checks,
-feedback, character bots, usage) and answers every API call as a demo user;
-`--as user` shows a regular user instead of the owner, `--lang ru` switches the
-language, `--port` moves it. Handy for UI work and screenshots in pull requests.
+To work on the Web App without Telegram, run `bun run webapp:demo` and open <http://localhost:3000/webapp>.
 
-How to work in this code — layout, conventions, and the Definition of done for a
-pull request — is in `CLAUDE.md`, which `AGENTS.md` symlinks to so every coding
-agent reads the same file.
+## Contributing
 
-## HTTP proxy
-
-The bot honours the standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY`
-environment variables (lowercase variants are also recognised). They apply
-to every outbound fetch: the Telegram Bot API (via grammY, which we route
-through Bun's native `fetch`), the AI endpoint, the `fetch_page` / `search_web`
-tools, and Telegram file downloads. `NO_PROXY` is a comma-separated list of
-exact hostnames to bypass (`*` disables the proxy entirely; per-entry ports
-are supported as `host:port`).
-
-## Features
-
-- `/ask <text>` — send to AI, optionally with reply context (walks the chain stored in KeyDB).
-- Media understanding — attach the `/ask` as a caption on a **photo** (albums included), a **voice
-  note**, a **video**, or a **GIF**, or reply with `/ask` to any of those (video notes included).
-  Photos go to the model as-is; voice notes are transcoded to mp3. A **video is sent whole** as a
-  native `input_video` item when the configured model accepts video input (Gemini & co — the bot
-  reads that off OpenRouter's `/models` modalities), so the model sees real motion and hears the
-  soundtrack; on a model without
-  video input it falls back to a handful of evenly spaced frames plus the audio track. Clips longer
-  than **60 seconds**, or above Telegram's 20 MB download ceiling, are refused with a note saying
-  which limit was hit. The duration cap is a cost guard: native video is billed by clip length
-  (Gemini charges ~260 tokens per second), so a few minutes of footage would swallow a user's whole
-  5-hour window in one ask.
-- Tool calling — built-in `random_number` tool; add new tools via `registerTool()`. Each call and
-  its result are stored with the turn and replayed on follow-ups as real `function_call` /
-  `function_call_output` items, so "you missed someone" is answered from the page the bot fetched
-  rather than from its own summary of it. Results are capped at 4096 chars (arguments are not —
-  they are model output, already bounded); at most 8 calls per turn are kept.
-- Reminders — ask the bot in chat to set one-shot reminders, list your pending ones, edit a
-  reminder's note or time, or cancel them by description; the AI drives this via the
-  `schedule_reminder` / `list_reminders` / `edit_reminder` / `cancel_reminder` tools. Each user
-  is capped at `maxRemindersPerUser` reminders shared across the main bot and all character bots
-  (default 5; editable in the admin Mini App under Reminders, or via `PUT /api/settings`).
-- Recurring reminders — "every day at 18:30", "every 20 minutes", "every two weeks starting
-  18 September": `schedule_reminder` with `everyAmount`/`everyUnit` repeats a reminder on a fixed interval of minutes,
-  hours, days or weeks. Only fixed intervals are supported — calendar rules ("every weekday", "the
-  first Monday of the month", cron) are declined with an explanation and the nearest supported
-  interval. The interval floor is 5 minutes, a series fires 4 times before it ends, and the whole
-  series counts as a single reminder against `maxRemindersPerUser`. Daily and weekly series repeat
-  on the user's wall clock, so a DST shift moves the spacing rather than the time of day.
-- Personal settings via chat — ask the bot to read or change your own name, timezone, gender, or
-  language in plain language ("call me Vasya", "I'm in Moscow time", "switch to Russian"); the AI
-  drives this via the `get_user_settings` / `update_user_settings` tools (the same four fields the
-  Web App exposes). Changes are confirmed with a blockquote and applied immediately — including to a
-  reminder set in the same message (e.g. "set it for 15:00, Yekaterinburg time") — and are shared
-  across the main bot and all character bots. The same settings are also editable in the Web App.
-- Per-user dual-window rate limit: a rolling **5-hour** and a **weekly** USD budget, charged with
-  what each reply actually cost (so cached input counts at its discounted price and output at its
-  full one; defaults: $0.025 / $0.175). Limited only when *either* window is exhausted; each user's window resets
-  are staggered (a deterministic per-user phase offset, in 10-minute steps). Configurable in admin UI.
-- **`/help`** (and `/start`) — an in-bot guide limited to what the UI does not reveal: that the bot
-  only answers `/ask`, that context follows reply chains, reminders, groups with several characters.
-  A home page with section buttons; ephemeral in a group, a plain reply in a DM.
-- **`/usage`** — any user can ask where they stand: per window, the share of that budget
-  already spent and when it resets. In a group the answer is an ephemeral message only the asker
-  sees, as `/feedback`'s is; in a DM it is a plain reply. The Web App shows the same two figures as progress
-  bars in a header above every screen. Both surfaces are **percentage-only by construction** — they
-  are built from a type that carries no amounts at all, so the raw budget figures stay on the
-  owner-gated admin routes.
-- **USD budget guard** — hard spend caps enforced independently of the per-user rate limit:
-  a global **monthly** cap (the kill-switch — sized to your real budget), a global **daily**
-  cap, a **per-chat** daily cap, and a tighter **new-user** daily cap during a soft-start window. The
-  owner is never blocked, but owner spend still counts. All caps are runtime-editable in the admin UI
-  (**Budget caps** tab); disable enforcement with one toggle. Spend is tracked per user/chat/global/
-  model — including reminder-delivery LLM re-runs, which now book cost too.
-- **Budget observability** — a **Spend dashboard** (admin UI) with the global total, top spenders
-  (users + chats), per-model breakdown (models OpenRouter reported no cost for are flagged, so the
-  total reads as a floor), most-denied users, and new
-  users/chats. Plus proactive owner DMs: instant alarms (global cap breached, bot added to a new
-  group, a user/chat spend spike) and a periodic **budget digest** (interval + spike thresholds
-  configurable). Alarms are deduped to once per period. The owner can also pull the digest at any
-  time with **`/digest`** in a DM — it renders the same tables without disturbing the schedule.
-- Whitelist (chats and users). Owner always bypasses it. Enforcement is a single toggle in the admin
-  UI (**Whitelist** tab): turn it off to open the bot to everyone — the USD budget guard and rate
-  limit stay in force as the safety net, and the whitelist entries are preserved (not consulted) so
-  it can be turned back on unchanged.
-- **Blacklist (chats and users).** A blocked user, and everyone speaking in a blocked chat, is always
-  denied — even while the whitelist is off, even if whitelisted, and in guest mode — and their
-  pending reminders are dropped instead of delivered. Only the owner is immune. Managed from the same
-  admin tab (blocked-users / blocked-chats lists) and via "Add to blacklist" on a user's or chat's
-  page. A blocked group that upgrades to a supergroup carries the block over.
-- **Messages sent "as a chat"** — an anonymous group admin, or a channel commenting under its own
-  post — are identified by the *sending chat*, not by Telegram's shared GroupAnonymousBot /
-  Channel_Bot pseudo-accounts. So each channel gets its own rate-limit window, budget and spend
-  ledger, and its own whitelist/blacklist standing (as a chat) instead of sharing one bucket with
-  every anonymous sender everywhere. The owner is not recognized through their own channel — Telegram
-  exposes no link between the two — so whitelist the channel to let it in.
-- Admin Web App served by the bot's HTTP server; set the chat menu button via @BotFather to point at it.
-- **Model settings** — the admin model picker validates ids against OpenRouter's model list and
-  shows price, modalities, tool and prompt-caching support. It also offers a **fallback chain**,
-  **provider routing** (sort by price/throughput/latency, or pin one provider with no fallback),
-  **service tiers** (flex/priority) and the resolved provider's live price/throughput/latency —
-  globally and per chat.
-- **Guest mode** (Bot API 10.0) — bot can answer queries from chats it isn't a member of.
-  Enable in @BotFather, then any whitelisted user (or owner) can invoke the bot via Telegram's
-  guest-mode UI. Replies are sent via `answerGuestQuery` and end with a short token on the
-  last line: replying to an answer continues exactly the conversation that led to it. Non-whitelisted
-  guest invocations are silently ignored.
-- **Rich Markdown replies** (Bot API 10.1) — AI answers are sent as rich messages via
-  `sendRichMessage`, so the model can use the full Rich Markdown set (headings, lists, tables,
-  blockquotes, code blocks, spoilers, strikethrough, footnotes, LaTeX, …). Long answers collapse
-  into a `<details>` block; a plain-text `sendMessage` is used as a fallback if a rich send fails.
+Read [CLAUDE.md](CLAUDE.md) first: layout, conventions, and what a pull request needs.
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE).
+[AGPL-3.0-or-later](LICENSE)
