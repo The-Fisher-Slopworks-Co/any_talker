@@ -282,8 +282,10 @@ function BotEditor({
         />
         <OptimizePromptRow optimize={optimize} />
       </Card>
-      <SectionFooter>{s.ui_mbot_system_prompt_footer}</SectionFooter>
-      <OptimizePromptFooter optimize={optimize} autosaves />
+      <OptimizePromptFooter
+        optimize={optimize}
+        lead={s.ui_mbot_system_prompt_footer}
+      />
 
       <div className="section-gap">
         <Card>

@@ -13,12 +13,24 @@ describe("OptimizePromptFooter", () => {
       <I18nProvider lang="en">
         <OptimizePromptFooter
           optimize={{ ready: true, status: "idle", copy: () => {} }}
-          autosaves
         />
       </I18nProvider>,
     );
     expect(html).toContain("paste the shortened prompt back here.");
     expect(html).not.toContain("save");
+  });
+
+  test("opens with the screen's own sentence in the same paragraph", () => {
+    const html = renderToStaticMarkup(
+      <I18nProvider lang="en">
+        <OptimizePromptFooter
+          optimize={{ ready: true, status: "idle", copy: () => {} }}
+          lead="Replaces the global prompt."
+        />
+      </I18nProvider>,
+    );
+    expect(html).toContain("Replaces the global prompt. Copies a request");
+    expect(html.match(/<div/g)).toHaveLength(1);
   });
 
   test("reports a clipboard failure instead", () => {

@@ -41,10 +41,6 @@ export const managedBotsMessages = {
     en: "e.g. Kitty",
     ru: "напр. Кошечка",
   }),
-  ui_mbot_username: m({
-    en: "Username",
-    ru: "Username",
-  }),
   ui_mbot_system_prompt: m({
     en: "System Prompt",
     ru: "Системный промпт",
@@ -56,26 +52,6 @@ export const managedBotsMessages = {
   ui_mbot_system_prompt_footer: m({
     en: "Replaces the global prompt for this bot only.",
     ru: "Заменяет глобальный промпт только для этого бота.",
-  }),
-  ui_mbot_status: m({
-    en: "Status",
-    ru: "Статус",
-  }),
-  ui_mbot_avatar: m({
-    en: "Avatar",
-    ru: "Аватар",
-  }),
-  ui_mbot_avatar_upload: m({
-    en: "Upload image",
-    ru: "Загрузить изображение",
-  }),
-  ui_mbot_avatar_footer: m({
-    en: "Static .jpg/.png, applied immediately.",
-    ru: "Статичный .jpg/.png, применяется сразу.",
-  }),
-  ui_mbot_avatar_saved: m({
-    en: "Avatar updated.",
-    ru: "Аватар обновлён.",
   }),
   ui_mbot_avatar_edit: m({
     en: "Edit",
@@ -96,10 +72,6 @@ export const managedBotsMessages = {
   ui_mbot_not_found: m({
     en: "Bot not found.",
     ru: "Бот не найден.",
-  }),
-  ui_mbot_save_error: m({
-    en: (code: string) => `Couldn't save: ${code}`,
-    ru: (code: string) => `Не удалось сохранить: ${code}`,
   }),
   ui_mbot_create_intro: m({
     en: "Opens @BotFather to create a new bot managed by this one.",

@@ -57,21 +57,22 @@ export function OptimizePromptRow({ optimize }: { optimize: Optimize }) {
   );
 }
 
-// `autosaves`: the screen has no Save button, so the instruction ends without it.
+// `lead`: what the screen has to say about its prompt, as the footer's first
+// sentence, so the card ends in one paragraph rather than two.
 export function OptimizePromptFooter({
   optimize,
-  autosaves,
+  lead,
 }: {
   optimize: Optimize;
-  autosaves?: boolean;
+  lead?: string;
 }) {
   const { t: s } = useI18n();
   return (
     <SectionFooter>
       {optimize.status === "failed"
         ? s.ui_prompt_optimize_failed
-        : autosaves
-          ? s.ui_prompt_optimize_autosave_footer
+        : lead
+          ? `${lead} ${s.ui_prompt_optimize_footer}`
           : s.ui_prompt_optimize_footer}
     </SectionFooter>
   );

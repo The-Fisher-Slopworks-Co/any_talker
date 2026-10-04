@@ -125,7 +125,7 @@ export function PromptTab({
         />
         <OptimizePromptRow optimize={optimize} />
       </Card>
-      <OptimizePromptFooter optimize={optimize} autosaves />
+      <OptimizePromptFooter optimize={optimize} />
 
       <div className="section-gap">
         <Card>
