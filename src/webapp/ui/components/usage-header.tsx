@@ -4,6 +4,7 @@
 import { useI18n } from "../i18n-context";
 import { useDateFmt } from "../datetime-context";
 import type { UsageShare, WindowShare } from "../../../ratelimit/share";
+import { Card, SectionFooter, SectionHeader } from "./layout";
 
 // Fill colour by how much of the window is gone — green-ish default, amber as
 // it tightens, destructive once the ceiling is in sight. Thresholds are on the
@@ -18,17 +19,16 @@ function WindowBar({ label, share }: { label: string; share: WindowShare }) {
   const { t: s } = useI18n();
   const now = Date.now();
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-medium">{label}</span>
-        <span className="text-[13px] tabular-nums text-tg-hint">
-          {s.ui_usage_header_left(share.remainingPercent)} ·{" "}
-          {s.ui_usage_header_resets(Math.max(0, share.resetMs - now))}
+    <div className="row relative flex flex-col gap-2 px-4 py-[11px]">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[17px]">{label}</span>
+        <span className="text-[17px] tabular-nums text-tg-hint">
+          {s.ui_usage_header_left(share.remainingPercent)}
         </span>
       </div>
       <div
         className="h-1.5 w-full overflow-hidden rounded-full"
-        style={{ background: "var(--tg-separator)" }}
+        style={{ background: "var(--tg-fill)" }}
         role="progressbar"
         aria-label={label}
         aria-valuenow={share.usedPercent}
@@ -43,6 +43,9 @@ function WindowBar({ label, share }: { label: string; share: WindowShare }) {
           }}
         />
       </div>
+      <span className="text-[13px] leading-[18px] text-tg-hint">
+        {s.ui_usage_header_resets(Math.max(0, share.resetMs - now))}
+      </span>
     </div>
   );
 }
@@ -59,28 +62,33 @@ export function UsageHeader({ usage }: { usage: UsageShare | null }) {
   const { format } = useDateFmt();
   if (!usage) return null;
   return (
-    <div className="mb-3 rounded-xl bg-tg-section px-4 py-3">
-      <div className="pb-2 text-[13px] font-medium text-tg-section-header">
-        {s.ui_usage_header_title}
-      </div>
-      {usage.exempt ? (
-        <div className="text-[13px] text-tg-hint">
-          {s.ui_usage_header_exempt}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          <WindowBar label={s.ui_usage_header_5h} share={usage.fiveHour} />
-          <WindowBar label={s.ui_usage_header_weekly} share={usage.weekly} />
-          {usage.boost ? (
-            <div className="text-[13px] text-tg-hint">
-              {s.ui_usage_header_boost(
-                usage.boost.percent,
-                format(usage.boost.untilMs),
-              )}
+    <div className="pb-[35px]">
+      <SectionHeader>{s.ui_usage_header_title}</SectionHeader>
+      <div className="pt-2">
+        <Card>
+          {usage.exempt ? (
+            <div className="px-4 py-[11px] text-tg-hint">
+              {s.ui_usage_header_exempt}
             </div>
-          ) : null}
-        </div>
-      )}
+          ) : (
+            <>
+              <WindowBar label={s.ui_usage_header_5h} share={usage.fiveHour} />
+              <WindowBar
+                label={s.ui_usage_header_weekly}
+                share={usage.weekly}
+              />
+            </>
+          )}
+        </Card>
+      </div>
+      {!usage.exempt && usage.boost ? (
+        <SectionFooter>
+          {s.ui_usage_header_boost(
+            usage.boost.percent,
+            format(usage.boost.untilMs),
+          )}
+        </SectionFooter>
+      ) : null}
     </div>
   );
 }
