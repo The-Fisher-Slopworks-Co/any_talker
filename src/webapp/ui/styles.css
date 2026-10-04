@@ -15,11 +15,16 @@
   --color-tg-button-text: var(--tg-theme-button-text-color, #ffffff);
   --color-tg-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
   --ease-tg-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  /* iOS Body: 17pt on a 22pt line, so every `text-base` row matches it. */
+  --text-base: 17px;
+  --text-base--line-height: 22px;
 }
 
 @layer base {
   :root {
     --tg-separator: rgb(from var(--color-tg-text) r g b / 0.08);
+    /* iOS systemFill: the track of an off switch, visible on either theme. */
+    --tg-fill: rgb(from var(--color-tg-text) r g b / 0.16);
   }
   html,
   body {
@@ -29,8 +34,9 @@
     font-family:
       -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
       sans-serif;
-    font-size: 16px;
-    line-height: 1.4;
+    font-size: 17px;
+    line-height: 22px;
+    letter-spacing: -0.41px;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     scrollbar-width: none;
@@ -82,7 +88,7 @@
     font-family:
       -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
       sans-serif;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 400;
   }
 }
@@ -101,10 +107,17 @@
   background: var(--tg-separator);
 }
 
-/* Extra spacing when a header / action follows a card or another action. */
-.card + .section-header,
-.action + .section-header {
-  margin-top: 24px;
+/* Rows led by a 29pt icon start their separator at the text, as in iOS. */
+.row-icon + .row-icon::before {
+  left: 57px;
+}
+
+/* iOS inset-grouped rhythm: ~35pt between sections, whatever closed the
+   previous one (a card, its footer or an action). The header sits close to
+   its own card so it reads as that card's label. */
+.section-header:not(:first-child),
+.section-gap:not(:first-child) {
+  margin-top: 27px;
 }
 
 /* iOS-style toggle: the sliding knob lives in ::after. */
@@ -112,7 +125,7 @@
   position: relative;
   width: 51px;
   height: 31px;
-  background: var(--tg-separator);
+  background: var(--tg-fill);
   border-radius: 9999px;
   border: none;
   padding: 0;

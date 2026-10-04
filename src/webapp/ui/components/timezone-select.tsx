@@ -9,7 +9,7 @@ import {
 } from "../timezones";
 import { Card } from "./layout";
 import { SelectChevron } from "./controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { ROW_CLS, ROW_LABEL_CLS, VALUE_INPUT_CLS } from "./row";
 
 export function TimezoneSelect({
   value,
@@ -44,7 +44,7 @@ export function TimezoneSelect({
         <span className={ROW_LABEL_CLS}>{s.ui_tz_area}</span>
         <span className="relative flex flex-1 min-w-0 items-center">
           <select
-            className={`${INPUT_CLS} w-full pr-5`}
+            className={`${VALUE_INPUT_CLS} w-full pr-4`}
             value={area}
             onChange={(e) => onAreaChange(e.target.value)}
           >
@@ -61,7 +61,7 @@ export function TimezoneSelect({
         <span className={ROW_LABEL_CLS}>{s.ui_tz_location}</span>
         <span className="relative flex flex-1 min-w-0 items-center">
           <select
-            className={`${INPUT_CLS} w-full pr-5`}
+            className={`${VALUE_INPUT_CLS} w-full pr-4`}
             value={location}
             onChange={(e) => onLocationChange(e.target.value)}
             disabled={locationOptions.length === 0}

@@ -10,7 +10,7 @@ import {
 } from "../provider-endpoints";
 import { Card } from "./layout";
 import { SelectChevron } from "./controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { ROW_CLS, ROW_LABEL_CLS, VALUE_INPUT_CLS } from "./row";
 
 export function ProviderSelectField({
   modelId,
@@ -61,7 +61,7 @@ export function ProviderSelectField({
         <span className={ROW_LABEL_CLS}>{s.ui_provider_label}</span>
         <span className="relative flex flex-1 min-w-0 items-center">
           <select
-            className={`${INPUT_CLS} w-full pr-5`}
+            className={`${VALUE_INPUT_CLS} w-full pr-4`}
             value={value ?? ""}
             disabled={loading || trimmedModel.length === 0}
             onChange={(e) =>

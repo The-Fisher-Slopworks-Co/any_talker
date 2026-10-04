@@ -3,7 +3,7 @@
 
 import type { ReactNode } from "react";
 import { SelectChevron } from "./controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { ROW_CLS, ROW_LABEL_CLS, VALUE_INPUT_CLS } from "./row";
 
 // A settings row with the current value on the right; tapping it opens the
 // platform's native picker over the `<option>`s passed as children.
@@ -23,7 +23,7 @@ export function ValueSelectRow({
       <span className={ROW_LABEL_CLS}>{label}</span>
       <span className="relative flex flex-1 min-w-0 items-center">
         <select
-          className={`${INPUT_CLS} w-full pr-5`}
+          className={`${VALUE_INPUT_CLS} w-full pr-4`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         >
