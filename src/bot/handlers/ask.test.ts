@@ -662,7 +662,7 @@ describe("askHandler", () => {
     ]);
   });
 
-  test("another user replying in the chain keeps the history; each profile is appended once", async () => {
+  test("another user replying in the chain keeps the prompt and the history; each profile is appended once", async () => {
     const storage = new MemoryStorage();
     await storage.access.addWhitelist("users", { id: "42" });
     await storage.access.addWhitelist("users", { id: "77" });
@@ -710,6 +710,10 @@ describe("askHandler", () => {
     await storage.facts.remember("42", "pet", "dog");
     const t4 = await turn("42", 7, 6, 8);
 
+    // Nothing about whoever asks reaches the system prompt.
+    expect(new Set([t1, t2, t3, t4].map((t) => t.system)).size).toBe(1);
+    expect(t1.system).not.toContain("cat");
+    expect(t2.system).not.toContain("Kazan");
     // Every request continues the previous one unchanged.
     expect(t2.sent.slice(0, t1.sent.length)).toEqual(t1.sent);
     expect(t3.sent.slice(0, t2.sent.length)).toEqual(t2.sent);

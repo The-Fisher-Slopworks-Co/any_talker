@@ -95,20 +95,12 @@ export async function feedbackHandler(
   if (count > FEEDBACK_DAILY_MAX) {
     return { kind: "rateLimited" };
   }
-  const [userTimezone, facts, threads] = await Promise.all([
-    scoped.profile.getTimezone(userId),
-    scoped.facts.list(userId),
-    // Legitimately empty once every indexed thread has expired.
-    buildThreadSnapshots(storage, userId),
-  ]);
+  // Legitimately empty once every indexed thread has expired.
+  const threads = await buildThreadSnapshots(storage, userId);
   // As `runAiTurn` renders it, less the per-turn detail-level section, which
   // `/feedback` has none of — so it matches `run.instr` for a turn that
   // carried no detail level either.
-  const systemPrompt = buildInstruction(settings.systemPrompt, {
-    timezone: userTimezone ?? settings.timezone,
-    lang: input.lang,
-    facts,
-  });
+  const systemPrompt = buildInstruction(settings.systemPrompt);
   const entry: FeedbackEntry = {
     id: crypto.randomUUID(),
     userId,
