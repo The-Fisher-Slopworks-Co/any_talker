@@ -4,9 +4,12 @@
 import { test, expect, describe } from "bun:test";
 import {
   anchorForSource,
+  DEFAULT_DRAFT,
   formatAnchorDate,
   formatClock,
   parseClock,
+  planSave,
+  revertDraft,
 } from "./check-edit-form";
 
 describe("check editor counter source", () => {
@@ -53,5 +56,96 @@ describe("check editor clock", () => {
   test("reads a cleared input as no time", () => {
     expect(parseClock("")).toBeNull();
     expect(parseClock("8:30")).toBeNull();
+  });
+});
+
+describe("check editor autosave plan", () => {
+  const saved = {
+    ...DEFAULT_DRAFT,
+    title: "Sport",
+    chatId: "-100",
+    targetUserId: "1",
+    targetName: "Nik",
+  };
+
+  test("sends the whole form, as the server will keep it", () => {
+    const plan = planSave({ ...saved, title: "  Gym  " }, saved);
+    expect(plan.error).toBeNull();
+    expect(plan.payload).toEqual({ ...saved, title: "Gym" });
+  });
+
+  test("sends nothing when the form equals the saved check", () => {
+    expect(planSave(saved, saved).payload).toBeNull();
+    // Surrounding blanks are not a change: the server trims them.
+    expect(planSave({ ...saved, title: "Sport " }, saved).payload).toBeNull();
+  });
+
+  test("toggle off then on before the response: the on state is sent", () => {
+    // `saved` is what the server last answered (on); "off" has been sent since.
+    const sentOff = { ...saved, enabled: false };
+    expect(planSave(saved, saved).payload).toBeNull();
+    expect(planSave(saved, sentOff).payload).toEqual(saved);
+  });
+
+  test("a refused field goes back, so it blocks nothing else", () => {
+    // Chat ID cleared: put back, error reported, nothing to send.
+    const first = planSave({ ...saved, chatId: " " }, saved);
+    expect(first).toEqual({
+      draft: saved,
+      error: "chat_id_empty",
+      payload: null,
+    });
+    // Then another field changes: that one is saved.
+    const second = planSave({ ...first.draft, enabled: false }, saved);
+    expect(second.error).toBeNull();
+    expect(second.payload).toEqual({ ...saved, enabled: false });
+  });
+
+  test("a change made together with a refused one is still saved", () => {
+    const plan = planSave({ ...saved, chatId: "", enabled: false }, saved);
+    expect(plan.error).toBe("chat_id_empty");
+    expect(plan.draft).toEqual({ ...saved, enabled: false });
+    expect(plan.payload).toEqual({ ...saved, enabled: false });
+  });
+
+  test("reports the first of several refused fields", () => {
+    const plan = planSave(
+      { ...saved, title: "", timeoutMinutes: 0, enabled: false },
+      saved,
+    );
+    expect(plan.error).toBe("title_empty");
+    expect(plan.draft).toEqual({ ...saved, enabled: false });
+  });
+
+  test("a new check has nothing to go back to, so a bad form stays as typed", () => {
+    const plan = planSave(DEFAULT_DRAFT, null);
+    expect(plan).toEqual({
+      draft: DEFAULT_DRAFT,
+      error: "title_empty",
+      payload: null,
+    });
+    expect(planSave(saved, null).payload).toEqual(saved);
+  });
+
+  test("a saved check that is itself invalid does not loop", () => {
+    const plan = planSave(
+      { ...saved, title: "", enabled: false },
+      {
+        ...saved,
+        title: "",
+      },
+    );
+    expect(plan.error).toBe("title_empty");
+    expect(plan.payload).toBeNull();
+  });
+
+  test("a rejected save puts back only the fields it changed", () => {
+    const failed = { ...saved, title: "Bad", enabled: false };
+    // Typed since: a new question.
+    const draft = { ...failed, question: "New?" };
+    expect(revertDraft(draft, saved, failed)).toEqual({
+      ...saved,
+      question: "New?",
+    });
   });
 });

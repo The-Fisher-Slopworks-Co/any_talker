@@ -189,6 +189,10 @@ export const checksMessages = {
     en: "Enabled",
     ru: "Включён",
   }),
+  ui_check_create: m({
+    en: "Create Check",
+    ru: "Создать чек",
+  }),
   ui_check_delete: m({
     en: "Delete Check",
     ru: "Удалить чек",
