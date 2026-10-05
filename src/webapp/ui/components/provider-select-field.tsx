@@ -10,19 +10,9 @@ import {
 } from "../provider-endpoints";
 import { ValueSelectRow } from "./value-select-row";
 
-// A picker row, to sit in a card with its siblings.
-export function ProviderSelectField({
-  modelId,
-  value,
-  onChange,
-}: {
-  modelId: string;
-  value: string | null;
-  onChange: (next: string | null) => void;
-}) {
-  const { t: s } = useI18n();
+// The providers serving `modelId`; null while they load.
+export function useProviderOptions(modelId: string): ProviderOption[] | null {
   const [providers, setProviders] = useState<ProviderOption[] | null>(null);
-
   const trimmedModel = modelId.trim();
 
   useEffect(() => {
@@ -43,6 +33,23 @@ export function ProviderSelectField({
       cancelled = true;
     };
   }, [trimmedModel]);
+
+  return providers;
+}
+
+// A picker row, to sit in a card with its siblings.
+export function ProviderSelectField({
+  modelId,
+  value,
+  onChange,
+}: {
+  modelId: string;
+  value: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  const { t: s } = useI18n();
+  const providers = useProviderOptions(modelId);
+  const trimmedModel = modelId.trim();
 
   const loading = providers === null;
   const options = providers ?? [];
