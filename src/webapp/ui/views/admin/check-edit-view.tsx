@@ -7,7 +7,7 @@ import { api } from "../../api-client";
 import type { RecurringCheck } from "../../../../checks/types";
 import { Card, SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
-import { DeleteButton, SaveButton } from "../../components/controls";
+import { ActionRow, SaveButton } from "../../components/controls";
 import { useFormReducer } from "../../lib/use-form-reducer";
 import { checkToDraft, DEFAULT_DRAFT } from "./check-edit-form";
 import {
@@ -89,13 +89,13 @@ export function CheckEditView({
   const sectionProps = { draft, set, setNow: set, commit: () => {} };
   return (
     <Stack>
+      <EnabledSection {...sectionProps} />
       <QuestionSection {...sectionProps} />
       <RecipientSection {...sectionProps} />
       <ScheduleSection {...sectionProps} />
       <ButtonsSection {...sectionProps} />
       <RepliesSection {...sectionProps} />
       <CounterSection {...sectionProps} />
-      <EnabledSection {...sectionProps} />
 
       {check && <CheckStatusCard check={check} />}
 
@@ -111,11 +111,17 @@ export function CheckEditView({
       />
 
       {check && (
-        <Card>
-          <DeleteButton disabled={saving || deleting} onClick={remove}>
-            {s.ui_check_delete}
-          </DeleteButton>
-        </Card>
+        <div className="section-gap">
+          <Card>
+            <ActionRow
+              destructive
+              disabled={saving || deleting}
+              onClick={remove}
+            >
+              {s.ui_check_delete}
+            </ActionRow>
+          </Card>
+        </div>
       )}
     </Stack>
   );

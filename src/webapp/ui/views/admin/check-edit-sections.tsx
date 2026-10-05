@@ -3,14 +3,13 @@
 
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
-import { TimeNote } from "../../components/time-note";
-import { Toggle } from "../../components/controls";
 import {
   isValidCounterMode,
   type RecurringCheck,
 } from "../../../../checks/types";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
 import { NumberRow } from "../../components/number-row";
+import { SwitchRow } from "../../components/switch-row";
 import { AreaRow, TextRow } from "../../components/text-row";
 import { TimezonePickerRow } from "../../components/timezone-picker-row";
 import { ValueSelectRow } from "../../components/value-select-row";
@@ -33,6 +32,21 @@ type SectionProps = {
   setNow: FormSetter<CheckDraft>;
   commit: () => void;
 };
+
+export function EnabledSection({ draft, setNow }: SectionProps) {
+  const { t: s } = useI18n();
+  return (
+    <div className="section-gap">
+      <Card>
+        <SwitchRow
+          label={s.ui_check_enabled_label}
+          value={draft.enabled}
+          onChange={(v) => setNow("enabled", v)}
+        />
+      </Card>
+    </div>
+  );
+}
 
 export function QuestionSection({ draft, set, commit }: SectionProps) {
   const { t: s } = useI18n();
@@ -293,36 +307,21 @@ export function CounterSection({ draft, setNow }: SectionProps) {
   );
 }
 
-export function EnabledSection({ draft, set }: SectionProps) {
-  const { t: s } = useI18n();
-  return (
-    <>
-      <SectionHeader>{s.ui_check_enabled_label}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_enabled_label}</span>
-          <span className="flex-1" />
-          <Toggle value={draft.enabled} onChange={(v) => set("enabled", v)} />
-        </div>
-      </Card>
-    </>
-  );
-}
-
 // Runtime state of a saved check — nothing here is editable.
 export function CheckStatusCard({ check }: { check: RecurringCheck }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
-  const lastFiredText = check.lastFiredAtMs
-    ? format(check.lastFiredAtMs)
-    : s.ui_check_last_fired_never;
+  const { short } = useDateFmt();
   return (
     <>
-      <SectionHeader>{s.ui_check_last_fired}</SectionHeader>
+      <SectionHeader>{s.ui_checks_status}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_check_last_fired}</span>
-          <span className={ROW_VALUE_CLS}>{lastFiredText}</span>
+          <span className={ROW_VALUE_CLS}>
+            {check.lastFiredAtMs
+              ? short(check.lastFiredAtMs)
+              : s.ui_check_last_fired_never}
+          </span>
         </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_check_pending}</span>
@@ -333,9 +332,6 @@ export function CheckStatusCard({ check }: { check: RecurringCheck }) {
           </span>
         </div>
       </Card>
-      <SectionFooter>
-        <TimeNote />
-      </SectionFooter>
     </>
   );
 }

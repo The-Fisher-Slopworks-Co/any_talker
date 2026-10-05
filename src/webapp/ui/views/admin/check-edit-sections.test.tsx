@@ -3,11 +3,15 @@
 
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { RecurringCheck } from "../../../../checks/types";
+import { DateFmtProvider } from "../../datetime-context";
 import { I18nProvider } from "../../i18n-context";
 import { DEFAULT_DRAFT } from "./check-edit-form";
 import {
   ButtonsSection,
+  CheckStatusCard,
   CounterSection,
+  EnabledSection,
   QuestionSection,
   RecipientSection,
   RepliesSection,
@@ -26,6 +30,13 @@ const props = {
 };
 
 describe("check editor groups", () => {
+  test("the enabled switch is a row of its own, under no header", () => {
+    const html = render(<EnabledSection {...props} />);
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-label="Enabled"');
+    expect(html).not.toContain("section-header");
+  });
+
   test("the title and the question share the Question card", () => {
     const html = render(<QuestionSection {...props} />);
     expect(html.match(/class="card /g)?.length).toBe(1);
@@ -93,5 +104,20 @@ describe("check editor groups", () => {
     expect(html).toContain('value="2026-01-02"');
     expect(html).not.toContain(">Value<");
     expect(html).toContain("days since this date");
+  });
+
+  test("the status shows when it last fired and whether a reply is pending", () => {
+    const check = { lastFiredAtMs: 0, pendingMessageId: 5 } as RecurringCheck;
+    const html = renderToStaticMarkup(
+      <I18nProvider lang="en">
+        <DateFmtProvider dateFormat="iso" timezone="UTC">
+          <CheckStatusCard check={check} />
+        </DateFmtProvider>
+      </I18nProvider>,
+    );
+    for (const text of ["Status", "Last Fired", "Never", "Pending Reply"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toContain(">Yes<");
   });
 });
