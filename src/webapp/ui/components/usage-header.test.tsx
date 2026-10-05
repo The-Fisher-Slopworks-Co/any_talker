@@ -10,7 +10,7 @@ import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
 import { DateFmtProvider } from "../datetime-context";
-import { UsageHeader } from "./usage-header";
+import { UsageHeader, UsageMeter } from "./usage-header";
 import type { UsageShare } from "../../../ratelimit/share";
 
 const HOUR = 60 * 60 * 1000;
@@ -108,5 +108,23 @@ describe("UsageHeader markup", () => {
     );
     expect(calm).not.toContain("--color-tg-destructive");
     expect(hot).toContain("--color-tg-destructive");
+  });
+});
+
+describe("UsageMeter", () => {
+  test("draws the bar at the used share and never past the track", () => {
+    const html = renderToStaticMarkup(
+      <UsageMeter
+        label="Weekly Window"
+        value="130% used"
+        usedPercent={130}
+        caption="Resets soon"
+      />,
+    );
+    expect(html).toContain("Weekly Window");
+    expect(html).toContain("130% used");
+    expect(html).toContain("Resets soon");
+    expect(html).toContain('aria-valuenow="100"');
+    expect(html).toContain("width:100%");
   });
 });

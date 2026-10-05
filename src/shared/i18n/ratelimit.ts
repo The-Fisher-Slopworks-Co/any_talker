@@ -23,19 +23,23 @@ export const rateLimitMessages = {
     ru: "Бюджеты трат пользователя; запросу нужен остаток в обоих.",
   }),
   ui_ratelimit_5h_window: m({
-    en: "5-hour window",
+    en: "5-Hour Window",
     ru: "Окно 5 часов",
   }),
   ui_ratelimit_weekly_window: m({
-    en: "Weekly window",
+    en: "Weekly Window",
     ru: "Недельное окно",
+  }),
+  ui_limit_used: m({
+    en: (percent: number) => `${percent}% used`,
+    ru: (percent: number) => `использовано ${percent}%`,
   }),
   ui_ratelimit_resets: m({
     en: "Resets",
     ru: "Сброс",
   }),
   ui_ratelimit_reset: m({
-    en: "Reset usage",
+    en: "Reset Usage",
     ru: "Сбросить использование",
   }),
   // Web App header (`components/usage-header.tsx`): the viewer's own budget as

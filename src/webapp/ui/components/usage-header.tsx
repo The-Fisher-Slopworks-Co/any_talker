@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { ReactNode } from "react";
 import { useI18n } from "../i18n-context";
 import { useDateFmt } from "../datetime-context";
 import type { UsageShare, WindowShare } from "../../../ratelimit/share";
@@ -15,38 +16,56 @@ function fillColor(usedPercent: number): string {
   return "var(--color-tg-button)";
 }
 
-function WindowBar({ label, share }: { label: string; share: WindowShare }) {
-  const { t: s } = useI18n();
-  const now = Date.now();
+// One limit window as a card row: its name and a figure, a progress bar and a
+// caption underneath. The bar never overflows, even when the figure does.
+export function UsageMeter({
+  label,
+  value,
+  usedPercent,
+  caption,
+}: {
+  label: string;
+  value: string;
+  usedPercent: number;
+  caption: ReactNode;
+}) {
+  const filled = Math.min(100, usedPercent);
   return (
     <div className="row relative flex flex-col gap-2 px-4 py-[11px]">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[17px]">{label}</span>
-        <span className="text-[17px] tabular-nums text-tg-hint">
-          {s.ui_usage_header_left(share.remainingPercent)}
-        </span>
+        <span className="text-[17px] tabular-nums text-tg-hint">{value}</span>
       </div>
       <div
         className="h-1.5 w-full overflow-hidden rounded-full"
         style={{ background: "var(--tg-fill)" }}
         role="progressbar"
         aria-label={label}
-        aria-valuenow={share.usedPercent}
+        aria-valuenow={filled}
         aria-valuemin={0}
         aria-valuemax={100}
       >
         <div
           className="h-full rounded-full transition-[width] duration-300 ease-tg-spring"
-          style={{
-            width: `${share.usedPercent}%`,
-            background: fillColor(share.usedPercent),
-          }}
+          style={{ width: `${filled}%`, background: fillColor(usedPercent) }}
         />
       </div>
-      <span className="text-[13px] leading-[18px] text-tg-hint">
-        {s.ui_usage_header_resets(Math.max(0, share.resetMs - now))}
-      </span>
+      <span className="text-[13px] leading-[18px] text-tg-hint">{caption}</span>
     </div>
+  );
+}
+
+function WindowBar({ label, share }: { label: string; share: WindowShare }) {
+  const { t: s } = useI18n();
+  return (
+    <UsageMeter
+      label={label}
+      value={s.ui_usage_header_left(share.remainingPercent)}
+      usedPercent={share.usedPercent}
+      caption={s.ui_usage_header_resets(
+        Math.max(0, share.resetMs - Date.now()),
+      )}
+    />
   );
 }
 
