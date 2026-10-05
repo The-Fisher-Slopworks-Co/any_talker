@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import type { Route } from "../lib/routes";
-import type { Loadable } from "../lib/use-loadable";
+import { preload, type Loadable } from "../lib/use-loadable";
 import { adminSummaryLoad } from "./admin/admin-view";
 import { adminSectionLoads } from "./admin/admin-section-view";
 import { chatEditLoads } from "./admin/chat-edit-view";
@@ -38,4 +38,9 @@ export function routeLoads(route: Route): Loadable<unknown>[] {
     case "my-facts":
       return Object.values(myFactsLoads());
   }
+}
+
+// Settles once the route's screen can show its first full frame.
+export function preloadRoute(route: Route): Promise<unknown> {
+  return Promise.all(routeLoads(route).map(preload));
 }

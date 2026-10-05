@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 /// <reference lib="dom" />
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { api, type MeResponse, type UsageShare } from "./api-client";
@@ -23,6 +23,8 @@ import { useSessionState } from "./lib/session-state";
 import { useBackButton } from "./lib/back-button";
 import { settleStartup, startupLang, type Startup } from "./lib/startup";
 import { matchTelegramChrome } from "./lib/telegram-chrome";
+import { createNavigator, holdTapped, trackTaps } from "./lib/navigate";
+import { preloadRoute } from "./views/route-loads";
 import { MainView } from "./views/main-view";
 import { RemindersList, myRemindersLoad } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
@@ -49,6 +51,22 @@ function AppShell({
     { kind: "main" },
     parseRoute,
   );
+  // A tap opens the next screen once its data is in (or a short wait runs
+  // out), so it opens whole instead of blank, then loading, then filled.
+  const { navigate, cancel } = useMemo(
+    () =>
+      createNavigator<Route>({
+        ready: preloadRoute,
+        show: setRoute,
+        hold: holdTapped,
+      }),
+    [setRoute],
+  );
+  // Back and the way out of a deleted item: their screens are already loaded.
+  const go: typeof setRoute = (r) => {
+    cancel();
+    setRoute(r);
+  };
   // undefined while loading (the header holds its place), null on failure.
   const [usage, setUsage] = useState<UsageShare | null | undefined>();
 
@@ -65,7 +83,7 @@ function AppShell({
     route.kind === "main"
       ? null
       : () =>
-          setRoute((r) => {
+          go((r) => {
             switch (r.kind) {
               case "user-edit":
               case "chat-edit":
@@ -123,16 +141,16 @@ function AppShell({
           <MainView
             me={me}
             onMe={onMe}
-            onOpenAdmin={() => setRoute({ kind: "admin" })}
-            onOpenMyReminders={() => setRoute({ kind: "my-reminders" })}
-            onOpenMyFacts={() => setRoute({ kind: "my-facts" })}
+            onOpenAdmin={() => navigate({ kind: "admin" })}
+            onOpenMyReminders={() => navigate({ kind: "my-reminders" })}
+            onOpenMyFacts={() => navigate({ kind: "my-facts" })}
           />
         );
       case "admin":
         return (
           <AdminView
             onOpenSection={(section) =>
-              setRoute({ kind: "admin-section", section })
+              navigate({ kind: "admin-section", section })
             }
           />
         );
@@ -141,17 +159,17 @@ function AppShell({
           <AdminSectionView
             section={route.section}
             onEditUser={(id, from) =>
-              setRoute({ kind: "user-edit", userId: id, from })
+              navigate({ kind: "user-edit", userId: id, from })
             }
             onEditChat={(id, from) =>
-              setRoute({ kind: "chat-edit", chatId: id, from })
+              navigate({ kind: "chat-edit", chatId: id, from })
             }
-            onEditCheck={(id) => setRoute({ kind: "check-edit", checkId: id })}
+            onEditCheck={(id) => navigate({ kind: "check-edit", checkId: id })}
             onEditManagedBot={(id) =>
-              setRoute({ kind: "managed-bot-edit", botId: id })
+              navigate({ kind: "managed-bot-edit", botId: id })
             }
             onOpenFeedback={(id) =>
-              setRoute({ kind: "feedback-view", feedbackId: id })
+              navigate({ kind: "feedback-view", feedbackId: id })
             }
           />
         );
@@ -163,16 +181,14 @@ function AppShell({
         return (
           <CheckEditView
             checkId={route.checkId}
-            onClose={() =>
-              setRoute({ kind: "admin-section", section: "checks" })
-            }
+            onClose={() => go({ kind: "admin-section", section: "checks" })}
           />
         );
       case "managed-bot-edit":
         return (
           <ManagedBotEditView
             botId={route.botId}
-            onClose={() => setRoute({ kind: "admin-section", section: "bots" })}
+            onClose={() => go({ kind: "admin-section", section: "bots" })}
           />
         );
       case "feedback-view":
@@ -180,22 +196,20 @@ function AppShell({
           <FeedbackView
             feedbackId={route.feedbackId}
             onOpenUser={(id) =>
-              setRoute({
+              navigate({
                 kind: "user-edit",
                 userId: id,
                 from: { kind: "feedback-view", feedbackId: route.feedbackId },
               })
             }
             onOpenChat={(id) =>
-              setRoute({
+              navigate({
                 kind: "chat-edit",
                 chatId: id,
                 from: { kind: "feedback-view", feedbackId: route.feedbackId },
               })
             }
-            onDeleted={() =>
-              setRoute({ kind: "admin-section", section: "feedback" })
-            }
+            onDeleted={() => go({ kind: "admin-section", section: "feedback" })}
           />
         );
       case "my-reminders":
@@ -236,6 +250,8 @@ const tg = window.Telegram?.WebApp;
 tg?.expand();
 // Before the first render, so Telegram's chrome never shows another colour.
 matchTelegramChrome(tg);
+// Lets the row that started a navigation stay pressed while it waits.
+trackTaps(document);
 // Requested before React mounts, in parallel with it.
 const startupPromise = settleStartup(api.getMe());
 // Started alongside /me rather than once the shell mounts after it, so the

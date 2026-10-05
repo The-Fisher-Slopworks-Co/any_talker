@@ -14,4 +14,4 @@ export const INPUT_CLS = `${INPUT_BASE_CLS} text-tg-text text-right`;
 export const VALUE_INPUT_CLS = `${INPUT_BASE_CLS} text-tg-hint text-right`;
 export const INPUT_LEFT_CLS = `${INPUT_BASE_CLS} text-tg-text text-left`;
 
-export const SELECTABLE_ROW_CLS = `${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)]`;
+export const SELECTABLE_ROW_CLS = `${ROW_CLS} text-left bg-transparent border-0 cursor-pointer w-full active:bg-[var(--tg-separator)] data-pressed:bg-[var(--tg-separator)]`;
