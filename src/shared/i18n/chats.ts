@@ -65,10 +65,6 @@ export const chatsMessages = {
     en: "Bold prefix on every AI reply. Leave empty to turn it off.",
     ru: "Жирный префикс в каждом ответе ИИ. Пусто — выключено.",
   }),
-  ui_chat_override_global: m({
-    en: "Override global",
-    ru: "Переопределить глобально",
-  }),
   ui_chat_system_prompt: m({
     en: "Own System Prompt",
     ru: "Свой системный промпт",
@@ -85,46 +81,6 @@ export const chatsMessages = {
   ui_chat_models_off_footer: m({
     en: (list: string) => `Global: ${list}`,
     ru: (list: string) => `Глобально: ${list}`,
-  }),
-  ui_chat_provider_routing: m({
-    en: "Provider Routing",
-    ru: "Маршрутизация провайдеров",
-  }),
-  ui_chat_provider_routing_off_footer: m({
-    en: (sort: string) => `Global (${sort}).`,
-    ru: (sort: string) => `Глобально (${sort}).`,
-  }),
-  ui_chat_provider: m({
-    en: "Specific Provider",
-    ru: "Конкретный провайдер",
-  }),
-  ui_chat_provider_on_footer: m({
-    en: "Pinning a provider disables fallback.",
-    ru: "Закреплённый провайдер отключает резервные модели.",
-  }),
-  ui_chat_provider_off_footer: m({
-    en: (provider: string) => `Global (${provider}).`,
-    ru: (provider: string) => `Глобально (${provider}).`,
-  }),
-  ui_chat_service_tier: m({
-    en: "Service Tier",
-    ru: "Тариф обслуживания",
-  }),
-  ui_chat_service_tier_off_footer: m({
-    en: (tier: string) => `Global (${tier}).`,
-    ru: (tier: string) => `Глобально (${tier}).`,
-  }),
-  ui_chat_tz: m({
-    en: "Timezone",
-    ru: "Часовой пояс",
-  }),
-  ui_chat_tz_on_footer: m({
-    en: "Unless the user sets their own.",
-    ru: "Если у пользователя нет своего.",
-  }),
-  ui_chat_tz_off_footer: m({
-    en: (tz: string) => `Global (${tz}).`,
-    ru: (tz: string) => `Глобально (${tz}).`,
   }),
   ui_chat_ai_header: m({
     en: "AI Settings",
@@ -145,10 +101,6 @@ export const chatsMessages = {
   ui_chat_keyword_filter: m({
     en: "Keyword Filter",
     ru: "Фильтр по ключевым словам",
-  }),
-  ui_chat_keyword_filter_enabled: m({
-    en: "Enabled",
-    ru: "Включён",
   }),
   ui_chat_keyword_filter_placeholder: m({
     en: "word1, word2, word3",
