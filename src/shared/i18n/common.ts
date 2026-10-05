@@ -46,12 +46,12 @@ export const commonMessages = {
     ru: "Готово",
   }),
   ui_yes: m({
-    en: "yes",
-    ru: "да",
+    en: "Yes",
+    ru: "Да",
   }),
   ui_no: m({
-    en: "no",
-    ru: "нет",
+    en: "No",
+    ru: "Нет",
   }),
   ui_dash: m({
     en: "—",

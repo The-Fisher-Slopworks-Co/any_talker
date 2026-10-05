@@ -87,6 +87,7 @@ export function PromptTab({
         fallback={true}
         providerSort={draft.providerSort}
       />
+      <SectionFooter>{s.ui_prompt_models_footer}</SectionFooter>
 
       <SectionHeader>{s.ui_prompt_provider_routing}</SectionHeader>
       <Card>

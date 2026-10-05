@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n-context";
 import {
   fetchModelCatalog,
@@ -17,8 +17,9 @@ import {
   type ProviderEndpoint,
 } from "../provider-endpoints";
 import type { ProviderSort } from "../../../shared/types";
+import { AddRow } from "./add-row";
 import { Card } from "./layout";
-import { RowButton } from "./controls";
+import { SwipeToDelete } from "./swipe-row";
 import { INPUT_LEFT_CLS } from "./row";
 
 // Which upstream a sort would actually land on, and what it costs there. Only
@@ -52,6 +53,9 @@ function useSortedEndpoint(
   return endpoint;
 }
 
+const joinParts = (parts: (string | null)[]) =>
+  parts.filter(Boolean).join(" · ");
+
 function ModelInfo({
   model,
   providerSort,
@@ -81,11 +85,27 @@ function ModelInfo({
   const hasTools = model.capabilities?.tools !== undefined;
   const caching = supportsCaching(model);
 
+  const prices = [
+    [s.ui_modelinfo_input, inputPrice],
+    [s.ui_modelinfo_output, outputPrice],
+    [s.ui_modelinfo_image, imagePrice],
+  ].map(([label, price]) => (price ? `${label} ${price}` : null));
+  const flags = [
+    hasTools
+      ? `${s.ui_modelinfo_tools}: ${supportsTools(model) ? s.ui_yes : s.ui_no}`
+      : null,
+    caching !== undefined
+      ? `${s.ui_modelinfo_caching}: ${caching ? s.ui_yes : s.ui_no}`
+      : null,
+  ];
+  const abilities = joinParts([modalities.join(", "), ...flags]);
+
   return (
-    <div className="flex flex-col gap-1">
-      <div className="font-medium text-tg-text">{model.name ?? model.id}</div>
+    <div className="text-tg-hint">
+      <div>{joinParts([model.name ?? model.id, ...prices])}</div>
+      {abilities && <div>{abilities}</div>}
       {providerSort !== null && (
-        <div className="text-tg-hint">
+        <div>
           {endpoint === undefined
             ? s.ui_modelinfo_resolving_provider
             : endpoint === null
@@ -107,48 +127,6 @@ function ModelInfo({
                 {Math.round(endpoint.latency)} {s.ui_modelinfo_ms}
               </>
             )}
-        </div>
-      )}
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-        {inputPrice && (
-          <span>
-            <span className="text-tg-hint">{s.ui_modelinfo_input}</span>{" "}
-            {inputPrice}
-          </span>
-        )}
-        {outputPrice && (
-          <span>
-            <span className="text-tg-hint">{s.ui_modelinfo_output}</span>{" "}
-            {outputPrice}
-          </span>
-        )}
-        {imagePrice && (
-          <span>
-            <span className="text-tg-hint">{s.ui_modelinfo_image}</span>{" "}
-            {imagePrice}
-          </span>
-        )}
-      </div>
-      {modalities.length > 0 && (
-        <div>
-          <span className="text-tg-hint">{s.ui_modelinfo_modalities}</span>{" "}
-          {modalities.join(", ")}
-        </div>
-      )}
-      {(hasTools || caching !== undefined) && (
-        <div className="flex flex-wrap gap-x-3">
-          {hasTools && (
-            <span>
-              <span className="text-tg-hint">{s.ui_modelinfo_tools}</span>{" "}
-              {supportsTools(model) ? s.ui_yes : s.ui_no}
-            </span>
-          )}
-          {caching !== undefined && (
-            <span>
-              <span className="text-tg-hint">{s.ui_modelinfo_caching}</span>{" "}
-              {caching ? s.ui_yes : s.ui_no}
-            </span>
-          )}
         </div>
       )}
     </div>
@@ -221,10 +199,16 @@ export function ModelsCard({
   }, [valid, onValidityChange]);
 
   const options = catalog ? [...catalog.keys()] : [];
-  // A chain row is prefixed by a 24px `#N` marker plus a 12px gap, so its detail
-  // text has to clear the same 36px or it reads as a second column under the
-  // marker instead of a caption under the field.
-  const detailCls = `text-[13px] leading-[1.45]${fallback ? " pl-[36px]" : ""}`;
+  // The detail sits under the input, not under the `N` marker.
+  const detailCls = `text-[13px] leading-[1.45]${fallback ? " col-start-2" : ""}`;
+  // Rows keep their identity when one is swiped away, so the next one does not
+  // inherit its slide.
+  const keys = useRef<number[]>([]);
+  const nextKey = useRef(0);
+  while (keys.current.length < rows.length)
+    keys.current.push(nextKey.current++);
+  // The row a tap on "Add Fallback" just made, ready to be typed into.
+  const [added, setAdded] = useState<number | null>(null);
   // Without a fallback chain the card owns exactly one id, so an edit replaces
   // the whole list. Otherwise ids left over from a gateway that *did* support
   // fallbacks would stay hidden below the fold and still be saved — and still be
@@ -250,6 +234,7 @@ export function ModelsCard({
     [],
   );
   const removeAt = (idx: number) => {
+    keys.current.splice(idx, 1);
     const next = models.filter((_, i) => i !== idx);
     onChange(next);
     commit(next);
@@ -261,39 +246,33 @@ export function ModelsCard({
         const trimmed = m.trim();
         const matched = resolve(m);
         const invalid = trimmed.length > 0 && canValidate && matched === null;
-        return (
+        const row = (
           <div
-            key={idx}
-            className="row relative flex flex-col gap-2 px-4 py-[11px]"
+            className={`row relative grid items-baseline gap-x-3 gap-y-1 px-4 py-[11px]${fallback ? " grid-cols-[14px_1fr]" : ""}`}
           >
-            <div className="flex items-center gap-3">
-              {fallback && (
-                <span className="shrink-0 text-tg-hint text-[15px] w-6">
-                  {s.ui_models_fallback_n(idx + 1)}
-                </span>
-              )}
-              <input
-                className={INPUT_LEFT_CLS}
-                value={m}
-                onChange={(e) => updateAt(idx, e.target.value)}
-                onBlur={() => commit(rows)}
-                placeholder={s.ui_models_model_id}
-                list={listId}
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-              {fallback && idx > 0 && (
-                <button
-                  className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
-                  onClick={() => removeAt(idx)}
-                  aria-label={s.ui_models_remove_fallback}
-                >
-                  {s.ui_remove}
-                </button>
-              )}
-            </div>
+            {fallback && (
+              <span className="text-tg-hint text-[15px]">
+                {s.ui_models_fallback_n(idx + 1)}
+              </span>
+            )}
+            <input
+              className={INPUT_LEFT_CLS}
+              value={m}
+              onChange={(e) => updateAt(idx, e.target.value)}
+              onBlur={() => {
+                if (idx === added) setAdded(null);
+                // An emptied fallback is a removed one: the keyboard path.
+                if (fallback && idx > 0 && trimmed.length === 0) removeAt(idx);
+                else commit(rows);
+              }}
+              placeholder={s.ui_models_model_id}
+              list={listId}
+              autoFocus={idx === added}
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
             {trimmed.length > 0 &&
               (invalid ? (
                 <div className={`${detailCls} text-tg-destructive`}>
@@ -316,11 +295,29 @@ export function ModelsCard({
               null)}
           </div>
         );
+        return (
+          <Fragment key={keys.current[idx]}>
+            {fallback && idx > 0 ? (
+              <SwipeToDelete
+                label={s.ui_models_delete_fallback}
+                onDelete={() => removeAt(idx)}
+              >
+                {row}
+              </SwipeToDelete>
+            ) : (
+              row
+            )}
+          </Fragment>
+        );
       })}
       {fallback && (
-        <RowButton onClick={() => onChange([...models, ""])}>
-          {s.ui_models_add_fallback}
-        </RowButton>
+        <AddRow
+          label={s.ui_models_add_fallback}
+          onClick={() => {
+            setAdded(models.length);
+            onChange([...models, ""]);
+          }}
+        />
       )}
       {/* One list shared by every row. Rendered unconditionally — an empty
           <datalist> suggests nothing, exactly like no list at all, and keeping
