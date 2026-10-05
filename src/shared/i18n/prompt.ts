@@ -33,21 +33,13 @@ export const promptMessages = {
     en: "Describe how the bot should behave",
     ru: "Опиши, как должен вести себя бот",
   }),
-  ui_prompt_timezone: m({
-    en: "Timezone",
-    ru: "Часовой пояс",
-  }),
   ui_prompt_timezone_footer: m({
-    en: "Default when a chat or user has no override.",
-    ru: "По умолчанию, если у чата или пользователя нет своего.",
+    en: "The timezone applies when a chat or user has none set. 0 chars collapses every reply.",
+    ru: "Часовой пояс действует, если у чата или пользователя нет своего. 0 символов сворачивает каждый ответ.",
   }),
   ui_prompt_expandable_threshold: m({
-    en: "Collapse threshold",
-    ru: "Порог сворачивания",
-  }),
-  ui_prompt_expandable_threshold_footer: m({
-    en: "In characters. 0 collapses every reply.",
-    ru: "В символах. 0 — сворачивать всё.",
+    en: "Collapse Replies Over",
+    ru: "Сворачивать ответы длиннее",
   }),
   // Footer for the fallback-chain field.
   ui_prompt_provider_routing: m({
@@ -85,6 +77,10 @@ export const promptMessages = {
   ui_sort_label: m({
     en: "Sort Providers By",
     ru: "Сортировка провайдеров",
+  }),
+  ui_prompt_chars_suffix: m({
+    en: "chars",
+    ru: "симв.",
   }),
   ui_sort_default: m({
     en: "Auto",

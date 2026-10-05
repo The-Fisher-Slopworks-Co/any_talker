@@ -8,7 +8,7 @@
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
-import { ModelsCard } from "./models-card";
+import { ModelsCard, committableModels } from "./models-card";
 
 function render(ui: React.ReactElement): string {
   return renderToStaticMarkup(<I18nProvider lang="en">{ui}</I18nProvider>);
@@ -89,5 +89,18 @@ describe("ModelsCard markup", () => {
       <ModelsCard models={["not-a-real-id"]} onChange={() => {}} />,
     );
     expect(html).not.toContain("isn’t in /v1/models");
+  });
+});
+
+describe("committableModels", () => {
+  const known = (id: string) => id !== "bad";
+
+  test("trims the ids and drops blank rows", () => {
+    expect(committableModels([" a ", "", "b"], known)).toEqual(["a", "b"]);
+  });
+
+  test("offers nothing while a row is unknown or all rows are blank", () => {
+    expect(committableModels(["a", "bad"], known)).toBeNull();
+    expect(committableModels(["", "  "], known)).toBeNull();
   });
 });
