@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 // A server-render smoke test, like quarantined-reminder-card.test.tsx: the
-// admin row actions and the inline editor have to reach the markup.
+// admin row actions have to reach the markup.
 
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -41,10 +41,8 @@ function render(actions?: ReminderCardManage): string {
 
 function manage(over: Partial<ReminderCardManage> = {}): ReminderCardManage {
   return {
-    editingId: null,
     busy: false,
     onEdit: () => {},
-    onSaved: () => {},
     onDelete: () => {},
     ...over,
   };
@@ -62,14 +60,5 @@ describe("ReminderCard", () => {
     const html = render(manage());
     expect(html).toContain(">Edit<");
     expect(html).toContain(">Remove<");
-  });
-
-  test("the row being edited turns into the editor, in the viewer's timezone", () => {
-    const html = render(manage({ editingId: "r1" }));
-    expect(html).toContain('type="datetime-local"');
-    // 09:30 UTC is 12:30 in Moscow.
-    expect(html).toContain('value="2026-01-02T12:30"');
-    expect(html).toContain(">buy milk</textarea>");
-    expect(html).not.toContain(">Edit<");
   });
 });

@@ -172,25 +172,28 @@ export const ACTION_ROW_CLS =
 
 // An iOS action row: a left-aligned link-coloured label that runs something
 // rather than opening a screen. `bold` marks the primary one of a form (Create),
-// `destructive` the one that deletes or revokes. Sits in a card of its own or
-// as the last row of the card it acts on.
+// `destructive` the one that deletes or revokes, `centered` one that stands
+// alone at the bottom of a sheet. Sits in a card of its own or as the last row
+// of the card it acts on.
 export function ActionRow({
   onClick,
   disabled,
   bold,
   destructive,
+  centered,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
   bold?: boolean;
   destructive?: boolean;
+  centered?: boolean;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
-      className={`${ACTION_ROW_CLS} ${destructive ? "text-tg-destructive" : "text-tg-link"} ${bold ? "font-semibold" : ""}`}
+      className={`${ACTION_ROW_CLS} ${destructive ? "text-tg-destructive" : "text-tg-link"} ${bold ? "font-semibold" : ""} ${centered ? "justify-center" : ""}`}
       disabled={disabled}
       onClick={onClick}
     >

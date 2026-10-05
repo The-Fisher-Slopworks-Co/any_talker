@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useI18n } from "../i18n-context";
 import { api, type RemindersResponse } from "../api-client";
 import type { Reminder } from "../../../reminders/types";
 import { SectionFooter, SectionHeader, Stack } from "../components/layout";
 import { LoadingState } from "../components/states";
 import { ReminderCard } from "../components/reminder-card";
+import { ReminderEditForm } from "../components/reminder-edit-form";
 import { TimeNote } from "../components/time-note";
 import { useLoadable } from "../lib/use-loadable";
+import { reminderTargetLabel, reminderUserLabel } from "../lib/labels";
 
 export function RemindersList({
   fetchReminders,
@@ -31,7 +33,9 @@ export function RemindersList({
 }) {
   const { t: s } = useI18n();
   const { data, setData } = useLoadable(fetchReminders, [fetchReminders]);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // The reminder open in the edit sheet.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const close = useCallback(() => setOpenId(null), []);
   const [busy, setBusy] = useState(false);
 
   if (data === null) return <LoadingState />;
@@ -45,7 +49,12 @@ export function RemindersList({
         .map((r) => (r.id === next.id ? next : r))
         .sort((a, b) => a.fireAtMs - b.fireAtMs),
     );
-    setEditingId(null);
+    setOpenId(null);
+  };
+
+  const onRemoved = (id: string) => {
+    updateRows((rows) => rows.filter((r) => r.id !== id));
+    setOpenId(null);
   };
 
   const onDelete = async (id: string) => {
@@ -61,6 +70,9 @@ export function RemindersList({
     }
   };
 
+  const open = data.reminders.find((r) => r.id === openId);
+  const author = open && reminderUserLabel(open, data.users, data.displayNames);
+
   return (
     <Stack>
       <SectionHeader>{header}</SectionHeader>
@@ -75,10 +87,8 @@ export function RemindersList({
         manage={
           editable
             ? {
-                editingId,
                 busy,
-                onEdit: setEditingId,
-                onSaved,
+                onEdit: setOpenId,
                 onDelete: (id) => void onDelete(id),
               }
             : undefined
@@ -87,6 +97,18 @@ export function RemindersList({
       <SectionFooter>
         {footer} <TimeNote />
       </SectionFooter>
+      {open && author && (
+        <ReminderEditForm
+          key={open.id}
+          reminder={open}
+          where={reminderTargetLabel(s, open, data.chats)}
+          author={`${author.primary}${author.secondary ? ` · ${author.secondary}` : ""}`}
+          onUserClick={onUserClick}
+          onSaved={onSaved}
+          onDeleted={onRemoved}
+          onClose={close}
+        />
+      )}
     </Stack>
   );
 }
