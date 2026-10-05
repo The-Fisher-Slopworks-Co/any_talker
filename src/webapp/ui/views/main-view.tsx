@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../i18n-context";
 import { api, type MeResponse } from "../api-client";
 import { composeFullName, type Gender } from "../../../shared/types";
@@ -16,8 +16,19 @@ import {
   type ProfileChoices,
 } from "../components/profile-settings-card";
 import { useAutosave } from "../lib/use-autosave";
+import { onceWhenIdle } from "../lib/idle";
+import { preload } from "../lib/use-loadable";
+import { myFactsLoads } from "./facts-view";
+import { myRemindersLoad } from "./reminders-list";
 
 type ProfilePatch = Parameters<typeof api.putMe>[0];
+
+// The screens a tap on the home opens, loaded quietly once it is up so their
+// first open is instant. Once per app open; admin screens are left alone.
+const preloadUserScreens = onceWhenIdle(() => {
+  for (const l of [myRemindersLoad, ...Object.values(myFactsLoads())])
+    void preload(l);
+});
 
 export function MainView({
   me,
@@ -33,6 +44,7 @@ export function MainView({
   onOpenMyFacts: () => void;
 }) {
   const { t: s, lang: resolvedLang } = useI18n();
+  useEffect(preloadUserScreens, []);
   const [name, setName] = useState(me.displayName ?? "");
   const [timezone, setTimezone] = useState<string | null>(me.timezone);
   const [gender, setGender] = useState<Gender | null>(me.gender);
