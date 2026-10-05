@@ -51,6 +51,7 @@ export function NavRow({
   badge,
   badgeLabel,
   wrapTitle,
+  dotLabel,
   onClick,
 }: {
   title: string;
@@ -68,6 +69,9 @@ export function NavRow({
   badgeLabel?: string;
   // Let a long title run to two lines instead of cutting it at one.
   wrapTitle?: boolean;
+  // A blue dot before the chevron, like Mail's unread marker; the text is what
+  // a screen reader says for it.
+  dotLabel?: string | undefined;
   onClick: () => void;
 }) {
   return (
@@ -98,6 +102,13 @@ export function NavRow({
         >
           {badge}
         </span>
+      ) : null}
+      {dotLabel ? (
+        <span
+          role="img"
+          aria-label={dotLabel}
+          className="shrink-0 size-[10px] rounded-full bg-tg-link"
+        />
       ) : null}
       <DisclosureChevron />
     </button>
