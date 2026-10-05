@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { ReactNode } from "react";
 import { useI18n } from "../../i18n-context";
 import type {
   ProviderSort,
@@ -8,36 +9,57 @@ import type {
   Settings,
 } from "../../../../shared/types";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
-import { Toggle } from "../../components/controls";
+import { SwitchRow } from "../../components/switch-row";
+import { AreaRow } from "../../components/text-row";
 import { ModelsCard } from "../../components/models-card";
-import { OverrideSection } from "../../components/override-section";
-import { OptimizePromptButton } from "../../components/optimize-prompt-button";
+import {
+  OptimizePromptFooter,
+  OptimizePromptRow,
+  useOptimizePrompt,
+} from "../../components/optimize-prompt-button";
 import {
   OverrideSelectRow,
   type Override,
 } from "../../components/override-select-row";
 import { useProviderOptions } from "../../components/provider-select-field";
 import { TimezonePickerRow } from "../../components/timezone-picker-row";
-import { ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 import type { FormSetter } from "../../lib/use-form-reducer";
 import { trimmedModels, type ChatForm } from "./chat-edit-form";
 
-const PROMPT_TEXTAREA_CLS =
-  "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[180px]";
-const KEYWORDS_TEXTAREA_CLS =
-  "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[80px]";
-
 // Every editable section reads the one form state and writes back through the
-// one setter; `global` is what the section falls back to while its override is
-// off, and what its footer names.
-// `set` follows typing; `commit` applies a change and saves it, and with an
-// empty patch saves what the form holds (a text field being left).
+// two functions it is handed: `set` follows typing, `commit` applies a change
+// and saves it (with an empty patch it saves what the form holds, as when a
+// text field is left). `global` is what the section falls back to while its
+// override is off.
 type SectionProps = {
   form: ChatForm;
   set: FormSetter<ChatForm>;
   commit: (patch: Partial<ChatForm>) => void;
   global: Settings;
 };
+
+// A card whose first row switches a chat-level setting on; `children` (the
+// editor) show only while it is.
+function OwnCard({
+  label,
+  on,
+  onChange,
+  children,
+}: {
+  label: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="section-gap">
+      <Card>
+        <SwitchRow label={label} value={on} onChange={onChange} />
+        {on ? children : null}
+      </Card>
+    </div>
+  );
+}
 
 export function SystemPromptSection({
   form,
@@ -46,55 +68,61 @@ export function SystemPromptSection({
   global,
 }: SectionProps) {
   const { t: s } = useI18n();
+  const optimize = useOptimizePrompt(form.promptValue);
   return (
-    <OverrideSection
-      title={s.ui_chat_system_prompt}
-      override={form.promptOverride}
-      onToggle={(v) => commit({ promptOverride: v })}
-      footer={
-        form.promptOverride
-          ? undefined
-          : s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)
-      }
-    >
-      <>
-        <Card>
-          <textarea
-            className={PROMPT_TEXTAREA_CLS}
-            value={form.promptValue}
-            onChange={(e) => set("promptValue", e.target.value)}
-            onBlur={() => commit({})}
-            placeholder={s.ui_chat_prompt_placeholder}
-          />
-        </Card>
-        <OptimizePromptButton prompt={form.promptValue} />
-      </>
-    </OverrideSection>
+    <>
+      <OwnCard
+        label={s.ui_chat_system_prompt}
+        on={form.promptOverride}
+        onChange={(v) => commit({ promptOverride: v })}
+      >
+        <AreaRow
+          label={s.ui_chat_system_prompt}
+          value={form.promptValue}
+          placeholder={s.ui_chat_prompt_placeholder}
+          minHeight="min-h-[180px]"
+          onChange={(v) => set("promptValue", v)}
+          onCommit={() => commit({})}
+        />
+        <OptimizePromptRow optimize={optimize} />
+      </OwnCard>
+      {form.promptOverride ? (
+        <OptimizePromptFooter optimize={optimize} autosaves />
+      ) : (
+        <SectionFooter>
+          {s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)}
+        </SectionFooter>
+      )}
+    </>
   );
 }
 
 export function ModelsSection({ form, set, commit, global }: SectionProps) {
   const { t: s } = useI18n();
   return (
-    <OverrideSection
-      title={s.ui_chat_models}
-      override={form.modelsOverride}
-      onToggle={(v) => commit({ modelsOverride: v })}
-      footer={
-        form.modelsOverride
-          ? undefined
-          : s.ui_chat_models_off_footer(global.models.join(", "))
-      }
-    >
-      <ModelsCard
-        models={form.models}
-        onChange={(next) => set("models", next)}
-        onCommit={(ids) => commit({ models: ids })}
-        onValidityChange={(valid) => set("modelsValid", valid)}
-        fallback={true}
-        providerSort={form.psOverride ? form.psValue : global.providerSort}
+    <>
+      <OwnCard
+        label={s.ui_chat_models}
+        on={form.modelsOverride}
+        onChange={(v) => commit({ modelsOverride: v })}
       />
-    </OverrideSection>
+      {form.modelsOverride ? (
+        <div className="mt-2">
+          <ModelsCard
+            models={form.models}
+            onChange={(next) => set("models", next)}
+            onCommit={(ids) => commit({ models: ids })}
+            onValidityChange={(valid) => set("modelsValid", valid)}
+            fallback={true}
+            providerSort={form.psOverride ? form.psValue : global.providerSort}
+          />
+        </div>
+      ) : (
+        <SectionFooter>
+          {s.ui_chat_models_off_footer(global.models.join(", "))}
+        </SectionFooter>
+      )}
+    </>
   );
 }
 
@@ -202,26 +230,23 @@ export function KeywordFilterSection({
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_chat_keyword_filter}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>
-            {s.ui_chat_keyword_filter_enabled}
-          </span>
-          <span className="flex-1" />
-          <Toggle
+      <div className="section-gap">
+        <Card>
+          <SwitchRow
+            label={s.ui_chat_keyword_filter}
             value={form.kfEnabled}
             onChange={(v) => commit({ kfEnabled: v })}
           />
-        </div>
-        <textarea
-          className={KEYWORDS_TEXTAREA_CLS}
-          value={form.keywordsText}
-          onChange={(e) => set("keywordsText", e.target.value)}
-          onBlur={() => commit({})}
-          placeholder={s.ui_chat_keyword_filter_placeholder}
-        />
-      </Card>
+          <AreaRow
+            label={s.ui_chat_keyword_filter}
+            value={form.keywordsText}
+            placeholder={s.ui_chat_keyword_filter_placeholder}
+            minHeight="min-h-[80px]"
+            onChange={(v) => set("keywordsText", v)}
+            onCommit={() => commit({})}
+          />
+        </Card>
+      </div>
       <SectionFooter>{s.ui_chat_keyword_filter_footer}</SectionFooter>
     </>
   );
