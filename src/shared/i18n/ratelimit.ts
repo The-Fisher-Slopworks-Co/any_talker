@@ -118,7 +118,7 @@ export const rateLimitMessages = {
     ru: "Классы лимитов",
   }),
   ui_limit_class_header: m({
-    en: "Limit class",
+    en: "Limit Class",
     ru: "Класс лимитов",
   }),
   ui_limit_class_name: m({
@@ -142,16 +142,16 @@ export const rateLimitMessages = {
     ru: "Запас на месяц",
   }),
   ui_limit_class_allowance_spent: m({
-    en: "Allowance used this month",
-    ru: "Потрачено из запаса за месяц",
+    en: "Allowance Spent",
+    ru: "Потрачено из запаса",
   }),
   ui_limit_classes_footer: m({
     en: "Set on the user's page. Overflow past regular limits comes from the monthly allowance.",
     ru: "Назначается на странице пользователя. Сверх обычных лимитов расходуется месячный запас.",
   }),
   ui_limit_class_footer: m({
-    en: "Applies the class settings from Limits. Not shown to the user.",
-    ru: "Применяет настройки класса с вкладки лимитов. Пользователю не показывается.",
+    en: "Limit class applies the class settings from Limits. Not shown to the user.",
+    ru: "Класс лимитов применяет настройки класса из раздела лимитов. Пользователю не показывается.",
   }),
   ui_usage_header_exempt: m({
     en: "No limits apply to you.",

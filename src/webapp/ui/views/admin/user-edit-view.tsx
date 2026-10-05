@@ -8,12 +8,10 @@ import { TimeNote } from "../../components/time-note";
 import {
   api,
   type SpendSummary,
-  type UsageStatus,
   type UserSettingsResponse,
 } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
 import { UserLimitsSection } from "../../components/user-limits-section";
-import { LimitClassCard } from "../../components/limit-class-card";
 import type { Gender } from "../../../../shared/types";
 import { DEFAULT_LANG, type Lang } from "../../../../shared/i18n";
 import {
@@ -53,7 +51,6 @@ export function UserEditView({ userId }: { userId: string }) {
   const [langValue, setLangValue] = useState<Lang>(DEFAULT_LANG);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [usage, setUsage] = useState<UsageStatus | null>(null);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
   const { data: botsData } = useLoadable(api.listMyBots, []);
   const [factScope, setFactScope] = useSessionState(
@@ -80,7 +77,6 @@ export function UserEditView({ userId }: { userId: string }) {
         setLangValue(d.language ?? DEFAULT_LANG);
       })
       .catch(() => setNotFound(true));
-    api.getUserUsage(userId).then((r) => setUsage(r.usage));
     api.getUserSpending(userId).then((r) => setSpending(r.spending));
   }, [userId]);
 
@@ -174,7 +170,11 @@ export function UserEditView({ userId }: { userId: string }) {
         footer={s.ui_access_footer_user}
       />
 
-      <UserLimitsSection userId={user.id} usage={usage} onUsage={setUsage} />
+      <UserLimitsSection
+        userId={user.id}
+        initialClass={data.limitClass}
+        allowanceMonthUsd={data.allowanceMonthUsd}
+      />
 
       <DisplayNameField
         label={s.ui_user_name}
@@ -213,15 +213,6 @@ export function UserEditView({ userId }: { userId: string }) {
       />
 
       {spending && <SpendingCard spending={spending} />}
-
-      <LimitClassCard
-        userId={user.id}
-        initial={data.limitClass}
-        allowanceMonthUsd={data.allowanceMonthUsd}
-        onChanged={() =>
-          api.getUserUsage(userId).then((r) => setUsage(r.usage))
-        }
-      />
 
       <SectionHeader>{s.ui_user_facts_header}</SectionHeader>
       {factBots && factBots.length > 1 ? (
