@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { ReactNode } from "react";
 import { Card, SectionFooter, Stack } from "./layout";
 import { LoadingState } from "./states";
 import { NavRow } from "./select-row";
@@ -27,26 +28,32 @@ export function ListTab<T>({
     title: string;
     subtitle: string;
     value?: string;
+    // An `Avatar` to lead the row.
+    avatar?: ReactNode;
   };
 }) {
   if (items === null) return <LoadingState />;
 
+  const rows = items.map(renderRow);
+
   return (
     <Stack>
       <Card>
-        {items.map((item) => {
-          const row = renderRow(item);
-          return (
-            <NavRow
-              key={row.id}
-              title={row.title}
-              subtitle={row.subtitle}
-              value={row.value}
-              onClick={() => onEdit(row.id)}
-            />
-          );
-        })}
-        <AddRow label={createLabel} onClick={onCreate} />
+        {rows.map((row) => (
+          <NavRow
+            key={row.id}
+            title={row.title}
+            subtitle={row.subtitle}
+            value={row.value}
+            avatar={row.avatar}
+            onClick={() => onEdit(row.id)}
+          />
+        ))}
+        <AddRow
+          label={createLabel}
+          onClick={onCreate}
+          underAvatars={rows.some((r) => r.avatar)}
+        />
       </Card>
       <SectionFooter>{footer}</SectionFooter>
     </Stack>

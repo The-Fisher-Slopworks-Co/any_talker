@@ -3,6 +3,7 @@
 
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
+import { Avatar } from "../../components/avatar";
 import { ListTab } from "../../components/list-tab";
 import { useLoadable } from "../../lib/use-loadable";
 
@@ -29,7 +30,9 @@ export function ManagedBotsTab({
       renderRow={(b) => ({
         id: b.botId,
         title: b.displayName,
-        subtitle: `@${b.username} · ${b.running ? s.ui_mbots_running : s.ui_mbots_stopped}`,
+        subtitle: `@${b.username}`,
+        value: b.running ? s.ui_mbots_running : s.ui_mbots_stopped,
+        avatar: <Avatar id={b.botId} name={b.displayName} />,
       })}
     />
   );

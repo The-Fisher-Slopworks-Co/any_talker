@@ -121,6 +121,7 @@
 
 /* Likewise past a 36px avatar. */
 .row-avatar + .row-avatar::before,
+.row-avatar + .add-row-avatar::before,
 .swipe-row:has(.row-avatar)::before {
   left: 64px;
 }
