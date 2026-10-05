@@ -16,6 +16,7 @@ import {
   DEFAULT_DRAFT,
   planSave,
   revertDraft,
+  withServerCounter,
   type CheckDraft,
 } from "./check-edit-form";
 import {
@@ -55,6 +56,9 @@ export function CheckEditView({
     },
     [resetDraft],
   );
+  // The runner moves a check's counter on its own, so the counter the server
+  // holds is what gets sent, until the admin edits it here and it is saved.
+  const counterEdited = useRef(false);
   const queued = useRef(false);
   // The form last sent: changes are compared with it, not with the server's
   // reply, which can be behind (on, then off again before the first reply).
@@ -71,6 +75,14 @@ export function CheckEditView({
     onSaved: (saved) => {
       if (!check) return onClose();
       setCheck(saved);
+      const form = latest.current;
+      if (
+        saved.counter === form.counter &&
+        (saved.counterAnchorDate ?? null) === form.counterAnchorDate
+      ) {
+        counterEdited.current = false;
+      }
+      apply(withServerCounter(form, saved, counterEdited.current));
     },
     onFailed: (failed) => {
       lastSent.current = null;
@@ -81,6 +93,7 @@ export function CheckEditView({
 
   useEffect(() => {
     lastSent.current = null;
+    counterEdited.current = false;
     if (isNew) {
       setCheck(null);
       apply(DEFAULT_DRAFT);
@@ -106,9 +119,12 @@ export function CheckEditView({
       if (error) setError(planSave(latest.current, null).error);
       return;
     }
+    const edited = counterEdited.current;
     const plan = planSave(
-      latest.current,
-      lastSent.current ?? checkToDraft(check),
+      withServerCounter(latest.current, check, edited),
+      lastSent.current
+        ? withServerCounter(lastSent.current, check, edited)
+        : checkToDraft(check),
     );
     apply(plan.draft);
     setError(plan.error);
@@ -122,8 +138,12 @@ export function CheckEditView({
     queued.current = true;
     queueMicrotask(run);
   };
-  const set: FormSetter<CheckDraft> = (key, value) =>
+  const set: FormSetter<CheckDraft> = (key, value) => {
+    if (key === "counter" || key === "counterAnchorDate") {
+      counterEdited.current = true;
+    }
     apply({ ...latest.current, [key]: value });
+  };
   const setNow: FormSetter<CheckDraft> = (key, value) => {
     set(key, value);
     commit();

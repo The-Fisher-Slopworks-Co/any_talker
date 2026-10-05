@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
+import type { RecurringCheck } from "../../../../checks/types";
 import {
   anchorForSource,
   DEFAULT_DRAFT,
@@ -10,6 +11,7 @@ import {
   parseClock,
   planSave,
   revertDraft,
+  withServerCounter,
 } from "./check-edit-form";
 
 describe("check editor counter source", () => {
@@ -147,5 +149,31 @@ describe("check editor autosave plan", () => {
       ...saved,
       question: "New?",
     });
+  });
+});
+
+describe("check editor counter", () => {
+  const form = { ...DEFAULT_DRAFT, counter: 3, counterAnchorDate: null };
+  // The runner has since moved the counter to 9 and set a start date.
+  const check = {
+    counter: 9,
+    counterAnchorDate: "2026-10-01",
+  } as RecurringCheck;
+
+  test("a counter nobody is editing is the one the server holds", () => {
+    expect(withServerCounter(form, check, false)).toEqual({
+      ...form,
+      counter: 9,
+      counterAnchorDate: "2026-10-01",
+    });
+  });
+
+  test("a counter edited and not yet saved is sent as edited", () => {
+    expect(withServerCounter(form, check, true)).toBe(form);
+  });
+
+  test("a check with no start date has none", () => {
+    const plain = { counter: 4 } as RecurringCheck;
+    expect(withServerCounter(form, plain, false).counterAnchorDate).toBeNull();
   });
 });
