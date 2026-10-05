@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { api, type BuildInfoResponse } from "../api-client";
 
 export function BuildInfoFooter() {
-  const [info, setInfo] = useState<BuildInfoResponse | null>(null);
+  // undefined while loading: the line is held blank so the page's height does
+  // not change when the hash lands. null when there is nothing to show.
+  const [info, setInfo] = useState<BuildInfoResponse | null | undefined>();
 
   useEffect(() => {
     api
@@ -14,10 +16,14 @@ export function BuildInfoFooter() {
       .catch(() => setInfo(null));
   }, []);
 
-  if (!info?.shortCommit) return null;
+  if (info !== undefined && !info?.shortCommit) return null;
   return (
     <div className="pt-6 text-center text-[12px] text-tg-hint font-mono">
-      <span title={info.commit ?? undefined}>{info.shortCommit}</span>
+      {info ? (
+        <span title={info.commit ?? undefined}>{info.shortCommit}</span>
+      ) : (
+        " "
+      )}
     </div>
   );
 }

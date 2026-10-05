@@ -268,7 +268,10 @@ export function FactsEditor({
 
 export function FactsView() {
   const { t: s } = useI18n();
-  const { data: botsData } = useLoadable("my-bots", api.listMyBots);
+  const { data: botsData, error: botsError } = useLoadable(
+    "my-bots",
+    api.listMyBots,
+  );
   const [scope, setScope] = useSessionState(
     "facts-scope",
     MAIN_SCOPE,
@@ -279,8 +282,14 @@ export function FactsView() {
   const { data, setData } = useLoadable(`my-facts:${scope}`, () =>
     api.listMyFacts(scope).then((r) => ({ ...r, scope })),
   );
+  // The character picker sits above the list and exists only for more than one
+  // bot, so the screen first shows once both have landed rather than letting
+  // the picker push the list down.
+  const ready = (botsData !== null || botsError) && data !== null;
 
   const bots = botsData?.bots ?? null;
+
+  if (!ready) return <LoadingState />;
 
   return (
     <Stack>

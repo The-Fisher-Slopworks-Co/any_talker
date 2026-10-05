@@ -22,6 +22,10 @@
 
 @layer base {
   :root {
+    /* Native controls (pickers, caret, autofill) follow Telegram's theme,
+       which telegram-web-app.js publishes as --tg-color-scheme. Outside
+       Telegram the fallback colours above are light, so the controls are too. */
+    color-scheme: var(--tg-color-scheme, light);
     --tg-separator: rgb(from var(--color-tg-text) r g b / 0.08);
     /* iOS systemFill: the track of an off switch, visible on either theme. */
     --tg-fill: rgb(from var(--color-tg-text) r g b / 0.16);

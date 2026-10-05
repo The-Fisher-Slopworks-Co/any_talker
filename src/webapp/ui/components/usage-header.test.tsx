@@ -31,7 +31,10 @@ const share = (over: Partial<UsageShare> = {}): UsageShare => ({
   ...over,
 });
 
-function render(usage: UsageShare | null, lang: "en" | "ru" = "en"): string {
+function render(
+  usage: UsageShare | null | undefined,
+  lang: "en" | "ru" = "en",
+): string {
   return renderToStaticMarkup(
     <I18nProvider lang={lang}>
       <DateFmtProvider dateFormat="iso" timezone="UTC">
@@ -42,7 +45,15 @@ function render(usage: UsageShare | null, lang: "en" | "ru" = "en"): string {
 }
 
 describe("UsageHeader markup", () => {
-  test("renders nothing until the usage lands", () => {
+  test("holds the place of two bars, without figures, while loading", () => {
+    const html = render(undefined);
+    expect(html.match(/class="row /g)?.length).toBe(2);
+    expect(html).not.toContain("progressbar");
+    expect(html).not.toContain("left");
+    expect(html).not.toContain("5 hours");
+  });
+
+  test("renders nothing when the fetch failed", () => {
     expect(render(null)).toBe("");
   });
 
@@ -78,7 +89,7 @@ describe("UsageHeader markup", () => {
     const html = render(share({ exempt: true }));
     expect(html).toContain("No limits apply to you.");
     expect(html).not.toContain("aria-valuenow");
-    expect(html).not.toContain("%");
+    expect(html).not.toContain("left");
   });
 
   test("translates", () => {
