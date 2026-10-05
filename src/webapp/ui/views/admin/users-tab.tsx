@@ -10,9 +10,14 @@ import { NavRow } from "../../components/select-row";
 import { formatUsd, userDisplayName } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
+const usersLoad = {
+  key: "admin-users",
+  load: () => api.listAdminUsers(),
+};
+
 export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { t: s } = useI18n();
-  const { data } = useLoadable("admin-users", () => api.listAdminUsers());
+  const { data } = useLoadable(usersLoad);
 
   if (data === null) return <LoadingState />;
   const { users, displayNames, spending, limitClasses } = data;

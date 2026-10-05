@@ -33,7 +33,7 @@ describe("useLoadable", () => {
   // Every frame the probe rendered, to catch a loading flash between two.
   let frames: (string[] | null)[] = [];
   function Probe({ k, load }: { k: string; load: () => Promise<string[]> }) {
-    hook = useLoadable(k, load);
+    hook = useLoadable({ key: k, load });
     frames.push(hook.data);
     return null;
   }

@@ -19,6 +19,20 @@ function parseFilter(raw: unknown): Filter | null {
   return raw === "all" || raw === "new" || raw === "closed" ? raw : null;
 }
 
+const statusOf = (f: Filter) => (f === "all" ? {} : { status: f });
+
+// A `nextCursor` and no total, so this pages by "load more" rather than by
+// numbered pages: a page is appended to what is already listed. The list
+// carries its filter, as the previous filter's list stays up while a newly
+// picked one loads.
+function feedbackListLoad(filter: Filter) {
+  return {
+    key: `feedback:${filter}`,
+    load: () =>
+      api.listFeedback(statusOf(filter)).then((r) => ({ ...r, filter })),
+  };
+}
+
 export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
   const { t: s } = useI18n();
   const [filter, setFilter] = useSessionState<Filter>(
@@ -28,14 +42,7 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
   );
   const [loadingMore, setLoadingMore] = useState(false);
   const { status, fail } = useFailureToast();
-  const statusOf = (f: Filter) => (f === "all" ? {} : { status: f });
-  // A `nextCursor` and no total, so this pages by "load more" rather than by
-  // numbered pages: a page is appended to what is already listed. The list
-  // carries its filter, as the previous filter's list stays up while a newly
-  // picked one loads.
-  const { data, setData } = useLoadable(`feedback:${filter}`, () =>
-    api.listFeedback(statusOf(filter)).then((r) => ({ ...r, filter })),
-  );
+  const { data, setData } = useLoadable(feedbackListLoad(filter));
 
   const loadMore = async () => {
     if (data === null || data.nextCursor === null) return;

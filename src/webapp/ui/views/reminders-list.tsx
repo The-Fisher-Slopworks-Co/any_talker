@@ -12,21 +12,23 @@ import { ReminderCard } from "../components/reminder-card";
 import { ReminderEditForm } from "../components/reminder-edit-form";
 import { TimeNote } from "../components/time-note";
 import { useFailureToast } from "../lib/use-failure-toast";
-import { useLoadable } from "../lib/use-loadable";
+import { useLoadable, type Loadable } from "../lib/use-loadable";
 import { reminderTargetLabel, reminderUserLabel } from "../lib/labels";
 
+export const myRemindersLoad = {
+  key: "my-reminders",
+  load: () => api.listMyReminders(),
+};
+
 export function RemindersList({
-  cacheKey,
-  fetchReminders,
+  source,
   header,
   emptyText,
   footer,
   onUserClick,
   editable = false,
 }: {
-  // Names the list `fetchReminders` returns, for useLoadable.
-  cacheKey: string;
-  fetchReminders: () => Promise<RemindersResponse>;
+  source: Loadable<RemindersResponse>;
   header: string;
   emptyText: string;
   footer: ReactNode;
@@ -35,7 +37,7 @@ export function RemindersList({
   editable?: boolean;
 }) {
   const { t: s } = useI18n();
-  const { data, setData } = useLoadable(cacheKey, fetchReminders);
+  const { data, setData } = useLoadable(source);
   const [openId, setOpenId] = useState<string | null>(null);
   const close = useCallback(() => setOpenId(null), []);
   // A failed delete slides the row back on its own; this only tells the user.

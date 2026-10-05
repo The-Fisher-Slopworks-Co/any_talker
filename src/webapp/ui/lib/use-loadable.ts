@@ -16,6 +16,11 @@ import {
 // share it.
 const cache = new Map<string, unknown>();
 
+// What a screen loads, named by `key`: what `load` fetches must change exactly
+// when the key does. Declared next to the screen, so anything else that needs
+// the same data asks for it by the same name.
+export type Loadable<T> = { key: string; load: () => Promise<T> };
+
 type Shown<T> = { key: string; dataKey: string; data: T | null };
 
 // On a key change, the new key's own data if there is any; otherwise the old
@@ -25,14 +30,10 @@ function shownFor<T>(key: string, prev?: Shown<T>): Shown<T> {
   return prev ? { ...prev, key } : { key, dataKey: key, data: null };
 }
 
-// `key` must change exactly when what `load` fetches does: it is the only
-// dependency. Until the data for the current key arrives, `data` may still be
-// the previous key's — callers that act on it should carry its own parameters
-// in it rather than read them from the current props.
-export function useLoadable<T>(
-  key: string,
-  load: () => Promise<T>,
-): {
+// The key is the only dependency. Until the data for the current key arrives,
+// `data` may still be the previous key's — callers that act on it should carry
+// its own parameters in it rather than read them from the current props.
+export function useLoadable<T>({ key, load }: Loadable<T>): {
   data: T | null;
   setData: Dispatch<SetStateAction<T | null>>;
   error: boolean;

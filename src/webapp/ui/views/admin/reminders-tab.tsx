@@ -10,6 +10,11 @@ import { SaveStatus } from "../../components/save-status";
 import { useSettingsAutosave } from "../../lib/use-settings-autosave";
 import { RemindersList } from "../reminders-list";
 
+const adminRemindersLoad = {
+  key: "admin-reminders",
+  load: () => api.listAdminReminders(),
+};
+
 // The admin reminders section: the per-user cap that governs how many of the
 // rows below one user may hold, and then the rows themselves.
 export function RemindersTab({
@@ -36,8 +41,7 @@ export function RemindersTab({
           the footer above and needs the gap spelled out. */}
       <div className="section-gap">
         <RemindersList
-          cacheKey="admin-reminders"
-          fetchReminders={api.listAdminReminders}
+          source={adminRemindersLoad}
           header={s.ui_reminders_admin_header}
           emptyText={s.ui_reminders_admin_empty}
           footer={s.ui_reminders_admin_footer}

@@ -97,6 +97,11 @@ function rowStatus(
   }
 }
 
+const adminSummaryLoad = {
+  key: "admin-summary",
+  load: () => api.getAdminSummary(),
+};
+
 // Shows at once and fills the values in when the summary arrives; if it never
 // does, the rows simply stay bare.
 export function AdminView({
@@ -104,7 +109,7 @@ export function AdminView({
 }: {
   onOpenSection: (section: AdminSection) => void;
 }) {
-  const { data } = useLoadable("admin-summary", api.getAdminSummary);
+  const { data } = useLoadable(adminSummaryLoad);
   return <AdminHome summary={data} onOpenSection={onOpenSection} />;
 }
 
