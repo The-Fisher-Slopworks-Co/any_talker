@@ -13,7 +13,7 @@ import { LoadingState } from "./components/states";
 import { BuildInfoFooter } from "./components/build-info-footer";
 import { UsageHeader } from "./components/usage-header";
 import {
-  adminSection,
+  adminSectionLabel,
   parseRoute,
   showsUsageHeader,
   type Route,
@@ -93,7 +93,7 @@ function AppShell({
       case "admin":
         return s.ui_route_admin;
       case "admin-section":
-        return adminSection(s, route.section).label;
+        return adminSectionLabel(s, route.section);
       case "user-edit":
         return s.ui_route_user_settings;
       case "chat-edit":
@@ -194,14 +194,10 @@ function AppShell({
 
   return (
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
-      {route.kind === "main" ? (
-        // iOS Large Title: the root screen names itself above everything else.
-        <h1 className="m-0 px-1 pb-3 text-[34px] leading-[41px] font-bold tracking-[0.37px]">
-          {title}
-        </h1>
-      ) : (
-        <div className="px-1 pb-4 text-xl font-semibold">{title}</div>
-      )}
+      {/* iOS Large Title: every screen names itself above its content. */}
+      <h1 className="m-0 px-1 pb-3 text-[34px] leading-[41px] font-bold tracking-[0.37px]">
+        {title}
+      </h1>
       {showsUsageHeader(route) && <UsageHeader usage={usage} />}
       {renderRoute()}
       {/* A commit hash means nothing to a regular user. */}

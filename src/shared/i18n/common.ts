@@ -46,12 +46,12 @@ export const commonMessages = {
     ru: "Настройки",
   }),
   ui_route_admin: m({
-    en: "Bot Admin",
+    en: "Admin",
     ru: "Админка",
   }),
   ui_route_user_settings: m({
     en: "User Settings",
-    ru: "Настройки пользователя",
+    ru: "Пользователь",
   }),
   ui_route_chat_settings: m({
     en: "Chat Settings",

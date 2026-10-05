@@ -11,7 +11,7 @@ export const checksMessages = {
   }),
   ui_route_check_edit: m({
     en: "Edit Check",
-    ru: "Редактирование чека",
+    ru: "Чек",
   }),
   ui_route_check_create: m({
     en: "New Check",
