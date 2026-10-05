@@ -21,7 +21,6 @@ import {
   RepliesSection,
   ScheduleSection,
   RecipientSection,
-  TimezoneSection,
 } from "./check-edit-sections";
 
 export function CheckEditView({
@@ -39,8 +38,6 @@ export function CheckEditView({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, set, resetDraft] = useFormReducer(DEFAULT_DRAFT);
-  // The Save button saves the whole form until it autosaves.
-  const commit = () => {};
 
   useEffect(() => {
     if (isNew) {
@@ -90,18 +87,19 @@ export function CheckEditView({
     }
   };
 
+  // The Save button saves the whole form until it autosaves.
+  const sectionProps = { draft, set, setNow: set, commit: () => {} };
   return (
     <Stack>
-      <QuestionSection draft={draft} set={set} commit={commit} />
-      <RecipientSection draft={draft} set={set} commit={commit} />
-      <ScheduleSection draft={draft} set={set} commit={commit} />
-      <TimezoneSection draft={draft} set={set} commit={commit} />
-      <ButtonsSection draft={draft} set={set} commit={commit} />
-      <RepliesSection draft={draft} set={set} commit={commit} />
-      <CounterSourceSection draft={draft} set={set} commit={commit} />
-      <CounterValueSection draft={draft} set={set} commit={commit} />
-      <CounterModeSection draft={draft} set={set} commit={commit} />
-      <EnabledSection draft={draft} set={set} commit={commit} />
+      <QuestionSection {...sectionProps} />
+      <RecipientSection {...sectionProps} />
+      <ScheduleSection {...sectionProps} />
+      <ButtonsSection {...sectionProps} />
+      <RepliesSection {...sectionProps} />
+      <CounterSourceSection {...sectionProps} />
+      <CounterValueSection {...sectionProps} />
+      <CounterModeSection {...sectionProps} />
+      <EnabledSection {...sectionProps} />
 
       {check && <CheckStatusCard check={check} />}
 

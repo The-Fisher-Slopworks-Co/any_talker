@@ -31,9 +31,3 @@ export function getTimezoneAreas(): string[] {
 export function getTimezoneLocations(area: string): string[] {
   return load().byArea.get(area) ?? [];
 }
-
-export function splitTimezone(tz: string): { area: string; location: string } {
-  const slash = tz.indexOf("/");
-  if (slash < 0) return { area: tz, location: "" };
-  return { area: tz.slice(0, slash), location: tz.slice(slash + 1) };
-}

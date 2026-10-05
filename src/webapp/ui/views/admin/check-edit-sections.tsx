@@ -8,9 +8,10 @@ import type { RecurringCheck } from "../../../../checks/types";
 import { localDateString } from "../../../../shared/tz";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
 import { NumberInput, Toggle } from "../../components/controls";
+import { NumberRow } from "../../components/number-row";
 import { SelectRow } from "../../components/select-row";
 import { AreaRow, TextRow } from "../../components/text-row";
-import { TimezoneSelect } from "../../components/timezone-select";
+import { TimezonePickerRow } from "../../components/timezone-picker-row";
 import {
   INPUT_CLS,
   ROW_CLS,
@@ -18,18 +19,17 @@ import {
   ROW_VALUE_CLS,
 } from "../../components/row";
 import type { FormSetter } from "../../lib/use-form-reducer";
-import type { CheckDraft } from "./check-edit-form";
+import { formatClock, parseClock, type CheckDraft } from "./check-edit-form";
 
 const TEXTAREA_CLS =
   "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[100px]";
-const CLOCK_INPUT_CLS =
-  "w-12 bg-transparent border-0 p-0 text-base text-tg-text text-right";
-
-// Every section edits the one draft through the one setter; `commit` is what a
-// text field does when it is left.
+// Every section edits the one draft. `set` changes the form (a field being
+// typed in), `commit` is what such a field does when it is left, and `setNow`
+// is `set` plus `commit` for a switch or picker that is done once chosen.
 type SectionProps = {
   draft: CheckDraft;
   set: FormSetter<CheckDraft>;
+  setNow: FormSetter<CheckDraft>;
   commit: () => void;
 };
 
@@ -53,6 +53,7 @@ export function QuestionSection({ draft, set, commit }: SectionProps) {
           value={draft.question}
           onChange={(v) => set("question", v)}
           onCommit={commit}
+          minHeight="min-h-[76px]"
         />
       </Card>
       <SectionFooter>{s.ui_check_question_footer}</SectionFooter>
@@ -94,58 +95,75 @@ export function RecipientSection({ draft, set, commit }: SectionProps) {
   );
 }
 
-export function ScheduleSection({ draft, set }: SectionProps) {
-  const { t: s } = useI18n();
+// A time or date as a row. The value is shown in the app's own format and the
+// platform's picker lies invisibly over it: a native time/date input has an
+// intrinsic width and its own format, and overflows a narrow card.
+function PickerRow({
+  label,
+  type,
+  shown,
+  value,
+  onChange,
+}: {
+  label: string;
+  type: "time" | "date";
+  shown?: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
-    <>
-      <SectionHeader>{s.ui_check_schedule}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_schedule}</span>
-          <span className="flex-1" />
-          <NumberInput
-            className={CLOCK_INPUT_CLS}
-            integer
-            min={0}
-            max={23}
-            value={draft.scheduleHour}
-            onChange={(n) => set("scheduleHour", n)}
-          />
-          <span className="text-tg-hint">:</span>
-          <NumberInput
-            className={CLOCK_INPUT_CLS}
-            integer
-            min={0}
-            max={59}
-            value={draft.scheduleMinute}
-            onChange={(n) => set("scheduleMinute", n)}
-          />
-        </div>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_timeout}</span>
-          <NumberInput
-            className={INPUT_CLS}
-            integer
-            min={1}
-            max={24 * 60}
-            value={draft.timeoutMinutes}
-            onChange={(n) => set("timeoutMinutes", n)}
-          />
-        </label>
-      </Card>
-    </>
+    <label className={ROW_CLS}>
+      <span className={ROW_LABEL_CLS}>{label}</span>
+      <span className="relative flex flex-1 min-w-0 justify-end">
+        <span>{shown ?? value}</span>
+        <input
+          type={type}
+          required
+          className="absolute inset-0 h-full w-full min-w-0 opacity-0"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onClick={(e) => e.currentTarget.showPicker?.()}
+        />
+      </span>
+    </label>
   );
 }
 
-export function TimezoneSection({ draft, set }: SectionProps) {
+export function ScheduleSection({ draft, set, setNow }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_check_timezone}</SectionHeader>
-      <TimezoneSelect
-        value={draft.timezone}
-        onChange={(tz) => set("timezone", tz)}
-      />
+      <SectionHeader>{s.ui_check_schedule_header}</SectionHeader>
+      <Card>
+        <PickerRow
+          label={s.ui_check_schedule}
+          type="time"
+          value={formatClock(draft.scheduleHour, draft.scheduleMinute)}
+          onChange={(v) => {
+            const clock = parseClock(v);
+            if (!clock) return;
+            set("scheduleHour", clock.hour);
+            setNow("scheduleMinute", clock.minute);
+          }}
+        />
+        <TimezonePickerRow
+          value={draft.timezone}
+          onChange={(tz) => {
+            if (tz !== null) setNow("timezone", tz);
+          }}
+          emptyLabel={null}
+        />
+        <NumberRow
+          label={s.ui_check_timeout}
+          suffix={s.ui_check_timeout_unit}
+          value={draft.timeoutMinutes}
+          onCommit={(n) => setNow("timeoutMinutes", n)}
+          integer
+          min={1}
+          max={24 * 60}
+        />
+      </Card>
+      <SectionFooter>{s.ui_check_timeout_footer}</SectionFooter>
     </>
   );
 }
