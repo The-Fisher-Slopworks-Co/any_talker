@@ -87,7 +87,7 @@ export function SystemPromptSection({
         <OptimizePromptRow optimize={optimize} />
       </OwnCard>
       {form.promptOverride ? (
-        <OptimizePromptFooter optimize={optimize} autosaves />
+        <OptimizePromptFooter optimize={optimize} />
       ) : (
         <SectionFooter>
           {s.ui_chat_system_prompt_off_footer(global.systemPrompt.length)}

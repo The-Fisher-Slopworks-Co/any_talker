@@ -22,10 +22,6 @@ export const promptMessages = {
     ru: "Скопировано",
   }),
   ui_prompt_optimize_footer: m({
-    en: "Copies a request with both prompts. Paste it into any chat, then paste the shortened prompt back and save.",
-    ru: "Копирует запрос с обоими промптами. Вставьте в любой чат, затем верните сокращённый промпт и сохраните.",
-  }),
-  ui_prompt_optimize_autosave_footer: m({
     en: "Copies a request with both prompts. Paste it into any chat, then paste the shortened prompt back here.",
     ru: "Копирует запрос с обоими промптами. Вставьте в любой чат, затем верните сюда сокращённый промпт.",
   }),
