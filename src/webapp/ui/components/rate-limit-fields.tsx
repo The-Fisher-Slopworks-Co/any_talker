@@ -3,48 +3,43 @@
 
 import { useI18n } from "../i18n-context";
 import type { RateLimitConfig } from "../../../shared/types";
+import type { SettingsPatch } from "../api-client/settings";
 import { Card } from "./layout";
-import { NumberInput, Toggle } from "./controls";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { NumberRow } from "./number-row";
+import { SwitchRow } from "./switch-row";
 
+// The per-user spend budgets and the owner's exemption; each edit saves at once.
 export function RateLimitFields({
   value,
-  onChange,
+  save,
 }: {
   value: RateLimitConfig;
-  onChange: (next: RateLimitConfig) => void;
+  save: (patch: SettingsPatch) => void;
 }) {
   const { t: s } = useI18n();
   return (
     <Card>
-      <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_5h_usd}</span>
-        <NumberInput
-          className={INPUT_CLS}
-          step="0.005"
-          min={0}
-          value={value.fiveHourUsd}
-          onChange={(n) => onChange({ ...value, fiveHourUsd: n })}
-        />
-      </label>
-      <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_weekly_usd}</span>
-        <NumberInput
-          className={INPUT_CLS}
-          step="0.025"
-          min={0}
-          value={value.weeklyUsd}
-          onChange={(n) => onChange({ ...value, weeklyUsd: n })}
-        />
-      </label>
-      <div className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_ratelimit_owner_exempt}</span>
-        <span className="flex-1" />
-        <Toggle
-          value={value.ownerExempt}
-          onChange={(v) => onChange({ ...value, ownerExempt: v })}
-        />
-      </div>
+      <NumberRow
+        label={s.ui_ratelimit_5h_usd}
+        prefix="$"
+        step="0.005"
+        min={0}
+        value={value.fiveHourUsd}
+        onCommit={(fiveHourUsd) => save({ rateLimit: { fiveHourUsd } })}
+      />
+      <NumberRow
+        label={s.ui_ratelimit_weekly_usd}
+        prefix="$"
+        step="0.025"
+        min={0}
+        value={value.weeklyUsd}
+        onCommit={(weeklyUsd) => save({ rateLimit: { weeklyUsd } })}
+      />
+      <SwitchRow
+        label={s.ui_ratelimit_owner_exempt}
+        value={value.ownerExempt}
+        onChange={(ownerExempt) => save({ rateLimit: { ownerExempt } })}
+      />
     </Card>
   );
 }

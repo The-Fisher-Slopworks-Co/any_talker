@@ -4,8 +4,8 @@
 import { useState } from "react";
 import { useI18n } from "../i18n-context";
 import { useDateFmt } from "../datetime-context";
-import { api } from "../api-client";
 import type { Settings } from "../../../shared/types";
+import type { SettingsPatch } from "../api-client/settings";
 import { activeBoost, MAX_BOOST_PERCENT } from "../../../ratelimit/boost";
 import {
   localDateTimeString,
@@ -20,11 +20,11 @@ const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 // Admin control for the "+X% to limits until <date>" promo: the running one
 // with a button to end it early, or a form to start one (one at a time).
 export function LimitBoostCard({
-  settings,
-  onSaved,
+  boost,
+  save,
 }: {
-  settings: Settings;
-  onSaved: (s: Settings) => void;
+  boost: Settings["limitBoost"];
+  save: (patch: SettingsPatch) => void;
 }) {
   const { t: s } = useI18n();
   const { format, timezone } = useDateFmt();
@@ -33,17 +33,7 @@ export function LimitBoostCard({
   const [until, setUntil] = useState(() =>
     localDateTimeString(Date.now() + TWO_WEEKS_MS, tz).replace(" ", "T"),
   );
-  const [busy, setBusy] = useState(false);
   const [invalid, setInvalid] = useState(false);
-
-  const save = async (limitBoost: Settings["limitBoost"]) => {
-    setBusy(true);
-    try {
-      onSaved(await api.putSettings({ limitBoost }));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const start = () => {
     const parsed = parseAbsoluteDateTimeMs(until, tz);
@@ -52,10 +42,10 @@ export function LimitBoostCard({
       return;
     }
     setInvalid(false);
-    void save({ percent, untilMs: parsed.ms });
+    save({ limitBoost: { percent, untilMs: parsed.ms } });
   };
 
-  const active = activeBoost(settings.limitBoost, Date.now());
+  const active = activeBoost(boost, Date.now());
   if (active) {
     return (
       <>
@@ -67,7 +57,7 @@ export function LimitBoostCard({
           </div>
         </Card>
         <Card>
-          <DeleteButton disabled={busy} onClick={() => void save(null)}>
+          <DeleteButton onClick={() => save({ limitBoost: null })}>
             {s.ui_boost_end}
           </DeleteButton>
         </Card>
@@ -105,7 +95,7 @@ export function LimitBoostCard({
         ) : null}
       </Card>
       <Card>
-        <RowButton disabled={busy || until === ""} onClick={start}>
+        <RowButton disabled={until === ""} onClick={start}>
           {s.ui_boost_start}
         </RowButton>
       </Card>
