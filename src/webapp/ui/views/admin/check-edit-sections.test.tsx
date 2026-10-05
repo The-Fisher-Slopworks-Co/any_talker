@@ -6,8 +6,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../../i18n-context";
 import { DEFAULT_DRAFT } from "./check-edit-form";
 import {
+  ButtonsSection,
   QuestionSection,
   RecipientSection,
+  RepliesSection,
   ScheduleSection,
 } from "./check-edit-sections";
 
@@ -40,6 +42,13 @@ describe("check editor groups", () => {
     expect(html).toContain("Replaces {name}");
   });
 
+  test("the buttons group labels both answers", () => {
+    const html = render(<ButtonsSection {...props} />);
+    expect(html).toContain(">Buttons<");
+    expect(html).toContain(">Yes Label<");
+    expect(html).toContain(">No Label<");
+  });
+
   test("the schedule is one time row, one timezone picker and a timeout in min", () => {
     const html = render(<ScheduleSection {...props} />);
     expect(html).toContain(">Schedule<");
@@ -53,5 +62,13 @@ describe("check editor groups", () => {
     expect(html).not.toContain("Automatic");
     expect(html).toContain(">Timeout<");
     expect(html).toContain(">min<");
+  });
+
+  test("the replies share one card, each under a small caption", () => {
+    const html = render(<RepliesSection {...props} />);
+    expect(html.match(/class="card /g)?.length).toBe(1);
+    expect(html.match(/<textarea/g)?.length).toBe(2);
+    expect(html).toContain(">When Yes<");
+    expect(html).toContain(">When No / Timeout<");
   });
 });

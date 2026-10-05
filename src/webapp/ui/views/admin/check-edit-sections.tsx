@@ -21,8 +21,6 @@ import {
 import type { FormSetter } from "../../lib/use-form-reducer";
 import { formatClock, parseClock, type CheckDraft } from "./check-edit-form";
 
-const TEXTAREA_CLS =
-  "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[100px]";
 // Every section edits the one draft. `set` changes the form (a field being
 // typed in), `commit` is what such a field does when it is left, and `setNow`
 // is `set` plus `commit` for a switch or picker that is done once chosen.
@@ -168,56 +166,56 @@ export function ScheduleSection({ draft, set, setNow }: SectionProps) {
   );
 }
 
-export function ButtonsSection({ draft, set }: SectionProps) {
+export function ButtonsSection({ draft, set, commit }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_check_yes_button}</SectionHeader>
+      <SectionHeader>{s.ui_check_buttons}</SectionHeader>
       <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_yes_button}</span>
-          <input
-            className={INPUT_CLS}
-            value={draft.yesButton}
-            onChange={(e) => set("yesButton", e.target.value)}
-            maxLength={32}
-          />
-        </label>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_check_no_button}</span>
-          <input
-            className={INPUT_CLS}
-            value={draft.noButton}
-            onChange={(e) => set("noButton", e.target.value)}
-            maxLength={32}
-          />
-        </label>
+        <TextRow
+          label={s.ui_check_yes_button}
+          placeholder=""
+          value={draft.yesButton}
+          onChange={(v) => set("yesButton", v)}
+          onCommit={commit}
+          maxLength={32}
+        />
+        <TextRow
+          label={s.ui_check_no_button}
+          placeholder=""
+          value={draft.noButton}
+          onChange={(v) => set("noButton", v)}
+          onCommit={commit}
+          maxLength={32}
+        />
       </Card>
     </>
   );
 }
 
-export function RepliesSection({ draft, set }: SectionProps) {
+export function RepliesSection({ draft, set, commit }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <>
-      <SectionHeader>{s.ui_check_yes_reply}</SectionHeader>
+      <SectionHeader>{s.ui_check_replies}</SectionHeader>
       <Card>
-        <textarea
-          className={TEXTAREA_CLS}
+        <AreaRow
+          label={s.ui_check_yes_reply}
+          showLabel
           placeholder={s.ui_check_yes_reply_placeholder}
           value={draft.yesReply}
-          onChange={(e) => set("yesReply", e.target.value)}
+          onChange={(v) => set("yesReply", v)}
+          onCommit={commit}
+          minHeight="min-h-[76px]"
         />
-      </Card>
-
-      <SectionHeader>{s.ui_check_no_reply}</SectionHeader>
-      <Card>
-        <textarea
-          className={TEXTAREA_CLS}
+        <AreaRow
+          label={s.ui_check_no_reply}
+          showLabel
           placeholder={s.ui_check_no_reply_placeholder}
           value={draft.noReply}
-          onChange={(e) => set("noReply", e.target.value)}
+          onChange={(v) => set("noReply", v)}
+          onCommit={commit}
+          minHeight="min-h-[76px]"
         />
       </Card>
       <SectionFooter>{s.ui_check_replies_footer}</SectionFooter>

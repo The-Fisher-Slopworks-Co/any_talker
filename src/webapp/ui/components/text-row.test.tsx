@@ -113,3 +113,23 @@ describe("committing", () => {
     expect(commits).toBe(1);
   });
 });
+
+test("an area row shows its label as a caption only when asked", () => {
+  const area = (showLabel: boolean) =>
+    renderToStaticMarkup(
+      <AreaRow
+        label="When Yes"
+        placeholder=""
+        value=""
+        showLabel={showLabel}
+        onChange={() => {}}
+        onCommit={() => {}}
+      />,
+    );
+  expect(area(true)).toContain(">When Yes</div>");
+  expect(area(false)).not.toContain(">When Yes</div>");
+  expect(area(true)).toContain('aria-label="When Yes"');
+  // Under a caption the text sits closer to it.
+  expect(area(true)).toContain("pt-1");
+  expect(area(false)).not.toContain("pt-1");
+});
