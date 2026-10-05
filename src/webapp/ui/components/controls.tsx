@@ -202,27 +202,7 @@ export function ActionRow({
   );
 }
 
-export function RowButton({
-  disabled,
-  onClick,
-  children,
-}: {
-  disabled?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      className="action-row relative block w-full bg-tg-section text-tg-link border-0 text-center px-4 py-[13px] text-base font-medium cursor-pointer active:not-disabled:bg-[var(--tg-separator)] disabled:opacity-50 disabled:cursor-not-allowed"
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
-
-// A full-width destructive action row (delete), styled like RowButton but in the
+// A full-width destructive action row (delete), a centred row in the
 // theme's destructive color. Lives alone in its own Card.
 export function DeleteButton({
   disabled,

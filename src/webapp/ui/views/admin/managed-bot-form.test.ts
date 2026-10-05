@@ -2,7 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { revertFailed } from "./managed-bot-form";
+import { newBotLink, revertFailed } from "./managed-bot-form";
 
 const confirmed = { displayName: "Nemo", systemPrompt: "Calm." };
 
@@ -20,5 +20,19 @@ describe("revertFailed", () => {
     const failed = { displayName: "Kitty", systemPrompt: "Calm." };
     const form = { displayName: "Kitty Cat", systemPrompt: "Calm." };
     expect(revertFailed(form, failed, confirmed)).toEqual(form);
+  });
+});
+
+describe("newBotLink", () => {
+  test("is the manager's link alone when nothing is suggested", () => {
+    expect(newBotLink("main_bot", " ", "")).toBe(
+      "https://t.me/newbot/main_bot",
+    );
+  });
+
+  test("carries the trimmed username in the path and the name in the query", () => {
+    expect(newBotLink("main_bot", " nemo_bot ", "Captain Nemo")).toBe(
+      "https://t.me/newbot/main_bot/nemo_bot?name=Captain%20Nemo",
+    );
   });
 });

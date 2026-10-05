@@ -14,8 +14,8 @@ export const managedBotsMessages = {
     ru: "Бот",
   }),
   ui_route_bot_create: m({
-    en: "New Bot",
-    ru: "Новый бот",
+    en: "New Character Bot",
+    ru: "Новый бот-персонаж",
   }),
   ui_mbots_footer: m({
     en: "Each character is a separate Telegram bot, answering only to /ask@its_username.",
@@ -110,7 +110,7 @@ export const managedBotsMessages = {
     ru: "Сначала включите управление ботами для основного бота в Mini App @BotFather.",
   }),
   ui_mbot_create_name: m({
-    en: "Suggested name",
+    en: "Suggested Name",
     ru: "Предлагаемое имя",
   }),
   ui_mbot_create_name_placeholder: m({
@@ -118,12 +118,12 @@ export const managedBotsMessages = {
     ru: "напр. Кошечка",
   }),
   ui_mbot_create_username: m({
-    en: "Suggested username",
+    en: "Suggested Username",
     ru: "Предлагаемый username",
   }),
   ui_mbot_create_username_placeholder: m({
-    en: "must end in 'bot'",
-    ru: "должен оканчиваться на 'bot'",
+    en: "e.g. kitty_bot",
+    ru: "напр. kitty_bot",
   }),
   ui_mbot_create_open: m({
     en: "Create in Telegram",

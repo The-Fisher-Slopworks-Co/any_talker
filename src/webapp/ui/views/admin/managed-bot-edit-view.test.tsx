@@ -253,3 +253,48 @@ describe("ManagedBotEditView", () => {
     await act(async () => root.unmount());
   });
 });
+
+async function mountCreate(canManageBots: boolean) {
+  Object.assign(api, {
+    getManagedBotNewInfo: async () => ({ username: "main_bot", canManageBots }),
+  });
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <I18nProvider lang="en">
+        <ManagedBotEditView botId={null} onClose={() => {}} />
+      </I18nProvider>,
+    ),
+  );
+  await until(() => container.querySelector("button") !== null);
+  return { root, container };
+}
+
+describe("ManagedBotEditView creating", () => {
+  test("asks for a suggested name and username, then offers Create in Telegram", async () => {
+    const { root, container } = await mountCreate(true);
+    const text = container.textContent;
+    for (const part of [
+      "Suggested Name",
+      "Suggested Username",
+      "Create in Telegram",
+    ])
+      expect(text).toContain(part);
+    expect(text).not.toContain("First enable bot management");
+    expect(container.querySelector("button")!.hasAttribute("disabled")).toBe(
+      false,
+    );
+    await act(async () => root.unmount());
+  });
+
+  test("greys the action out under a warning when bot management is off", async () => {
+    const { root, container } = await mountCreate(false);
+    expect(container.textContent).toContain("First enable bot management");
+    expect(container.querySelector("button")!.hasAttribute("disabled")).toBe(
+      true,
+    );
+    await act(async () => root.unmount());
+  });
+});
