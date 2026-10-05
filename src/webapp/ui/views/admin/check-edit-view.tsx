@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type { RecurringCheck, ValidationError } from "../../../../checks/types";
-import { Card, SectionFooter, Stack } from "../../components/layout";
+import { Card, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
 import { ActionRow } from "../../components/controls";
 import { SaveStatus } from "../../components/save-status";
@@ -169,7 +169,7 @@ export function CheckEditView({
     }
   };
 
-  const sectionProps = { draft, set, setNow, commit };
+  const sectionProps = { draft, set, setNow, commit, error };
   return (
     <Stack>
       <EnabledSection {...sectionProps} />
@@ -182,13 +182,6 @@ export function CheckEditView({
 
       {check && <CheckStatusCard check={check} />}
       <SaveStatus status={status} />
-      {error && (
-        <SectionFooter>
-          <span className="text-tg-destructive">
-            {s.ui_check_save_validation_error(error)}
-          </span>
-        </SectionFooter>
-      )}
 
       {!check && (
         <div className="section-gap">

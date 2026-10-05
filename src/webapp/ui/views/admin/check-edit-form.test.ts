@@ -6,6 +6,7 @@ import type { RecurringCheck } from "../../../../checks/types";
 import {
   anchorForSource,
   DEFAULT_DRAFT,
+  errorGroup,
   formatAnchorDate,
   formatClock,
   parseClock,
@@ -139,6 +140,15 @@ describe("check editor autosave plan", () => {
     );
     expect(plan.error).toBe("title_empty");
     expect(plan.payload).toBeNull();
+  });
+
+  test("an error belongs to the group its field is in", () => {
+    expect(errorGroup("title_empty")).toBe("question");
+    expect(errorGroup("target_name_empty")).toBe("recipient");
+    expect(errorGroup("timezone_invalid")).toBe("schedule");
+    expect(errorGroup("no_button_empty")).toBe("buttons");
+    expect(errorGroup("no_reply_empty")).toBe("replies");
+    expect(errorGroup("counter_anchor_date_invalid")).toBe("counter");
   });
 
   test("a rejected save puts back only the fields it changed", () => {

@@ -1,7 +1,48 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
+import type { ValidationError } from "../../checks/types";
 import { m } from "./message";
+
+// What the check editor says about a field the server refuses; a new error code
+// is a type error here until both languages word it.
+const EN_ERRORS = {
+  title_empty: "Enter a title.",
+  question_empty: "Enter the question.",
+  chat_id_empty: "Enter a chat ID.",
+  target_user_id_empty: "Enter a user ID.",
+  target_name_empty: "Enter the name to show.",
+  schedule_hour_invalid: "Pick a time.",
+  schedule_minute_invalid: "Pick a time.",
+  timezone_invalid: "Pick a timezone.",
+  timeout_minutes_invalid: "Timeout must be 1 to 1440 minutes.",
+  yes_button_empty: "Enter the Yes label.",
+  no_button_empty: "Enter the No label.",
+  yes_reply_empty: "Enter the reply for Yes.",
+  no_reply_empty: "Enter the reply for No.",
+  counter_invalid: "Value must be a whole number, 0 or more.",
+  counter_mode_invalid: "Pick what Yes does to the counter.",
+  counter_anchor_date_invalid: "Pick a valid start date.",
+} satisfies Record<ValidationError, string>;
+
+const RU_ERRORS = {
+  title_empty: "Укажите название.",
+  question_empty: "Укажите вопрос.",
+  chat_id_empty: "Укажите ID чата.",
+  target_user_id_empty: "Укажите ID пользователя.",
+  target_name_empty: "Укажите имя для сообщений.",
+  schedule_hour_invalid: "Выберите время.",
+  schedule_minute_invalid: "Выберите время.",
+  timezone_invalid: "Выберите часовой пояс.",
+  timeout_minutes_invalid: "Таймаут — от 1 до 1440 минут.",
+  yes_button_empty: "Укажите подпись «Да».",
+  no_button_empty: "Укажите подпись «Нет».",
+  yes_reply_empty: "Укажите ответ при «Да».",
+  no_reply_empty: "Укажите ответ при «Нет».",
+  counter_invalid: "Значение — целое число, 0 или больше.",
+  counter_mode_invalid: "Выберите, что «Да» делает со счётчиком.",
+  counter_anchor_date_invalid: "Выберите корректную дату начала.",
+} satisfies Record<ValidationError, string>;
 
 // Scheduled check-ins: the admin list and the check editor.
 export const checksMessages = {
@@ -225,8 +266,8 @@ export const checksMessages = {
     en: "No",
     ru: "Нет",
   }),
-  ui_check_save_validation_error: m({
-    en: (code: string) => `Validation error: ${code}`,
-    ru: (code: string) => `Ошибка валидации: ${code}`,
+  ui_check_error: m({
+    en: (code: ValidationError) => EN_ERRORS[code],
+    ru: (code: ValidationError) => RU_ERRORS[code],
   }),
 };
