@@ -5,10 +5,6 @@ import { m } from "./message";
 
 // Group chats: the admin list and a chat's per-chat overrides.
 export const chatsMessages = {
-  ui_chats_all: m({
-    en: "All Chats",
-    ru: "Все чаты",
-  }),
   ui_chats_empty: m({
     en: "No chats yet.",
     ru: "Чатов пока нет.",
@@ -16,6 +12,30 @@ export const chatsMessages = {
   ui_chat_private: m({
     en: "Private chat",
     ru: "Приватный чат",
+  }),
+  ui_chat_type_private: m({
+    en: "Private",
+    ru: "Приватный",
+  }),
+  ui_chat_type_group: m({
+    en: "Group",
+    ru: "Группа",
+  }),
+  ui_chat_type_supergroup: m({
+    en: "Supergroup",
+    ru: "Супергруппа",
+  }),
+  ui_chat_type_channel: m({
+    en: "Channel",
+    ru: "Канал",
+  }),
+  ui_chat_access_allowed: m({
+    en: "Allowed",
+    ru: "Разрешён",
+  }),
+  ui_chat_access_blocked: m({
+    en: "Blocked",
+    ru: "Заблокирован",
   }),
   ui_chat_not_found: m({
     en: "Chat not found.",
