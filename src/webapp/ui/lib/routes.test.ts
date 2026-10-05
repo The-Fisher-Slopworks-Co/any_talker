@@ -135,7 +135,10 @@ describe("adminSectionLabel", () => {
 });
 
 describe("showsLargeTitle", () => {
-  test("hands the title over to the hero of a user or chat page", () => {
+  test("hands the title over to the hero of a user, chat or bot page", () => {
+    expect(
+      showsLargeTitle({ kind: "managed-bot-edit", botId: "2000001" }),
+    ).toBe(false);
     expect(
       showsLargeTitle({ kind: "user-edit", userId: "1", from: "users" }),
     ).toBe(false);

@@ -49,7 +49,11 @@ export function showsUsageHeader(route: Route): boolean {
 // own: the hero's name is their heading. Until the page has loaded, it renders
 // the large title itself.
 export function showsLargeTitle(route: Route): boolean {
-  return route.kind !== "user-edit" && route.kind !== "chat-edit";
+  return (
+    route.kind !== "user-edit" &&
+    route.kind !== "chat-edit" &&
+    !(route.kind === "managed-bot-edit" && route.botId !== null)
+  );
 }
 
 // The admin home's groups, top to bottom. A null header is a headerless

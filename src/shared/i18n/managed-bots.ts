@@ -34,7 +34,7 @@ export const managedBotsMessages = {
     ru: "Остановлен",
   }),
   ui_mbot_display_name: m({
-    en: "Display name",
+    en: "Display Name",
     ru: "Отображаемое имя",
   }),
   ui_mbot_display_name_placeholder: m({
@@ -46,7 +46,7 @@ export const managedBotsMessages = {
     ru: "Username",
   }),
   ui_mbot_system_prompt: m({
-    en: "System prompt",
+    en: "System Prompt",
     ru: "Системный промпт",
   }),
   ui_mbot_system_prompt_placeholder: m({
@@ -54,8 +54,8 @@ export const managedBotsMessages = {
     ru: "Опишите персону этого персонажа…",
   }),
   ui_mbot_system_prompt_footer: m({
-    en: "Replaces the global prompt for this bot only; other settings are inherited.",
-    ru: "Заменяет глобальный промпт только для этого бота; остальное наследуется.",
+    en: "Replaces the global prompt for this bot only.",
+    ru: "Заменяет глобальный промпт только для этого бота.",
   }),
   ui_mbot_status: m({
     en: "Status",
@@ -77,12 +77,16 @@ export const managedBotsMessages = {
     en: "Avatar updated.",
     ru: "Аватар обновлён.",
   }),
+  ui_mbot_avatar_edit: m({
+    en: "Edit",
+    ru: "Изменить",
+  }),
   ui_mbot_avatar_failed: m({
     en: "Couldn't set the avatar (is the bot running?).",
     ru: "Не удалось установить аватар (бот запущен?).",
   }),
   ui_mbot_delete: m({
-    en: "Delete bot",
+    en: "Delete Bot",
     ru: "Удалить бота",
   }),
   ui_mbot_delete_confirm: m({
