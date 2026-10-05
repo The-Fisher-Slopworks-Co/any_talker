@@ -193,6 +193,8 @@ function BotEditor({
     },
   });
   const failure = useFailureToast();
+  const avatarFailure = useFailureToast();
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -223,11 +225,13 @@ function BotEditor({
   const onPickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploading(true);
     try {
       await api.setManagedBotAvatar(botId, await fileToDataUrl(file));
     } catch {
-      failure.fail();
+      avatarFailure.fail();
     } finally {
+      setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -249,6 +253,7 @@ function BotEditor({
         action={{
           label: s.ui_mbot_avatar_edit,
           onClick: () => fileRef.current?.click(),
+          disabled: uploading,
         }}
         actionUnderAvatar
       />
@@ -288,6 +293,10 @@ function BotEditor({
         </Card>
       </div>
       <SaveStatus status={failure.status === "failed" ? "failed" : status} />
+      <SaveStatus
+        status={avatarFailure.status}
+        message={s.ui_mbot_avatar_failed}
+      />
     </Stack>
   );
 }
