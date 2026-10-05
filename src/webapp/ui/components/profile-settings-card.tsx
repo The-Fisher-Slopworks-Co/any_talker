@@ -14,7 +14,7 @@ import type { DisplayNameError } from "../../../shared/display-name";
 import type { Gender } from "../../../shared/types";
 import { DISPLAY_NAME_ERR_KEY, LANG_LABEL_KEY } from "../lib/labels";
 import { Card, SectionFooter, SectionHeader } from "./layout";
-import { INPUT_CLS, ROW_CLS, ROW_LABEL_CLS } from "./row";
+import { TextRow } from "./text-row";
 import { GenderPickerRow } from "./gender-picker-row";
 import { TimezonePickerRow } from "./timezone-picker-row";
 import { ValueSelectRow } from "./value-select-row";
@@ -53,19 +53,13 @@ export function AboutYouSection({
     <>
       <SectionHeader>{s.ui_main_about_you}</SectionHeader>
       <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_main_name}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={namePlaceholder}
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            onBlur={onNameCommit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-          />
-        </label>
+        <TextRow
+          label={s.ui_main_name}
+          placeholder={namePlaceholder}
+          value={name}
+          onChange={onNameChange}
+          onCommit={onNameCommit}
+        />
         <GenderPickerRow value={gender} onChange={onGender} />
       </Card>
       <SectionFooter>
