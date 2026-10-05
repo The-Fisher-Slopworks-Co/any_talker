@@ -20,12 +20,12 @@ import {
 } from "../../components/layout";
 import { LargeTitle } from "../../components/large-title";
 import { LoadingState } from "../../components/states";
-import { SelectRow } from "../../components/select-row";
+import { CharacterPickerRow } from "../../components/character-picker-row";
 import { UserAboutSection } from "../../components/user-about-section";
 import { AccessRows } from "../../components/access-rows";
 import { Hero } from "../../components/hero";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
-import { botLabel, userDisplayName } from "../../lib/labels";
+import { userDisplayName } from "../../lib/labels";
 import { FactsEditor, type FactsWriter } from "../facts-view";
 import { useLoadable } from "../../lib/use-loadable";
 import { parseString, useSessionState } from "../../lib/session-state";
@@ -135,14 +135,11 @@ export function UserEditView({ userId }: { userId: string }) {
       <SectionHeader>{s.ui_user_facts_header}</SectionHeader>
       {factBots && factBots.length > 1 ? (
         <Card>
-          {factBots.map((b) => (
-            <SelectRow
-              key={b.botId ?? "main"}
-              label={botLabel(s, b)}
-              selected={factScope === (b.botId ?? "main")}
-              onSelect={() => setFactScope(b.botId ?? "main")}
-            />
-          ))}
+          <CharacterPickerRow
+            bots={factBots}
+            scope={factScope}
+            onChange={setFactScope}
+          />
         </Card>
       ) : null}
       {factsData === null ? (

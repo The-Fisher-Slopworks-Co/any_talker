@@ -16,7 +16,7 @@ import {
   Stack,
 } from "../components/layout";
 import { EmptyState, LoadingState } from "../components/states";
-import { RowButton } from "../components/controls";
+import { AddRow } from "../components/add-row";
 import { Sheet, SheetButton, useSheet } from "../components/sheet";
 import { NavRow, SelectRow } from "../components/select-row";
 import { INPUT_LEFT_CLS, ROW_CLS } from "../components/row";
@@ -239,14 +239,11 @@ export function FactsEditor({
         {data.facts.length === 0 ? (
           <EmptyState>{s.ui_facts_empty}</EmptyState>
         ) : null}
-      </Card>
-      <Card>
-        <RowButton
+        <AddRow
+          label={s.ui_facts_add}
           disabled={data.facts.length >= data.cap}
           onClick={() => setOpen(NEW_FACT)}
-        >
-          {s.ui_facts_add}
-        </RowButton>
+        />
       </Card>
       {open !== null ? (
         <FactSheet

@@ -38,7 +38,7 @@ describe("FactsEditor markup", () => {
     expect(html).toContain("pets");
     expect(html).toContain("two cats");
     expect(html).toContain("welder");
-    expect(html).toMatch(/<button[^>]*>Add fact<\/button>/);
+    expect(html).toMatch(/<button[^>]*>.*Add Fact<\/button>/);
   });
 
   test("disables adding at the cap", () => {
@@ -46,6 +46,6 @@ describe("FactsEditor markup", () => {
       facts: [{ key: "pets", value: "two cats" }],
       cap: 1,
     });
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Add fact<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>.*Add Fact<\/button>/);
   });
 });
