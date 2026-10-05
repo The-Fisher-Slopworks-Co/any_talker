@@ -14,7 +14,7 @@ export const accessMessages = {
     ru: "Добавить в белый список",
   }),
   ui_whitelist_enforce: m({
-    en: "Enforce whitelist",
+    en: "Enforce Whitelist",
     ru: "Требовать белый список",
   }),
   ui_whitelist_enforce_footer: m({
@@ -30,8 +30,12 @@ export const accessMessages = {
     ru: "Разрешённые чаты",
   }),
   ui_whitelist_no_entries: m({
-    en: "No entries",
-    ru: "Записей нет",
+    en: "None",
+    ru: "Нет",
+  }),
+  ui_whitelist_footer: m({
+    en: "Swipe left to remove an entry. To add one, open the user or chat.",
+    ru: "Смахните влево, чтобы убрать запись. Чтобы добавить, откройте пользователя или чат.",
   }),
   ui_blacklist_add: m({
     en: "Add to blacklist",

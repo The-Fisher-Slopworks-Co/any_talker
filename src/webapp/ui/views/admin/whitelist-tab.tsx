@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type { Settings, WhitelistEntry } from "../../../../shared/types";
@@ -11,9 +11,14 @@ import {
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { Toggle } from "../../components/controls";
-import { EmptyState, LoadingState } from "../../components/states";
-import { ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
+import { Avatar } from "../../components/avatar";
+import { SwitchRow } from "../../components/switch-row";
+import { NavRow } from "../../components/select-row";
+import { SwipeToDelete } from "../../components/swipe-row";
+import { SaveStatus } from "../../components/save-status";
+import { LoadingState } from "../../components/states";
+import { ROW_CLS } from "../../components/row";
+import type { SaveStatus as Status } from "../../lib/use-autosave";
 import { useLoadable } from "../../lib/use-loadable";
 
 // One allow/block list section. The two lists differ only in their header and
@@ -37,37 +42,36 @@ function EntryList({
       <SectionHeader>{header}</SectionHeader>
       <Card>
         {entries.length === 0 ? (
-          <EmptyState>{s.ui_whitelist_no_entries}</EmptyState>
+          <div className={`${ROW_CLS} text-tg-hint`}>
+            {s.ui_whitelist_no_entries}
+          </div>
         ) : (
-          entries.map((e) => (
-            <div
-              key={e.id}
-              className={`${ROW_CLS} cursor-pointer active:bg-[var(--tg-separator)]`}
-              onClick={() => onOpen(e.id)}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="truncate">{e.label || `id:${e.id}`}</div>
-                <div className="text-[13px] text-tg-hint truncate">
-                  id {e.id}
-                </div>
-              </div>
-              <button
-                className="bg-transparent border-0 px-2 py-1.5 text-[15px] text-tg-destructive cursor-pointer"
-                onClick={(ev) => {
-                  ev.stopPropagation();
-                  onRemove(e.id);
-                }}
+          entries.map((e) => {
+            const name = e.label || `id:${e.id}`;
+            return (
+              <SwipeToDelete
+                key={e.id}
+                label={s.ui_remove}
+                onDelete={() => onRemove(e.id)}
               >
-                {s.ui_remove}
-              </button>
-            </div>
-          ))
+                <NavRow
+                  avatar={<Avatar id={e.id} name={name} />}
+                  title={name}
+                  subtitle={`id ${e.id}`}
+                  onClick={() => onOpen(e.id)}
+                />
+              </SwipeToDelete>
+            );
+          })
         )}
       </Card>
       {footer && <SectionFooter>{footer}</SectionFooter>}
     </>
   );
 }
+
+// How long the failure toast stays, as after an autosave.
+const FAILURE_SHOWN_MS = 5000;
 
 export function WhitelistTab({
   settings,
@@ -90,6 +94,23 @@ export function WhitelistTab({
   // fails. Whitelist enforcement is a global policy — one PUT per toggle.
   const [enabled, setEnabled] = useState(settings.whitelistEnabled);
   const [saving, setSaving] = useState(false);
+  // A failed change reverts on its own; this only tells the user.
+  const [status, setStatus] = useState<Status>("idle");
+  useEffect(() => {
+    if (status !== "failed") return;
+    const timer = setTimeout(() => setStatus("idle"), FAILURE_SHOWN_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
+  // Rethrows, so the swiped row still slides back.
+  const reportFailure =
+    (remove: (id: string) => Promise<void>) => async (id: string) => {
+      try {
+        await remove(id);
+      } catch (e) {
+        setStatus("failed");
+        throw e;
+      }
+    };
 
   const toggleEnforce = async (v: boolean) => {
     if (saving) return;
@@ -101,6 +122,7 @@ export function WhitelistTab({
       setEnabled(next.whitelistEnabled);
     } catch {
       setEnabled(!v);
+      setStatus("failed");
     } finally {
       setSaving(false);
     }
@@ -108,14 +130,15 @@ export function WhitelistTab({
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_whitelist_enforce}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_whitelist_enforce}</span>
-          <span className="flex-1" />
-          <Toggle value={enabled} onChange={toggleEnforce} />
-        </div>
-      </Card>
+      <div className="section-gap">
+        <Card>
+          <SwitchRow
+            label={s.ui_whitelist_enforce}
+            value={enabled}
+            onChange={toggleEnforce}
+          />
+        </Card>
+      </div>
       <SectionFooter>{s.ui_whitelist_enforce_footer}</SectionFooter>
 
       {data === null ? (
@@ -126,19 +149,20 @@ export function WhitelistTab({
             header={s.ui_whitelist_allowed_users}
             entries={data.users}
             onOpen={onOpenUser}
-            onRemove={async (id) => {
+            onRemove={reportFailure(async (id) => {
               const users = await api.removeWhitelist("users", id);
               setData((prev) => (prev ? { ...prev, users } : prev));
-            }}
+            })}
           />
           <EntryList
             header={s.ui_whitelist_allowed_chats}
+            footer={s.ui_whitelist_footer}
             entries={data.chats}
             onOpen={onOpenChat}
-            onRemove={async (id) => {
+            onRemove={reportFailure(async (id) => {
               const chats = await api.removeWhitelist("chats", id);
               setData((prev) => (prev ? { ...prev, chats } : prev));
-            }}
+            })}
           />
         </>
       )}
@@ -152,23 +176,24 @@ export function WhitelistTab({
             footer={s.ui_blacklist_footer_users}
             entries={blacklist.users}
             onOpen={onOpenUser}
-            onRemove={async (id) => {
+            onRemove={reportFailure(async (id) => {
               const users = await api.removeBlacklist("users", id);
               setBlacklist((prev) => (prev ? { ...prev, users } : prev));
-            }}
+            })}
           />
           <EntryList
             header={s.ui_blacklist_blocked_chats}
             footer={s.ui_blacklist_footer_chats}
             entries={blacklist.chats}
             onOpen={onOpenChat}
-            onRemove={async (id) => {
+            onRemove={reportFailure(async (id) => {
               const chats = await api.removeBlacklist("chats", id);
               setBlacklist((prev) => (prev ? { ...prev, chats } : prev));
-            }}
+            })}
           />
         </>
       )}
+      <SaveStatus status={status} />
     </Stack>
   );
 }
