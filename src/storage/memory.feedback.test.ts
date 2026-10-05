@@ -93,6 +93,16 @@ describe("MemoryStorage feedback", () => {
     expect(page.nextCursor).toBeNull();
   });
 
+  test("count tallies records by status", async () => {
+    const s = new MemoryStorage();
+    expect(await s.feedback.count("new")).toBe(0);
+    await s.feedback.save(makeFeedback({ id: "a", status: "new" }));
+    await s.feedback.save(makeFeedback({ id: "b", status: "closed" }));
+    await s.feedback.save(makeFeedback({ id: "c", status: "new" }));
+    expect(await s.feedback.count("new")).toBe(2);
+    expect(await s.feedback.count("closed")).toBe(1);
+  });
+
   test("list is empty on a fresh store", async () => {
     const s = new MemoryStorage();
     expect(await s.feedback.list()).toEqual({ entries: [], nextCursor: null });

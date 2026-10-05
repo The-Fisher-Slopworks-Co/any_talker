@@ -3,6 +3,9 @@
 
 import { Fragment } from "react";
 import { useI18n } from "../../i18n-context";
+import { api } from "../../api-client";
+import type { AdminSummary } from "../../../../shared/types/admin-summary";
+import { useLoadable } from "../../lib/use-loadable";
 import { Card, SectionHeader, Stack } from "../../components/layout";
 import { NavRow } from "../../components/select-row";
 import {
@@ -49,9 +52,67 @@ function groupHeader(s: Strings, group: AdminGroup): string {
   }
 }
 
+// The text at the right of a section's row, or the badge for what needs
+// attention. Rows that carry no state (limits, prompt, spending) have neither.
+function rowStatus(
+  s: Strings,
+  id: AdminSection,
+  summary: AdminSummary | null,
+): { value?: string; badge?: number; badgeLabel?: string } {
+  if (!summary) return {};
+  const onOff = (on: boolean) =>
+    on ? s.ui_admin_value_on : s.ui_admin_value_off;
+  switch (id) {
+    case "bots":
+      return { value: String(summary.bots) };
+    case "budget":
+      return { value: onOff(summary.budgetEnabled) };
+    case "whitelist":
+      return { value: onOff(summary.whitelistEnabled) };
+    case "users":
+      return { value: String(summary.users) };
+    case "chats":
+      return { value: String(summary.chats) };
+    case "reminders":
+      return { value: String(summary.reminders) };
+    case "quarantine":
+      return { value: String(summary.quarantined) };
+    case "checks":
+      return { value: String(summary.checks) };
+    case "feedback":
+      return {
+        badge: summary.newFeedback,
+        badgeLabel: s.ui_admin_new_count(summary.newFeedback),
+      };
+    case "api-token":
+      return {
+        value: summary.apiTokenCreated
+          ? s.ui_admin_value_created
+          : s.ui_admin_value_not_created,
+      };
+    case "prompt":
+    case "ratelimit":
+    case "spend":
+      return {};
+  }
+}
+
+// Shows at once and fills the values in when the summary arrives; if it never
+// does, the rows simply stay bare.
 export function AdminView({
   onOpenSection,
 }: {
+  onOpenSection: (section: AdminSection) => void;
+}) {
+  const { data } = useLoadable(api.getAdminSummary, []);
+  return <AdminHome summary={data} onOpenSection={onOpenSection} />;
+}
+
+export function AdminHome({
+  summary,
+  onOpenSection,
+}: {
+  summary: AdminSummary | null;
   onOpenSection: (section: AdminSection) => void;
 }) {
   const { t: s } = useI18n();
@@ -65,6 +126,7 @@ export function AdminView({
                 key={id}
                 title={adminSectionLabel(s, id)}
                 icon={<SettingsIcon {...ADMIN_SECTION_ICONS[id]} />}
+                {...rowStatus(s, id, summary)}
                 onClick={() => onOpenSection(id)}
               />
             ))}

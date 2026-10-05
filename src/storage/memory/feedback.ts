@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import type { FeedbackEntry } from "../../shared/types/feedback";
+import type {
+  FeedbackEntry,
+  FeedbackStatus,
+} from "../../shared/types/feedback";
 import {
   clampFeedbackLimit,
   type FeedbackListQuery,
@@ -40,6 +43,12 @@ export class MemoryFeedbackStore implements FeedbackStore {
       entries: page.map((e) => structuredClone(e)),
       nextCursor: more ? (page[page.length - 1]?.createdAt ?? null) : null,
     };
+  }
+
+  async count(status: FeedbackStatus): Promise<number> {
+    let n = 0;
+    for (const e of this.b.feedback.values()) if (e.status === status) n++;
+    return n;
   }
 
   // Date-bucketed like the denial ranking, so the pruning rule is the same one;

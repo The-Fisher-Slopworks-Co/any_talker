@@ -52,6 +52,10 @@ class FakeRedis {
     return n;
   }
 
+  async zcard(key: string): Promise<number> {
+    return this.zset(key).size;
+  }
+
   async zscore(key: string, member: string): Promise<number | null> {
     return this.zset(key).get(member) ?? null;
   }
@@ -111,6 +115,19 @@ function makeFeedback(over: Partial<FeedbackEntry> = {}): FeedbackEntry {
 }
 
 describe("KeyDBFeedbackStore", () => {
+  test("count reads the status index, following status changes", async () => {
+    const { store } = makeStore();
+    await store.save(makeFeedback({ id: "a", status: "new" }));
+    await store.save(makeFeedback({ id: "b", status: "new" }));
+    await store.save(makeFeedback({ id: "c", status: "closed" }));
+    expect(await store.count("new")).toBe(2);
+    await store.save(makeFeedback({ id: "a", status: "closed" }));
+    expect(await store.count("new")).toBe(1);
+    expect(await store.count("closed")).toBe(2);
+    await store.delete("b");
+    expect(await store.count("new")).toBe(0);
+  });
+
   test("save writes the payload and both indexes under the global prefix", async () => {
     const { redis, store } = makeStore();
     await store.save(makeFeedback());
