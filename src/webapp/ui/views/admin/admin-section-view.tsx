@@ -49,7 +49,8 @@ export function AdminSectionView({
     if (needsSettings) api.getSettings().then(setSettings);
   }, [needsSettings]);
 
-  if (section === "spend") return <SpendTab />;
+  if (section === "spend")
+    return <SpendTab onEditUser={goUser} onEditChat={goChat} />;
   if (section === "quarantine") return <QuarantineTab />;
   if (section === "feedback") return <FeedbackTab onOpen={onOpenFeedback} />;
   if (section === "api-token") return <ApiTokenTab />;

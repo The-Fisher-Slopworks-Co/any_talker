@@ -7,7 +7,15 @@ import { Card, SectionFooter, SectionHeader } from "./layout";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
 import { formatUsd } from "../lib/labels";
 
-export function SpendingCard({ spending }: { spending: SpendSummary }) {
+export function SpendingCard({
+  spending,
+  header,
+}: {
+  spending: SpendSummary;
+  // Defaults to "Spending"; the Spending screen is already titled so, and
+  // names the group by who it covers instead.
+  header?: string;
+}) {
   const { t: s } = useI18n();
   const rows: Array<[string, number]> = [
     [s.ui_spending_day, spending.day],
@@ -16,7 +24,7 @@ export function SpendingCard({ spending }: { spending: SpendSummary }) {
   ];
   return (
     <>
-      <SectionHeader>{s.ui_spending_title}</SectionHeader>
+      <SectionHeader>{header ?? s.ui_spending_title}</SectionHeader>
       <Card>
         {rows.map(([label, amount]) => (
           <div key={label} className={ROW_CLS}>

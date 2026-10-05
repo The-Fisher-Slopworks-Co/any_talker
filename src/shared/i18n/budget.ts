@@ -83,42 +83,46 @@ export const budgetMessages = {
   ui_budget_unit_hours: m({ en: "h", ru: "ч" }),
   ui_budget_unit_per_day: m({ en: "/day", ru: "/день" }),
   ui_budget_unit_baseline: m({ en: "× baseline", ru: "× базы" }),
-  // Spend dashboard tab
+  // Spending screen
   ui_spend_global_header: m({
-    en: "Total spend (everyone)",
-    ru: "Всего трат (все)",
+    en: "Everyone",
+    ru: "Все",
   }),
   ui_spend_top_users: m({
-    en: "Top spenders — users",
-    ru: "Топ по тратам — юзеры",
+    en: "Top Users · Last 30 Days",
+    ru: "Топ пользователей · 30 дней",
   }),
   ui_spend_top_chats: m({
-    en: "Top spenders — chats",
-    ru: "Топ по тратам — чаты",
+    en: "Top Chats · Last 30 Days",
+    ru: "Топ чатов · 30 дней",
   }),
   ui_spend_models: m({
-    en: "By model",
-    ru: "По моделям",
+    en: "Models · Last 30 Days",
+    ru: "Модели · 30 дней",
   }),
   ui_spend_denials: m({
-    en: "Most-denied users (today)",
-    ru: "Чаще всего отклонялись (сегодня)",
+    en: "Most Denied Today",
+    ru: "Чаще всего отклонялись сегодня",
   }),
   ui_spend_new_users: m({
-    en: "New users (7 days)",
-    ru: "Новые юзеры (7 дней)",
+    en: "New Users · 7 Days",
+    ru: "Новые пользователи · 7 дней",
   }),
   ui_spend_new_chats: m({
-    en: "New chats (7 days)",
-    ru: "Новые чаты (7 дней)",
+    en: "New Chats · 7 Days",
+    ru: "Новые чаты · 7 дней",
   }),
   ui_spend_unpriced: m({
-    en: "no cost reported",
-    ru: "нет данных о стоимости",
+    en: "No cost reported",
+    ru: "Нет данных о стоимости",
+  }),
+  ui_spend_today: m({
+    en: (amount: string) => `Today ${amount}`,
+    ru: (amount: string) => `Сегодня ${amount}`,
   }),
   ui_spend_empty: m({
-    en: "Nothing yet.",
-    ru: "Пока пусто.",
+    en: "None",
+    ru: "Нет",
   }),
   ui_spending_title: m({
     en: "Spending",
@@ -129,11 +133,11 @@ export const budgetMessages = {
     ru: "Сегодня",
   }),
   ui_spending_week: m({
-    en: "Last 7 days",
+    en: "Last 7 Days",
     ru: "За 7 дней",
   }),
   ui_spending_month: m({
-    en: "Last 30 days",
+    en: "Last 30 Days",
     ru: "За 30 дней",
   }),
   ui_spending_footer: m({

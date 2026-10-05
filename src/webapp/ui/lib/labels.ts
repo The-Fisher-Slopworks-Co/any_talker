@@ -40,8 +40,12 @@ const CHAT_TYPE_KEY = {
   channel: "ui_chat_type_channel",
 } as const satisfies Record<ChatType, keyof Strings>;
 
+export function chatTypeLabel(s: Strings, type: ChatType): string {
+  return s[CHAT_TYPE_KEY[type]];
+}
+
 export function chatSubtitle(s: Strings, c: Chat): string {
-  const type = s[CHAT_TYPE_KEY[c.type]];
+  const type = chatTypeLabel(s, c.type);
   return c.username && c.title ? `${type} · @${c.username}` : type;
 }
 

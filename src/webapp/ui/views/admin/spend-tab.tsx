@@ -1,126 +1,161 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import type { ReactNode } from "react";
 import { useI18n } from "../../i18n-context";
-import { api } from "../../api-client";
+import { api, type SpendOverview } from "../../api-client";
 import { Card, SectionHeader, Stack } from "../../components/layout";
-import { EmptyState, LoadingState } from "../../components/states";
+import { ROW_CLS } from "../../components/row";
+import { NavRow } from "../../components/select-row";
 import { SpendingCard } from "../../components/spending-card";
-import { ROW_CLS, ROW_VALUE_CLS } from "../../components/row";
-import { formatUsd } from "../../lib/labels";
+import { LoadingState } from "../../components/states";
+import { chatTypeLabel, formatUsd } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
-function ListCard({
-  header,
-  empty,
-  rows,
-}: {
-  header: string;
-  empty: string;
-  rows: Array<{ key: string; label: ReactNode; value: ReactNode }>;
-}) {
+type Row = {
+  key: string;
+  title: string;
+  subtitle?: string;
+  value?: string;
+  // Rows that lead to a page; the rest (models) are plain.
+  onClick?: () => void;
+};
+
+function PlainRow({ title, subtitle, value }: Omit<Row, "key" | "onClick">) {
+  return (
+    <div className={ROW_CLS}>
+      <div className="flex-1 min-w-0">
+        <div className="truncate">{title}</div>
+        {subtitle ? (
+          <div className="text-[13px] text-tg-hint truncate">{subtitle}</div>
+        ) : null}
+      </div>
+      {value ? (
+        <span className="shrink-0 text-tg-hint tabular-nums">{value}</span>
+      ) : null}
+    </div>
+  );
+}
+
+function ListCard({ header, rows }: { header: string; rows: Row[] }) {
+  const { t: s } = useI18n();
   return (
     <>
       <SectionHeader>{header}</SectionHeader>
       <Card>
         {rows.length === 0 ? (
-          <EmptyState>{empty}</EmptyState>
+          <div className={`${ROW_CLS} text-tg-hint`}>{s.ui_spend_empty}</div>
         ) : (
-          rows.map((r) => (
-            <div key={r.key} className={ROW_CLS}>
-              <span className="flex-1 min-w-0 truncate">{r.label}</span>
-              <span className={`${ROW_VALUE_CLS} shrink-0 tabular-nums`}>
-                {r.value}
-              </span>
-            </div>
-          ))
+          rows.map(({ key, onClick, ...row }) =>
+            onClick ? (
+              <NavRow key={key} {...row} onClick={onClick} />
+            ) : (
+              <PlainRow key={key} {...row} />
+            ),
+          )
         )}
       </Card>
     </>
   );
 }
 
-export function SpendTab() {
-  const { t: s } = useI18n();
-  const { data } = useLoadable(() => api.getSpendOverview(), []);
-  if (data === null) return <LoadingState />;
+// "anthropic/claude-sonnet-5" → the model on top, its provider underneath.
+function splitModelId(id: string): { name: string; provider?: string } {
+  const slash = id.indexOf("/");
+  return slash < 0
+    ? { name: id }
+    : { name: id.slice(slash + 1), provider: id.slice(0, slash) };
+}
 
-  const spendValue = (day: number, month: number): ReactNode => (
-    <>
-      {formatUsd(month)}{" "}
-      <span className="text-tg-hint">({formatUsd(day)}/d)</span>
-    </>
-  );
+export function SpendOverviewView({
+  data,
+  onEditUser,
+  onEditChat,
+}: {
+  data: SpendOverview;
+  onEditUser: (id: string) => void;
+  onEditChat: (id: string) => void;
+}) {
+  const { t: s } = useI18n();
+  const spendRow =
+    (open: (id: string) => void) =>
+    (r: SpendOverview["topUsers"][number]): Row => ({
+      key: r.id,
+      title: r.label,
+      subtitle: s.ui_spend_today(formatUsd(r.spend.day)),
+      value: formatUsd(r.spend.month),
+      onClick: () => open(r.id),
+    });
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_spend_global_header}</SectionHeader>
-      <SpendingCard spending={data.global} />
+      <SpendingCard spending={data.global} header={s.ui_spend_global_header} />
 
       <ListCard
         header={s.ui_spend_top_users}
-        empty={s.ui_spend_empty}
-        rows={data.topUsers.map((r) => ({
-          key: r.id,
-          label: r.label,
-          value: spendValue(r.spend.day, r.spend.month),
-        }))}
+        rows={data.topUsers.map(spendRow(onEditUser))}
       />
       <ListCard
         header={s.ui_spend_top_chats}
-        empty={s.ui_spend_empty}
-        rows={data.topChats.map((r) => ({
-          key: r.id,
-          label: r.label,
-          value: spendValue(r.spend.day, r.spend.month),
-        }))}
+        rows={data.topChats.map(spendRow(onEditChat))}
       />
       <ListCard
         header={s.ui_spend_models}
-        empty={s.ui_spend_empty}
-        rows={data.models.map((m) => ({
-          key: m.modelId,
-          label: (
-            <>
-              {m.modelId}
-              {m.unpriced ? (
-                <span className="ml-1 text-tg-hint">
-                  ({s.ui_spend_unpriced})
-                </span>
-              ) : null}
-            </>
-          ),
-          value: formatUsd(m.spend.month),
-        }))}
+        rows={data.models.map((m) => {
+          const { name, provider } = splitModelId(m.modelId);
+          return {
+            key: m.modelId,
+            title: name,
+            subtitle: [provider, m.unpriced ? s.ui_spend_unpriced : null]
+              .filter(Boolean)
+              .join(" · "),
+            value: formatUsd(m.spend.month),
+          };
+        })}
       />
       <ListCard
         header={s.ui_spend_denials}
-        empty={s.ui_spend_empty}
         rows={data.topDenied.map((d) => ({
           key: d.userId,
-          label: d.label,
-          value: d.count,
+          title: d.label,
+          value: String(d.count),
+          onClick: () => onEditUser(d.userId),
         }))}
       />
       <ListCard
         header={s.ui_spend_new_users}
-        empty={s.ui_spend_empty}
         rows={data.newUsers.map((u) => ({
           key: u.id,
-          label: u.label,
-          value: "",
+          title: u.label,
+          onClick: () => onEditUser(u.id),
         }))}
       />
       <ListCard
         header={s.ui_spend_new_chats}
-        empty={s.ui_spend_empty}
         rows={data.newChats.map((c) => ({
           key: c.id,
-          label: c.label,
-          value: c.type,
+          title: c.label,
+          value: chatTypeLabel(s, c.type),
+          onClick: () => onEditChat(c.id),
         }))}
       />
     </Stack>
+  );
+}
+
+export function SpendTab({
+  onEditUser,
+  onEditChat,
+}: {
+  onEditUser: (id: string) => void;
+  onEditChat: (id: string) => void;
+}) {
+  const { data } = useLoadable(() => api.getSpendOverview(), []);
+  if (data === null) return <LoadingState />;
+  return (
+    <SpendOverviewView
+      data={data}
+      onEditUser={onEditUser}
+      onEditChat={onEditChat}
+    />
   );
 }
