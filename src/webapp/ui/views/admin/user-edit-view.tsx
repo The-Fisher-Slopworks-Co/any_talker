@@ -22,6 +22,7 @@ import {
   SectionHeader,
   Stack,
 } from "../../components/layout";
+import { LargeTitle } from "../../components/large-title";
 import { LoadingState } from "../../components/states";
 import { RowButton, SaveButton } from "../../components/controls";
 import { SelectRow } from "../../components/select-row";
@@ -29,8 +30,8 @@ import { DisplayNameField } from "../../components/display-name-field";
 import { GenderField } from "../../components/gender-field";
 import { TimezoneField } from "../../components/timezone-field";
 import { LanguageField } from "../../components/language-field";
-import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
-import { BlacklistToggleButton } from "../../components/blacklist-toggle-button";
+import { AccessRows } from "../../components/access-rows";
+import { Hero } from "../../components/hero";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { botLabel, userDisplayName } from "../../lib/labels";
 import { FactsEditor, type FactsWriter } from "../facts-view";
@@ -41,7 +42,7 @@ import { validateDisplayName } from "../../../../shared/display-name";
 
 export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
+  const { short } = useDateFmt();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [name, setName] = useState("");
   const [tzOverride, setTzOverride] = useState(false);
@@ -88,8 +89,18 @@ export function UserEditView({ userId }: { userId: string }) {
     setUsage(r.usage);
   };
 
-  if (notFound) return <LoadingState text={s.ui_user_not_found} />;
-  if (!data) return <LoadingState />;
+  // Until the hero can name the user, the page is titled like any other.
+  if (notFound || !data)
+    return (
+      <>
+        <LargeTitle>{s.ui_route_user_settings}</LargeTitle>
+        {notFound ? (
+          <LoadingState text={s.ui_user_not_found} />
+        ) : (
+          <LoadingState />
+        )}
+      </>
+    );
 
   const { user } = data;
   const factBots = botsData?.bots ?? null;
@@ -136,45 +147,37 @@ export function UserEditView({ userId }: { userId: string }) {
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_user_profile}</SectionHeader>
+      <Hero
+        id={user.id}
+        name={fallbackName}
+        subtitle={user.username ? `@${user.username}` : undefined}
+        action={{
+          label: s.ui_user_open_in_tg,
+          onClick: () => openTelegramProfile(user),
+        }}
+      />
       <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
-          <span className={ROW_VALUE_CLS}>{fallbackName}</span>
-        </div>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_user_username}</span>
-          <span className={ROW_VALUE_CLS}>
-            {user.username ? `@${user.username}` : s.ui_dash}
-          </span>
-        </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_id}</span>
           <span className={ROW_VALUE_CLS}>{user.id}</span>
         </div>
         <div className={ROW_CLS}>
           <span className={ROW_LABEL_CLS}>{s.ui_user_last_seen}</span>
-          <span className={ROW_VALUE_CLS}>{format(user.lastSeenAt)}</span>
+          <span className={ROW_VALUE_CLS}>{short(user.lastSeenAt)}</span>
         </div>
-        <RowButton onClick={() => openTelegramProfile(user)}>
-          {s.ui_user_open_in_tg}
-        </RowButton>
-        <WhitelistToggleButton
-          kind="users"
-          id={user.id}
-          label={effectiveName}
-          initial={data.whitelisted}
-        />
-        <BlacklistToggleButton
-          kind="users"
-          id={user.id}
-          label={effectiveName}
-          initial={data.blacklisted}
-        />
       </Card>
       <SectionFooter>
         <TimeNote />
       </SectionFooter>
+
+      <AccessRows
+        kind="users"
+        id={user.id}
+        label={effectiveName}
+        whitelisted={data.whitelisted}
+        blacklisted={data.blacklisted}
+        footer={s.ui_access_footer_user}
+      />
 
       <SectionHeader>{s.ui_user_usage}</SectionHeader>
       {usage ? (

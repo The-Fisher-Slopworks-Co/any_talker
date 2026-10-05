@@ -9,6 +9,7 @@ import { api, type MeResponse, type UsageShare } from "./api-client";
 import { resolveLang, type Lang } from "../../shared/i18n";
 import { I18nProvider, useI18n } from "./i18n-context";
 import { DateFmtProvider } from "./datetime-context";
+import { LargeTitle } from "./components/large-title";
 import { LoadingState } from "./components/states";
 import { BuildInfoFooter } from "./components/build-info-footer";
 import { UsageHeader } from "./components/usage-header";
@@ -16,6 +17,7 @@ import {
   adminSectionLabel,
   fromRoute,
   parseRoute,
+  showsLargeTitle,
   showsUsageHeader,
   type Route,
 } from "./lib/routes";
@@ -216,9 +218,7 @@ function AppShell({
   return (
     <div className="mx-auto max-w-[640px] px-3 pt-4 pb-8">
       {/* iOS Large Title: every screen names itself above its content. */}
-      <h1 className="m-0 px-1 pb-3 text-[34px] leading-[41px] font-bold tracking-[0.37px]">
-        {title}
-      </h1>
+      {showsLargeTitle(route) && <LargeTitle>{title}</LargeTitle>}
       {showsUsageHeader(route) && <UsageHeader usage={usage} />}
       {renderRoute()}
       {/* A commit hash means nothing to a regular user. */}

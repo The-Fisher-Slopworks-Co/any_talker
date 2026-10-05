@@ -45,6 +45,13 @@ export function showsUsageHeader(route: Route): boolean {
   return route.kind === "main";
 }
 
+// Pages that open with a `Hero` (avatar + name) show no large title of their
+// own: the hero's name is their heading. Until the page has loaded, it renders
+// the large title itself.
+export function showsLargeTitle(route: Route): boolean {
+  return route.kind !== "user-edit" && route.kind !== "chat-edit";
+}
+
 // The admin home's groups, top to bottom. A null header is a headerless
 // group, like the top block of iOS Settings.
 export type AdminGroup = "spending" | "access" | "automation";

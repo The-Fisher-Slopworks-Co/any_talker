@@ -13,6 +13,26 @@ export const accessMessages = {
     en: "Add to whitelist",
     ru: "Добавить в белый список",
   }),
+  ui_access_header: m({
+    en: "Access",
+    ru: "Доступ",
+  }),
+  ui_access_allowed: m({
+    en: "Allowed",
+    ru: "Разрешено",
+  }),
+  ui_access_blocked: m({
+    en: "Blocked",
+    ru: "Заблокировано",
+  }),
+  ui_access_footer_user: m({
+    en: "Blocked users are always denied; their pending reminders are dropped.",
+    ru: "Заблокированным всегда отказ; их отложенные напоминания не доставляются.",
+  }),
+  ui_access_footer_chat: m({
+    en: "A blocked chat is denied for everyone except you; pending reminders are dropped.",
+    ru: "Заблокированному чату отказ для всех, кроме вас; отложенные напоминания не доставляются.",
+  }),
   ui_whitelist_enforce: m({
     en: "Enforce Whitelist",
     ru: "Требовать белый список",

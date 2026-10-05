@@ -17,24 +17,16 @@ export const usersMessages = {
     en: "User not found.",
     ru: "Пользователь не найден.",
   }),
-  ui_user_profile: m({
-    en: "Profile",
-    ru: "Профиль",
-  }),
   ui_user_name: m({
     en: "Name",
     ru: "Имя",
-  }),
-  ui_user_username: m({
-    en: "Username",
-    ru: "Username",
   }),
   ui_user_id: m({
     en: "ID",
     ru: "ID",
   }),
   ui_user_last_seen: m({
-    en: "Last seen",
+    en: "Last Seen",
     ru: "Последний раз",
   }),
   ui_user_open_in_tg: m({
