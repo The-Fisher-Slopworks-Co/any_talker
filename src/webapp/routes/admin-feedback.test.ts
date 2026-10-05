@@ -59,6 +59,26 @@ function makeFeedback(over: Partial<FeedbackEntry> = {}): FeedbackEntry {
   };
 }
 
+// The directory rows `makeFeedback`'s `user-1` and `chat-1` resolve to.
+async function seedDirectory(d: ReturnType<typeof deps>) {
+  await d.storage.users.upsert({
+    id: "user-1",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    username: "ada",
+    firstSeenAt: 1,
+    lastSeenAt: 1,
+  });
+  await d.storage.chats.upsert({
+    id: "chat-1",
+    type: "supergroup",
+    title: "Analytical Engines",
+    username: null,
+    firstSeenAt: 1,
+    lastSeenAt: 1,
+  });
+}
+
 // The owner asking, with a `body` that defaults to null the way a GET or a
 // DELETE arrives from `server.ts`.
 function ask(
@@ -88,6 +108,43 @@ describe("GET /api/admin/feedback", () => {
       text: "the bot answered in the wrong language",
       status: "new",
       systemPromptHash: "0123456789abcdef",
+    });
+  });
+
+  test("names each report's author and chat, null where unknown", async () => {
+    const d = deps();
+    await seedDirectory(d);
+    await d.storage.feedback.save(makeFeedback({ id: "known", createdAt: 3 }));
+    await d.storage.feedback.save(
+      makeFeedback({
+        id: "stranger",
+        userId: "user-404",
+        chatId: "chat-404",
+        createdAt: 2,
+      }),
+    );
+    // A guest's id is not a directory user, even if it collides with one.
+    await d.storage.feedback.save(
+      makeFeedback({ id: "guest", isGuest: true, createdAt: 1 }),
+    );
+
+    const r = await ask(d, { method: "GET", path: "/api/admin/feedback" });
+    const body = r.body as { entries: Record<string, unknown>[] };
+    const byId = Object.fromEntries(body.entries.map((e) => [e.id, e]));
+    expect(byId.known).toMatchObject({
+      authorName: "Ada Lovelace",
+      authorUsername: "ada",
+      chatTitle: "Analytical Engines",
+    });
+    expect(byId.stranger).toMatchObject({
+      authorName: null,
+      authorUsername: null,
+      chatTitle: null,
+    });
+    expect(byId.guest).toMatchObject({
+      authorName: null,
+      authorUsername: null,
+      chatTitle: "Analytical Engines",
     });
   });
 
@@ -179,7 +236,26 @@ describe("GET /api/admin/feedback/:id", () => {
 
     const r = await ask(d, { method: "GET", path: "/api/admin/feedback/f1" });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ entry });
+    // Nobody in the directory: the names are there, and empty.
+    expect(r.body).toEqual({
+      entry,
+      names: { authorName: null, authorUsername: null, chatTitle: null },
+    });
+  });
+
+  test("names the author and the chat from the directories", async () => {
+    const d = deps();
+    await seedDirectory(d);
+    await d.storage.feedback.save(makeFeedback());
+
+    const r = await ask(d, { method: "GET", path: "/api/admin/feedback/f1" });
+    expect(r.body).toMatchObject({
+      names: {
+        authorName: "Ada Lovelace",
+        authorUsername: "ada",
+        chatTitle: "Analytical Engines",
+      },
+    });
   });
 
   test("serves a record whose threads expired and whose pointedAt dangles", async () => {

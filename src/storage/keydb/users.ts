@@ -37,4 +37,16 @@ export class KeyDBUsersStore implements UsersStore {
     const raw = await this.client.hget(`${PREFIX}users`, id);
     return raw ? withFirstSeen(JSON.parse(raw) as User) : null;
   }
+
+  async getMany(ids: string[]): Promise<Map<string, User>> {
+    const found = new Map<string, User>();
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return found;
+    const raws = await this.client.hmget(`${PREFIX}users`, unique);
+    unique.forEach((id, i) => {
+      const raw = raws[i];
+      if (raw) found.set(id, withFirstSeen(JSON.parse(raw) as User));
+    });
+    return found;
+  }
 }

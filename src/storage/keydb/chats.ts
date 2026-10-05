@@ -40,6 +40,18 @@ export class KeyDBChatsStore implements ChatsStore {
     return raw ? withFirstSeen(JSON.parse(raw) as Chat) : null;
   }
 
+  async getMany(ids: string[]): Promise<Map<string, Chat>> {
+    const found = new Map<string, Chat>();
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return found;
+    const raws = await this.client.hmget(`${PREFIX}chats`, unique);
+    unique.forEach((id, i) => {
+      const raw = raws[i];
+      if (raw) found.set(id, withFirstSeen(JSON.parse(raw) as Chat));
+    });
+    return found;
+  }
+
   async delete(id: string): Promise<void> {
     await this.client.hdel(`${PREFIX}chats`, id);
   }

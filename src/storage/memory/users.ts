@@ -30,4 +30,13 @@ export class MemoryUsersStore implements UsersStore {
     const u = this.b.users.get(id);
     return u ? { ...u } : null;
   }
+
+  async getMany(ids: string[]): Promise<Map<string, User>> {
+    const found = new Map<string, User>();
+    for (const id of ids) {
+      const u = this.b.users.get(id);
+      if (u) found.set(id, { ...u });
+    }
+    return found;
+  }
 }

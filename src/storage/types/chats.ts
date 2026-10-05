@@ -13,6 +13,8 @@ export interface ChatsStore {
   // fresh group join).
   upsert(chat: Chat): Promise<{ isNew: boolean }>;
   get(id: string): Promise<Chat | null>;
+  // One round trip for many ids; ids with no row are absent from the map.
+  getMany(ids: string[]): Promise<Map<string, Chat>>;
   // Removes a chat's directory row. Only chat migration (group→supergroup)
   // retires an id; nothing else ever deletes from the directory.
   delete(id: string): Promise<void>;

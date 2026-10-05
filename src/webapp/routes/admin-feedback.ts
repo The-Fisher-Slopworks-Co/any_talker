@@ -5,6 +5,8 @@ import type {
   FeedbackEntry,
   FeedbackStatus,
 } from "../../shared/types/feedback";
+import { composeFullName } from "../../shared/types/users";
+import type { Storage } from "../../storage/types";
 import type { FeedbackListQuery } from "../../storage/types/feedback";
 import type { ApiResponse, Route } from "./types";
 
@@ -32,18 +34,56 @@ function isStatus(value: unknown): value is FeedbackStatus {
 // bulk of it — a page of 25 with both would be megabytes to render a list of
 // texts. Both are on the detail route, which is what a reader opens next; the
 // counts are what a row shows in their place.
-export type FeedbackSummary = Omit<
-  FeedbackEntry,
-  "systemPrompt" | "threads"
-> & {
-  threadCount: number;
-  turnCount: number;
+export type FeedbackSummary = Omit<FeedbackEntry, "systemPrompt" | "threads"> &
+  FeedbackNames & {
+    threadCount: number;
+    turnCount: number;
+  };
+
+// Who and where, as the directory knows them, so the UI shows a name rather
+// than a numeric id. Every field is `null` when there is nothing to show — a
+// guest, an id the directory never saw, a private chat with no title — and the
+// UI falls back to the id.
+export type FeedbackNames = {
+  authorName: string | null;
+  authorUsername: string | null;
+  chatTitle: string | null;
 };
 
-function toSummary(entry: FeedbackEntry): FeedbackSummary {
+// Each report paired with its names, from one read each of the user and chat
+// directories however many reports there are. A guest's `userId` is not a
+// directory user, so it is not looked up.
+async function resolveNames(
+  storage: Pick<Storage, "users" | "chats">,
+  entries: FeedbackEntry[],
+): Promise<{ entry: FeedbackEntry; names: FeedbackNames }[]> {
+  const [users, chats] = await Promise.all([
+    storage.users.getMany(
+      entries.filter((e) => !e.isGuest).map((e) => e.userId),
+    ),
+    storage.chats.getMany(entries.map((e) => e.chatId)),
+  ]);
+  return entries.map((entry) => {
+    const user = entry.isGuest ? undefined : users.get(entry.userId);
+    return {
+      entry,
+      names: {
+        authorName: composeFullName(user?.firstName, user?.lastName) || null,
+        authorUsername: user?.username || null,
+        chatTitle: chats.get(entry.chatId)?.title || null,
+      },
+    };
+  });
+}
+
+function toSummary(
+  entry: FeedbackEntry,
+  names: FeedbackNames,
+): FeedbackSummary {
   const { systemPrompt: _prompt, threads, ...rest } = entry;
   return {
     ...rest,
+    ...names,
     threadCount: threads.length,
     turnCount: threads.reduce((n, thread) => n + thread.turns.length, 0),
   };
@@ -89,10 +129,11 @@ export const adminFeedbackRoutes: Route[] = [
       const query = parseListQuery(req.query);
       if (!query.ok) return query.error;
       const page = await deps.storage.feedback.list(query.value);
+      const named = await resolveNames(deps.storage, page.entries);
       return {
         status: 200,
         body: {
-          entries: page.entries.map(toSummary),
+          entries: named.map((n) => toSummary(n.entry, n.names)),
           nextCursor: page.nextCursor,
         },
       };
@@ -104,7 +145,8 @@ export const adminFeedbackRoutes: Route[] = [
     handle: async ({ deps, params }) => {
       const entry = await deps.storage.feedback.get(params[0]!);
       if (!entry) return FEEDBACK_NOT_FOUND;
-      return { status: 200, body: { entry } };
+      const [named] = await resolveNames(deps.storage, [entry]);
+      return { status: 200, body: { entry, names: named!.names } };
     },
   },
   // `status` only — everything else on a record is what the submission
