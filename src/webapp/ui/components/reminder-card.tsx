@@ -6,28 +6,24 @@ import { useDateFmt } from "../datetime-context";
 import type { Reminder } from "../../../reminders/types";
 import type { Chat, User } from "../../../shared/types";
 import { Card } from "./layout";
+import { NavRow } from "./select-row";
+import { SwipeToDelete } from "./swipe-row";
 import { EmptyState } from "./states";
 import { reminderTargetLabel, reminderUserLabel } from "../lib/labels";
 
-// The admin's hold on the listed rows. Absent on the user's own list, which
-// stays read-only.
+// The admin's hold on the listed rows: tap one to open it, swipe it to delete
+// it. Absent on the user's own list, which stays read-only.
 export type ReminderCardManage = {
-  // A delete is in flight, so the row actions stay out of reach until it settles.
-  busy: boolean;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
+  onOpen: (id: string) => void;
+  // Rejects when the reminder could not be deleted, so the row slides back.
+  onDelete: (id: string) => Promise<void>;
 };
-
-const ACTION_BTN_CLS =
-  "bg-transparent border-0 p-0 text-left text-[13px] cursor-pointer disabled:opacity-50";
 
 export function ReminderCard({
   reminders,
   chats,
   users,
   displayNames,
-  showUserId,
-  onUserClick,
   emptyText,
   manage,
 }: {
@@ -35,25 +31,35 @@ export function ReminderCard({
   chats: Record<string, Chat>;
   users?: Record<string, User> | undefined;
   displayNames?: Record<string, string | null> | undefined;
-  showUserId: boolean;
-  onUserClick?: ((userId: string) => void) | undefined;
   emptyText: string;
   manage?: ReminderCardManage | undefined;
 }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
+  const { format, short } = useDateFmt();
   return (
     <Card>
       {reminders.length === 0 ? (
         <EmptyState>{emptyText}</EmptyState>
       ) : (
         reminders.map((r) => {
-          const userLabel = showUserId
-            ? reminderUserLabel(r, users, displayNames)
-            : null;
-          const userText = userLabel
-            ? `${userLabel.primary}${userLabel.secondary ? ` · ${userLabel.secondary}` : ""}`
-            : null;
+          const target = reminderTargetLabel(s, r, chats);
+          if (manage) {
+            const { primary } = reminderUserLabel(r, users, displayNames);
+            return (
+              <SwipeToDelete
+                key={r.id}
+                label={s.ui_reminders_delete}
+                onDelete={() => manage.onDelete(r.id)}
+              >
+                <NavRow
+                  wrapTitle
+                  title={r.text}
+                  subtitle={`${short(r.fireAtMs)} · ${primary} · ${target}`}
+                  onClick={() => manage.onOpen(r.id)}
+                />
+              </SwipeToDelete>
+            );
+          }
           return (
             <div
               key={r.id}
@@ -64,43 +70,12 @@ export function ReminderCard({
                   {format(r.fireAtMs)}
                 </span>
                 <span className="text-[13px] text-tg-hint truncate">
-                  {reminderTargetLabel(s, r, chats)}
+                  {target}
                 </span>
               </div>
               <div className="text-[15px] whitespace-pre-wrap break-words">
                 {r.text}
               </div>
-              {userText &&
-                (onUserClick ? (
-                  <button
-                    className="self-start bg-transparent border-0 p-0 text-left text-[13px] text-tg-link cursor-pointer"
-                    onClick={() => onUserClick(r.userId)}
-                  >
-                    {userText}
-                  </button>
-                ) : (
-                  <div className="text-[13px] text-tg-hint">{userText}</div>
-                ))}
-              {manage && (
-                <div className="flex gap-4">
-                  <button
-                    type="button"
-                    className={`${ACTION_BTN_CLS} text-tg-link`}
-                    disabled={manage.busy}
-                    onClick={() => manage.onEdit(r.id)}
-                  >
-                    {s.ui_reminders_edit}
-                  </button>
-                  <button
-                    type="button"
-                    className={`${ACTION_BTN_CLS} text-tg-destructive`}
-                    disabled={manage.busy}
-                    onClick={() => manage.onDelete(r.id)}
-                  >
-                    {s.ui_remove}
-                  </button>
-                </div>
-              )}
             </div>
           );
         })

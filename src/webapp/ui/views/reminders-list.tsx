@@ -6,10 +6,12 @@ import { useI18n } from "../i18n-context";
 import { api, type RemindersResponse } from "../api-client";
 import type { Reminder } from "../../../reminders/types";
 import { SectionFooter, SectionHeader, Stack } from "../components/layout";
+import { SaveStatus } from "../components/save-status";
 import { LoadingState } from "../components/states";
 import { ReminderCard } from "../components/reminder-card";
 import { ReminderEditForm } from "../components/reminder-edit-form";
 import { TimeNote } from "../components/time-note";
+import { useFailureToast } from "../lib/use-failure-toast";
 import { useLoadable } from "../lib/use-loadable";
 import { reminderTargetLabel, reminderUserLabel } from "../lib/labels";
 
@@ -18,7 +20,6 @@ export function RemindersList({
   header,
   emptyText,
   footer,
-  showUserId,
   onUserClick,
   editable = false,
 }: {
@@ -26,17 +27,16 @@ export function RemindersList({
   header: string;
   emptyText: string;
   footer: ReactNode;
-  showUserId: boolean;
   onUserClick?: (userId: string) => void;
-  // The admin listing: every row can be edited or removed.
+  // The admin listing: every row can be opened to edit and swiped to delete.
   editable?: boolean;
 }) {
   const { t: s } = useI18n();
   const { data, setData } = useLoadable(fetchReminders, [fetchReminders]);
-  // The reminder open in the edit sheet.
   const [openId, setOpenId] = useState<string | null>(null);
   const close = useCallback(() => setOpenId(null), []);
-  const [busy, setBusy] = useState(false);
+  // A failed delete slides the row back on its own; this only tells the user.
+  const { status, fail } = useFailureToast();
 
   if (data === null) return <LoadingState />;
 
@@ -57,22 +57,19 @@ export function RemindersList({
     setOpenId(null);
   };
 
+  // Rethrows, so the swiped row still slides back.
   const onDelete = async (id: string) => {
-    if (!confirm(s.ui_reminders_delete_confirm)) return;
-    setBusy(true);
     try {
       await api.deleteAdminReminder(id);
       updateRows((rows) => rows.filter((r) => r.id !== id));
-    } catch {
-      // Nothing to undo — the row stays, one tap from a retry.
-    } finally {
-      setBusy(false);
+    } catch (e) {
+      fail();
+      throw e;
     }
   };
 
   const open = data.reminders.find((r) => r.id === openId);
   const author = open && reminderUserLabel(open, data.users, data.displayNames);
-
   return (
     <Stack>
       <SectionHeader>{header}</SectionHeader>
@@ -81,22 +78,13 @@ export function RemindersList({
         chats={data.chats}
         users={data.users}
         displayNames={data.displayNames}
-        showUserId={showUserId}
-        onUserClick={onUserClick}
         emptyText={emptyText}
-        manage={
-          editable
-            ? {
-                busy,
-                onEdit: setOpenId,
-                onDelete: (id) => void onDelete(id),
-              }
-            : undefined
-        }
+        manage={editable ? { onOpen: setOpenId, onDelete } : undefined}
       />
       <SectionFooter>
         {footer} <TimeNote />
       </SectionFooter>
+      {editable && <SaveStatus status={status} />}
       {open && author && (
         <ReminderEditForm
           key={open.id}

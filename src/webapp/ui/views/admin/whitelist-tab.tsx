@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type { Settings, WhitelistEntry } from "../../../../shared/types";
@@ -18,7 +18,7 @@ import { SwipeToDelete } from "../../components/swipe-row";
 import { SaveStatus } from "../../components/save-status";
 import { LoadingState } from "../../components/states";
 import { ROW_CLS } from "../../components/row";
-import type { SaveStatus as Status } from "../../lib/use-autosave";
+import { useFailureToast } from "../../lib/use-failure-toast";
 import { useLoadable } from "../../lib/use-loadable";
 
 // One allow/block list section. The two lists differ only in their header and
@@ -70,9 +70,6 @@ function EntryList({
   );
 }
 
-// How long the failure toast stays, as after an autosave.
-const FAILURE_SHOWN_MS = 5000;
-
 export function WhitelistTab({
   settings,
   onSaved,
@@ -95,19 +92,14 @@ export function WhitelistTab({
   const [enabled, setEnabled] = useState(settings.whitelistEnabled);
   const [saving, setSaving] = useState(false);
   // A failed change reverts on its own; this only tells the user.
-  const [status, setStatus] = useState<Status>("idle");
-  useEffect(() => {
-    if (status !== "failed") return;
-    const timer = setTimeout(() => setStatus("idle"), FAILURE_SHOWN_MS);
-    return () => clearTimeout(timer);
-  }, [status]);
+  const { status, fail } = useFailureToast();
   // Rethrows, so the swiped row still slides back.
   const reportFailure =
     (remove: (id: string) => Promise<void>) => async (id: string) => {
       try {
         await remove(id);
       } catch (e) {
-        setStatus("failed");
+        fail();
         throw e;
       }
     };
@@ -122,7 +114,7 @@ export function WhitelistTab({
       setEnabled(next.whitelistEnabled);
     } catch {
       setEnabled(!v);
-      setStatus("failed");
+      fail();
     } finally {
       setSaving(false);
     }

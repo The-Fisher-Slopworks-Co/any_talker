@@ -30,9 +30,9 @@ export const remindersMessages = {
     en: "Failed deliveries are retried.",
     ru: "Неудачная доставка повторяется.",
   }),
-  ui_reminders_edit: m({
-    en: "Edit",
-    ru: "Изменить",
+  ui_reminders_delete: m({
+    en: "Delete",
+    ru: "Удалить",
   }),
   ui_reminders_cancel: m({
     en: "Cancel",
@@ -70,17 +70,13 @@ export const remindersMessages = {
     en: (code: string) => `Could not save: ${code}`,
     ru: (code: string) => `Не удалось сохранить: ${code}`,
   }),
-  ui_reminders_cap_header: m({
-    en: "Per-User Limit",
-    ru: "Лимит на пользователя",
-  }),
   ui_reminders_cap_label: m({
-    en: "Max reminders",
-    ru: "Максимум напоминаний",
+    en: "Max per User",
+    ru: "Максимум на пользователя",
   }),
   ui_reminders_cap_footer: m({
-    en: "Per user, across all characters. Lowering it keeps existing reminders.",
-    ru: "На пользователя, по всем персонажам. Понижение не трогает существующие.",
+    en: "Across all characters. Lowering it keeps existing reminders.",
+    ru: "По всем персонажам. Понижение не трогает существующие.",
   }),
   ui_quarantine_empty: m({
     en: "Nothing quarantined.",

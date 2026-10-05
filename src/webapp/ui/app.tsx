@@ -184,7 +184,6 @@ function AppShell({
             header={s.ui_reminders_upcoming}
             emptyText={s.ui_reminders_empty_my}
             footer={s.ui_reminders_footer_my}
-            showUserId={false}
           />
         );
       case "my-facts":

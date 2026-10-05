@@ -13,7 +13,7 @@ import { ReminderCapField } from "./reminder-cap-field";
 function render(value: number, lang: "en" | "ru" = "en"): string {
   return renderToStaticMarkup(
     <I18nProvider lang={lang}>
-      <ReminderCapField value={value} onChange={() => {}} />
+      <ReminderCapField value={value} onCommit={() => {}} />
     </I18nProvider>,
   );
 }
@@ -24,7 +24,7 @@ describe("ReminderCapField", () => {
   // stale stored value could not even be seen, let alone corrected.
   test("shows the stored cap in an editable input", () => {
     const html = render(50);
-    expect(html).toContain("Max reminders");
+    expect(html).toContain("Max per User");
     const input = /<input[^>]*>/.exec(html)?.[0];
     expect(input).toBeDefined();
     expect(input).toContain('value="50"');
@@ -38,6 +38,6 @@ describe("ReminderCapField", () => {
   });
 
   test("is translated", () => {
-    expect(render(5, "ru")).toContain("Максимум напоминаний");
+    expect(render(5, "ru")).toContain("Максимум на пользователя");
   });
 });
