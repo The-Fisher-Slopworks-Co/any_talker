@@ -8,10 +8,9 @@ import {
   toProviderOptions,
   type ProviderOption,
 } from "../provider-endpoints";
-import { Card } from "./layout";
-import { SelectChevron } from "./controls";
-import { ROW_CLS, ROW_LABEL_CLS, VALUE_INPUT_CLS } from "./row";
+import { ValueSelectRow } from "./value-select-row";
 
+// A picker row, to sit in a card with its siblings.
 export function ProviderSelectField({
   modelId,
   value,
@@ -56,30 +55,20 @@ export function ProviderSelectField({
       : options;
 
   return (
-    <Card>
-      <label className={ROW_CLS}>
-        <span className={ROW_LABEL_CLS}>{s.ui_provider_label}</span>
-        <span className="relative flex flex-1 min-w-0 items-center">
-          <select
-            className={`${VALUE_INPUT_CLS} w-full pr-4`}
-            value={value ?? ""}
-            disabled={loading || trimmedModel.length === 0}
-            onChange={(e) =>
-              onChange(e.target.value === "" ? null : e.target.value)
-            }
-          >
-            <option value="">
-              {loading ? s.ui_provider_loading : s.ui_provider_auto}
-            </option>
-            {merged.map((o) => (
-              <option key={o.slug} value={o.slug}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-          <SelectChevron />
-        </span>
-      </label>
-    </Card>
+    <ValueSelectRow
+      label={s.ui_provider_label}
+      value={value ?? ""}
+      disabled={loading || trimmedModel.length === 0}
+      onChange={(v) => onChange(v === "" ? null : v)}
+    >
+      <option value="">
+        {loading ? s.ui_provider_loading : s.ui_provider_auto}
+      </option>
+      {merged.map((o) => (
+        <option key={o.slug} value={o.slug}>
+          {o.name}
+        </option>
+      ))}
+    </ValueSelectRow>
   );
 }

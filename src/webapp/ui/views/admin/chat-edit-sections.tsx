@@ -207,10 +207,12 @@ export function ProviderRoutingSection({ form, set, global }: SectionProps) {
             )
       }
     >
-      <ProviderSortField
-        value={form.psValue}
-        onChange={(v) => set("psValue", v)}
-      />
+      <Card>
+        <ProviderSortField
+          value={form.psValue}
+          onChange={(v) => set("psValue", v)}
+        />
+      </Card>
     </OverrideSection>
   );
 }
@@ -228,14 +230,16 @@ export function ProviderSection({ form, set, global }: SectionProps) {
           : s.ui_chat_provider_off_footer(global.provider ?? s.ui_provider_auto)
       }
     >
-      <ProviderSelectField
-        modelId={
-          (form.modelsOverride ? trimmedModels(form)[0] : global.models[0]) ??
-          ""
-        }
-        value={form.provValue}
-        onChange={(v) => set("provValue", v)}
-      />
+      <Card>
+        <ProviderSelectField
+          modelId={
+            (form.modelsOverride ? trimmedModels(form)[0] : global.models[0]) ??
+            ""
+          }
+          value={form.provValue}
+          onChange={(v) => set("provValue", v)}
+        />
+      </Card>
     </OverrideSection>
   );
 }
@@ -255,10 +259,12 @@ export function ServiceTierSection({ form, set, global }: SectionProps) {
             )
       }
     >
-      <ServiceTierField
-        value={form.stValue}
-        onChange={(v) => set("stValue", v)}
-      />
+      <Card>
+        <ServiceTierField
+          value={form.stValue}
+          onChange={(v) => set("stValue", v)}
+        />
+      </Card>
     </OverrideSection>
   );
 }

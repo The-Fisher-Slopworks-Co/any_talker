@@ -11,11 +11,13 @@ export function ValueSelectRow({
   label,
   value,
   onChange,
+  disabled,
   children,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -25,6 +27,7 @@ export function ValueSelectRow({
         <select
           className={`${VALUE_INPUT_CLS} w-full pr-4`}
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         >
           {children}
