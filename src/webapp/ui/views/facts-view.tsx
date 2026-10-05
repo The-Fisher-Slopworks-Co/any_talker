@@ -268,13 +268,17 @@ export function FactsEditor({
 
 export function FactsView() {
   const { t: s } = useI18n();
-  const { data: botsData } = useLoadable(api.listMyBots, []);
+  const { data: botsData } = useLoadable("my-bots", api.listMyBots);
   const [scope, setScope] = useSessionState(
     "facts-scope",
     MAIN_SCOPE,
     parseString,
   );
-  const { data, setData } = useLoadable(() => api.listMyFacts(scope), [scope]);
+  // The facts carry their scope: the previous scope's stay up, and editable,
+  // while a newly picked one loads.
+  const { data, setData } = useLoadable(`my-facts:${scope}`, () =>
+    api.listMyFacts(scope).then((r) => ({ ...r, scope })),
+  );
 
   const bots = botsData?.bots ?? null;
 
@@ -302,11 +306,11 @@ export function FactsView() {
       ) : (
         <>
           <FactsEditor
-            key={scope}
+            key={data.scope}
             writer={MY_FACTS}
-            scope={scope}
+            scope={data.scope}
             data={data}
-            onChange={setData}
+            onChange={(next) => setData({ ...next, scope: data.scope })}
           />
           <SectionFooter>
             {s.ui_facts_footer} {s.ui_facts_count(data.facts.length, data.cap)}

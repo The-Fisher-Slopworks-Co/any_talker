@@ -16,16 +16,22 @@ type Optimize = {
 
 // Copies a request for trimming `prompt` against the system prompt, to be run
 // in an outside chat (claude.ai or similar) — the bot itself calls no model.
-// The template is fetched up front so the click only fills and copies it.
+// The template is fetched up front so the click only fills and copies it, and
+// kept, so a prompt screen opened again has the action ready at once.
+let loadedTemplate: string | null = null;
+
 export function useOptimizePrompt(prompt: string): Optimize {
-  const [template, setTemplate] = useState<string | null>(null);
+  const [template, setTemplate] = useState(loadedTemplate);
   const [status, setStatus] = useState<Optimize["status"]>("idle");
 
   useEffect(() => {
     api
       .getPromptOptimizationTemplate()
-      .then((r) => setTemplate(r.template))
-      .catch(() => setTemplate(null));
+      .then((r) => {
+        loadedTemplate = r.template;
+        setTemplate(r.template);
+      })
+      .catch(() => setTemplate(loadedTemplate));
   }, []);
 
   // A later edit makes the copied text stale.

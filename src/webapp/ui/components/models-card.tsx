@@ -6,6 +6,7 @@ import { useI18n } from "../i18n-context";
 import {
   fetchModelCatalog,
   formatPricePerMillion,
+  loadedModelCatalog,
   lookupModel,
   supportsCaching,
   supportsTools,
@@ -13,6 +14,7 @@ import {
 } from "../model-catalog";
 import {
   fetchProviderEndpoints,
+  loadedProviderEndpoints,
   pickEndpointBySort,
   type ProviderEndpoint,
 } from "../provider-endpoints";
@@ -25,33 +27,31 @@ import { useDelayedFlag } from "../lib/use-delayed-flag";
 
 // Which upstream a sort would actually land on, and what it costs there. Only
 // asked for when the deployment has per-provider stats and a sort is set; every
-// failure degrades to the catalogue's own numbers rather than an error.
+// failure degrades to the catalogue's own numbers rather than an error. A model
+// already looked up has its answer from the first frame.
 function useSortedEndpoint(
   modelId: string | undefined,
   providerSort: ProviderSort | null,
 ): ProviderEndpoint | null | undefined {
-  const [endpoint, setEndpoint] = useState<ProviderEndpoint | null | undefined>(
-    undefined,
-  );
+  const wanted = modelId && providerSort ? modelId : null;
+  // The last model whose lookup finished; a failed one caches nothing.
+  const [settled, setSettled] = useState<string | null>(null);
   useEffect(() => {
-    if (!modelId || !providerSort) {
-      setEndpoint(null);
-      return;
-    }
+    if (!wanted || loadedProviderEndpoints(wanted)) return;
     let cancelled = false;
-    setEndpoint(undefined);
-    fetchProviderEndpoints(modelId)
-      .then((eps) => {
-        if (!cancelled) setEndpoint(pickEndpointBySort(eps, providerSort));
-      })
-      .catch(() => {
-        if (!cancelled) setEndpoint(null);
+    fetchProviderEndpoints(wanted)
+      .catch(() => {})
+      .then(() => {
+        if (!cancelled) setSettled(wanted);
       });
     return () => {
       cancelled = true;
     };
-  }, [modelId, providerSort]);
-  return endpoint;
+  }, [wanted]);
+  if (!wanted || !providerSort) return null;
+  const endpoints = loadedProviderEndpoints(wanted);
+  if (endpoints) return pickEndpointBySort(endpoints, providerSort);
+  return settled === wanted ? null : undefined;
 }
 
 const joinParts = (parts: (string | null)[]) =>
@@ -180,7 +180,7 @@ export function ModelsCard({
   const { t: s } = useI18n();
   const listId = useId();
   const [catalog, setCatalog] = useState<Map<string, CatalogModel> | null>(
-    null,
+    loadedModelCatalog,
   );
 
   useEffect(() => {

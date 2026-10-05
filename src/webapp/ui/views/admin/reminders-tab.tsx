@@ -36,6 +36,7 @@ export function RemindersTab({
           the footer above and needs the gap spelled out. */}
       <div className="section-gap">
         <RemindersList
+          cacheKey="admin-reminders"
           fetchReminders={api.listAdminReminders}
           header={s.ui_reminders_admin_header}
           emptyText={s.ui_reminders_admin_empty}

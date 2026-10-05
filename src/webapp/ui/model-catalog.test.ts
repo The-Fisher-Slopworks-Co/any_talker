@@ -1,8 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { test, expect, describe } from "bun:test";
-import { formatPricePerMillion } from "./model-catalog";
+import { test, expect, describe, spyOn } from "bun:test";
+import {
+  fetchModelCatalog,
+  formatPricePerMillion,
+  loadedModelCatalog,
+} from "./model-catalog";
+
+describe("loadedModelCatalog", () => {
+  test("holds the catalogue once it has arrived, for a later first frame", async () => {
+    Object.assign(globalThis, { window: globalThis.window ?? {} });
+    const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ models: [{ id: "a/b", name: "B" }] }),
+    );
+    try {
+      expect(loadedModelCatalog()).toBeNull();
+      const pending = fetchModelCatalog();
+      expect(loadedModelCatalog()).toBeNull();
+      const map = await pending;
+      expect(loadedModelCatalog()).toBe(map);
+      expect(map.has("a/b")).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+});
 
 describe("formatPricePerMillion", () => {
   test("drops trailing zeros: whole dollars stay whole", () => {

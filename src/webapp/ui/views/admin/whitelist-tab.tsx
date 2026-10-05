@@ -82,10 +82,12 @@ export function WhitelistTab({
   onOpenChat: (id: string) => void;
 }) {
   const { t: s } = useI18n();
-  const { data, setData } = useLoadable(() => api.getWhitelist(), []);
+  const { data, setData } = useLoadable("admin-whitelist", () =>
+    api.getWhitelist(),
+  );
   const { data: blacklist, setData: setBlacklist } = useLoadable(
+    "admin-blacklist",
     () => api.getBlacklist(),
-    [],
   );
   // Optimistic local mirror so the switch flips instantly; reverted if the save
   // fails. Whitelist enforcement is a global policy — one PUT per toggle.

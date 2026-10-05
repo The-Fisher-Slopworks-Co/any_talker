@@ -104,7 +104,7 @@ export function AdminView({
 }: {
   onOpenSection: (section: AdminSection) => void;
 }) {
-  const { data } = useLoadable(api.getAdminSummary, []);
+  const { data } = useLoadable("admin-summary", api.getAdminSummary);
   return <AdminHome summary={data} onOpenSection={onOpenSection} />;
 }
 

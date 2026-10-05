@@ -12,7 +12,7 @@ import { useLoadable } from "../../lib/use-loadable";
 
 export function UsersTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { t: s } = useI18n();
-  const { data } = useLoadable(() => api.listAdminUsers(), []);
+  const { data } = useLoadable("admin-users", () => api.listAdminUsers());
 
   if (data === null) return <LoadingState />;
   const { users, displayNames, spending, limitClasses } = data;

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, spyOn } from "bun:test";
 import {
+  fetchProviderEndpoints,
+  loadedProviderEndpoints,
   pickEndpointBySort,
   toProviderOptions,
   type ProviderEndpoint,
@@ -97,5 +99,24 @@ describe("pickEndpointBySort", () => {
 
   test("returns null for an empty list", () => {
     expect(pickEndpointBySort([], "price")).toBeNull();
+  });
+});
+
+describe("loadedProviderEndpoints", () => {
+  test("holds a model's endpoints once they have arrived, and not a failure", async () => {
+    Object.assign(globalThis, { window: globalThis.window ?? {} });
+    const fetchSpy = spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ endpoints: [ep({})] }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }));
+    try {
+      expect(loadedProviderEndpoints("x/ok")).toBeUndefined();
+      const eps = await fetchProviderEndpoints("x/ok");
+      expect(loadedProviderEndpoints("x/ok")).toBe(eps);
+
+      await expect(fetchProviderEndpoints("x/missing")).rejects.toThrow();
+      expect(loadedProviderEndpoints("x/missing")).toBeUndefined();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
