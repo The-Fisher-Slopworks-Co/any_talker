@@ -6,6 +6,7 @@ import { t } from "../../../shared/i18n";
 import {
   ADMIN_SECTION_IDS,
   adminSectionLabel,
+  fromRoute,
   parseRoute,
   showsUsageHeader,
   type Route,
@@ -17,6 +18,16 @@ const ALL_ROUTES: Route[] = [
   { kind: "admin-section", section: "feedback" },
   { kind: "user-edit", userId: "1", from: "users" },
   { kind: "chat-edit", chatId: "-100", from: "whitelist" },
+  {
+    kind: "user-edit",
+    userId: "1",
+    from: { kind: "feedback-view", feedbackId: "f1" },
+  },
+  {
+    kind: "chat-edit",
+    chatId: "-100",
+    from: { kind: "feedback-view", feedbackId: "f1" },
+  },
   { kind: "check-edit", checkId: null },
   { kind: "check-edit", checkId: "c1" },
   { kind: "managed-bot-edit", botId: null },
@@ -52,6 +63,13 @@ describe("parseRoute", () => {
       { kind: "user-edit", userId: "1" },
       { kind: "user-edit", userId: "", from: "users" },
       { kind: "chat-edit", chatId: 1, from: "chats" },
+      { kind: "user-edit", userId: "1", from: { kind: "feedback-view" } },
+      {
+        kind: "user-edit",
+        userId: "1",
+        from: { kind: "admin", feedbackId: "f1" },
+      },
+      { kind: "chat-edit", chatId: "1", from: null },
       { kind: "check-edit" },
       { kind: "managed-bot-edit", botId: 3 },
       { kind: "feedback-view" },
@@ -59,6 +77,17 @@ describe("parseRoute", () => {
     for (const raw of bad) {
       expect(parseRoute(raw)).toBeNull();
     }
+  });
+});
+
+describe("fromRoute", () => {
+  test("leads back to the section or the report a page was opened from", () => {
+    expect(fromRoute("users")).toEqual({
+      kind: "admin-section",
+      section: "users",
+    });
+    const report = { kind: "feedback-view", feedbackId: "f1" } as const;
+    expect(fromRoute(report)).toEqual(report);
   });
 });
 

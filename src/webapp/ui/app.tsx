@@ -14,6 +14,7 @@ import { BuildInfoFooter } from "./components/build-info-footer";
 import { UsageHeader } from "./components/usage-header";
 import {
   adminSectionLabel,
+  fromRoute,
   parseRoute,
   showsUsageHeader,
   type Route,
@@ -68,7 +69,7 @@ function AppShell({
             switch (r.kind) {
               case "user-edit":
               case "chat-edit":
-                return { kind: "admin-section", section: r.from };
+                return fromRoute(r.from);
               case "check-edit":
                 return { kind: "admin-section", section: "checks" };
               case "managed-bot-edit":
@@ -179,6 +180,20 @@ function AppShell({
         return (
           <FeedbackView
             feedbackId={route.feedbackId}
+            onOpenUser={(id) =>
+              setRoute({
+                kind: "user-edit",
+                userId: id,
+                from: { kind: "feedback-view", feedbackId: route.feedbackId },
+              })
+            }
+            onOpenChat={(id) =>
+              setRoute({
+                kind: "chat-edit",
+                chatId: id,
+                from: { kind: "feedback-view", feedbackId: route.feedbackId },
+              })
+            }
             onDeleted={() =>
               setRoute({ kind: "admin-section", section: "feedback" })
             }

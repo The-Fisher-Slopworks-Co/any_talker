@@ -10,18 +10,23 @@ import {
   type FeedbackNames,
   type FeedbackStatus,
 } from "../../api-client";
+import { ActionRow } from "../../components/controls";
+import { CodeBlock, FeedbackThreads } from "../../components/feedback-threads";
 import {
   Card,
   SectionFooter,
   SectionHeader,
   Stack,
 } from "../../components/layout";
-import { ActionRow } from "../../components/controls";
-import { LoadingState } from "../../components/states";
-import { CodeBlock, FeedbackThreads } from "../../components/feedback-threads";
-import { SegmentedField } from "../../components/segmented-field";
-import { TimeNote } from "../../components/time-note";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
+import { SaveStatus } from "../../components/save-status";
+import { NavRow } from "../../components/select-row";
+import { LoadingState } from "../../components/states";
+import { TimeNote } from "../../components/time-note";
+import { ValueSelectRow } from "../../components/value-select-row";
+import { feedbackAuthor } from "../../lib/labels";
+import { useAutosave } from "../../lib/use-autosave";
+import { useFailureToast } from "../../lib/use-failure-toast";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -32,83 +37,71 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-// One report, opened from the list. The fields, the text in full — the row cuts
-// it to a preview — and the thread snapshots as the JSON they are stored as,
-// each carrying the generation ids the turn ran on. Plus `status`, which the
-// list deliberately leaves here: closing a report is what reading it concludes.
-export function FeedbackView({
-  feedbackId,
-  onDeleted,
+// A loaded report: text, status picker, fields, threads, prompt and delete.
+export function FeedbackReport({
+  entry,
+  names,
+  status,
+  deleting,
+  onStatus,
+  onOpenUser,
+  onOpenChat,
+  onDelete,
 }: {
-  feedbackId: string;
-  // The report is gone, so there is nothing left to show.
-  onDeleted: () => void;
+  entry: FeedbackEntry;
+  names: FeedbackNames;
+  // What the picker shows, which can be ahead of `entry.status` while saving.
+  status: FeedbackStatus;
+  deleting: boolean;
+  onStatus: (next: FeedbackStatus) => void;
+  onOpenUser: (id: string) => void;
+  onOpenChat: (id: string) => void;
+  onDelete: () => void;
 }) {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
-  const [entry, setEntry] = useState<FeedbackEntry | null>(null);
-  const [names, setNames] = useState<FeedbackNames | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api
-      .getFeedback(feedbackId)
-      .then((r) => {
-        setEntry(r.entry);
-        setNames(r.names);
-      })
-      .catch(() => setNotFound(true));
-  }, [feedbackId]);
-
-  if (notFound) return <LoadingState text={s.ui_feedback_not_found} />;
-  if (!entry || !names) return <LoadingState />;
-
-  // The control reads from the stored record, so a rejected write simply leaves
-  // it where it was — there is nothing half-applied to undo.
-  const setStatus = async (status: FeedbackStatus) => {
-    if (busy || status === entry.status) return;
-    setBusy(true);
-    try {
-      const r = await api.setFeedbackStatus(feedbackId, status);
-      setEntry(r.entry);
-    } catch {
-      // Nothing was written; the segmented control stays on the stored value.
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // A report holds the only copy of its thread snapshot, hence the confirm.
-  // The list's swipe is the quick way; this is the one that needs no gesture.
-  const remove = async () => {
-    if (busy || !confirm(s.ui_feedback_delete_confirm)) return;
-    setBusy(true);
-    try {
-      await api.deleteFeedback(feedbackId);
-      onDeleted();
-    } catch {
-      // Nothing was deleted; the report stays, one tap from a retry.
-      setBusy(false);
-    }
-  };
-
-  const user = entry.isGuest
-    ? `${entry.userId} · ${s.ui_feedback_guest_marker}`
-    : entry.userId;
+  const { short } = useDateFmt();
+  const author = feedbackAuthor(s, { ...names, ...entry });
 
   return (
     <Stack>
+      <Card>
+        <div className="px-4 py-[11px] text-[20px] leading-[26px] font-semibold whitespace-pre-wrap break-words">
+          {entry.text}
+        </div>
+      </Card>
+
+      <div className="section-gap">
+        <Card>
+          <ValueSelectRow
+            label={s.ui_feedback_status_header}
+            value={status}
+            onChange={(next) => onStatus(next as FeedbackStatus)}
+          >
+            <option value="new">{s.ui_feedback_status_new}</option>
+            <option value="closed">{s.ui_feedback_status_closed}</option>
+          </ValueSelectRow>
+        </Card>
+      </div>
+
       <SectionHeader>{s.ui_feedback_record_header}</SectionHeader>
       <Card>
         <Field
           label={s.ui_feedback_field_sent}
-          value={format(entry.createdAt)}
+          value={short(entry.createdAt)}
         />
-        <Field label={s.ui_feedback_field_user} value={user} />
-        <Field
-          label={s.ui_feedback_field_chat}
-          value={`${entry.chatId} · ${entry.chatType}`}
+        {entry.isGuest ? (
+          <Field label={s.ui_feedback_field_user} value={author} />
+        ) : (
+          <NavRow
+            title={s.ui_feedback_field_user}
+            value={author}
+            onClick={() => onOpenUser(entry.userId)}
+          />
+        )}
+        <NavRow
+          title={s.ui_feedback_field_chat}
+          value={names.chatTitle ?? `${entry.chatId} · ${entry.chatType}`}
+          onClick={() => onOpenChat(entry.chatId)}
         />
         {/* `null` is the main bot, as everywhere `forBot` is scoped. */}
         <Field
@@ -140,23 +133,6 @@ export function FeedbackView({
         <TimeNote />
       </SectionFooter>
 
-      <SectionHeader>{s.ui_feedback_status_header}</SectionHeader>
-      <SegmentedField
-        value={entry.status}
-        options={[
-          { value: "new" as const, label: s.ui_feedback_status_new },
-          { value: "closed" as const, label: s.ui_feedback_status_closed },
-        ]}
-        onChange={(next) => void setStatus(next)}
-      />
-
-      <SectionHeader>{s.ui_feedback_text_header}</SectionHeader>
-      <Card>
-        <div className="px-4 py-[11px] text-[15px] whitespace-pre-wrap break-words">
-          {entry.text}
-        </div>
-      </Card>
-
       <SectionHeader>{s.ui_feedback_threads_header}</SectionHeader>
       <FeedbackThreads
         threads={entry.threads}
@@ -176,11 +152,90 @@ export function FeedbackView({
 
       <div className="section-gap">
         <Card>
-          <ActionRow destructive disabled={busy} onClick={() => void remove()}>
+          <ActionRow destructive disabled={deleting} onClick={onDelete}>
             {s.ui_feedback_delete_report}
           </ActionRow>
         </Card>
       </div>
     </Stack>
+  );
+}
+
+type Report = { entry: FeedbackEntry; names: FeedbackNames };
+
+// One report, opened from the list. The status saves on change, and the report
+// can be deleted from here as well as by swiping it away in the list.
+export function FeedbackView({
+  feedbackId,
+  onOpenUser,
+  onOpenChat,
+  onDeleted,
+}: {
+  feedbackId: string;
+  onOpenUser: (id: string) => void;
+  onOpenChat: (id: string) => void;
+  // The report is gone, so there is nothing left to show.
+  onDeleted: () => void;
+}) {
+  const { t: s } = useI18n();
+  const [report, setReport] = useState<Report | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  // What the picker shows: the stored status until it is changed, then the
+  // choice, put back to the stored one if the write is refused.
+  const [picked, setPicked] = useState<FeedbackStatus | null>(null);
+  const deleteToast = useFailureToast();
+  const [deleting, setDeleting] = useState(false);
+
+  const { save, status } = useAutosave<
+    FeedbackStatus,
+    { entry: FeedbackEntry }
+  >({
+    send: (next) => api.setFeedbackStatus(feedbackId, next),
+    onSaved: (r) => setReport((prev) => prev && { ...prev, entry: r.entry }),
+    onFailed: () => setPicked(null),
+  });
+
+  useEffect(() => {
+    api
+      .getFeedback(feedbackId)
+      .then(setReport)
+      .catch(() => setNotFound(true));
+  }, [feedbackId]);
+
+  if (notFound) return <LoadingState text={s.ui_feedback_not_found} />;
+  if (!report) return <LoadingState />;
+
+  const remove = async () => {
+    // A report holds the only copy of its thread snapshot.
+    if (deleting || !confirm(s.ui_feedback_delete_confirm)) return;
+    setDeleting(true);
+    try {
+      await api.deleteFeedback(feedbackId);
+      onDeleted();
+    } catch {
+      deleteToast.fail();
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      <FeedbackReport
+        entry={report.entry}
+        names={report.names}
+        status={picked ?? report.entry.status}
+        deleting={deleting}
+        onStatus={(next) => {
+          setPicked(next);
+          save(next);
+        }}
+        onOpenUser={onOpenUser}
+        onOpenChat={onOpenChat}
+        onDelete={() => void remove()}
+      />
+      <SaveStatus
+        status={deleteToast.status === "failed" ? "failed" : status}
+      />
+    </>
   );
 }
