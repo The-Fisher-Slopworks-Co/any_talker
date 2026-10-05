@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import { TimeNote } from "../../components/time-note";
-import {
-  api,
-  type SpendSummary,
-  type UserSettingsResponse,
-} from "../../api-client";
+import { api } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
 import { UserLimitsSection } from "../../components/user-limits-section";
 import {
@@ -31,8 +26,18 @@ import { useLoadable } from "../../lib/use-loadable";
 import { parseString, useSessionState } from "../../lib/session-state";
 import { openTelegramProfile } from "../../lib/telegram";
 
+// The user record seeds sections that then edit their own copy of it.
 function userEditLoads(userId: string, factScope: string) {
   return {
+    user: {
+      key: `admin-user:${userId}`,
+      load: () => api.getAdminUser(userId),
+      once: true,
+    },
+    spending: {
+      key: `user-spending:${userId}`,
+      load: () => api.getUserSpending(userId),
+    },
     bots: myBotsLoad,
     facts: {
       key: `user-facts:${userId}:${factScope}`,
@@ -47,37 +52,28 @@ function userEditLoads(userId: string, factScope: string) {
 export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
-  const [data, setData] = useState<UserSettingsResponse | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  // null while loading (the card holds its place), undefined if it failed.
-  const [spending, setSpending] = useState<SpendSummary | null | undefined>(
-    null,
-  );
   const [factScope, setFactScope] = useSessionState(
     `user-facts-scope:${userId}`,
     "main",
     parseString,
   );
   const loads = userEditLoads(userId, factScope);
+  const { data, error: notFound } = useLoadable(loads.user);
+  const spent = useLoadable(loads.spending);
+  // null while loading (the card holds its place), undefined if it failed.
+  const spending = spent.data
+    ? spent.data.spending
+    : spent.error
+      ? undefined
+      : null;
   const { data: botsData, error: botsError } = useLoadable(loads.bots);
   const { data: factsData, setData: setFactsData } = useLoadable(loads.facts);
   // Whether a bot picker heads the facts is unknown until the bots land, so
   // picker and list first show together; a later scope switch keeps both up.
   const factsReady = (botsData !== null || botsError) && factsData !== null;
 
-  useEffect(() => {
-    api
-      .getAdminUser(userId)
-      .then(setData)
-      .catch(() => setNotFound(true));
-    api
-      .getUserSpending(userId)
-      .then((r) => setSpending(r.spending))
-      .catch(() => setSpending(undefined));
-  }, [userId]);
-
   // Until the hero can name the user, the page is titled like any other.
-  if (notFound || !data)
+  if (!data)
     return (
       <>
         <LargeTitle>{s.ui_route_user_settings}</LargeTitle>

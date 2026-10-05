@@ -32,16 +32,24 @@ describe("useLoadable", () => {
   let hook: Hook | null = null;
   // Every frame the probe rendered, to catch a loading flash between two.
   let frames: (string[] | null)[] = [];
-  function Probe({ k, load }: { k: string; load: () => Promise<string[]> }) {
-    hook = useLoadable({ key: k, load });
+  function Probe({
+    k,
+    load,
+    once = false,
+  }: {
+    k: string;
+    load: () => Promise<string[]>;
+    once?: boolean;
+  }) {
+    hook = useLoadable({ key: k, load, once });
     frames.push(hook.data);
     return null;
   }
 
-  async function mount(k: string, load: () => Promise<string[]>) {
+  async function mount(k: string, load: () => Promise<string[]>, once = false) {
     frames = [];
     const root = createRoot(document.createElement("div"));
-    await act(async () => root.render(<Probe k={k} load={load} />));
+    await act(async () => root.render(<Probe k={k} load={load} once={once} />));
     return root;
   }
   const rerender = (root: Root, k: string, load: () => Promise<string[]>) => {
@@ -103,5 +111,20 @@ describe("useLoadable", () => {
     expect(frames[0]).toEqual(["a"]);
     await answer(["a"]);
     await act(async () => third.unmount());
+  });
+
+  test("a form's data is not kept once its screen is left", async () => {
+    const { load, answer } = deferredLoads();
+    const first = await mount("t4", load, true);
+    await answer(["a"]);
+    expect(hook!.data).toEqual(["a"]);
+    await act(async () => first.unmount());
+
+    // The form may have changed it since: the next open waits for the server.
+    const second = await mount("t4", load, true);
+    expect(frames).toEqual([null]);
+    await answer(["b"]);
+    expect(hook!.data).toEqual(["b"]);
+    await act(async () => second.unmount());
   });
 });

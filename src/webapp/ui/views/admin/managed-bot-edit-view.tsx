@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api, type ManagedBotDetail } from "../../api-client";
 import { Hero } from "../../components/hero";
@@ -24,6 +24,7 @@ import { SaveStatus } from "../../components/save-status";
 import { AreaRow, TextRow } from "../../components/text-row";
 import { useAutosave } from "../../lib/use-autosave";
 import { useFailureToast } from "../../lib/use-failure-toast";
+import { useLoadable } from "../../lib/use-loadable";
 import {
   botForm,
   newBotLink,
@@ -38,6 +39,20 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+const newBotLoad = {
+  key: "managed-bot-new",
+  load: () => api.getManagedBotNewInfo(),
+};
+
+// The bot seeds the editor, which then edits its own copy.
+function managedBotLoad(botId: string) {
+  return {
+    key: `managed-bot:${botId}`,
+    load: () => api.getManagedBot(botId),
+    once: true,
+  };
 }
 
 export function ManagedBotEditView({
@@ -57,19 +72,9 @@ export function ManagedBotEditView({
 // once Telegram notifies the main bot.
 function CreateBotForm() {
   const { t: s } = useI18n();
-  const [info, setInfo] = useState<{
-    username: string | null;
-    canManageBots: boolean;
-  } | null>(null);
+  const { data: info } = useLoadable(newBotLoad);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-
-  useEffect(() => {
-    api
-      .getManagedBotNewInfo()
-      .then(setInfo)
-      .catch(() => setInfo(null));
-  }, []);
 
   if (info === null) return <LoadingState />;
 
@@ -137,18 +142,10 @@ function EditBotForm({
   onClose: () => void;
 }) {
   const { t: s } = useI18n();
-  const [detail, setDetail] = useState<ManagedBotDetail | null>(null);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    api
-      .getManagedBot(botId)
-      .then(setDetail)
-      .catch(() => setNotFound(true));
-  }, [botId]);
+  const { data: detail, error: notFound } = useLoadable(managedBotLoad(botId));
 
   // Until the hero can name the bot, the page is titled like any other.
-  if (notFound || !detail)
+  if (!detail)
     return (
       <>
         <LargeTitle>{s.ui_route_bot_edit}</LargeTitle>

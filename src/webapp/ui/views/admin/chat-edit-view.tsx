@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import { api } from "../../api-client";
@@ -17,6 +17,8 @@ import { TextRow } from "../../components/text-row";
 import { TimeNote } from "../../components/time-note";
 import { chatSubtitle, chatTitle } from "../../lib/labels";
 import { useAutosave } from "../../lib/use-autosave";
+import { useLoadable } from "../../lib/use-loadable";
+import { settingsLoad } from "./admin-section-view";
 import { useFormReducer } from "../../lib/use-form-reducer";
 import {
   EMPTY_CHAT_FORM,
@@ -40,11 +42,26 @@ type Loaded = {
   blacklisted: boolean;
 };
 
+// Both seed the form, which then edits its own copy.
+function chatEditLoads(chatId: string) {
+  return {
+    global: settingsLoad,
+    chat: {
+      key: `admin-chat:${chatId}`,
+      load: () => api.getAdminChat(chatId),
+      once: true,
+    },
+  };
+}
+
 export function ChatEditView({ chatId }: { chatId: string }) {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
+  const loads = chatEditLoads(chatId);
+  const { data: globalData, error: globalFailed } = useLoadable(loads.global);
+  const { data: d, error: chatFailed } = useLoadable(loads.chat);
+  const notFound = globalFailed || chatFailed;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [notFound, setNotFound] = useState(false);
   const [form, set, resetForm] = useFormReducer(EMPTY_CHAT_FORM);
 
   // The server takes the whole record, so every change sends all of it, one
@@ -81,21 +98,19 @@ export function ChatEditView({ chatId }: { chatId: string }) {
     },
   });
 
-  useEffect(() => {
-    Promise.all([api.getSettings(), api.getAdminChat(chatId)])
-      .then(([global, d]) => {
-        base.current = d.settings;
-        confirmed.current = d.settings;
-        setLoaded({
-          global,
-          chat: d.chat,
-          whitelisted: d.whitelisted,
-          blacklisted: d.blacklisted,
-        });
-        resetForm(chatFormFromSettings(d.settings, global));
-      })
-      .catch(() => setNotFound(true));
-  }, [chatId, resetForm]);
+  // Before the first paint with the data, so the form never shows empty.
+  useLayoutEffect(() => {
+    if (!globalData || !d) return;
+    base.current = d.settings;
+    confirmed.current = d.settings;
+    setLoaded({
+      global: globalData,
+      chat: d.chat,
+      whitelisted: d.whitelisted,
+      blacklisted: d.blacklisted,
+    });
+    resetForm(chatFormFromSettings(d.settings, globalData));
+  }, [globalData, d, resetForm]);
 
   // Applies `patch` to the form and sends the result, unless that is nothing
   // new for the server.

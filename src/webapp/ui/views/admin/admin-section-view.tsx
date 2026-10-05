@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
 import { api } from "../../api-client";
-import type { Settings } from "../../../../shared/types";
 import { LoadingState } from "../../components/states";
+import { useLoadable } from "../../lib/use-loadable";
 import { ApiTokenTab } from "./api-token-tab";
 import { ChatsTab } from "./chats-tab";
 import { ChecksTab } from "./checks-tab";
@@ -19,6 +18,13 @@ import { SpendTab } from "./spend-tab";
 import { UsersTab } from "./users-tab";
 import { WhitelistTab } from "./whitelist-tab";
 import type { AdminSection } from "../../lib/routes";
+
+// The global settings, which each screen editing them copies into a form.
+export const settingsLoad = {
+  key: "admin-settings",
+  load: () => api.getSettings(),
+  once: true,
+};
 
 export function AdminSectionView({
   section,
@@ -35,19 +41,8 @@ export function AdminSectionView({
   onEditManagedBot: (id: string | null) => void;
   onOpenFeedback: (id: string) => void;
 }) {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const needsSettings =
-    section === "prompt" ||
-    section === "ratelimit" ||
-    section === "budget" ||
-    section === "reminders" ||
-    section === "whitelist";
   const goUser = (id: string) => onEditUser(id, section);
   const goChat = (id: string) => onEditChat(id, section);
-
-  useEffect(() => {
-    if (needsSettings) api.getSettings().then(setSettings);
-  }, [needsSettings]);
 
   if (section === "spend")
     return <SpendTab onEditUser={goUser} onEditChat={goChat} />;
@@ -70,6 +65,20 @@ export function AdminSectionView({
         onCreate={() => onEditManagedBot(null)}
       />
     );
+  return <SettingsSection section={section} goUser={goUser} goChat={goChat} />;
+}
+
+// The sections that edit the global settings, each in a copy of its own.
+function SettingsSection({
+  section,
+  goUser,
+  goChat,
+}: {
+  section: AdminSection;
+  goUser: (id: string) => void;
+  goChat: (id: string) => void;
+}) {
+  const { data: settings, setData: setSettings } = useLoadable(settingsLoad);
   if (!settings) return <LoadingState />;
   if (section === "reminders")
     return (

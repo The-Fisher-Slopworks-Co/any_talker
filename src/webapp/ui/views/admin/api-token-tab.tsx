@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import { api } from "../../api-client";
@@ -9,6 +9,12 @@ import { ActionRow } from "../../components/controls";
 import { Card, SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
+import { useLoadable } from "../../lib/use-loadable";
+
+const apiTokenLoad = {
+  key: "admin-api-token",
+  load: () => api.getApiToken(),
+};
 
 // The admin API token: create, rotate, delete. The server hands the token out
 // once, in the create answer, so it lives in this component's state only until
@@ -16,26 +22,21 @@ import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 export function ApiTokenTab() {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
-  // undefined while loading; null when no token exists.
-  const [createdAt, setCreatedAt] = useState<number | null | undefined>();
+  const token = useLoadable(apiTokenLoad);
   const [fresh, setFresh] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
-    api
-      .getApiToken()
-      .then((r) => setCreatedAt(r.createdAt))
-      .catch(() => setFailed(true));
-  }, []);
-
-  if (createdAt === undefined)
-    return failed ? (
+  if (token.data === null)
+    return token.error ? (
       <LoadingState text={s.ui_api_token_error} />
     ) : (
       <LoadingState />
     );
+  // null when no token exists.
+  const { createdAt } = token.data;
+  const setCreatedAt = (at: number | null) => token.setData({ createdAt: at });
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);

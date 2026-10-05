@@ -27,6 +27,7 @@ import { settingsApi } from "./settings";
 export type { MeResponse, UserFact, FactBot, FactsResponse } from "./me";
 /** @public */
 export type { SpendingResponse } from "./admin-users";
+/** @public */
 export type { UserSettingsResponse } from "./admin-users";
 /** @public */
 export type { ChatSettingsResponse } from "./admin-chats";

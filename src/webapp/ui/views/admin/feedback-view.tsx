@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import {
@@ -27,6 +27,7 @@ import { ValueSelectRow } from "../../components/value-select-row";
 import { feedbackAuthor } from "../../lib/labels";
 import { useAutosave } from "../../lib/use-autosave";
 import { useFailureToast } from "../../lib/use-failure-toast";
+import { useLoadable } from "../../lib/use-loadable";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -161,7 +162,12 @@ export function FeedbackReport({
   );
 }
 
-type Report = { entry: FeedbackEntry; names: FeedbackNames };
+function feedbackReportLoad(feedbackId: string) {
+  return {
+    key: `feedback-report:${feedbackId}`,
+    load: () => api.getFeedback(feedbackId),
+  };
+}
 
 // One report, opened from the list. The status saves on change, and the report
 // can be deleted from here as well as by swiping it away in the list.
@@ -178,8 +184,11 @@ export function FeedbackView({
   onDeleted: () => void;
 }) {
   const { t: s } = useI18n();
-  const [report, setReport] = useState<Report | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const {
+    data: report,
+    setData: setReport,
+    error: notFound,
+  } = useLoadable(feedbackReportLoad(feedbackId));
   // What the picker shows: the stored status until it is changed, then the
   // choice, put back to the stored one if the write is refused.
   const [picked, setPicked] = useState<FeedbackStatus | null>(null);
@@ -195,15 +204,12 @@ export function FeedbackView({
     onFailed: () => setPicked(null),
   });
 
-  useEffect(() => {
-    api
-      .getFeedback(feedbackId)
-      .then(setReport)
-      .catch(() => setNotFound(true));
-  }, [feedbackId]);
-
-  if (notFound) return <LoadingState text={s.ui_feedback_not_found} />;
-  if (!report) return <LoadingState />;
+  if (!report)
+    return notFound ? (
+      <LoadingState text={s.ui_feedback_not_found} />
+    ) : (
+      <LoadingState />
+    );
 
   const remove = async () => {
     // A report holds the only copy of its thread snapshot.
