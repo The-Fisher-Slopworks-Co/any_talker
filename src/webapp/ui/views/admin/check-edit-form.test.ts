@@ -2,7 +2,37 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { test, expect, describe } from "bun:test";
-import { formatClock, parseClock } from "./check-edit-form";
+import {
+  anchorForSource,
+  formatAnchorDate,
+  formatClock,
+  parseClock,
+} from "./check-edit-form";
+
+describe("check editor counter source", () => {
+  const now = Date.UTC(2026, 9, 4, 22, 30);
+
+  test("a hand-kept counter has no start date", () => {
+    expect(anchorForSource(false, "2026-01-01", "UTC", now)).toBeNull();
+  });
+
+  test("choosing the date source starts from today in the check's zone", () => {
+    expect(anchorForSource(true, null, "UTC", now)).toBe("2026-10-04");
+    // 22:30 UTC is already the next day in Moscow.
+    expect(anchorForSource(true, null, "Europe/Moscow", now)).toBe(
+      "2026-10-05",
+    );
+  });
+
+  test("keeps the start date already set", () => {
+    expect(anchorForSource(true, "2026-01-01", "UTC", now)).toBe("2026-01-01");
+  });
+
+  test("writes the start date in the viewer's language", () => {
+    expect(formatAnchorDate("2026-01-02", "en")).toBe("Jan 2, 2026");
+    expect(formatAnchorDate("2026-01-02", "ru")).toBe("2 янв. 2026 г.");
+  });
+});
 
 describe("check editor clock", () => {
   test("shows the time as the HH:MM a time input takes", () => {

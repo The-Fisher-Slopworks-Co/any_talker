@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useI18n } from "../i18n-context";
 
 // The SF Symbol `chevron.up.chevron.down` iOS puts after a pop-up value.
@@ -88,80 +87,6 @@ export function SaveButton({
     <PrimaryButton disabled={disabled ?? (saving || !dirty)} onClick={onClick}>
       {saving ? s.ui_saving : dirty ? s.ui_save : s.ui_saved}
     </PrimaryButton>
-  );
-}
-
-export function NumberInput({
-  value,
-  onChange,
-  min,
-  max,
-  step,
-  integer,
-  className,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-  min?: number | undefined;
-  max?: number | undefined;
-  step?: number | string | undefined;
-  integer?: boolean | undefined;
-  className?: string | undefined;
-}) {
-  const [text, setText] = useState(() => String(value));
-  const lastEmittedRef = useRef(value);
-
-  useEffect(() => {
-    if (value !== lastEmittedRef.current) {
-      lastEmittedRef.current = value;
-      setText(String(value));
-    }
-  }, [value]);
-
-  const commit = (n: number) => {
-    lastEmittedRef.current = n;
-    onChange(n);
-  };
-
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setText(raw);
-    if (raw === "" || raw === "-") return;
-    const n = Number(raw);
-    if (!Number.isFinite(n)) return;
-    commit(integer ? Math.floor(n) : n);
-  };
-
-  const handleBlur = () => {
-    if (text === "") {
-      setText(String(lastEmittedRef.current));
-      return;
-    }
-    const n = Number(text);
-    if (!Number.isFinite(n)) {
-      setText(String(lastEmittedRef.current));
-      return;
-    }
-    let normalized = integer ? Math.floor(n) : n;
-    if (typeof min === "number") normalized = Math.max(min, normalized);
-    if (typeof max === "number") normalized = Math.min(max, normalized);
-    if (normalized !== n) {
-      commit(normalized);
-      setText(String(normalized));
-    }
-  };
-
-  return (
-    <input
-      type="number"
-      className={className}
-      value={text}
-      min={min}
-      max={max}
-      step={step}
-      onChange={handleChange}
-      onBlur={handleBlur}
-    />
   );
 }
 

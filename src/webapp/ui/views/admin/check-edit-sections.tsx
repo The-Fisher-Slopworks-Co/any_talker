@@ -4,22 +4,25 @@
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import { TimeNote } from "../../components/time-note";
-import type { RecurringCheck } from "../../../../checks/types";
-import { localDateString } from "../../../../shared/tz";
+import { Toggle } from "../../components/controls";
+import {
+  isValidCounterMode,
+  type RecurringCheck,
+} from "../../../../checks/types";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
-import { NumberInput, Toggle } from "../../components/controls";
 import { NumberRow } from "../../components/number-row";
-import { SelectRow } from "../../components/select-row";
 import { AreaRow, TextRow } from "../../components/text-row";
 import { TimezonePickerRow } from "../../components/timezone-picker-row";
-import {
-  INPUT_CLS,
-  ROW_CLS,
-  ROW_LABEL_CLS,
-  ROW_VALUE_CLS,
-} from "../../components/row";
+import { ValueSelectRow } from "../../components/value-select-row";
+import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import type { FormSetter } from "../../lib/use-form-reducer";
-import { formatClock, parseClock, type CheckDraft } from "./check-edit-form";
+import {
+  anchorForSource,
+  formatAnchorDate,
+  formatClock,
+  parseClock,
+  type CheckDraft,
+} from "./check-edit-form";
 
 // Every section edits the one draft. `set` changes the form (a field being
 // typed in), `commit` is what such a field does when it is left, and `setNow`
@@ -223,96 +226,69 @@ export function RepliesSection({ draft, set, commit }: SectionProps) {
   );
 }
 
-// The counter is either kept by hand or derived from a start date; picking the
-// date source seeds it with today so the second choice is never empty.
-export function CounterSourceSection({ draft, set }: SectionProps) {
-  const { t: s } = useI18n();
+// The counter is either kept by hand or derived from a start date.
+export function CounterSection({ draft, setNow }: SectionProps) {
+  const { t: s, lang } = useI18n();
+  const byDate = draft.counterAnchorDate !== null;
   return (
     <>
-      <SectionHeader>{s.ui_check_counter_source}</SectionHeader>
+      <SectionHeader>{s.ui_check_counter}</SectionHeader>
       <Card>
-        <SelectRow
-          label={s.ui_check_counter_source_manual}
-          selected={draft.counterAnchorDate === null}
-          onSelect={() => set("counterAnchorDate", null)}
-        />
-        <SelectRow
-          label={s.ui_check_counter_source_date}
-          selected={draft.counterAnchorDate !== null}
-          onSelect={() => {
-            if (draft.counterAnchorDate === null) {
-              set(
-                "counterAnchorDate",
-                localDateString(Date.now(), draft.timezone),
-              );
-            }
-          }}
-        />
-      </Card>
-    </>
-  );
-}
-
-export function CounterValueSection({ draft, set }: SectionProps) {
-  const { t: s } = useI18n();
-  if (draft.counterAnchorDate === null) {
-    return (
-      <>
-        <SectionHeader>{s.ui_check_counter}</SectionHeader>
-        <Card>
-          <label className={ROW_CLS}>
-            <span className={ROW_LABEL_CLS}>{s.ui_check_counter}</span>
-            <NumberInput
-              className={INPUT_CLS}
-              integer
-              min={0}
-              value={draft.counter}
-              onChange={(n) => set("counter", n)}
-            />
-          </label>
-        </Card>
-        <SectionFooter>{s.ui_check_counter_footer}</SectionFooter>
-      </>
-    );
-  }
-  return (
-    <>
-      <SectionHeader>{s.ui_check_counter_anchor_date}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>
-            {s.ui_check_counter_anchor_date}
-          </span>
-          <input
-            type="date"
-            className={INPUT_CLS}
-            value={draft.counterAnchorDate}
-            onChange={(e) => set("counterAnchorDate", e.target.value || null)}
+        <ValueSelectRow
+          label={s.ui_check_counter_source}
+          value={byDate ? "date" : "manual"}
+          onChange={(v) =>
+            setNow(
+              "counterAnchorDate",
+              anchorForSource(
+                v === "date",
+                draft.counterAnchorDate,
+                draft.timezone,
+              ),
+            )
+          }
+        >
+          <option value="manual">{s.ui_check_counter_source_manual}</option>
+          <option value="date">{s.ui_check_counter_source_date}</option>
+        </ValueSelectRow>
+        {draft.counterAnchorDate === null ? (
+          <NumberRow
+            label={s.ui_check_counter_value}
+            value={draft.counter}
+            onCommit={(n) => setNow("counter", n)}
+            integer
+            min={0}
           />
-        </label>
+        ) : (
+          <PickerRow
+            label={s.ui_check_counter_anchor_date}
+            type="date"
+            shown={formatAnchorDate(draft.counterAnchorDate, lang)}
+            value={draft.counterAnchorDate}
+            onChange={(v) => {
+              // Clearing the native field must not switch the source back.
+              if (v) setNow("counterAnchorDate", v);
+            }}
+          />
+        )}
+        <ValueSelectRow
+          label={s.ui_check_counter_mode}
+          value={draft.counterMode}
+          onChange={(v) => {
+            if (isValidCounterMode(v)) setNow("counterMode", v);
+          }}
+        >
+          <option value="always_increment">
+            {s.ui_check_counter_mode_always}
+          </option>
+          <option value="reset_on_yes">{s.ui_check_counter_mode_reset}</option>
+        </ValueSelectRow>
       </Card>
-      <SectionFooter>{s.ui_check_counter_anchor_date_footer}</SectionFooter>
-    </>
-  );
-}
-
-export function CounterModeSection({ draft, set }: SectionProps) {
-  const { t: s } = useI18n();
-  return (
-    <>
-      <SectionHeader>{s.ui_check_counter_mode}</SectionHeader>
-      <Card>
-        <SelectRow
-          label={s.ui_check_counter_mode_always}
-          selected={draft.counterMode === "always_increment"}
-          onSelect={() => set("counterMode", "always_increment")}
-        />
-        <SelectRow
-          label={s.ui_check_counter_mode_reset}
-          selected={draft.counterMode === "reset_on_yes"}
-          onSelect={() => set("counterMode", "reset_on_yes")}
-        />
-      </Card>
+      <SectionFooter>
+        {byDate
+          ? s.ui_check_counter_anchor_date_footer
+          : s.ui_check_counter_footer}
+      </SectionFooter>
     </>
   );
 }
