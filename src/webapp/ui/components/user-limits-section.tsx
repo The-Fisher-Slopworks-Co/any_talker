@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useI18n } from "../i18n-context";
 import { useDateFmt } from "../datetime-context";
 import { api, type UsageStatus } from "../api-client";
+import { useLoadable } from "../lib/use-loadable";
 import { LIMIT_CLASSES, type LimitClass } from "../../../shared/types";
 import type { WindowStatus } from "../../../ratelimit/window";
 import { formatUsd } from "../lib/labels";
@@ -53,6 +54,13 @@ function WindowMeter({ label, w }: { label: string; w: WindowStatus }) {
   );
 }
 
+export function userUsageLoad(userId: string) {
+  return {
+    key: `user-usage:${userId}`,
+    load: () => api.getUserUsage(userId),
+  };
+}
+
 // A user's rate-limit windows, their limit class and a way to start the
 // windows over, in one card. A class pick saves at once (and refetches the
 // windows it moves); a rejected one goes back to the last saved class.
@@ -67,20 +75,14 @@ export function UserLimitsSection({
   allowanceMonthUsd: number;
 }) {
   const { t: s } = useI18n();
+  const loaded = useLoadable(userUsageLoad(userId));
   // undefined while loading, null if the fetch failed.
-  const [usage, setUsage] = useState<UsageStatus | null | undefined>();
+  const usage = loaded.data?.usage ?? (loaded.error ? null : undefined);
   const [limitClass, setLimitClass] = useState(initialClass);
   const [savedClass, setSavedClass] = useState(initialClass);
   // The class change queued last. A refused one only goes back when no newer
   // one has been queued since, or it would undo that one on screen.
   const queued = useRef<Change | null>(null);
-
-  useEffect(() => {
-    api
-      .getUserUsage(userId)
-      .then((r) => setUsage(r.usage))
-      .catch(() => setUsage(null));
-  }, [userId]);
 
   const { save, status } = useAutosave<Change, Saved>({
     send: async (change) => {
@@ -93,7 +95,7 @@ export function UserLimitsSection({
       };
     },
     onSaved: (r) => {
-      setUsage(r.usage);
+      loaded.setData({ usage: r.usage });
       if (r.limitClass !== undefined) setSavedClass(r.limitClass);
     },
     onFailed: (change) => {

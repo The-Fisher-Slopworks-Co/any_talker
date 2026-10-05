@@ -7,7 +7,7 @@ import { Avatar } from "../../components/avatar";
 import { ListTab } from "../../components/list-tab";
 import { useLoadable } from "../../lib/use-loadable";
 
-const managedBotsLoad = {
+export const managedBotsLoad = {
   key: "admin-managed-bots",
   load: () => api.listManagedBots().then((r) => r.bots),
 };

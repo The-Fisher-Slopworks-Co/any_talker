@@ -11,7 +11,7 @@ import { SegmentedField } from "../../components/segmented-field";
 import { FeedbackCard } from "../../components/feedback-card";
 import { useFailureToast } from "../../lib/use-failure-toast";
 import { useLoadable } from "../../lib/use-loadable";
-import { useSessionState } from "../../lib/session-state";
+import { readSession, useSessionState } from "../../lib/session-state";
 
 type Filter = FeedbackStatus | "all";
 
@@ -19,13 +19,16 @@ function parseFilter(raw: unknown): Filter | null {
   return raw === "all" || raw === "new" || raw === "closed" ? raw : null;
 }
 
+const FILTER_KEY = "feedback-filter";
 const statusOf = (f: Filter) => (f === "all" ? {} : { status: f });
 
 // A `nextCursor` and no total, so this pages by "load more" rather than by
 // numbered pages: a page is appended to what is already listed. The list
 // carries its filter, as the previous filter's list stays up while a newly
 // picked one loads.
-function feedbackListLoad(filter: Filter) {
+export function feedbackListLoad(
+  filter = readSession(FILTER_KEY, parseFilter) ?? "all",
+) {
   return {
     key: `feedback:${filter}`,
     load: () =>
@@ -36,7 +39,7 @@ function feedbackListLoad(filter: Filter) {
 export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
   const { t: s } = useI18n();
   const [filter, setFilter] = useSessionState<Filter>(
-    "feedback-filter",
+    FILTER_KEY,
     "all",
     parseFilter,
   );

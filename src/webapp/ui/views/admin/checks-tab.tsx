@@ -6,7 +6,7 @@ import { api } from "../../api-client";
 import { ListTab } from "../../components/list-tab";
 import { useLoadable } from "../../lib/use-loadable";
 
-const checksLoad = {
+export const checksLoad = {
   key: "admin-checks",
   load: () => api.listChecks().then((r) => r.checks),
 };

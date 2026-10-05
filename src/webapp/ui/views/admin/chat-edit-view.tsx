@@ -43,7 +43,7 @@ type Loaded = {
 };
 
 // Both seed the form, which then edits its own copy.
-function chatEditLoads(chatId: string) {
+export function chatEditLoads(chatId: string) {
   return {
     global: settingsLoad,
     chat: {

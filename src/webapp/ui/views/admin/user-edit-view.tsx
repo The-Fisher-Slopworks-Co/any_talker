@@ -6,7 +6,10 @@ import { useDateFmt } from "../../datetime-context";
 import { TimeNote } from "../../components/time-note";
 import { api } from "../../api-client";
 import { SpendingCard } from "../../components/spending-card";
-import { UserLimitsSection } from "../../components/user-limits-section";
+import {
+  UserLimitsSection,
+  userUsageLoad,
+} from "../../components/user-limits-section";
 import {
   Card,
   SectionFooter,
@@ -23,11 +26,20 @@ import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { userDisplayName } from "../../lib/labels";
 import { FactsEditor, myBotsLoad, type FactsWriter } from "../facts-view";
 import { useLoadable } from "../../lib/use-loadable";
-import { parseString, useSessionState } from "../../lib/session-state";
+import {
+  parseString,
+  readSession,
+  useSessionState,
+} from "../../lib/session-state";
 import { openTelegramProfile } from "../../lib/telegram";
 
+const scopeKey = (userId: string) => `user-facts-scope:${userId}`;
+
 // The user record seeds sections that then edit their own copy of it.
-function userEditLoads(userId: string, factScope: string) {
+export function userEditLoads(
+  userId: string,
+  factScope = readSession(scopeKey(userId), parseString) ?? "main",
+) {
   return {
     user: {
       key: `admin-user:${userId}`,
@@ -38,6 +50,8 @@ function userEditLoads(userId: string, factScope: string) {
       key: `user-spending:${userId}`,
       load: () => api.getUserSpending(userId),
     },
+    // Loaded by the limits section, which is part of the first frame.
+    usage: userUsageLoad(userId),
     bots: myBotsLoad,
     facts: {
       key: `user-facts:${userId}:${factScope}`,
@@ -53,7 +67,7 @@ export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
   const [factScope, setFactScope] = useSessionState(
-    `user-facts-scope:${userId}`,
+    scopeKey(userId),
     "main",
     parseString,
   );

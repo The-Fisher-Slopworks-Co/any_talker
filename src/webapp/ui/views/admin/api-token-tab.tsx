@@ -11,7 +11,7 @@ import { LoadingState } from "../../components/states";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { useLoadable } from "../../lib/use-loadable";
 
-const apiTokenLoad = {
+export const apiTokenLoad = {
   key: "admin-api-token",
   load: () => api.getApiToken(),
 };
