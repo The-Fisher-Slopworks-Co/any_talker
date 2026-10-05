@@ -3,7 +3,7 @@
 
 import { m } from "./message";
 
-// Admin panel chrome: the section titles.
+// Admin panel chrome: the section titles and the home screen's groups.
 export const adminMessages = {
   ui_admin_prompt: m({
     en: "Prompt",
@@ -44,6 +44,18 @@ export const adminMessages = {
   ui_admin_checks: m({
     en: "Checks",
     ru: "Чеки",
+  }),
+  ui_admin_group_spending: m({
+    en: "Spending & Limits",
+    ru: "Траты и лимиты",
+  }),
+  ui_admin_group_access: m({
+    en: "Access",
+    ru: "Доступ",
+  }),
+  ui_admin_group_automation: m({
+    en: "Automation",
+    ru: "Автоматизация",
   }),
 
   // The admin API token: a bearer that opens the admin API without Telegram.

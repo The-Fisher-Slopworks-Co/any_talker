@@ -40,21 +40,24 @@ export function showsUsageHeader(route: Route): boolean {
   return route.kind === "main";
 }
 
-export const ADMIN_SECTION_IDS: readonly AdminSection[] = [
-  "prompt",
-  "ratelimit",
-  "budget",
-  "spend",
-  "whitelist",
-  "users",
-  "chats",
-  "reminders",
-  "quarantine",
-  "checks",
-  "bots",
-  "feedback",
-  "api-token",
+// The admin home's groups, top to bottom. A null header is a headerless
+// group, like the top block of iOS Settings.
+export type AdminGroup = "spending" | "access" | "automation";
+
+export const ADMIN_GROUPS: readonly {
+  header: AdminGroup | null;
+  sections: readonly AdminSection[];
+}[] = [
+  { header: null, sections: ["prompt", "bots"] },
+  { header: "spending", sections: ["ratelimit", "budget", "spend"] },
+  { header: "access", sections: ["whitelist", "users", "chats"] },
+  { header: "automation", sections: ["reminders", "quarantine", "checks"] },
+  { header: null, sections: ["feedback", "api-token"] },
 ];
+
+export const ADMIN_SECTION_IDS: readonly AdminSection[] = ADMIN_GROUPS.flatMap(
+  (g) => g.sections,
+);
 
 function isAdminSection(v: unknown): v is AdminSection {
   return ADMIN_SECTION_IDS.includes(v as AdminSection);
