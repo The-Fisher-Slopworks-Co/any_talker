@@ -4,7 +4,7 @@
 import { useMemo } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
-import { SectionFooter, SectionHeader, Stack } from "../../components/layout";
+import { SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
 import { QuarantinedReminderCard } from "../../components/quarantined-reminder-card";
 import { TimeNote } from "../../components/time-note";
@@ -21,7 +21,6 @@ export function QuarantineTab() {
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_quarantine_header}</SectionHeader>
       <QuarantinedReminderCard
         quarantined={data.quarantined}
         nowMs={nowMs}

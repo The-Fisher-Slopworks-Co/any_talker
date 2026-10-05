@@ -8,27 +8,40 @@
 import { test, expect, describe } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nProvider } from "../i18n-context";
+import { formatShortDateTime } from "../../../shared/date-format";
 import { DateFmtProvider } from "../datetime-context";
 import type { QuarantinedReminder } from "../../../storage/types/reminders";
 import { QUARANTINE_TTL_MS } from "../../../storage/types/reminders";
-import { QuarantinedReminderCard } from "./quarantined-reminder-card";
+import {
+  PayloadSheet,
+  QuarantinedReminderCard,
+} from "./quarantined-reminder-card";
 
-const NOW = Date.UTC(2026, 0, 2, 12, 0, 0);
+// The short dates count days from the real clock, so the records are placed
+// relative to it.
+const NOW = Date.now();
+
+function wrap(node: React.ReactNode, lang: "en" | "ru" = "en"): string {
+  return renderToStaticMarkup(
+    <I18nProvider lang={lang}>
+      <DateFmtProvider dateFormat="en-GB" timezone="UTC">
+        {node}
+      </DateFmtProvider>
+    </I18nProvider>,
+  );
+}
 
 function render(
   quarantined: QuarantinedReminder[],
   lang: "en" | "ru" = "en",
 ): string {
-  return renderToStaticMarkup(
-    <I18nProvider lang={lang}>
-      <DateFmtProvider dateFormat="iso" timezone="UTC">
-        <QuarantinedReminderCard
-          quarantined={quarantined}
-          nowMs={NOW}
-          emptyText="Nothing was rejected."
-        />
-      </DateFmtProvider>
-    </I18nProvider>,
+  return wrap(
+    <QuarantinedReminderCard
+      quarantined={quarantined}
+      nowMs={NOW}
+      emptyText="Nothing quarantined."
+    />,
+    lang,
   );
 }
 
@@ -44,54 +57,90 @@ function record(over: Partial<QuarantinedReminder> = {}): QuarantinedReminder {
 
 describe("QuarantinedReminderCard", () => {
   // The regression this whole view exists to prevent: a record sits in
-  // quarantine and nobody can see it. Every field that lets an admin act on it
-  // has to be on screen without opening the payload.
-  test("shows what identifies a record without opening the payload", () => {
+  // quarantine and nobody can see it. What lets an admin pick it out has to be
+  // on its row without opening the payload.
+  test("shows what identifies a record on its row", () => {
     const html = render([record()]);
-    expect(html).toContain("id r1");
-    expect(html).toContain("user u42");
     expect(html).toContain("buy milk");
-    expect(html).toContain("Does not match the schema");
-    expect(html).toContain("2026-01-01");
+    expect(html).toContain("Does not match the schema · Yesterday, ");
   });
 
-  test("counts down the retention window", () => {
-    const html = render([record()]);
+  test("counts the retention window down in days", () => {
     // One day into a 30-day window.
-    expect(html).toContain("expires in ~29 d");
-
+    expect(render([record()])).toContain(">29 days<");
+    const lastDay = record({
+      quarantinedAtMs: NOW - QUARANTINE_TTL_MS + 3_600_000,
+    });
+    expect(render([lastDay])).toContain(">1 day<");
     const stale = render([
       record({ quarantinedAtMs: NOW - QUARANTINE_TTL_MS - 1 }),
     ]);
-    expect(stale).toContain("expired");
-    expect(stale).not.toContain("expires in");
+    expect(stale).toContain(">Expired<");
+    expect(stale).not.toContain("days");
   });
 
-  test("names the invalid-JSON reason and drops the fields it cannot read", () => {
+  test("falls back to the id when no text survived", () => {
     const html = render([
       record({ raw: "{not json at all", reason: "invalid_json" }),
     ]);
+    expect(html).toContain("ID r1");
     expect(html).toContain("Not valid JSON");
-    expect(html).toContain("id r1");
-    expect(html).not.toContain("user u42");
+    expect(html).not.toContain("buy milk");
   });
 
-  test("keeps the payload behind a toggle rather than on screen", () => {
+  test("keeps the payload out of the list", () => {
     const html = render([record()]);
-    expect(html).toContain("Show payload");
     expect(html).not.toContain("<pre");
+    expect(html).not.toContain('role="dialog"');
   });
 
-  test("reads as nothing-was-rejected when the quarantine is empty", () => {
+  test("reads as nothing quarantined when the quarantine is empty", () => {
     const html = render([]);
-    expect(html).toContain("Nothing was rejected.");
-    expect(html).not.toContain("Show payload");
+    expect(html).toContain("Nothing quarantined.");
+    expect(html).not.toContain("days");
   });
 
   test("takes its labels from the catalogue, not from English literals", () => {
     const html = render([record()], "ru");
-    expect(html).toContain("Не соответствует схеме");
-    expect(html).toContain("пользователь u42");
-    expect(html).toContain("Показать данные");
+    expect(html).toContain("Не соответствует схеме · Вчера, ");
+    expect(html).toContain(">29 дней<");
+  });
+});
+
+describe("PayloadSheet", () => {
+  const open = (r: QuarantinedReminder, lang: "en" | "ru" = "en") =>
+    wrap(<PayloadSheet record={r} onClose={() => {}} />, lang);
+
+  test("lists user, id and expiry above the pretty-printed payload", () => {
+    const html = open(record());
+    expect(html).toContain("Payload");
+    expect(html).toMatch(/>User<[\s\S]*>u42</);
+    expect(html).toMatch(/>ID<[\s\S]*>r1</);
+    // Quarantined a day ago, kept 30 days.
+    const expires = formatShortDateTime(
+      NOW + 29 * 86_400_000,
+      Date.now(),
+      "en-GB",
+      "UTC",
+      { today: "Today", yesterday: "Yesterday", tomorrow: "Tomorrow" },
+    );
+    expect(html).toMatch(new RegExp(`>Expires<[\\s\\S]*${expires}`));
+    expect(html).toContain("<pre");
+    expect(html).toContain("&quot;text&quot;: &quot;buy milk&quot;");
+    expect(html.indexOf("<pre")).toBeLessThan(html.indexOf(">Copy<"));
+  });
+
+  test("drops the user row when the payload names none", () => {
+    const html = open(record({ raw: "{not json", reason: "invalid_json" }));
+    expect(html).not.toContain(">User<");
+    expect(html).toContain("{not json");
+  });
+
+  test("closes with Done and speaks the viewer's language", () => {
+    const html = open(record(), "ru");
+    expect(html).toContain(">Данные<");
+    expect(html).toContain(">Готово<");
+    expect(html).toContain(">Пользователь<");
+    expect(html).toContain(">Копировать<");
   });
 });
