@@ -82,7 +82,7 @@ describe("AboutYouSection", () => {
   test("offers 'not set' as the first gender and selects it by default", () => {
     const html = renderAbout();
     expect(selectedOptions(html)).toEqual([""]);
-    expect(html).toContain(">Not set<");
+    expect(html).toContain(">Not Set<");
   });
 
   test("shows a stored gender as selected", () => {
