@@ -9,6 +9,7 @@ import {
   type ProviderOption,
 } from "../provider-endpoints";
 import { ValueSelectRow } from "./value-select-row";
+import { useDelayedFlag } from "../lib/use-delayed-flag";
 
 // The providers serving `modelId`; null while they load.
 export function useProviderOptions(modelId: string): ProviderOption[] | null {
@@ -52,6 +53,7 @@ export function ProviderSelectField({
   const trimmedModel = modelId.trim();
 
   const loading = providers === null;
+  const showLoading = useDelayedFlag(loading);
   const options = providers ?? [];
   // Keep a pinned slug selectable even when it isn't in the fetched list (model
   // changed, stale cache, slug-less endpoint) so switching never drops it.
@@ -69,7 +71,7 @@ export function ProviderSelectField({
       onChange={(v) => onChange(v === "" ? null : v)}
     >
       <option value="">
-        {loading ? s.ui_provider_loading : s.ui_provider_auto}
+        {showLoading ? s.ui_provider_loading : s.ui_provider_auto}
       </option>
       {merged.map((o) => (
         <option key={o.slug} value={o.slug}>

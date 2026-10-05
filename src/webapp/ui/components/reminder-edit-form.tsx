@@ -16,6 +16,7 @@ import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
 import { NavRow } from "./select-row";
 import { Sheet, SheetButton, useSheet } from "./sheet";
 import { TimeNote } from "./time-note";
+import { useDelayedFlag } from "../lib/use-delayed-flag";
 
 const TEXTAREA_CLS =
   "block w-full box-border bg-transparent border-0 px-4 py-3 text-base min-h-[110px] resize-none";
@@ -56,7 +57,10 @@ export function ReminderEditForm({
   const initialWhen = toDateTimeInput(reminder.fireAtMs, tz);
   const [text, setText] = useState(reminder.text);
   const [when, setWhen] = useState(initialWhen);
-  const [busy, setBusy] = useState(false);
+  // Which request is in flight: only a save turns Save into "Saving…".
+  const [action, setAction] = useState<"save" | "delete" | null>(null);
+  const busy = action !== null;
+  const showSaving = useDelayedFlag(action === "save");
   const [error, setError] = useState<string | null>(null);
   const [deleteFailed, setDeleteFailed] = useState(false);
   const { closing, dismiss, cancel } = useSheet(onClose);
@@ -64,7 +68,7 @@ export function ReminderEditForm({
   // The pill shows the app's format; the too-wide native input lies over it.
   const picked = parseAbsoluteDateTimeMs(when, tz);
   const run = async (fn: () => Promise<void>, deleting = false) => {
-    setBusy(true);
+    setAction(deleting ? "delete" : "save");
     setError(null);
     setDeleteFailed(false);
     try {
@@ -72,7 +76,7 @@ export function ReminderEditForm({
     } catch (err) {
       if (deleting) setDeleteFailed(true);
       else setError((err as { code?: string | null }).code ?? "save_failed");
-      setBusy(false);
+      setAction(null);
     }
   };
 
@@ -125,7 +129,7 @@ export function ReminderEditForm({
           disabled={busy || text.trim() === "" || when === ""}
           onClick={save}
         >
-          {busy ? s.ui_saving : s.ui_save}
+          {showSaving ? s.ui_saving : s.ui_save}
         </SheetButton>
       }
     >

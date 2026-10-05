@@ -10,6 +10,7 @@ import { NavRow } from "./select-row";
 import { EmptyState } from "./states";
 import { SwipeToDelete } from "./swipe-row";
 import { feedbackAuthor } from "../lib/labels";
+import { useDelayedFlag } from "../lib/use-delayed-flag";
 
 // The listing sends each text whole — up to Telegram's 4096 — and a row shows
 // one line of it; the rest is only weight in the page.
@@ -35,6 +36,7 @@ export function FeedbackCard({
 }) {
   const { t: s } = useI18n();
   const { short } = useDateFmt();
+  const showLoading = useDelayedFlag(loadingMore);
 
   return (
     <Card>
@@ -66,7 +68,7 @@ export function FeedbackCard({
       )}
       {onLoadMore && (
         <ActionRow disabled={loadingMore} onClick={onLoadMore}>
-          {loadingMore ? s.ui_loading : s.ui_feedback_load_more}
+          {showLoading ? s.ui_loading : s.ui_feedback_load_more}
         </ActionRow>
       )}
     </Card>
