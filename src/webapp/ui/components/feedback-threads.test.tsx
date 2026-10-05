@@ -38,11 +38,17 @@ function render(
   threads: ThreadSnapshot[],
   pointedAt: { chatId: string; botMsgId: number } | null = null,
   lang: "en" | "ru" = "en",
+  chatTitle: string | null = null,
 ): string {
   return renderToStaticMarkup(
     <I18nProvider lang={lang}>
       <DateFmtProvider dateFormat="iso" timezone="UTC">
-        <FeedbackThreads threads={threads} pointedAt={pointedAt} />
+        <FeedbackThreads
+          threads={threads}
+          pointedAt={pointedAt}
+          chatId="-100500"
+          chatTitle={chatTitle}
+        />
       </DateFmtProvider>
     </I18nProvider>,
   );
@@ -52,18 +58,36 @@ describe("FeedbackThreads", () => {
   test("renders the snapshot as JSON and links every generation id", () => {
     const html = render([thread()]);
     expect(html).toContain("why did you answer in English");
-    expect(html).toContain("#1 · chat -100500 · turns: 1");
+    expect(html).toContain("#1 · -100500 · 1 turn");
     expect(html).toContain(
       "https://openrouter.ai/activity?id=gen-1789064867-b8Jgaf5awCPg2hexiRjE",
     );
     expect(html).toContain("<pre");
   });
 
+  test("names the report's chat by its title and any other by its id", () => {
+    const titled = render([thread()], null, "en", "Weekend Hikers");
+    expect(titled).toContain("#1 · Weekend Hikers · 1 turn");
+    const other = render(
+      [thread({ chatId: "-100999" })],
+      null,
+      "en",
+      "Weekend Hikers",
+    );
+    expect(other).toContain("#1 · -100999 · 1 turn");
+  });
+
+  test("gives every thread its own card", () => {
+    const html = render([thread(), thread({ ts: NOW - 1000 })]);
+    expect(html.match(/class="card /g)).toHaveLength(2);
+  });
+
   test("says so when a turn carries no generation ids", () => {
     const html = render([
       thread({ turns: [{ userQuestion: "q", botAnswer: "a" }] }),
     ]);
-    expect(html).toContain("no generation ids");
+    expect(html).toContain("Generations");
+    expect(html).toContain("None");
     expect(html).not.toContain("openrouter.ai");
   });
 
@@ -79,14 +103,15 @@ describe("FeedbackThreads", () => {
 
   test("marks the thread the report pointed at", () => {
     const html = render([thread()], { chatId: "-100500", botMsgId: 77 });
-    expect(html).toContain("chain · pointed at");
+    expect(html).toContain("Pointed At");
+    expect(html).not.toContain("Chain");
     expect(html).not.toContain("in the snapshot; its thread");
   });
 
   test("takes its labels from the catalogue, not from English literals", () => {
     const html = render([thread({ kind: "guest" })], null, "ru");
-    expect(html).toContain("#1 · чат -100500 · ходов: 1");
-    expect(html).toContain("гостевой");
-    expect(html).toContain("Генерации:");
+    expect(html).toContain("#1 · -100500 · 1 ход");
+    expect(html).toContain("Гостевой");
+    expect(html).toContain("Генерации");
   });
 });
