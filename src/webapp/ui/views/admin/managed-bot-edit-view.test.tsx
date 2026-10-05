@@ -100,6 +100,39 @@ async function mount() {
   };
 }
 
+describe("ManagedBotEditView deleting", () => {
+  // The server's save is read-modify-write, so a save still in flight when
+  // the delete lands could resurrect the bot or find it gone.
+  test("waits for a save in flight before deleting", async () => {
+    const { root, container, name, type, leave, answer } = await mount();
+    const deletes: string[] = [];
+    Object.assign(api, {
+      deleteManagedBot: async (id: string) => {
+        deletes.push(id);
+        return { ok: true };
+      },
+    });
+    Object.assign(globalThis, { confirm: () => true });
+    await type(name, "Kitty");
+    await leave(name);
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Delete Bot",
+    )!;
+    const key = Object.keys(button).find((k) => k.startsWith("__reactProps"))!;
+    const click = (
+      button as unknown as Record<string, { onClick: () => void }>
+    )[key]!.onClick;
+    await act(async () => {
+      void click();
+    });
+    expect(deletes).toEqual([]);
+    await answer(0, true);
+    await until(() => deletes.length === 1);
+    expect(deletes).toEqual([BOT.botId]);
+    await act(async () => root.unmount());
+  });
+});
+
 describe("ManagedBotEditView", () => {
   test("opens with the bot as the page heading, with its handle and status", async () => {
     const { root, container } = await mount();

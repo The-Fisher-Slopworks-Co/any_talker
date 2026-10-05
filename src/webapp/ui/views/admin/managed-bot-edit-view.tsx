@@ -180,7 +180,7 @@ function BotEditor({
   const queued = useRef<BotForm>(form);
   const confirmed = useRef<BotForm>(form);
   const optimize = useOptimizePrompt(form.systemPrompt);
-  const { save, status } = useAutosave<BotForm, ManagedBotDetail>({
+  const { save, flush, status } = useAutosave<BotForm, ManagedBotDetail>({
     send: (payload) => api.updateManagedBot(botId, payload),
     onSaved: (saved) => {
       confirmed.current = botForm(saved.bot);
@@ -210,6 +210,8 @@ function BotEditor({
     if (!confirm(s.ui_mbot_delete_confirm)) return;
     setDeleting(true);
     try {
+      // The server's save is read-modify-write: let the ones in flight land.
+      await flush();
       await api.deleteManagedBot(botId);
       onClose();
     } catch {
