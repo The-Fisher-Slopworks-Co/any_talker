@@ -2,9 +2,7 @@
 // Copyright (C) 2026 The Fisher Slopworks Co
 
 import { useI18n } from "../../i18n-context";
-import { useDateFmt } from "../../datetime-context";
-import { TimeNote } from "../../components/time-note";
-import type { Chat, Settings } from "../../../../shared/types";
+import type { Settings } from "../../../../shared/types";
 import { Card, SectionFooter, SectionHeader } from "../../components/layout";
 import { Toggle } from "../../components/controls";
 import { ModelsCard } from "../../components/models-card";
@@ -14,15 +12,7 @@ import { ProviderSortField } from "../../components/provider-sort-field";
 import { ProviderSelectField } from "../../components/provider-select-field";
 import { ServiceTierField } from "../../components/service-tier-field";
 import { TimezoneSelect } from "../../components/timezone-select";
-import { WhitelistToggleButton } from "../../components/whitelist-toggle-button";
-import { BlacklistToggleButton } from "../../components/blacklist-toggle-button";
-import {
-  INPUT_CLS,
-  ROW_CLS,
-  ROW_LABEL_CLS,
-  ROW_VALUE_CLS,
-} from "../../components/row";
-import { chatTitle } from "../../lib/labels";
+import { ROW_CLS, ROW_LABEL_CLS } from "../../components/row";
 import type { FormSetter } from "../../lib/use-form-reducer";
 import { trimmedModels, type ChatForm } from "./chat-edit-form";
 
@@ -42,90 +32,6 @@ type SectionProps = {
   commit: (patch: Partial<ChatForm>) => void;
   global: Settings;
 };
-
-export function ChatInfoCard({
-  chat,
-  whitelisted,
-  blacklisted,
-}: {
-  chat: Chat;
-  whitelisted: boolean;
-  blacklisted: boolean;
-}) {
-  const { t: s } = useI18n();
-  const { format } = useDateFmt();
-  return (
-    <>
-      <SectionHeader>{s.ui_chat_chat}</SectionHeader>
-      <Card>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_chat_title}</span>
-          <span className={ROW_VALUE_CLS}>{chatTitle(s, chat)}</span>
-        </div>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_chat_type}</span>
-          <span className={ROW_VALUE_CLS}>{chat.type}</span>
-        </div>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_chat_username}</span>
-          <span className={ROW_VALUE_CLS}>
-            {chat.username ? `@${chat.username}` : s.ui_dash}
-          </span>
-        </div>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_chat_id}</span>
-          <span className={ROW_VALUE_CLS}>{chat.id}</span>
-        </div>
-        <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_chat_last_seen}</span>
-          <span className={ROW_VALUE_CLS}>{format(chat.lastSeenAt)}</span>
-        </div>
-        <WhitelistToggleButton
-          kind="chats"
-          id={chat.id}
-          label={chatTitle(s, chat)}
-          initial={whitelisted}
-        />
-        <BlacklistToggleButton
-          kind="chats"
-          id={chat.id}
-          label={chatTitle(s, chat)}
-          initial={blacklisted}
-        />
-      </Card>
-      <SectionFooter>
-        <TimeNote />
-      </SectionFooter>
-    </>
-  );
-}
-
-export function BotNameSection({
-  form,
-  set,
-  commit,
-}: Omit<SectionProps, "global">) {
-  const { t: s } = useI18n();
-  return (
-    <>
-      <SectionHeader>{s.ui_chat_bot_name}</SectionHeader>
-      <Card>
-        <label className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_user_name}</span>
-          <input
-            className={INPUT_CLS}
-            placeholder={s.ui_chat_bot_name_placeholder}
-            value={form.botName}
-            onChange={(e) => set("botName", e.target.value)}
-            onBlur={() => commit({})}
-            maxLength={64}
-          />
-        </label>
-      </Card>
-      <SectionFooter>{s.ui_chat_bot_name_footer}</SectionFooter>
-    </>
-  );
-}
 
 export function SystemPromptSection({
   form,

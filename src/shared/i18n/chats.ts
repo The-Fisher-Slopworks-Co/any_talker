@@ -45,24 +45,12 @@ export const chatsMessages = {
     en: "Chat",
     ru: "Чат",
   }),
-  ui_chat_title: m({
-    en: "Title",
-    ru: "Название",
-  }),
-  ui_chat_type: m({
-    en: "Type",
-    ru: "Тип",
-  }),
-  ui_chat_username: m({
-    en: "Username",
-    ru: "Username",
-  }),
   ui_chat_id: m({
     en: "ID",
     ru: "ID",
   }),
   ui_chat_last_seen: m({
-    en: "Last seen",
+    en: "Last Seen",
     ru: "Последний раз",
   }),
   ui_chat_bot_name: m({
@@ -70,12 +58,12 @@ export const chatsMessages = {
     ru: "Имя бота",
   }),
   ui_chat_bot_name_placeholder: m({
-    en: "Leave empty to disable",
-    ru: "Пусто — выключено",
+    en: "Off",
+    ru: "Выкл.",
   }),
   ui_chat_bot_name_footer: m({
-    en: "Bold prefix on every AI reply.",
-    ru: "Жирный префикс в каждом ответе ИИ.",
+    en: "Bold prefix on every AI reply. Leave empty to turn it off.",
+    ru: "Жирный префикс в каждом ответе ИИ. Пусто — выключено.",
   }),
   ui_chat_override_global: m({
     en: "Override global",

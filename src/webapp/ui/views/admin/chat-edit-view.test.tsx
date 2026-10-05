@@ -91,6 +91,19 @@ async function mount() {
   return { root, props, type, container, puts, answer };
 }
 
+describe("ChatEditView", () => {
+  test("opens with the chat as the page heading, its details and access", async () => {
+    const { root, container } = await mount();
+    const heading = container.querySelector("h1")!;
+    expect(heading.textContent).toBe("Hikers");
+    const text = container.textContent;
+    for (const label of ["-100", "Last Seen", "Allowed", "Blocked", "Bot Name"])
+      expect(text).toContain(label);
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+    await act(async () => root.unmount());
+  });
+});
+
 describe("ChatEditView autosave", () => {
   test("sends the whole record when a field is left, once", async () => {
     const { root, props, type, puts, answer } = await mount();
