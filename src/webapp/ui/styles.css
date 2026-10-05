@@ -95,8 +95,10 @@
 
 /* Structural pieces that don't translate to inline utilities cleanly. */
 
-/* Hairline separator between consecutive rows within a card. */
+/* Hairline separator between consecutive rows within a card; a text area
+   (`.field-block`) counts as a row. */
 .row + .row::before,
+.field-block + .action-row::before,
 .row + .action-row::before,
 .row + .swipe-row::before,
 .swipe-row + .row::before,

@@ -14,7 +14,7 @@ export const promptMessages = {
     ru: "Системный промпт",
   }),
   ui_prompt_optimize_copy: m({
-    en: "Copy for optimization",
+    en: "Copy for Optimization",
     ru: "Скопировать для оптимизации",
   }),
   ui_prompt_optimize_copied: m({
@@ -24,6 +24,10 @@ export const promptMessages = {
   ui_prompt_optimize_footer: m({
     en: "Copies a request with both prompts. Paste it into any chat, then paste the shortened prompt back and save.",
     ru: "Копирует запрос с обоими промптами. Вставьте в любой чат, затем верните сокращённый промпт и сохраните.",
+  }),
+  ui_prompt_optimize_autosave_footer: m({
+    en: "Copies a request with both prompts. Paste it into any chat, then paste the shortened prompt back here.",
+    ru: "Копирует запрос с обоими промптами. Вставьте в любой чат, затем верните сюда сокращённый промпт.",
   }),
   ui_prompt_optimize_failed: m({
     en: "Could not copy to the clipboard.",
