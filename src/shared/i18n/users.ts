@@ -43,8 +43,4 @@ export const usersMessages = {
     ru: (fallback: string) =>
       `Как ИИ называет пользователя (пусто: ${fallback}).`,
   }),
-  ui_user_set_language: m({
-    en: "Set language",
-    ru: "Задать язык",
-  }),
 };

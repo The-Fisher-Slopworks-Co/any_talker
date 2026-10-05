@@ -53,14 +53,6 @@ export const profileMessages = {
     en: "Timezone",
     ru: "Часовой пояс",
   }),
-  ui_main_use_my_tz: m({
-    en: "Use my timezone",
-    ru: "Использовать мой пояс",
-  }),
-  ui_main_tz_footer: m({
-    en: "Off: chat or global timezone for the AI, device timezone here.",
-    ru: "Выкл: для ИИ пояс чата или глобальный, здесь — пояс устройства.",
-  }),
   ui_main_time_format: m({
     en: "Time Format",
     ru: "Формат времени",
