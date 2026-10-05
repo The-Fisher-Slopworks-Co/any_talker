@@ -101,7 +101,8 @@
 .row + .swipe-row::before,
 .swipe-row + .row::before,
 .swipe-row + .action-row::before,
-.swipe-row + .swipe-row::before {
+.swipe-row + .swipe-row::before,
+.action-row + .action-row::before {
   content: "";
   position: absolute;
   top: 0;

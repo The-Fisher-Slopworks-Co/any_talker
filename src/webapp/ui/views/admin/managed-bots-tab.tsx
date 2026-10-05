@@ -22,8 +22,6 @@ export function ManagedBotsTab({
   return (
     <ListTab
       items={bots}
-      header={s.ui_mbots_all}
-      empty={s.ui_mbots_empty}
       footer={s.ui_mbots_footer}
       createLabel={s.ui_mbots_create}
       onEdit={onEdit}
