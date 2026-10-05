@@ -34,9 +34,12 @@ const KEYWORDS_TEXTAREA_CLS =
 // Every editable section reads the one form state and writes back through the
 // one setter; `global` is what the section falls back to while its override is
 // off, and what its footer names.
+// `set` follows typing; `commit` applies a change and saves it, and with an
+// empty patch saves what the form holds (a text field being left).
 type SectionProps = {
   form: ChatForm;
   set: FormSetter<ChatForm>;
+  commit: (patch: Partial<ChatForm>) => void;
   global: Settings;
 };
 
@@ -97,7 +100,11 @@ export function ChatInfoCard({
   );
 }
 
-export function BotNameSection({ form, set }: Omit<SectionProps, "global">) {
+export function BotNameSection({
+  form,
+  set,
+  commit,
+}: Omit<SectionProps, "global">) {
   const { t: s } = useI18n();
   return (
     <>
@@ -110,6 +117,7 @@ export function BotNameSection({ form, set }: Omit<SectionProps, "global">) {
             placeholder={s.ui_chat_bot_name_placeholder}
             value={form.botName}
             onChange={(e) => set("botName", e.target.value)}
+            onBlur={() => commit({})}
             maxLength={64}
           />
         </label>
@@ -119,13 +127,18 @@ export function BotNameSection({ form, set }: Omit<SectionProps, "global">) {
   );
 }
 
-export function SystemPromptSection({ form, set, global }: SectionProps) {
+export function SystemPromptSection({
+  form,
+  set,
+  commit,
+  global,
+}: SectionProps) {
   const { t: s } = useI18n();
   return (
     <OverrideSection
       title={s.ui_chat_system_prompt}
       override={form.promptOverride}
-      onToggle={(v) => set("promptOverride", v)}
+      onToggle={(v) => commit({ promptOverride: v })}
       footer={
         form.promptOverride
           ? undefined
@@ -138,6 +151,7 @@ export function SystemPromptSection({ form, set, global }: SectionProps) {
             className={PROMPT_TEXTAREA_CLS}
             value={form.promptValue}
             onChange={(e) => set("promptValue", e.target.value)}
+            onBlur={() => commit({})}
             placeholder={s.ui_chat_prompt_placeholder}
           />
         </Card>
@@ -147,13 +161,13 @@ export function SystemPromptSection({ form, set, global }: SectionProps) {
   );
 }
 
-export function ModelsSection({ form, set, global }: SectionProps) {
+export function ModelsSection({ form, set, commit, global }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <OverrideSection
       title={s.ui_chat_models}
       override={form.modelsOverride}
-      onToggle={(v) => set("modelsOverride", v)}
+      onToggle={(v) => commit({ modelsOverride: v })}
       footer={
         form.modelsOverride
           ? undefined
@@ -163,6 +177,7 @@ export function ModelsSection({ form, set, global }: SectionProps) {
       <ModelsCard
         models={form.models}
         onChange={(next) => set("models", next)}
+        onCommit={(ids) => commit({ models: ids })}
         onValidityChange={(valid) => set("modelsValid", valid)}
         fallback={true}
         providerSort={form.psOverride ? form.psValue : global.providerSort}
@@ -171,13 +186,17 @@ export function ModelsSection({ form, set, global }: SectionProps) {
   );
 }
 
-export function TimezoneOverrideSection({ form, set, global }: SectionProps) {
+export function TimezoneOverrideSection({
+  form,
+  commit,
+  global,
+}: SectionProps) {
   const { t: s } = useI18n();
   return (
     <OverrideSection
       title={s.ui_chat_tz}
       override={form.tzOverride}
-      onToggle={(v) => set("tzOverride", v)}
+      onToggle={(v) => commit({ tzOverride: v })}
       footer={
         form.tzOverride
           ? s.ui_chat_tz_on_footer
@@ -186,19 +205,19 @@ export function TimezoneOverrideSection({ form, set, global }: SectionProps) {
     >
       <TimezoneSelect
         value={form.tzValue}
-        onChange={(tz) => set("tzValue", tz)}
+        onChange={(tz) => commit({ tzValue: tz })}
       />
     </OverrideSection>
   );
 }
 
-export function ProviderRoutingSection({ form, set, global }: SectionProps) {
+export function ProviderRoutingSection({ form, commit, global }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <OverrideSection
       title={s.ui_chat_provider_routing}
       override={form.psOverride}
-      onToggle={(v) => set("psOverride", v)}
+      onToggle={(v) => commit({ psOverride: v })}
       footer={
         form.psOverride
           ? undefined
@@ -210,20 +229,20 @@ export function ProviderRoutingSection({ form, set, global }: SectionProps) {
       <Card>
         <ProviderSortField
           value={form.psValue}
-          onChange={(v) => set("psValue", v)}
+          onChange={(v) => commit({ psValue: v })}
         />
       </Card>
     </OverrideSection>
   );
 }
 
-export function ProviderSection({ form, set, global }: SectionProps) {
+export function ProviderSection({ form, commit, global }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <OverrideSection
       title={s.ui_chat_provider}
       override={form.provOverride}
-      onToggle={(v) => set("provOverride", v)}
+      onToggle={(v) => commit({ provOverride: v })}
       footer={
         form.provOverride
           ? s.ui_chat_provider_on_footer
@@ -237,20 +256,20 @@ export function ProviderSection({ form, set, global }: SectionProps) {
             ""
           }
           value={form.provValue}
-          onChange={(v) => set("provValue", v)}
+          onChange={(v) => commit({ provValue: v })}
         />
       </Card>
     </OverrideSection>
   );
 }
 
-export function ServiceTierSection({ form, set, global }: SectionProps) {
+export function ServiceTierSection({ form, commit, global }: SectionProps) {
   const { t: s } = useI18n();
   return (
     <OverrideSection
       title={s.ui_chat_service_tier}
       override={form.stOverride}
-      onToggle={(v) => set("stOverride", v)}
+      onToggle={(v) => commit({ stOverride: v })}
       footer={
         form.stOverride
           ? undefined
@@ -262,7 +281,7 @@ export function ServiceTierSection({ form, set, global }: SectionProps) {
       <Card>
         <ServiceTierField
           value={form.stValue}
-          onChange={(v) => set("stValue", v)}
+          onChange={(v) => commit({ stValue: v })}
         />
       </Card>
     </OverrideSection>
@@ -272,6 +291,7 @@ export function ServiceTierSection({ form, set, global }: SectionProps) {
 export function KeywordFilterSection({
   form,
   set,
+  commit,
 }: Omit<SectionProps, "global">) {
   const { t: s } = useI18n();
   return (
@@ -285,13 +305,14 @@ export function KeywordFilterSection({
           <span className="flex-1" />
           <Toggle
             value={form.kfEnabled}
-            onChange={(v) => set("kfEnabled", v)}
+            onChange={(v) => commit({ kfEnabled: v })}
           />
         </div>
         <textarea
           className={KEYWORDS_TEXTAREA_CLS}
           value={form.keywordsText}
           onChange={(e) => set("keywordsText", e.target.value)}
+          onBlur={() => commit({})}
           placeholder={s.ui_chat_keyword_filter_placeholder}
         />
       </Card>
