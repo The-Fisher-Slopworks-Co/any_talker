@@ -93,40 +93,36 @@ export const adminMessages = {
     ru: "Токен",
   }),
   ui_api_token_none: m({
-    en: "Not created",
+    en: "Not Created",
     ru: "Не создан",
   }),
   ui_api_token_created: m({
-    en: (at: string) => `Created ${at}`,
-    ru: (at: string) => `Создан ${at}`,
+    en: "Created",
+    ru: "Создан",
   }),
   ui_api_token_create: m({
-    en: "Create token",
+    en: "Create Token",
     ru: "Создать токен",
   }),
   ui_api_token_recreate: m({
-    en: "Create a new token",
-    ru: "Создать новый токен",
+    en: "Regenerate Token",
+    ru: "Перевыпустить токен",
   }),
   ui_api_token_recreate_confirm: m({
-    en: "The current token will stop working. Create a new one?",
-    ru: "Текущий токен перестанет работать. Создать новый?",
+    en: "The current token will stop working. Regenerate it?",
+    ru: "Текущий токен перестанет работать. Перевыпустить его?",
   }),
   ui_api_token_delete: m({
-    en: "Delete token",
-    ru: "Удалить токен",
+    en: "Revoke Token",
+    ru: "Отозвать токен",
   }),
   ui_api_token_delete_confirm: m({
-    en: "Delete the token? Its users lose access.",
-    ru: "Удалить токен? Доступ пропадёт.",
+    en: "Revoke the token? Its users lose access.",
+    ru: "Отозвать токен? Доступ пропадёт.",
   }),
   ui_api_token_footer: m({
     en: "Send as Authorization: Bearer <token>. Full admin API access.",
     ru: "Передавай в Authorization: Bearer <токен>. Полный доступ к админскому API.",
-  }),
-  ui_api_token_new_header: m({
-    en: "New token",
-    ru: "Новый токен",
   }),
   ui_api_token_new_footer: m({
     en: "Shown once. Copy it now.",

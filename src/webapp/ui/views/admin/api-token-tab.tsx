@@ -5,13 +5,8 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { useDateFmt } from "../../datetime-context";
 import { api } from "../../api-client";
-import { DeleteButton, RowButton } from "../../components/controls";
-import {
-  Card,
-  SectionFooter,
-  SectionHeader,
-  Stack,
-} from "../../components/layout";
+import { ActionRow } from "../../components/controls";
+import { Card, SectionFooter, Stack } from "../../components/layout";
 import { LoadingState } from "../../components/states";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 
@@ -20,7 +15,7 @@ import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 // the tab is left.
 export function ApiTokenTab() {
   const { t: s } = useI18n();
-  const { format } = useDateFmt();
+  const { short } = useDateFmt();
   // undefined while loading; null when no token exists.
   const [createdAt, setCreatedAt] = useState<number | null | undefined>();
   const [fresh, setFresh] = useState<string | null>(null);
@@ -83,47 +78,55 @@ export function ApiTokenTab() {
 
   return (
     <Stack>
-      <SectionHeader>{s.ui_admin_api_token}</SectionHeader>
       <Card>
         <div className={ROW_CLS}>
-          <span className={ROW_LABEL_CLS}>{s.ui_api_token_status}</span>
-          <span className={ROW_VALUE_CLS}>
+          <span className={ROW_LABEL_CLS}>
             {createdAt === null
-              ? s.ui_api_token_none
-              : s.ui_api_token_created(format(createdAt))}
+              ? s.ui_api_token_status
+              : s.ui_api_token_created}
+          </span>
+          <span className={ROW_VALUE_CLS}>
+            {createdAt === null ? s.ui_api_token_none : short(createdAt)}
           </span>
         </div>
+        {fresh !== null && (
+          <>
+            <div className={ROW_CLS}>
+              <span className="min-w-0 font-mono text-[14px] break-all select-all">
+                {fresh}
+              </span>
+            </div>
+            <ActionRow onClick={copy}>
+              {copied ? s.ui_api_token_copied : s.ui_api_token_copy}
+            </ActionRow>
+          </>
+        )}
       </Card>
       <SectionFooter>
-        {failed ? s.ui_api_token_error : s.ui_api_token_footer}
+        {failed
+          ? s.ui_api_token_error
+          : fresh !== null
+            ? `${s.ui_api_token_new_footer} ${s.ui_api_token_footer}`
+            : s.ui_api_token_footer}
       </SectionFooter>
 
-      {fresh !== null && (
-        <>
-          <SectionHeader>{s.ui_api_token_new_header}</SectionHeader>
-          <Card>
-            <div className="px-4 py-[11px] font-mono text-[14px] break-all select-all">
-              {fresh}
-            </div>
-            <RowButton onClick={copy}>
-              {copied ? s.ui_api_token_copied : s.ui_api_token_copy}
-            </RowButton>
-          </Card>
-          <SectionFooter>{s.ui_api_token_new_footer}</SectionFooter>
-        </>
-      )}
-
-      <Card>
-        <RowButton disabled={busy} onClick={create}>
-          {createdAt === null ? s.ui_api_token_create : s.ui_api_token_recreate}
-        </RowButton>
-      </Card>
-      {createdAt !== null && (
+      <div className="section-gap">
         <Card>
-          <DeleteButton disabled={busy} onClick={remove}>
-            {s.ui_api_token_delete}
-          </DeleteButton>
+          <ActionRow bold={createdAt === null} disabled={busy} onClick={create}>
+            {createdAt === null
+              ? s.ui_api_token_create
+              : s.ui_api_token_recreate}
+          </ActionRow>
         </Card>
+      </div>
+      {createdAt !== null && (
+        <div className="section-gap">
+          <Card>
+            <ActionRow destructive disabled={busy} onClick={remove}>
+              {s.ui_api_token_delete}
+            </ActionRow>
+          </Card>
+        </div>
       )}
     </Stack>
   );
