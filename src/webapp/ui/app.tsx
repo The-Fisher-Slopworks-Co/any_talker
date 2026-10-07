@@ -6,11 +6,9 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { api, type MeResponse, type UsageShare } from "./api-client";
-import { resolveLang, type Lang } from "../../shared/i18n";
 import { I18nProvider, useI18n } from "./i18n-context";
 import { DateFmtProvider } from "./datetime-context";
 import { LargeTitle } from "./components/large-title";
-import { LoadingState } from "./components/states";
 import { BuildInfoFooter } from "./components/build-info-footer";
 import { UsageHeader } from "./components/usage-header";
 import {
@@ -23,6 +21,7 @@ import {
 } from "./lib/routes";
 import { useSessionState } from "./lib/session-state";
 import { useBackButton } from "./lib/back-button";
+import { settleStartup, startupLang, type Startup } from "./lib/startup";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
@@ -38,7 +37,7 @@ function AppShell({
   me,
   onMe,
 }: {
-  me: MeResponse | null;
+  me: MeResponse;
   onMe: (m: MeResponse) => void;
 }) {
   const { t: s } = useI18n();
@@ -51,15 +50,12 @@ function AppShell({
   );
   const [usage, setUsage] = useState<UsageShare | null>(null);
 
-  // The header is fetched once here rather than by the main view, so it does
-  // not reload every time the user comes back to the home screen. A failure
-  // leaves it null and the header simply doesn't render — never a reason to
-  // block the settings the user actually opened.
+  // The header is fetched once at startup rather than by the main view, so it
+  // does not reload every time the user comes back to the home screen. A
+  // failure leaves it null and the header simply doesn't render — never a
+  // reason to block the settings the user actually opened.
   useEffect(() => {
-    api
-      .getMyUsageShare()
-      .then((r) => setUsage(r.usage))
-      .catch(() => setUsage(null));
+    void usagePromise.then(setUsage);
   }, []);
 
   // Back goes one level up the route tree; the root screen has no back.
@@ -119,7 +115,6 @@ function AppShell({
   })();
 
   const renderRoute = () => {
-    if (!me) return <LoadingState />;
     switch (route.kind) {
       case "main":
         return (
@@ -223,32 +218,62 @@ function AppShell({
       {showsUsageHeader(route) && <UsageHeader usage={usage} />}
       {renderRoute()}
       {/* A commit hash means nothing to a regular user. */}
-      {me?.isOwner ? <BuildInfoFooter /> : null}
+      {me.isOwner ? <BuildInfoFooter /> : null}
     </div>
   );
 }
 
+function LoadFailed() {
+  const { t: s } = useI18n();
+  return (
+    <div className="text-center text-tg-hint py-20">{s.ui_load_failed}</div>
+  );
+}
+
+const tg = window.Telegram?.WebApp;
+// Full height before the first paint, so the viewport does not jump under it.
+tg?.expand();
+// Requested before React mounts, in parallel with it.
+const startupPromise = settleStartup(api.getMe());
+// Started alongside /me rather than once the shell mounts after it, so the
+// header is not a whole round trip behind the settings.
+const usagePromise: Promise<UsageShare | null> = api.getMyUsageShare().then(
+  (r) => r.usage,
+  () => null,
+);
+
 function App() {
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const [startup, setStartup] = useState<Startup>({ kind: "loading" });
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    tg?.ready();
-    tg?.expand();
-    api.getMe().then(setMe);
+    void startupPromise.then(setStartup);
   }, []);
 
-  const tg = window.Telegram?.WebApp;
-  const tgCode = tg?.initDataUnsafe?.user?.language_code;
-  const lang: Lang = resolveLang(me?.language ?? null, tgCode);
+  // Telegram keeps its own splash up until ready(): hand over only once the
+  // first real frame — the settings in the saved language, or the error — has
+  // been committed, never a blank or half-translated one.
+  useEffect(() => {
+    if (startup.kind !== "loading") tg?.ready();
+  }, [startup.kind]);
 
+  const lang = startupLang(startup, tg?.initDataUnsafe?.user?.language_code);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
+  if (startup.kind === "loading") return null;
+  if (startup.kind === "failed") {
+    return (
+      <I18nProvider lang={lang}>
+        <LoadFailed />
+      </I18nProvider>
+    );
+  }
+  const { me } = startup;
   return (
     <I18nProvider lang={lang}>
-      <DateFmtProvider
-        dateFormat={me?.dateFormat ?? null}
-        timezone={me?.timezone ?? null}
-      >
-        <AppShell me={me} onMe={setMe} />
+      <DateFmtProvider dateFormat={me.dateFormat} timezone={me.timezone}>
+        <AppShell me={me} onMe={(m) => setStartup({ kind: "ready", me: m })} />
       </DateFmtProvider>
     </I18nProvider>
   );

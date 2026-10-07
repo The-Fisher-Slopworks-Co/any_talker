@@ -9,6 +9,10 @@ export const commonMessages = {
     en: "Loading…",
     ru: "Загрузка…",
   }),
+  ui_load_failed: m({
+    en: "Couldn't load. Close the app and open it again.",
+    ru: "Не удалось загрузить. Закройте приложение и откройте снова.",
+  }),
   ui_saving: m({
     en: "Saving…",
     ru: "Сохранение…",
