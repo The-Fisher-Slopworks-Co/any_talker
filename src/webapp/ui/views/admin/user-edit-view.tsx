@@ -26,10 +26,23 @@ import { AccessRows } from "../../components/access-rows";
 import { Hero } from "../../components/hero";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "../../components/row";
 import { userDisplayName } from "../../lib/labels";
-import { FactsEditor, type FactsWriter } from "../facts-view";
+import { FactsEditor, myBotsLoad, type FactsWriter } from "../facts-view";
 import { useLoadable } from "../../lib/use-loadable";
 import { parseString, useSessionState } from "../../lib/session-state";
 import { openTelegramProfile } from "../../lib/telegram";
+
+function userEditLoads(userId: string, factScope: string) {
+  return {
+    bots: myBotsLoad,
+    facts: {
+      key: `user-facts:${userId}:${factScope}`,
+      load: () =>
+        api
+          .listUserFacts(userId, factScope)
+          .then((r) => ({ ...r, scope: factScope })),
+    },
+  };
+}
 
 export function UserEditView({ userId }: { userId: string }) {
   const { t: s } = useI18n();
@@ -40,22 +53,14 @@ export function UserEditView({ userId }: { userId: string }) {
   const [spending, setSpending] = useState<SpendSummary | null | undefined>(
     null,
   );
-  const { data: botsData, error: botsError } = useLoadable(
-    "my-bots",
-    api.listMyBots,
-  );
   const [factScope, setFactScope] = useSessionState(
     `user-facts-scope:${userId}`,
     "main",
     parseString,
   );
-  const { data: factsData, setData: setFactsData } = useLoadable(
-    `user-facts:${userId}:${factScope}`,
-    () =>
-      api
-        .listUserFacts(userId, factScope)
-        .then((r) => ({ ...r, scope: factScope })),
-  );
+  const loads = userEditLoads(userId, factScope);
+  const { data: botsData, error: botsError } = useLoadable(loads.bots);
+  const { data: factsData, setData: setFactsData } = useLoadable(loads.facts);
   // Whether a bot picker heads the facts is unknown until the bots land, so
   // picker and list first show together; a later scope switch keeps both up.
   const factsReady = (botsData !== null || botsError) && factsData !== null;

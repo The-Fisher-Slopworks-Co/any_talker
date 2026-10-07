@@ -266,22 +266,32 @@ export function FactsEditor({
   );
 }
 
+// The bots the viewer can pick a character of; shared with the admin's user
+// page, which lists the same bots.
+export const myBotsLoad = { key: "my-bots", load: () => api.listMyBots() };
+
+// The facts carry their scope: the previous scope's stay up, and editable,
+// while a newly picked one loads.
+function myFactsLoads(scope: string) {
+  return {
+    bots: myBotsLoad,
+    facts: {
+      key: `my-facts:${scope}`,
+      load: () => api.listMyFacts(scope).then((r) => ({ ...r, scope })),
+    },
+  };
+}
+
 export function FactsView() {
   const { t: s } = useI18n();
-  const { data: botsData, error: botsError } = useLoadable(
-    "my-bots",
-    api.listMyBots,
-  );
   const [scope, setScope] = useSessionState(
     "facts-scope",
     MAIN_SCOPE,
     parseString,
   );
-  // The facts carry their scope: the previous scope's stay up, and editable,
-  // while a newly picked one loads.
-  const { data, setData } = useLoadable(`my-facts:${scope}`, () =>
-    api.listMyFacts(scope).then((r) => ({ ...r, scope })),
-  );
+  const loads = myFactsLoads(scope);
+  const { data: botsData, error: botsError } = useLoadable(loads.bots);
+  const { data, setData } = useLoadable(loads.facts);
   // The character picker sits above the list and exists only for more than one
   // bot, so the screen first shows once both have landed rather than letting
   // the picker push the list down.

@@ -70,6 +70,11 @@ function EntryList({
   );
 }
 
+const whitelistLoads = {
+  whitelist: { key: "admin-whitelist", load: () => api.getWhitelist() },
+  blacklist: { key: "admin-blacklist", load: () => api.getBlacklist() },
+};
+
 export function WhitelistTab({
   settings,
   onSaved,
@@ -82,12 +87,9 @@ export function WhitelistTab({
   onOpenChat: (id: string) => void;
 }) {
   const { t: s } = useI18n();
-  const { data, setData } = useLoadable("admin-whitelist", () =>
-    api.getWhitelist(),
-  );
+  const { data, setData } = useLoadable(whitelistLoads.whitelist);
   const { data: blacklist, setData: setBlacklist } = useLoadable(
-    "admin-blacklist",
-    () => api.getBlacklist(),
+    whitelistLoads.blacklist,
   );
   // Optimistic local mirror so the switch flips instantly; reverted if the save
   // fails. Whitelist enforcement is a global policy — one PUT per toggle.

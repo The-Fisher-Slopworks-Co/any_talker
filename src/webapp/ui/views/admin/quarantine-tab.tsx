@@ -10,12 +10,14 @@ import { QuarantinedReminderCard } from "../../components/quarantined-reminder-c
 import { TimeNote } from "../../components/time-note";
 import { useLoadable } from "../../lib/use-loadable";
 
+const quarantineLoad = {
+  key: "admin-quarantine",
+  load: () => api.listQuarantinedReminders(),
+};
+
 export function QuarantineTab() {
   const { t: s } = useI18n();
-  const { data } = useLoadable(
-    "admin-quarantine",
-    api.listQuarantinedReminders,
-  );
+  const { data } = useLoadable(quarantineLoad);
   // One instant for the whole listing, so the remaining-TTL readings agree with
   // each other and do not drift row by row as React re-renders.
   const nowMs = useMemo(() => Date.now(), [data]);

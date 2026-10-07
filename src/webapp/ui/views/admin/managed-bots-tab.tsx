@@ -7,6 +7,11 @@ import { Avatar } from "../../components/avatar";
 import { ListTab } from "../../components/list-tab";
 import { useLoadable } from "../../lib/use-loadable";
 
+const managedBotsLoad = {
+  key: "admin-managed-bots",
+  load: () => api.listManagedBots().then((r) => r.bots),
+};
+
 export function ManagedBotsTab({
   onEdit,
   onCreate,
@@ -15,9 +20,7 @@ export function ManagedBotsTab({
   onCreate: () => void;
 }) {
   const { t: s } = useI18n();
-  const { data: bots } = useLoadable("admin-managed-bots", () =>
-    api.listManagedBots().then((r) => r.bots),
-  );
+  const { data: bots } = useLoadable(managedBotsLoad);
 
   return (
     <ListTab

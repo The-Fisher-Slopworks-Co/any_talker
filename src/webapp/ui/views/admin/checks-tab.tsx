@@ -6,6 +6,11 @@ import { api } from "../../api-client";
 import { ListTab } from "../../components/list-tab";
 import { useLoadable } from "../../lib/use-loadable";
 
+const checksLoad = {
+  key: "admin-checks",
+  load: () => api.listChecks().then((r) => r.checks),
+};
+
 export function ChecksTab({
   onEdit,
   onCreate,
@@ -14,9 +19,7 @@ export function ChecksTab({
   onCreate: () => void;
 }) {
   const { t: s } = useI18n();
-  const { data: checks } = useLoadable("admin-checks", () =>
-    api.listChecks().then((r) => r.checks),
-  );
+  const { data: checks } = useLoadable(checksLoad);
 
   return (
     <ListTab

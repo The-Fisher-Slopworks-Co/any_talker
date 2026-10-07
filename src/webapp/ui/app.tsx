@@ -24,7 +24,7 @@ import { useBackButton } from "./lib/back-button";
 import { settleStartup, startupLang, type Startup } from "./lib/startup";
 import { matchTelegramChrome } from "./lib/telegram-chrome";
 import { MainView } from "./views/main-view";
-import { RemindersList } from "./views/reminders-list";
+import { RemindersList, myRemindersLoad } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
 import { AdminView } from "./views/admin/admin-view";
 import { AdminSectionView } from "./views/admin/admin-section-view";
@@ -201,8 +201,7 @@ function AppShell({
       case "my-reminders":
         return (
           <RemindersList
-            cacheKey="my-reminders"
-            fetchReminders={api.listMyReminders}
+            source={myRemindersLoad}
             header={s.ui_reminders_upcoming}
             emptyText={s.ui_reminders_empty_my}
             footer={s.ui_reminders_footer_my}
