@@ -19,7 +19,14 @@ const cache = new Map<string, unknown>();
 // What a screen loads, named by `key`: what `load` fetches must change exactly
 // when the key does. Declared next to the screen, so anything else that needs
 // the same data asks for it by the same name.
-export type Loadable<T> = { key: string; load: () => Promise<T> };
+export type Loadable<T> = {
+  key: string;
+  load: () => Promise<T>;
+  // The screen copies the data into a form of its own and edits it there,
+  // where the cache does not see it. Nothing is kept once the screen is left,
+  // so the next open does not start from data its own edits have outdated.
+  once?: boolean;
+};
 
 type Shown<T> = { key: string; dataKey: string; data: T | null };
 
@@ -33,7 +40,7 @@ function shownFor<T>(key: string, prev?: Shown<T>): Shown<T> {
 // The key is the only dependency. Until the data for the current key arrives,
 // `data` may still be the previous key's — callers that act on it should carry
 // its own parameters in it rather than read them from the current props.
-export function useLoadable<T>({ key, load }: Loadable<T>): {
+export function useLoadable<T>({ key, load, once }: Loadable<T>): {
   data: T | null;
   setData: Dispatch<SetStateAction<T | null>>;
   error: boolean;
@@ -68,6 +75,11 @@ export function useLoadable<T>({ key, load }: Loadable<T>): {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  useEffect(
+    () => (once ? () => void cache.delete(key) : undefined),
+    [key, once],
+  );
 
   const setData = useCallback<Dispatch<SetStateAction<T | null>>>((next) => {
     const k = dataKey.current;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n-context";
 import { api } from "../../api-client";
 import type { RecurringCheck, ValidationError } from "../../../../checks/types";
@@ -10,6 +10,7 @@ import { LoadingState } from "../../components/states";
 import { ActionRow } from "../../components/controls";
 import { SaveStatus } from "../../components/save-status";
 import { useAutosave } from "../../lib/use-autosave";
+import { useLoadable } from "../../lib/use-loadable";
 import { useFormReducer, type FormSetter } from "../../lib/use-form-reducer";
 import {
   checkToDraft,
@@ -30,6 +31,19 @@ import {
   RecipientSection,
 } from "./check-edit-sections";
 
+// The check seeds the form, which then edits its own copy.
+function checkEditLoads(checkId: string | null) {
+  return {
+    check: {
+      key: `check:${checkId ?? "new"}`,
+      // A new one starts from the defaults, with nothing to fetch.
+      load: async () =>
+        checkId === null ? null : (await api.getCheck(checkId)).check,
+      once: true,
+    },
+  };
+}
+
 export function CheckEditView({
   checkId,
   onClose,
@@ -39,8 +53,10 @@ export function CheckEditView({
 }) {
   const { t: s } = useI18n();
   const isNew = checkId === null;
+  const { data: loaded, error: notFound } = useLoadable(
+    checkEditLoads(checkId).check,
+  );
   const [check, setCheck] = useState<RecurringCheck | null>(null);
-  const [notFound, setNotFound] = useState(false);
   const [deleting, setDeleting] = useState(false);
   // The form's first field the server would refuse.
   const [error, setError] = useState<ValidationError | null>(null);
@@ -91,22 +107,13 @@ export function CheckEditView({
     },
   });
 
-  useEffect(() => {
+  // Before the first paint with the check, so the form never shows defaults.
+  useLayoutEffect(() => {
     lastSent.current = null;
     counterEdited.current = false;
-    if (isNew) {
-      setCheck(null);
-      apply(DEFAULT_DRAFT);
-      return;
-    }
-    api
-      .getCheck(checkId)
-      .then((r) => {
-        setCheck(r.check);
-        apply(checkToDraft(r.check));
-      })
-      .catch(() => setNotFound(true));
-  }, [checkId, isNew, apply]);
+    setCheck(loaded);
+    apply(loaded ? checkToDraft(loaded) : DEFAULT_DRAFT);
+  }, [loaded, apply]);
 
   if (notFound) return <LoadingState text={s.ui_check_not_found} />;
   if (!isNew && !check) return <LoadingState />;
