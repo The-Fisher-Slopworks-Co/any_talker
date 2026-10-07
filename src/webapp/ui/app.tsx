@@ -22,6 +22,7 @@ import {
 import { useSessionState } from "./lib/session-state";
 import { useBackButton } from "./lib/back-button";
 import { settleStartup, startupLang, type Startup } from "./lib/startup";
+import { matchTelegramChrome } from "./lib/telegram-chrome";
 import { MainView } from "./views/main-view";
 import { RemindersList } from "./views/reminders-list";
 import { FactsView } from "./views/facts-view";
@@ -48,11 +49,12 @@ function AppShell({
     { kind: "main" },
     parseRoute,
   );
-  const [usage, setUsage] = useState<UsageShare | null>(null);
+  // undefined while loading (the header holds its place), null on failure.
+  const [usage, setUsage] = useState<UsageShare | null | undefined>();
 
   // The header is fetched once at startup rather than by the main view, so it
   // does not reload every time the user comes back to the home screen. A
-  // failure leaves it null and the header simply doesn't render — never a
+  // failure sets it null and the header simply doesn't render — never a
   // reason to block the settings the user actually opened.
   useEffect(() => {
     void usagePromise.then(setUsage);
@@ -233,6 +235,8 @@ function LoadFailed() {
 const tg = window.Telegram?.WebApp;
 // Full height before the first paint, so the viewport does not jump under it.
 tg?.expand();
+// Before the first render, so Telegram's chrome never shows another colour.
+matchTelegramChrome(tg);
 // Requested before React mounts, in parallel with it.
 const startupPromise = settleStartup(api.getMe());
 // Started alongside /me rather than once the shell mounts after it, so the

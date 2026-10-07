@@ -11,16 +11,18 @@ export function SpendingCard({
   spending,
   header,
 }: {
-  spending: SpendSummary;
+  // null while loading: the rows are laid out with blank values, so nothing
+  // below them moves when the figures land.
+  spending: SpendSummary | null;
   // Defaults to "Spending"; the Spending screen is already titled so, and
   // names the group by who it covers instead.
   header?: string;
 }) {
   const { t: s } = useI18n();
-  const rows: Array<[string, number]> = [
-    [s.ui_spending_day, spending.day],
-    [s.ui_spending_week, spending.week],
-    [s.ui_spending_month, spending.month],
+  const rows: Array<[string, number | undefined]> = [
+    [s.ui_spending_day, spending?.day],
+    [s.ui_spending_week, spending?.week],
+    [s.ui_spending_month, spending?.month],
   ];
   return (
     <>
@@ -29,7 +31,9 @@ export function SpendingCard({
         {rows.map(([label, amount]) => (
           <div key={label} className={ROW_CLS}>
             <span className={ROW_LABEL_CLS}>{label}</span>
-            <span className={ROW_VALUE_CLS}>{formatUsd(amount)}</span>
+            <span className={ROW_VALUE_CLS}>
+              {amount === undefined ? " " : formatUsd(amount)}
+            </span>
           </div>
         ))}
       </Card>

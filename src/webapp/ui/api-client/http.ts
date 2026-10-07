@@ -20,6 +20,8 @@ declare global {
         expand: () => void;
         openTelegramLink?: (url: string) => void;
         openLink?: (url: string) => void;
+        setHeaderColor?: (color: string) => void;
+        setBackgroundColor?: (color: string) => void;
         isVerticalSwipesEnabled?: boolean;
         disableVerticalSwipes?: () => void;
         enableVerticalSwipes?: () => void;

@@ -36,8 +36,14 @@ export function UserEditView({ userId }: { userId: string }) {
   const { short } = useDateFmt();
   const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [spending, setSpending] = useState<SpendSummary | null>(null);
-  const { data: botsData } = useLoadable("my-bots", api.listMyBots);
+  // null while loading (the card holds its place), undefined if it failed.
+  const [spending, setSpending] = useState<SpendSummary | null | undefined>(
+    null,
+  );
+  const { data: botsData, error: botsError } = useLoadable(
+    "my-bots",
+    api.listMyBots,
+  );
   const [factScope, setFactScope] = useSessionState(
     `user-facts-scope:${userId}`,
     "main",
@@ -50,13 +56,19 @@ export function UserEditView({ userId }: { userId: string }) {
         .listUserFacts(userId, factScope)
         .then((r) => ({ ...r, scope: factScope })),
   );
+  // Whether a bot picker heads the facts is unknown until the bots land, so
+  // picker and list first show together; a later scope switch keeps both up.
+  const factsReady = (botsData !== null || botsError) && factsData !== null;
 
   useEffect(() => {
     api
       .getAdminUser(userId)
       .then(setData)
       .catch(() => setNotFound(true));
-    api.getUserSpending(userId).then((r) => setSpending(r.spending));
+    api
+      .getUserSpending(userId)
+      .then((r) => setSpending(r.spending))
+      .catch(() => setSpending(undefined));
   }, [userId]);
 
   // Until the hero can name the user, the page is titled like any other.
@@ -133,10 +145,10 @@ export function UserEditView({ userId }: { userId: string }) {
         }}
       />
 
-      {spending && <SpendingCard spending={spending} />}
+      {spending !== undefined && <SpendingCard spending={spending} />}
 
       <SectionHeader>{s.ui_user_facts_header}</SectionHeader>
-      {factBots && factBots.length > 1 ? (
+      {factsReady && factBots && factBots.length > 1 ? (
         <Card>
           <CharacterPickerRow
             bots={factBots}
@@ -145,7 +157,7 @@ export function UserEditView({ userId }: { userId: string }) {
           />
         </Card>
       ) : null}
-      {factsData === null ? (
+      {!factsReady || factsData === null ? (
         <LoadingState />
       ) : (
         <>

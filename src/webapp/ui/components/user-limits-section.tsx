@@ -13,7 +13,7 @@ import { ActionRow } from "./controls";
 import { Card, SectionFooter, SectionHeader } from "./layout";
 import { ROW_CLS, ROW_LABEL_CLS, ROW_VALUE_CLS } from "./row";
 import { SaveStatus } from "./save-status";
-import { UsageMeter } from "./usage-header";
+import { UsageMeter, UsageMeterPlaceholder } from "./usage-header";
 import { ValueSelectRow } from "./value-select-row";
 
 // Share of the window's budget spent. Rounds like `ratelimit/share.ts` (any
@@ -67,7 +67,8 @@ export function UserLimitsSection({
   allowanceMonthUsd: number;
 }) {
   const { t: s } = useI18n();
-  const [usage, setUsage] = useState<UsageStatus | null>(null);
+  // undefined while loading, null if the fetch failed.
+  const [usage, setUsage] = useState<UsageStatus | null | undefined>();
   const [limitClass, setLimitClass] = useState(initialClass);
   const [savedClass, setSavedClass] = useState(initialClass);
   // The class change queued last. A refused one only goes back when no newer
@@ -75,7 +76,10 @@ export function UserLimitsSection({
   const queued = useRef<Change | null>(null);
 
   useEffect(() => {
-    void api.getUserUsage(userId).then((r) => setUsage(r.usage));
+    api
+      .getUserUsage(userId)
+      .then((r) => setUsage(r.usage))
+      .catch(() => setUsage(null));
   }, [userId]);
 
   const { save, status } = useAutosave<Change, Saved>({
@@ -109,6 +113,12 @@ export function UserLimitsSection({
               label={s.ui_ratelimit_weekly_window}
               w={usage.weekly}
             />
+          </>
+        ) : usage === undefined ? (
+          // Held open while loading, so the rows below don't move down.
+          <>
+            <UsageMeterPlaceholder />
+            <UsageMeterPlaceholder />
           </>
         ) : null}
         <ValueSelectRow

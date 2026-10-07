@@ -23,15 +23,22 @@ export function UsageMeter({
   value,
   usedPercent,
   caption,
+  placeholder = false,
 }: {
   label: string;
   value: string;
   usedPercent: number;
   caption: ReactNode;
+  // A stand-in while the figures load: same height, hidden from assistive
+  // tech, no progressbar semantics.
+  placeholder?: boolean;
 }) {
   const filled = Math.min(100, usedPercent);
   return (
-    <div className="row relative flex flex-col gap-2 px-4 py-[11px]">
+    <div
+      className="row relative flex flex-col gap-2 px-4 py-[11px]"
+      aria-hidden={placeholder || undefined}
+    >
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[17px]">{label}</span>
         <span className="text-[17px] tabular-nums text-tg-hint">{value}</span>
@@ -39,11 +46,11 @@ export function UsageMeter({
       <div
         className="h-1.5 w-full overflow-hidden rounded-full"
         style={{ background: "var(--tg-fill)" }}
-        role="progressbar"
-        aria-label={label}
-        aria-valuenow={filled}
-        aria-valuemin={0}
-        aria-valuemax={100}
+        role={placeholder ? undefined : "progressbar"}
+        aria-label={placeholder ? undefined : label}
+        aria-valuenow={placeholder ? undefined : filled}
+        aria-valuemin={placeholder ? undefined : 0}
+        aria-valuemax={placeholder ? undefined : 100}
       >
         <div
           className="h-full rounded-full transition-[width] duration-300 ease-tg-spring"
@@ -52,6 +59,21 @@ export function UsageMeter({
       </div>
       <span className="text-[13px] leading-[18px] text-tg-hint">{caption}</span>
     </div>
+  );
+}
+
+const NBSP = " ";
+
+// A meter row with nothing in it yet, exactly as tall as a filled one.
+export function UsageMeterPlaceholder() {
+  return (
+    <UsageMeter
+      placeholder
+      label={NBSP}
+      value={NBSP}
+      usedPercent={0}
+      caption={NBSP}
+    />
   );
 }
 
@@ -74,18 +96,32 @@ function WindowBar({ label, share }: { label: string; share: WindowShare }) {
 // progress bars. Percentage-only by construction — it is
 // handed a `UsageShare`, which carries no token counts at all (see
 // `ratelimit/share.ts`), so the same rule the `/usage` command follows holds
-// here. Renders nothing until the fetch lands, so the layout below it doesn't
-// jump twice.
-export function UsageHeader({ usage }: { usage: UsageShare | null }) {
+// here.
+//
+// While the fetch is in flight (`undefined`) it holds the place of the common
+// answer — two empty bars — so the settings below are laid out once and stay
+// put when the figures land. Only a failed fetch (`null`) collapses it; the
+// owner's single "no limit" row is the one answer that still shifts, and only
+// by a row.
+export function UsageHeader({
+  usage,
+}: {
+  usage: UsageShare | null | undefined;
+}) {
   const { t: s } = useI18n();
   const { format } = useDateFmt();
-  if (!usage) return null;
+  if (usage === null) return null;
   return (
     <div className="pb-[35px]">
       <SectionHeader>{s.ui_usage_header_title}</SectionHeader>
       <div className="pt-2">
         <Card>
-          {usage.exempt ? (
+          {usage === undefined ? (
+            <>
+              <UsageMeterPlaceholder />
+              <UsageMeterPlaceholder />
+            </>
+          ) : usage.exempt ? (
             <div className="px-4 py-[11px] text-tg-hint">
               {s.ui_usage_header_exempt}
             </div>
@@ -100,7 +136,7 @@ export function UsageHeader({ usage }: { usage: UsageShare | null }) {
           )}
         </Card>
       </div>
-      {!usage.exempt && usage.boost ? (
+      {usage && !usage.exempt && usage.boost ? (
         <SectionFooter>
           {s.ui_usage_header_boost(
             usage.boost.percent,
