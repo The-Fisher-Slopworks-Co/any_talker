@@ -46,6 +46,15 @@ export function writeSessionValue(
   }
 }
 
+// What `useSessionState(key)` starts from, for code outside the screen that
+// owns it.
+export function readSession<T>(
+  key: string,
+  parse: (raw: unknown) => T | null,
+): T | null {
+  return readSessionValue(sessionStore(), key, parse);
+}
+
 export function useSessionState<T>(
   key: string,
   initial: T,

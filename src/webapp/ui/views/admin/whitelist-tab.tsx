@@ -70,7 +70,7 @@ function EntryList({
   );
 }
 
-const whitelistLoads = {
+export const whitelistLoads = {
   whitelist: { key: "admin-whitelist", load: () => api.getWhitelist() },
   blacklist: { key: "admin-blacklist", load: () => api.getBlacklist() },
 };

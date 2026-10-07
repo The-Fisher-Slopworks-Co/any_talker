@@ -97,7 +97,7 @@ function rowStatus(
   }
 }
 
-const adminSummaryLoad = {
+export const adminSummaryLoad = {
   key: "admin-summary",
   load: () => api.getAdminSummary(),
 };

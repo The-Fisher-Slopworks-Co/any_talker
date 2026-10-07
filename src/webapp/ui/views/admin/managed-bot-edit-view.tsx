@@ -55,6 +55,10 @@ function managedBotLoad(botId: string) {
   };
 }
 
+export function managedBotEditLoads(botId: string | null) {
+  return [botId === null ? newBotLoad : managedBotLoad(botId)];
+}
+
 export function ManagedBotEditView({
   botId,
   onClose,

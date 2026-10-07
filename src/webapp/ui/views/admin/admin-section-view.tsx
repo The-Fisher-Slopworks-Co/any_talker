@@ -3,20 +3,20 @@
 
 import { api } from "../../api-client";
 import { LoadingState } from "../../components/states";
-import { useLoadable } from "../../lib/use-loadable";
-import { ApiTokenTab } from "./api-token-tab";
-import { ChatsTab } from "./chats-tab";
-import { ChecksTab } from "./checks-tab";
-import { FeedbackTab } from "./feedback-tab";
-import { ManagedBotsTab } from "./managed-bots-tab";
+import { useLoadable, type Loadable } from "../../lib/use-loadable";
+import { ApiTokenTab, apiTokenLoad } from "./api-token-tab";
+import { ChatsTab, chatsLoad } from "./chats-tab";
+import { ChecksTab, checksLoad } from "./checks-tab";
+import { FeedbackTab, feedbackListLoad } from "./feedback-tab";
+import { ManagedBotsTab, managedBotsLoad } from "./managed-bots-tab";
 import { PromptTab } from "./prompt-tab";
-import { QuarantineTab } from "./quarantine-tab";
+import { QuarantineTab, quarantineLoad } from "./quarantine-tab";
 import { RateLimitTab } from "./rate-limit-tab";
-import { RemindersTab } from "./reminders-tab";
+import { RemindersTab, adminRemindersLoad } from "./reminders-tab";
 import { BudgetTab } from "./budget-tab";
-import { SpendTab } from "./spend-tab";
-import { UsersTab } from "./users-tab";
-import { WhitelistTab } from "./whitelist-tab";
+import { SpendTab, spendLoad } from "./spend-tab";
+import { UsersTab, usersLoad } from "./users-tab";
+import { WhitelistTab, whitelistLoads } from "./whitelist-tab";
 import type { AdminSection } from "../../lib/routes";
 
 // The global settings, which each screen editing them copies into a form.
@@ -25,6 +25,35 @@ export const settingsLoad = {
   load: () => api.getSettings(),
   once: true,
 };
+
+export function adminSectionLoads(section: AdminSection): Loadable<unknown>[] {
+  switch (section) {
+    case "spend":
+      return [spendLoad];
+    case "quarantine":
+      return [quarantineLoad];
+    case "feedback":
+      return [feedbackListLoad()];
+    case "api-token":
+      return [apiTokenLoad];
+    case "users":
+      return [usersLoad];
+    case "chats":
+      return [chatsLoad];
+    case "checks":
+      return [checksLoad];
+    case "bots":
+      return [managedBotsLoad];
+    case "reminders":
+      return [settingsLoad, adminRemindersLoad];
+    case "whitelist":
+      return [settingsLoad, whitelistLoads.whitelist, whitelistLoads.blacklist];
+    case "prompt":
+    case "budget":
+    case "ratelimit":
+      return [settingsLoad];
+  }
+}
 
 export function AdminSectionView({
   section,

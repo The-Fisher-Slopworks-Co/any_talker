@@ -10,7 +10,7 @@ import { SaveStatus } from "../../components/save-status";
 import { useSettingsAutosave } from "../../lib/use-settings-autosave";
 import { RemindersList } from "../reminders-list";
 
-const adminRemindersLoad = {
+export const adminRemindersLoad = {
   key: "admin-reminders",
   load: () => api.listAdminReminders(),
 };

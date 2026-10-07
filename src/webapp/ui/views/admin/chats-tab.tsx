@@ -10,7 +10,7 @@ import { NavRow } from "../../components/select-row";
 import { chatAccessLabel, chatSubtitle, chatTitle } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
-const chatsLoad = {
+export const chatsLoad = {
   key: "admin-chats",
   load: async () => {
     const [{ chats }, whitelist, blacklist] = await Promise.all([

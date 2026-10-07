@@ -22,7 +22,11 @@ import { NavRow, SelectRow } from "../components/select-row";
 import { INPUT_LEFT_CLS, ROW_CLS } from "../components/row";
 import { useDelayedFlag } from "../lib/use-delayed-flag";
 import { useLoadable } from "../lib/use-loadable";
-import { parseString, useSessionState } from "../lib/session-state";
+import {
+  parseString,
+  readSession,
+  useSessionState,
+} from "../lib/session-state";
 import { botLabel, FACT_ERR_KEY } from "../lib/labels";
 import type { Strings } from "../lib/routes";
 import {
@@ -270,9 +274,13 @@ export function FactsEditor({
 // page, which lists the same bots.
 export const myBotsLoad = { key: "my-bots", load: () => api.listMyBots() };
 
+const SCOPE_KEY = "facts-scope";
+
 // The facts carry their scope: the previous scope's stay up, and editable,
 // while a newly picked one loads.
-function myFactsLoads(scope: string) {
+export function myFactsLoads(
+  scope = readSession(SCOPE_KEY, parseString) ?? MAIN_SCOPE,
+) {
   return {
     bots: myBotsLoad,
     facts: {
@@ -284,11 +292,7 @@ function myFactsLoads(scope: string) {
 
 export function FactsView() {
   const { t: s } = useI18n();
-  const [scope, setScope] = useSessionState(
-    "facts-scope",
-    MAIN_SCOPE,
-    parseString,
-  );
+  const [scope, setScope] = useSessionState(SCOPE_KEY, MAIN_SCOPE, parseString);
   const loads = myFactsLoads(scope);
   const { data: botsData, error: botsError } = useLoadable(loads.bots);
   const { data, setData } = useLoadable(loads.facts);

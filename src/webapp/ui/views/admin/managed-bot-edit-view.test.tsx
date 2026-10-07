@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 The Fisher Slopworks Co
 
-import { test, expect, describe } from "bun:test";
+import { afterAll, describe, expect, setSystemTime, test } from "bun:test";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
@@ -255,6 +255,8 @@ describe("ManagedBotEditView", () => {
 });
 
 async function mountCreate(canManageBots: boolean) {
+  // Past the window in which the previous test's answer counts as just loaded.
+  setSystemTime(Date.now() + 5000);
   Object.assign(api, {
     getManagedBotNewInfo: async () => ({ username: "main_bot", canManageBots }),
   });
@@ -273,6 +275,7 @@ async function mountCreate(canManageBots: boolean) {
 }
 
 describe("ManagedBotEditView creating", () => {
+  afterAll(() => setSystemTime());
   test("asks for a suggested name and username, then offers Create in Telegram", async () => {
     const { root, container } = await mountCreate(true);
     const text = container.textContent;

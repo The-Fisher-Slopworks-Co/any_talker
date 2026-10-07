@@ -10,7 +10,7 @@ import { QuarantinedReminderCard } from "../../components/quarantined-reminder-c
 import { TimeNote } from "../../components/time-note";
 import { useLoadable } from "../../lib/use-loadable";
 
-const quarantineLoad = {
+export const quarantineLoad = {
   key: "admin-quarantine",
   load: () => api.listQuarantinedReminders(),
 };

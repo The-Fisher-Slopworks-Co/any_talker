@@ -15,6 +15,17 @@ import {
 // key names the data rather than the screen: two screens loading the same thing
 // share it.
 const cache = new Map<string, unknown>();
+// When each key's data last came from the server.
+const loadedAt = new Map<string, number>();
+// The request out for each key: whoever asks meanwhile waits for it rather than
+// sending another.
+const inFlight = new Map<string, Promise<void>>();
+// Local changes per key: an answer requested before one is older than it.
+const edits = new Map<string, number>();
+
+// Data loaded this recently is what a screen opened right after its preload
+// would fetch again: it is shown as it is, without asking a second time.
+const FRESH_MS = 2000;
 
 // What a screen loads, named by `key`: what `load` fetches must change exactly
 // when the key does. Declared next to the screen, so anything else that needs
@@ -24,16 +35,53 @@ export type Loadable<T> = {
   load: () => Promise<T>;
   // The screen copies the data into a form of its own and edits it there,
   // where the cache does not see it. Nothing is kept once the screen is left,
-  // so the next open does not start from data its own edits have outdated.
+  // so the next open does not start from data its own edits have outdated,
+  // and only a just-loaded copy is shown.
   once?: boolean;
 };
+
+const fresh = (key: string) =>
+  cache.has(key) && Date.now() - (loadedAt.get(key) ?? -Infinity) < FRESH_MS;
+
+// Whether the cache can show the data at once.
+const usable = (key: string, once = false) =>
+  once ? fresh(key) : cache.has(key);
+
+const edited = (key: string) => edits.set(key, (edits.get(key) ?? 0) + 1);
+
+// Loads `l` into the cache, or joins the request already out for it. An answer
+// a local change has overtaken is dropped.
+function fetchShared({ key, load }: Loadable<unknown>): Promise<void> {
+  let request = inFlight.get(key);
+  if (!request) {
+    const editsAtStart = edits.get(key) ?? 0;
+    request = load()
+      .then((d) => {
+        if ((edits.get(key) ?? 0) !== editsAtStart) return;
+        cache.set(key, d);
+        loadedAt.set(key, Date.now());
+      })
+      .finally(() => inFlight.delete(key));
+    inFlight.set(key, request);
+  }
+  return request;
+}
+
+// Starts loading `l` ahead of its screen, unless it was just loaded. Settles
+// once the screen could show it whole: at once if the cache already can, or
+// else when the request does, whether it succeeded or not.
+export function preload(l: Loadable<unknown>): Promise<void> {
+  const loading = fresh(l.key) ? Promise.resolve() : fetchShared(l);
+  return usable(l.key, l.once) ? Promise.resolve() : loading.catch(() => {});
+}
 
 type Shown<T> = { key: string; dataKey: string; data: T | null };
 
 // On a key change, the new key's own data if there is any; otherwise the old
 // data stays up until the new one arrives, rather than a loader in between.
-function shownFor<T>(key: string, prev?: Shown<T>): Shown<T> {
-  if (cache.has(key)) return { key, dataKey: key, data: cache.get(key) as T };
+function shownFor<T>(key: string, once = false, prev?: Shown<T>): Shown<T> {
+  if (usable(key, once))
+    return { key, dataKey: key, data: cache.get(key) as T };
   return prev ? { ...prev, key } : { key, dataKey: key, data: null };
 }
 
@@ -45,29 +93,32 @@ export function useLoadable<T>({ key, load, once }: Loadable<T>): {
   setData: Dispatch<SetStateAction<T | null>>;
   error: boolean;
 } {
-  const [state, setState] = useState<Shown<T>>(() => shownFor(key));
+  const [state, setState] = useState<Shown<T>>(() => shownFor(key, once));
   const [error, setError] = useState(false);
   let shown = state;
   if (state.key !== key) {
-    shown = shownFor(key, state);
+    shown = shownFor(key, once, state);
     setState(shown);
   }
   const dataKey = useRef(shown.dataKey);
   dataKey.current = shown.dataKey;
-  // Local changes per key: an answer requested before one is older than it.
-  const edits = useRef(new Map<string, number>());
 
   useEffect(() => {
     let cancelled = false;
-    const editsAtStart = edits.current.get(key) ?? 0;
+    // Also picks up a load that landed between the render and this effect.
+    const show = () => {
+      const data = cache.get(key) as T;
+      if (!cancelled && cache.has(key))
+        setState((s) =>
+          s.dataKey === key && s.data === data
+            ? s
+            : { key, dataKey: key, data },
+        );
+    };
     setError(false);
-    load()
-      .then((d) => {
-        if (cancelled || (edits.current.get(key) ?? 0) !== editsAtStart) return;
-        cache.set(key, d);
-        setState({ key, dataKey: key, data: d });
-      })
-      .catch(() => {
+    if (fresh(key)) show();
+    else
+      fetchShared({ key, load }).then(show, () => {
         if (!cancelled) setError(true);
       });
     return () => {
@@ -76,14 +127,17 @@ export function useLoadable<T>({ key, load, once }: Loadable<T>): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  useEffect(
-    () => (once ? () => void cache.delete(key) : undefined),
-    [key, once],
-  );
+  useEffect(() => {
+    if (!once) return;
+    return () => {
+      // A request still out for it would land data older than the edits.
+      edited(key);
+      cache.delete(key);
+    };
+  }, [key, once]);
 
   const setData = useCallback<Dispatch<SetStateAction<T | null>>>((next) => {
-    const k = dataKey.current;
-    edits.current.set(k, (edits.current.get(k) ?? 0) + 1);
+    edited(dataKey.current);
     setState((prev) => {
       const data =
         typeof next === "function"

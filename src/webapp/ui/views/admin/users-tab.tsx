@@ -10,7 +10,7 @@ import { NavRow } from "../../components/select-row";
 import { formatUsd, userDisplayName } from "../../lib/labels";
 import { useLoadable } from "../../lib/use-loadable";
 
-const usersLoad = {
+export const usersLoad = {
   key: "admin-users",
   load: () => api.listAdminUsers(),
 };

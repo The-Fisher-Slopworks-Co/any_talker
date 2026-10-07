@@ -162,7 +162,7 @@ export function FeedbackReport({
   );
 }
 
-function feedbackReportLoad(feedbackId: string) {
+export function feedbackReportLoad(feedbackId: string) {
   return {
     key: `feedback-report:${feedbackId}`,
     load: () => api.getFeedback(feedbackId),

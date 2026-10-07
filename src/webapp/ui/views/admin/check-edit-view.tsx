@@ -32,7 +32,7 @@ import {
 } from "./check-edit-sections";
 
 // The check seeds the form, which then edits its own copy.
-function checkEditLoads(checkId: string | null) {
+export function checkEditLoads(checkId: string | null) {
   return {
     check: {
       key: `check:${checkId ?? "new"}`,

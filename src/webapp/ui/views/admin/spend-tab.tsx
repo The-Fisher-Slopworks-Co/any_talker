@@ -142,7 +142,7 @@ export function SpendOverviewView({
   );
 }
 
-const spendLoad = {
+export const spendLoad = {
   key: "admin-spend",
   load: () => api.getSpendOverview(),
 };
