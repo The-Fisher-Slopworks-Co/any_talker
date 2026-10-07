@@ -28,12 +28,13 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
   );
   const [loadingMore, setLoadingMore] = useState(false);
   const { status, fail } = useFailureToast();
-  const statusParam = filter === "all" ? {} : { status: filter };
+  const statusOf = (f: Filter) => (f === "all" ? {} : { status: f });
   // A `nextCursor` and no total, so this pages by "load more" rather than by
-  // numbered pages: a page is appended to what is already listed.
-  const { data, setData } = useLoadable(
-    () => api.listFeedback(statusParam),
-    [filter],
+  // numbered pages: a page is appended to what is already listed. The list
+  // carries its filter, as the previous filter's list stays up while a newly
+  // picked one loads.
+  const { data, setData } = useLoadable(`feedback:${filter}`, () =>
+    api.listFeedback(statusOf(filter)).then((r) => ({ ...r, filter })),
   );
 
   const loadMore = async () => {
@@ -41,13 +42,17 @@ export function FeedbackTab({ onOpen }: { onOpen: (id: string) => void }) {
     setLoadingMore(true);
     try {
       const page = await api.listFeedback({
-        ...statusParam,
+        ...statusOf(data.filter),
         cursor: data.nextCursor,
       });
-      setData((prev) => ({
-        entries: [...(prev?.entries ?? []), ...page.entries],
-        nextCursor: page.nextCursor,
-      }));
+      setData(
+        (prev) =>
+          prev && {
+            ...prev,
+            entries: [...prev.entries, ...page.entries],
+            nextCursor: page.nextCursor,
+          },
+      );
     } catch {
       // Nothing was added; Load More stays, one tap from a retry.
     } finally {

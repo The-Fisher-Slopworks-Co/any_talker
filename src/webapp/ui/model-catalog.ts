@@ -13,6 +13,13 @@ export type { ModelInfo };
 // endpoint needs an API key and may not be CORS-open), so this call is
 // authenticated with the Telegram initData like every other Mini App request.
 let cache: Promise<Map<string, ModelInfo>> | null = null;
+// The same catalogue once it has arrived, so a screen opened later can start
+// from it instead of a loading frame.
+let loaded: Map<string, ModelInfo> | null = null;
+
+export function loadedModelCatalog(): Map<string, ModelInfo> | null {
+  return loaded;
+}
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -27,6 +34,7 @@ export function fetchModelCatalog(): Promise<Map<string, ModelInfo>> {
     const json = (await res.json()) as { models?: ModelInfo[] };
     const map = new Map<string, ModelInfo>();
     for (const m of json.models ?? []) map.set(m.id, m);
+    loaded = map;
     return map;
   })().catch((err) => {
     cache = null;

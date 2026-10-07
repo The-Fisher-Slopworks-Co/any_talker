@@ -149,7 +149,7 @@ export function SpendTab({
   onEditUser: (id: string) => void;
   onEditChat: (id: string) => void;
 }) {
-  const { data } = useLoadable(() => api.getSpendOverview(), []);
+  const { data } = useLoadable("admin-spend", () => api.getSpendOverview());
   if (data === null) return <LoadingState />;
   return (
     <SpendOverviewView

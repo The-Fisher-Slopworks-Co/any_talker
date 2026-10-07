@@ -29,6 +29,14 @@ export type ProviderEndpoint = {
 export type ProviderOption = { slug: string; name: string };
 
 const endpointCache = new Map<string, Promise<ProviderEndpoint[]>>();
+// The same endpoints once they have arrived, to start a screen from.
+const loadedEndpoints = new Map<string, ProviderEndpoint[]>();
+
+export function loadedProviderEndpoints(
+  modelId: string,
+): ProviderEndpoint[] | undefined {
+  return loadedEndpoints.get(modelId);
+}
 
 function authHeader(): Record<string, string> {
   const initData = window.Telegram?.WebApp?.initData ?? "";
@@ -48,7 +56,9 @@ export function fetchProviderEndpoints(
     });
     if (!res.ok) throw new Error(`endpoint stats: HTTP ${res.status}`);
     const json = (await res.json()) as { endpoints?: ProviderEndpoint[] };
-    return json.endpoints ?? [];
+    const endpoints = json.endpoints ?? [];
+    loadedEndpoints.set(modelId, endpoints);
+    return endpoints;
   })().catch((err) => {
     endpointCache.delete(modelId);
     throw err;

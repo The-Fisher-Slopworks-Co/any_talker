@@ -37,15 +37,18 @@ export function UserEditView({ userId }: { userId: string }) {
   const [data, setData] = useState<UserSettingsResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [spending, setSpending] = useState<SpendSummary | null>(null);
-  const { data: botsData } = useLoadable(api.listMyBots, []);
+  const { data: botsData } = useLoadable("my-bots", api.listMyBots);
   const [factScope, setFactScope] = useSessionState(
     `user-facts-scope:${userId}`,
     "main",
     parseString,
   );
   const { data: factsData, setData: setFactsData } = useLoadable(
-    () => api.listUserFacts(userId, factScope),
-    [userId, factScope],
+    `user-facts:${userId}:${factScope}`,
+    () =>
+      api
+        .listUserFacts(userId, factScope)
+        .then((r) => ({ ...r, scope: factScope })),
   );
 
   useEffect(() => {
@@ -147,11 +150,13 @@ export function UserEditView({ userId }: { userId: string }) {
       ) : (
         <>
           <FactsEditor
-            key={factScope}
+            key={factsData.scope}
             writer={factsWriter}
-            scope={factScope}
+            scope={factsData.scope}
             data={factsData}
-            onChange={setFactsData}
+            onChange={(next) =>
+              setFactsData({ ...next, scope: factsData.scope })
+            }
           />
           <SectionFooter>
             {s.ui_facts_count(factsData.facts.length, factsData.cap)}

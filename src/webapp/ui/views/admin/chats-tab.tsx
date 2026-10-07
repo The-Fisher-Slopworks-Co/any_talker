@@ -12,14 +12,14 @@ import { useLoadable } from "../../lib/use-loadable";
 
 export function ChatsTab({ onEdit }: { onEdit: (id: string) => void }) {
   const { t: s } = useI18n();
-  const { data } = useLoadable(async () => {
+  const { data } = useLoadable("admin-chats", async () => {
     const [{ chats }, whitelist, blacklist] = await Promise.all([
       api.listAdminChats(),
       api.getWhitelist(),
       api.getBlacklist(),
     ]);
     return { chats, whitelist: whitelist.chats, blacklist: blacklist.chats };
-  }, []);
+  });
 
   if (data === null) return <LoadingState />;
   const { chats, whitelist, blacklist } = data;

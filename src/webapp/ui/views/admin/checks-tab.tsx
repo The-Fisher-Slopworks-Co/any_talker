@@ -14,9 +14,8 @@ export function ChecksTab({
   onCreate: () => void;
 }) {
   const { t: s } = useI18n();
-  const { data: checks } = useLoadable(
-    () => api.listChecks().then((r) => r.checks),
-    [],
+  const { data: checks } = useLoadable("admin-checks", () =>
+    api.listChecks().then((r) => r.checks),
   );
 
   return (

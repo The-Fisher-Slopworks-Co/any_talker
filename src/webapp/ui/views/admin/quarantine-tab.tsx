@@ -12,7 +12,10 @@ import { useLoadable } from "../../lib/use-loadable";
 
 export function QuarantineTab() {
   const { t: s } = useI18n();
-  const { data } = useLoadable(api.listQuarantinedReminders, []);
+  const { data } = useLoadable(
+    "admin-quarantine",
+    api.listQuarantinedReminders,
+  );
   // One instant for the whole listing, so the remaining-TTL readings agree with
   // each other and do not drift row by row as React re-renders.
   const nowMs = useMemo(() => Date.now(), [data]);

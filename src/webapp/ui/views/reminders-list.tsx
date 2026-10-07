@@ -16,6 +16,7 @@ import { useLoadable } from "../lib/use-loadable";
 import { reminderTargetLabel, reminderUserLabel } from "../lib/labels";
 
 export function RemindersList({
+  cacheKey,
   fetchReminders,
   header,
   emptyText,
@@ -23,6 +24,8 @@ export function RemindersList({
   onUserClick,
   editable = false,
 }: {
+  // Names the list `fetchReminders` returns, for useLoadable.
+  cacheKey: string;
   fetchReminders: () => Promise<RemindersResponse>;
   header: string;
   emptyText: string;
@@ -32,7 +35,7 @@ export function RemindersList({
   editable?: boolean;
 }) {
   const { t: s } = useI18n();
-  const { data, setData } = useLoadable(fetchReminders, [fetchReminders]);
+  const { data, setData } = useLoadable(cacheKey, fetchReminders);
   const [openId, setOpenId] = useState<string | null>(null);
   const close = useCallback(() => setOpenId(null), []);
   // A failed delete slides the row back on its own; this only tells the user.

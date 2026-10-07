@@ -5,37 +5,39 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../i18n-context";
 import {
   fetchProviderEndpoints,
+  loadedProviderEndpoints,
   toProviderOptions,
   type ProviderOption,
 } from "../provider-endpoints";
 import { ValueSelectRow } from "./value-select-row";
 import { useDelayedFlag } from "../lib/use-delayed-flag";
 
-// The providers serving `modelId`; null while they load.
+// The providers serving `modelId`; null while they load. A model already
+// looked up has them from the first frame.
 export function useProviderOptions(modelId: string): ProviderOption[] | null {
-  const [providers, setProviders] = useState<ProviderOption[] | null>(null);
   const trimmedModel = modelId.trim();
+  // The last model whose lookup finished; a failed one caches nothing.
+  const [settled, setSettled] = useState<string | null>(null);
 
   useEffect(() => {
-    if (trimmedModel.length === 0) {
-      setProviders([]);
+    if (trimmedModel.length === 0 || loadedProviderEndpoints(trimmedModel)) {
       return;
     }
     let cancelled = false;
-    setProviders(null);
     fetchProviderEndpoints(trimmedModel)
-      .then((eps) => {
-        if (!cancelled) setProviders(toProviderOptions(eps));
-      })
-      .catch(() => {
-        if (!cancelled) setProviders([]);
+      .catch(() => {})
+      .then(() => {
+        if (!cancelled) setSettled(trimmedModel);
       });
     return () => {
       cancelled = true;
     };
   }, [trimmedModel]);
 
-  return providers;
+  if (trimmedModel.length === 0) return [];
+  const endpoints = loadedProviderEndpoints(trimmedModel);
+  if (endpoints) return toProviderOptions(endpoints);
+  return settled === trimmedModel ? [] : null;
 }
 
 // A picker row, to sit in a card with its siblings.

@@ -204,6 +204,7 @@ function AppShell({
       case "my-reminders":
         return (
           <RemindersList
+            cacheKey="my-reminders"
             fetchReminders={api.listMyReminders}
             header={s.ui_reminders_upcoming}
             emptyText={s.ui_reminders_empty_my}

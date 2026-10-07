@@ -15,9 +15,8 @@ export function ManagedBotsTab({
   onCreate: () => void;
 }) {
   const { t: s } = useI18n();
-  const { data: bots } = useLoadable(
-    () => api.listManagedBots().then((r) => r.bots),
-    [],
+  const { data: bots } = useLoadable("admin-managed-bots", () =>
+    api.listManagedBots().then((r) => r.bots),
   );
 
   return (
