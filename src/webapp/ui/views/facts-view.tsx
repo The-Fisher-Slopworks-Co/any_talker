@@ -20,6 +20,7 @@ import { AddRow } from "../components/add-row";
 import { Sheet, SheetButton, useSheet } from "../components/sheet";
 import { NavRow, SelectRow } from "../components/select-row";
 import { INPUT_LEFT_CLS, ROW_CLS } from "../components/row";
+import { useDelayedFlag } from "../lib/use-delayed-flag";
 import { useLoadable } from "../lib/use-loadable";
 import { parseString, useSessionState } from "../lib/session-state";
 import { botLabel, FACT_ERR_KEY } from "../lib/labels";
@@ -85,28 +86,34 @@ function FactSheet({
   const { t: s } = useI18n();
   const [key, setKey] = useState(fact?.key ?? "");
   const [value, setValue] = useState(fact?.value ?? "");
-  const [busy, setBusy] = useState(false);
+  // Which request is in flight: only a save turns Save into "Saving…".
+  const [action, setAction] = useState<"save" | "delete" | null>(null);
+  const busy = action !== null;
+  const showSaving = useDelayedFlag(action === "save");
   const [error, setError] = useState<string | null>(null);
   const { closing, dismiss, cancel } = useSheet(onCancel);
 
   const normalizedKey = normalizeFactKey(key);
   const valid = normalizedKey !== null && normalizeFactValue(value) !== null;
 
-  const run = async (fn: () => Promise<FactsResponse>) => {
-    setBusy(true);
+  const run = async (
+    kind: "save" | "delete",
+    fn: () => Promise<FactsResponse>,
+  ) => {
+    setAction(kind);
     setError(null);
     try {
       const next = await fn();
       dismiss(() => onDone(next));
     } catch (err) {
       setError((err as { code?: string | null }).code ?? "save_failed");
-      setBusy(false);
+      setAction(null);
     }
   };
 
   const save = () => {
     if (normalizedKey === null) return;
-    void run(() =>
+    void run("save", () =>
       fact
         ? writer.update(
             scope,
@@ -122,7 +129,7 @@ function FactSheet({
   const remove = () => {
     if (!fact) return;
     if (!confirm(s.ui_facts_delete_confirm)) return;
-    void run(() => writer.remove(scope, fact.key));
+    void run("delete", () => writer.remove(scope, fact.key));
   };
 
   return (
@@ -138,7 +145,7 @@ function FactSheet({
       }
       trailing={
         <SheetButton bold disabled={busy || !valid} onClick={save}>
-          {busy ? s.ui_saving : s.ui_save}
+          {showSaving ? s.ui_saving : s.ui_save}
         </SheetButton>
       }
     >

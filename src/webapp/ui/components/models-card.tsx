@@ -21,6 +21,7 @@ import { AddRow } from "./add-row";
 import { Card } from "./layout";
 import { SwipeToDelete } from "./swipe-row";
 import { INPUT_LEFT_CLS } from "./row";
+import { useDelayedFlag } from "../lib/use-delayed-flag";
 
 // Which upstream a sort would actually land on, and what it costs there. Only
 // asked for when the deployment has per-provider stats and a sort is set; every
@@ -65,9 +66,14 @@ function ModelInfo({
 }) {
   const { t: s } = useI18n();
   const endpoint = useSortedEndpoint(model?.id, providerSort);
+  const showLoading = useDelayedFlag(model === undefined);
 
   if (model === undefined)
-    return <span className="text-tg-hint">{s.ui_modelinfo_loading}</span>;
+    return (
+      <span className="text-tg-hint">
+        {showLoading ? s.ui_modelinfo_loading : "\u00a0"}
+      </span>
+    );
 
   // With a sort in play the resolved endpoint's own prices are what this request
   // would be billed at, so they replace the catalogue's cross-provider figures.
