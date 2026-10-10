@@ -98,7 +98,10 @@ jobs:
               /^\s*(assisted-by|generated-by|ai-assisted|claude-session|copilot-session|amp-thread(-id)?)\s*:/im,
               // PR-body footers and links back to an agent's session.
               /generated (with|by) \[?(claude code|codex|copilot|cursor|opencode)\b/i,
-              /claude\.ai\/code\/session_|ampcode\.com\/threads\/|app\.devin\.ai\/sessions\/|chatgpt\.com\/codex\/tasks\//i,
+              /claude\.ai\/code\b|ampcode\.com\/threads\/|app\.devin\.ai\/sessions\/|chatgpt\.com\/codex\/tasks\//i,
+              // Agent-platform attribution markers, e.g. a hidden
+              // `<!-- claude-projects-attribution: … -->` comment.
+              /\b(claude-projects-attribution|claude-code-attribution)\b/i,
             ];
 
             // Names agents commit under when no address gives them away.
