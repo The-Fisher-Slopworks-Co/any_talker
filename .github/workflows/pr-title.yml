@@ -79,11 +79,15 @@ jobs:
     name: No AI attribution
     runs-on: ubuntu-latest
     steps:
-      - name: Scan title and body
+      # GitHub's squash merge turns every commit author into a
+      # `Co-authored-by:` trailer on main, so an agent identity or trailer in
+      # any commit of the PR is as visible as one in the body.
+      - name: Scan title, body and commits
         uses: actions/github-script@v9
         with:
           script: |
-            const { title, body } = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const { number, title, body } = context.payload.pull_request;
 
             const PATTERNS = [
               // Co-author trailers, by the address each agent signs with.
@@ -97,12 +101,44 @@ jobs:
               /claude\.ai\/code\/session_|ampcode\.com\/threads\/|app\.devin\.ai\/sessions\/|chatgpt\.com\/codex\/tasks\//i,
             ];
 
-            const lines = `${title}\n${body ?? ""}`.split("\n");
-            const hits = lines.filter((line) => PATTERNS.some((re) => re.test(line)));
+            // Names agents commit under when no address gives them away.
+            const AGENT_NAME = /^(claude( code)?|(github )?copilot|cursor ?agent|devin(-ai-integration)?|codex|aider|opencode|amp|jules|gemini)(\[bot\])?$/i;
+
+            const hits = [];
+            const scan = (where, text) => {
+              for (const line of text.split("\n")) {
+                if (PATTERNS.some((re) => re.test(line))) hits.push(`${where}: ${line.trim()}`);
+              }
+            };
+
+            scan("PR", `${title}\n${body ?? ""}`);
+
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
+              pull_number: number,
+              per_page: 100,
+            });
+
+            for (const { sha, commit } of commits) {
+              const where = sha.slice(0, 7);
+              scan(where, commit.message);
+              for (const [role, person] of [
+                ["author", commit.author],
+                ["committer", commit.committer],
+              ]) {
+                if (!person) continue;
+                const identity = `${person.name} <${person.email}>`;
+                if (AGENT_NAME.test(person.name.trim()) || PATTERNS.some((re) => re.test(identity))) {
+                  hits.push(`${where}: ${role} ${identity}`);
+                }
+              }
+            }
 
             if (hits.length > 0) {
               core.setFailed(
-                "Remove the AI attribution from the PR title/body (see CLAUDE.md → Definition of done):\n" +
-                  hits.map((line) => `  ${line.trim()}`).join("\n"),
+                "Remove the AI attribution from the PR title/body and commits (see CLAUDE.md → Definition of done).\n" +
+                  "Rewrite offending commits with your own identity (`git commit --amend --reset-author`, or rebase).\n" +
+                  hits.map((hit) => `  ${hit}`).join("\n"),
               );
             }
