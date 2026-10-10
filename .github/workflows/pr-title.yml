@@ -97,7 +97,7 @@ jobs:
               // Disclosure and session trailers, only at the start of a line.
               /^\s*(assisted-by|generated-by|ai-assisted|claude-session|copilot-session|amp-thread(-id)?)\s*:/im,
               // PR-body footers and links back to an agent's session.
-              /generated with \[?(claude code|codex|copilot|cursor|opencode)\b/i,
+              /generated (with|by) \[?(claude code|codex|copilot|cursor|opencode)\b/i,
               /claude\.ai\/code\/session_|ampcode\.com\/threads\/|app\.devin\.ai\/sessions\/|chatgpt\.com\/codex\/tasks\//i,
             ];
 
