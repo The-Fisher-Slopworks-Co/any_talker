@@ -60,7 +60,8 @@ export type AskResult = {
   // that answered). Optional so fixtures that don't care still type.
   modelId?: string;
   // USD cost OpenRouter reported for the whole tool-calling loop
-  // (`SessionEnd.totalUsage.cost`). 0 when it reported none. Optional so
+  // (`SessionEnd.totalUsage.cost`), plus what the provider billed the key on
+  // BYOK calls (`resolveAskCost`). 0 when it reported none. Optional so
   // fixtures/callers that don't care still type.
   costUsd?: number;
   // False when OpenRouter reported no cost for this ask, so `costUsd` is a
