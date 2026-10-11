@@ -28,6 +28,7 @@ import type {
 import { toResponsesInput } from "./responses-input";
 import { extractToolCalls } from "./tool-calls";
 import { proxiedFetch } from "../proxy";
+import { meterUpstreamCost } from "./upstream-cost";
 
 // The documented ceiling on `session_id`. A longer value is rejected, and the
 // rejection costs the whole request — the SDK does not validate it, so the id
@@ -145,21 +146,26 @@ export function buildRequestFields(opts: {
 
 // What one ask cost and whether that figure is complete.
 //
-// OpenRouter states the real price (cache discounts, BYOK, reasoning tokens and
-// server-tool usage included) and aggregates it across every model call in the
-// tool-calling loop, so its figure is the only one used. A reported 0 is a real
-// cost (a free model); anything non-finite or absent means OpenRouter said
-// nothing, so the cost floors at 0 and `priced` goes false — the ledger's blind
-// spot stays visible instead of being mistaken for a free reply.
-export function resolveAskCost(totals: SessionUsageTotals | undefined): {
+// OpenRouter states the price (cache discounts, reasoning tokens and
+// server-tool usage included) and the agent aggregates it across every model
+// call in the tool-calling loop. On a BYOK call that figure is only
+// OpenRouter's fee: what the provider charged the key is `upstreamUsd`, metered
+// off the wire (`upstream-cost.ts`) because the agent drops it, and is added on
+// top. A reported 0 is a real cost (a free model); anything non-finite or
+// absent means OpenRouter said nothing, so `priced` goes false — the ledger's
+// blind spot stays visible instead of being mistaken for a free reply.
+export function resolveAskCost(
+  totals: SessionUsageTotals | undefined,
+  upstreamUsd = 0,
+): {
   costUsd: number;
   priced: boolean;
 } {
   const cost = totals?.cost;
   if (typeof cost === "number" && Number.isFinite(cost)) {
-    return { costUsd: cost, priced: true };
+    return { costUsd: cost + upstreamUsd, priced: true };
   }
-  return { costUsd: 0, priced: false };
+  return { costUsd: upstreamUsd, priced: false };
 }
 
 // AI client for OpenRouter's Responses API, driven by `@openrouter/agent`'s
@@ -167,7 +173,10 @@ export function resolveAskCost(totals: SessionUsageTotals | undefined): {
 // provider routing, a service tier, a session id, a reasoning effort — is
 // always sent; OpenRouter honours all of it.
 export class OpenRouterClient implements AIClient {
-  private readonly client: OpenRouter;
+  // A client per ask, over that ask's own metered fetch: the upstream (BYOK)
+  // cost it reads is then that ask's alone, with no cross-ask bookkeeping.
+  private readonly newClient: (fetch: Fetcher) => OpenRouter;
+  private readonly fetch: Fetcher;
   // OpenRouter's documented attribution header. `SDKOptions.appTitle` only
   // emits `X-OpenRouter-Title`, and `RequestOptions.headers` is merged into
   // every request by `callModel` and `_createRequest`, so both go out.
@@ -183,15 +192,19 @@ export class OpenRouterClient implements AIClient {
     timeoutMs?: number;
     retryConfig?: SDKOptions["retryConfig"];
   }) {
-    this.client = new OpenRouter({
-      apiKey: opts.apiKey,
-      serverURL: opts.baseURL ?? DEFAULT_BASE_URL,
-      ...(opts.attribution?.url ? { httpReferer: opts.attribution.url } : {}),
-      ...(opts.attribution?.title ? { appTitle: opts.attribution.title } : {}),
-      httpClient: new HTTPClient({ fetcher: opts.fetch ?? proxiedFetch }),
-      timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      retryConfig: opts.retryConfig ?? DEFAULT_RETRY_CONFIG,
-    });
+    this.fetch = opts.fetch ?? proxiedFetch;
+    this.newClient = (fetch) =>
+      new OpenRouter({
+        apiKey: opts.apiKey,
+        serverURL: opts.baseURL ?? DEFAULT_BASE_URL,
+        ...(opts.attribution?.url ? { httpReferer: opts.attribution.url } : {}),
+        ...(opts.attribution?.title
+          ? { appTitle: opts.attribution.title }
+          : {}),
+        httpClient: new HTTPClient({ fetcher: fetch }),
+        timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        retryConfig: opts.retryConfig ?? DEFAULT_RETRY_CONFIG,
+      });
     this.titleHeader = opts.attribution?.title
       ? { headers: { "X-Title": opts.attribution.title } }
       : undefined;
@@ -247,8 +260,10 @@ export class OpenRouterClient implements AIClient {
     const generations: string[] = [];
     let answeredBy: string | undefined;
 
+    const meter = meterUpstreamCost(this.fetch);
+
     const result = callModel(
-      this.client,
+      this.newClient(meter.fetch),
       {
         ...buildRequestFields({
           models: opts.models,
@@ -322,7 +337,7 @@ export class OpenRouterClient implements AIClient {
     } catch (err) {
       console.error("reading tool calls off the agent state failed:", err);
     }
-    const { costUsd, priced } = resolveAskCost(totals);
+    const { costUsd, priced } = resolveAskCost(totals, await meter.total());
 
     return {
       text,

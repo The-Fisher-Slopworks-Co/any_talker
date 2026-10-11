@@ -170,6 +170,19 @@ describe("resolveAskCost", () => {
   test("no totals at all means the ledger under-counts", () => {
     expect(resolveAskCost(undefined)).toEqual({ costUsd: 0, priced: false });
   });
+
+  test("adds the upstream (BYOK) cost on top of OpenRouter's fee", () => {
+    const r = resolveAskCost(totals(0.0005), 0.01);
+    expect(r.costUsd).toBeCloseTo(0.0105, 9);
+    expect(r.priced).toBe(true);
+  });
+
+  test("keeps a metered upstream cost even when no fee was reported", () => {
+    expect(resolveAskCost(undefined, 0.01)).toEqual({
+      costUsd: 0.01,
+      priced: false,
+    });
+  });
 });
 
 // --- wire harness ----------------------------------------------------------
@@ -185,6 +198,8 @@ type Captured = {
 function responsePayload(opts: {
   output?: unknown[];
   cost?: number | undefined;
+  // Marks the call BYOK, with this as what the provider charged the key.
+  upstreamCost?: number;
   model?: string;
   id?: string;
   toolCall?: { name: string; args: unknown; callId?: string };
@@ -237,6 +252,16 @@ function responsePayload(opts: {
       output_tokens_details: { reasoning_tokens: 0 },
       total_tokens: 15,
       ...(opts.cost === undefined ? {} : { cost: opts.cost }),
+      ...(opts.upstreamCost === undefined
+        ? {}
+        : {
+            is_byok: true,
+            cost_details: {
+              upstream_inference_cost: opts.upstreamCost,
+              upstream_inference_input_cost: opts.upstreamCost / 2,
+              upstream_inference_output_cost: opts.upstreamCost / 2,
+            },
+          }),
     },
   };
 }
@@ -505,6 +530,52 @@ describe("OpenRouterClient — the result that comes back", () => {
     expect(result.text).toBe("hello");
     expect(result.costUsd).toBeCloseTo(0.005, 9);
     expect(result.totalTokens).toBe(30);
+    expect(result.priced).toBe(true);
+  });
+
+  // On BYOK, `cost` is only OpenRouter's fee — 0 inside the free allowance.
+  // Charging just that let BYOK traffic through every spend limit for free.
+  test("a BYOK call is charged what the provider billed the key", async () => {
+    const { client } = capturingClient({
+      reply: (turn) =>
+        new Response(
+          JSON.stringify(
+            responsePayload(
+              turn === 1
+                ? {
+                    cost: 0,
+                    upstreamCost: 0.02,
+                    toolCall: { name: "echo", args: { value: "x" } },
+                  }
+                : { cost: 0.0005, upstreamCost: 0.01 },
+            ),
+          ),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts({ tools: [echoTool] }));
+    expect(result.costUsd).toBeCloseTo(0.0305, 9);
+    expect(result.priced).toBe(true);
+  });
+
+  // Production traffic is streamed: the agent and the meter share the body.
+  test("a streamed BYOK call is charged and still read in full", async () => {
+    const { client } = capturingClient({
+      reply: () =>
+        new Response(
+          `data: ${JSON.stringify({
+            type: "response.completed",
+            sequence_number: 0,
+            response: responsePayload({ cost: 0, upstreamCost: 0.02 }),
+          })}\n\ndata: [DONE]\n\n`,
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+    });
+
+    const result = await client.ask(askOpts());
+    expect(result.text).toBe("hello");
+    expect(result.costUsd).toBeCloseTo(0.02, 9);
     expect(result.priced).toBe(true);
   });
 
