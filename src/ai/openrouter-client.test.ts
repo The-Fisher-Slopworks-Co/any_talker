@@ -17,6 +17,7 @@ import {
   MAX_SESSION_ID_LENGTH,
   MAX_TOOL_ROUNDS,
   OpenRouterClient,
+  promptCacheControl,
   resolveAskCost,
 } from "./openrouter-client";
 import type { AIMessage } from "./types";
@@ -130,6 +131,37 @@ describe("buildRequestFields", () => {
       reasoningEffort: null,
     });
     expect(f).not.toHaveProperty("reasoning");
+  });
+
+  test("asks for prompt caching when the primary is an Anthropic model", () => {
+    const f = buildRequestFields({
+      models: ["anthropic/claude-sonnet-5.5", "google/gemini-3.1-flash-lite"],
+      routing: {},
+    });
+    expect(f.cacheControl).toEqual({ type: "ephemeral" });
+  });
+
+  test("leaves caching to the provider for every other primary", () => {
+    for (const models of [
+      ["google/gemini-3.1-flash-lite"],
+      ["openai/gpt-5", "anthropic/claude-sonnet-5.5"],
+    ]) {
+      const f = buildRequestFields({ models, routing: {} });
+      expect(f).not.toHaveProperty("cacheControl");
+    }
+  });
+});
+
+describe("promptCacheControl", () => {
+  test("only Anthropic model ids get a directive", () => {
+    expect(promptCacheControl("anthropic/claude-sonnet-5.5")).toEqual({
+      type: "ephemeral",
+    });
+    expect(promptCacheControl("anthropic/claude-opus-5.5:thinking")).toEqual({
+      type: "ephemeral",
+    });
+    expect(promptCacheControl("google/gemini-3.1-flash-lite")).toBeUndefined();
+    expect(promptCacheControl("")).toBeUndefined();
   });
 });
 
@@ -401,6 +433,18 @@ describe("OpenRouterClient — the request that goes out", () => {
     const { client, calls } = capturingClient();
     await client.ask(askOpts({ routing: { serviceTier: "flex" } }));
     expect(calls[0]!.body.service_tier).toBe("flex");
+  });
+
+  test("an Anthropic primary sends top-level cache_control; others do not", async () => {
+    const claude = capturingClient();
+    await claude.client.ask(
+      askOpts({ models: ["anthropic/claude-sonnet-5.5"] }),
+    );
+    expect(claude.calls[0]!.body.cache_control).toEqual({ type: "ephemeral" });
+
+    const other = capturingClient();
+    await other.client.ask(askOpts());
+    expect(other.calls[0]!.body).not.toHaveProperty("cache_control");
   });
 
   test("the session id reaches the wire, clamped; absent when falsy", async () => {

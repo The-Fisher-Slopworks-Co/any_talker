@@ -96,9 +96,31 @@ export function buildProviderRouting(
   return undefined;
 }
 
+// The top-level `cache_control` directive: OpenRouter's automatic prompt
+// caching, which puts the breakpoint on the last cacheable block of each
+// request and moves it forward as the chain grows.
+export type PromptCacheControl = NonNullable<ResponsesRequest["cacheControl"]>;
+
+// Whether a request should ask for prompt caching explicitly.
+//
+// Gemini, OpenAI and most other providers cache a repeated prefix on their own,
+// so the stable instruction and the append-only chain (`instruction.ts`,
+// `bot/context-builder.ts`) are already discounted there. Anthropic does not:
+// without `cache_control` every Claude request re-pays the whole history at the
+// full input price. Only the primary decides — it is the model the request is
+// shaped for. The directive rides on the whole request, so a non-Anthropic
+// fallback receives it too; a Claude fallback behind another primary goes
+// uncached, which is the price of not sending it where it is not needed.
+export function promptCacheControl(
+  primary: string,
+): PromptCacheControl | undefined {
+  return primary.startsWith("anthropic/") ? { type: "ephemeral" } : undefined;
+}
+
 // The routing/identity fields of one ask — everything except instructions,
 // input and tools. Every one of them is always sent: OpenRouter honours them
-// all, so there is no capability gate left to consult.
+// all, so there is no capability gate left to consult. The one exception is
+// `cacheControl`, which only goes to models that need it (`promptCacheControl`).
 export function buildRequestFields(opts: {
   // The full chain; [0] is the primary.
   models: string[];
@@ -113,6 +135,7 @@ export function buildRequestFields(opts: {
   serviceTier?: NonNullable<ResponsesRequest["serviceTier"]>;
   sessionId?: string;
   reasoning?: { effort: ReasoningEffort };
+  cacheControl?: PromptCacheControl;
 } {
   const [primary, ...fallbacks] = opts.models;
   // `ask` rejects an empty chain before it gets here, so the fallback only
@@ -140,6 +163,9 @@ export function buildRequestFields(opts: {
   }
 
   if (opts.reasoningEffort) out.reasoning = { effort: opts.reasoningEffort };
+
+  const cacheControl = promptCacheControl(out.model);
+  if (cacheControl) out.cacheControl = cacheControl;
 
   return out;
 }
