@@ -1,18 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Fisher Slopworks Co
+#
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (C) 2026 The Fisher Slopworks Co
 
-# main only ever gains squashed pull requests, and GitHub uses the PR title as
-# the squash commit subject. So this — not a local commit message — is where
-# conventional-commit discipline actually has to hold. The PR body becomes the
-# squash commit body, so it is checked here too.
+# Conventional-commit PR titles and no AI attribution, via the org's reusable
+# workflow. The scopes are this repo's top-level src/ modules plus deps,
+# github, release and docker.
 name: PR title
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
-# Editing a title while the previous check is still running is the normal way
-# to fix it; only the latest title deserves a verdict.
 concurrency:
   group: pr-title-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -22,126 +20,24 @@ permissions:
   pull-requests: read
 
 jobs:
-  title:
-    name: Conventional commit title
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate title
-        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            refactor
-            chore
-            docs
-            test
-            ci
-            perf
-            revert
-          # The top-level modules under src/, plus the areas that live outside
-          # it. Extend this list whenever a new src/ module appears — a scope
-          # that isn't here fails the check.
-          scopes: |
-            ai
-            bot
-            budget
-            checks
-            managed-bots
-            observability
-            ratelimit
-            reminders
-            shared
-            spending
-            storage
-            types
-            webapp
-            deps
-            github
-            release
-            docker
-          requireScope: true
-          # Lowercase start (imperative: "add", not "Added") and no trailing
-          # period — the shape a commit subject on main has to have.
-          subjectPattern: '^(?![A-Z]).+[^.\s]$'
-          subjectPatternError: >-
-            The subject "{subject}" of "{title}" is invalid: it must start with
-            a lowercase letter, be phrased in the imperative ("add", not
-            "Added"), and must not end with a period.
-
-  # An agent's "Generated with …" footer or co-author trailer in the body would
-  # land on main as part of the squash commit. That is just free advertising for the LLM's provider. Matches go by the agents' own emails,
-  # trailer keys and session links rather than product names, so a human
-  # co-author called Claude or a sentence about Copilot stays fine.
-  attribution:
-    name: No AI attribution
-    runs-on: ubuntu-latest
-    steps:
-      # GitHub's squash merge turns every commit author into a
-      # `Co-authored-by:` trailer on main, so an agent identity or trailer in
-      # any commit of the PR is as visible as one in the body.
-      - name: Scan title, body and commits
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const { number, title, body } = context.payload.pull_request;
-
-            const PATTERNS = [
-              // Co-author trailers, by the address each agent signs with.
-              /noreply@(anthropic\.com|openai\.com|aider\.chat|opencode\.ai|z\.ai)\b/i,
-              /\b(cursoragent@cursor\.com|amp@ampcode\.com|qwen-coder@alibabacloud\.com|copilot@github\.com)\b/i,
-              /\d+\+(copilot|copilot-swe-agent|devin-ai-integration|factory-droid|gemini-code-assist|google-labs-jules)(\[bot\])?@users\.noreply\.github\.com/i,
-              // Disclosure and session trailers, only at the start of a line.
-              /^\s*(assisted-by|generated-by|ai-assisted|claude-session|copilot-session|amp-thread(-id)?)\s*:/im,
-              // PR-body footers and links back to an agent's session.
-              /generated (with|by) \[?(claude code|codex|copilot|cursor|opencode)\b/i,
-              /claude\.ai\/code\b|ampcode\.com\/threads\/|app\.devin\.ai\/sessions\/|chatgpt\.com\/codex\/tasks\//i,
-              // Agent-platform attribution markers, e.g. a hidden
-              // `<!-- claude-projects-attribution: … -->` comment.
-              /\b(claude-projects-attribution|claude-code-attribution)\b/i,
-            ];
-
-            // Names agents commit under when no address gives them away.
-            const AGENT_NAME = /^(claude( code)?|(github )?copilot|cursor ?agent|devin(-ai-integration)?|codex|aider|opencode|amp|jules|gemini)(\[bot\])?$/i;
-
-            const hits = [];
-            const scan = (where, text) => {
-              for (const line of text.split("\n")) {
-                if (PATTERNS.some((re) => re.test(line))) hits.push(`${where}: ${line.trim()}`);
-              }
-            };
-
-            scan("PR", `${title}\n${body ?? ""}`);
-
-            const commits = await github.paginate(github.rest.pulls.listCommits, {
-              owner,
-              repo,
-              pull_number: number,
-              per_page: 100,
-            });
-
-            for (const { sha, commit } of commits) {
-              const where = sha.slice(0, 7);
-              scan(where, commit.message);
-              for (const [role, person] of [
-                ["author", commit.author],
-                ["committer", commit.committer],
-              ]) {
-                if (!person) continue;
-                const identity = `${person.name} <${person.email}>`;
-                if (AGENT_NAME.test(person.name.trim()) || PATTERNS.some((re) => re.test(identity))) {
-                  hits.push(`${where}: ${role} ${identity}`);
-                }
-              }
-            }
-
-            if (hits.length > 0) {
-              core.setFailed(
-                "Remove the AI attribution from the PR title/body and commits (see CLAUDE.md → Definition of done).\n" +
-                  "Rewrite offending commits with your own identity (`git commit --amend --reset-author`, or rebase).\n" +
-                  hits.map((hit) => `  ${hit}`).join("\n"),
-              );
-            }
+  pr-title:
+    uses: The-Fisher-Slopworks-Co/.github/.github/workflows/pr-title.yml@main
+    with:
+      scopes: |
+        ai
+        bot
+        budget
+        checks
+        managed-bots
+        observability
+        ratelimit
+        reminders
+        shared
+        spending
+        storage
+        types
+        webapp
+        deps
+        github
+        release
+        docker
