@@ -13,6 +13,8 @@ import { extractReplyTarget } from "../reply";
 import { buildRichMarkdown, buildEffectsTopBlock } from "../format";
 import { refuseEphemeralAsk } from "../ephemeral";
 import { readValidDisplayName } from "../../shared/display-name";
+import { emitLog } from "../../log";
+import { createTypingIndicator } from "../typing";
 import type { BotRuntime } from "../runtime";
 import type { BotContext } from "../middleware/lang";
 
@@ -37,6 +39,7 @@ export async function dispatchAsk(
   ctx: BotContext,
   args: AskDispatch,
 ): Promise<void> {
+  const receivedAt = Date.now();
   rt.debugLog("ask_dispatch", {
     chat_id: ctx.chat?.id,
     ask_message_id: args.askMessageId,
@@ -145,19 +148,14 @@ export async function dispatchAsk(
     gender,
   };
 
-  let typingTimer: ReturnType<typeof setInterval> | null = null;
-  const stopTyping = () => {
-    if (typingTimer !== null) {
-      clearInterval(typingTimer);
-      typingTimer = null;
-    }
-  };
-  const startTyping = () => {
-    ctx.replyWithChatAction("typing").catch(() => {});
-    typingTimer = setInterval(() => {
-      ctx.replyWithChatAction("typing").catch(() => {});
-    }, 4000);
-  };
+  const typing = createTypingIndicator({
+    send: () => ctx.replyWithChatAction("typing"),
+    receivedAt,
+    fields: { chat_id: chatId, bot_id: rt.botId },
+    warn: (msg, fields) =>
+      emitLog({ level: "warn", msg, fields }, rt.deps.logFormat),
+    debug: rt.debugLog,
+  });
 
   let outcome;
   try {
@@ -186,11 +184,11 @@ export async function dispatchAsk(
       replyTarget,
       lang: ctx.lang,
       detailLevel: args.detailLevel,
-      onAIStart: startTyping,
+      onAIStart: typing.start,
       fetchPhoto: rt.fetchPhoto,
     });
   } finally {
-    stopTyping();
+    typing.stop();
   }
   switch (outcome.kind) {
     case "denied":
