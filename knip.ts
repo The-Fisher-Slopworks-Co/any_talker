@@ -18,8 +18,9 @@ const config: KnipConfig = {
   // Consumed by Bun from `bunfig.toml`'s `[serve.static]` plugin list, which
   // knip has no reason to read.
   ignoreDependencies: ["bun-plugin-tailwind"],
-  // `uv` is a machine prerequisite (README → Run it), not an npm package.
-  ignoreBinaries: ["uvx"],
+  // `uv` is a machine prerequisite (README → Run it), not an npm package;
+  // `awk` is a POSIX tool the `coverage` script pipes through.
+  ignoreBinaries: ["uvx", "awk"],
 };
 
 export default config;

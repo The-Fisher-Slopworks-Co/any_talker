@@ -9,6 +9,7 @@
     "start": "bun ./src/main.ts",
     "webapp:demo": "bun ./src/webapp/demo.ts",
     "test": "bun test src",
+    "coverage": "bun test src --coverage --coverage-reporter=text 2>&1 | awk -F'|' '/^All files/ { gsub(/ /, \"\", $3); print $3 }'",
     "typecheck": "bunx tsc --noEmit",
     "lint": "oxlint",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
